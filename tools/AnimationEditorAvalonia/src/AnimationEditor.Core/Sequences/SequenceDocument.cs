@@ -435,8 +435,8 @@ public sealed class SequenceDocument : ISequenceChainLookup
             newName.TryAdd(copies[i].Name, names[i]);
             copies[i].Name = names[i];
         }
-        foreach (var reference in copies.SelectMany(copy => copy.Tracks).Select(track => track.Reference))
-            if (reference is not null && newName.TryGetValue(reference.Sequence, out var renamed))
+        foreach (var reference in copies.SelectMany(copy => copy.Tracks).SelectMany(track => track.References ?? []))
+            if (newName.TryGetValue(reference.Sequence, out var renamed))
                 reference.Sequence = renamed;
         return copies;
     }
@@ -494,7 +494,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
             }
         }
         // A track plays chains or a sequence, never both (the file would not load).
-        var playsSequence = landing.OfType<int>().Distinct().Where(lane => tracks[lane].Reference is not null).ToList();
+        var playsSequence = landing.OfType<int>().Distinct().Where(lane => tracks[lane].References is not null).ToList();
         if (playsSequence.Count > 0)
         {
             return TimelinePasteResult.Empty with
@@ -568,12 +568,12 @@ public sealed class SequenceDocument : ISequenceChainLookup
     {
         if (content.Tracks.Count == 0) return TimelinePasteResult.Empty;
         string host = Save.Sequences[sequence].Name;
-        var cycling = content.Tracks.Where(track => track.Reference is { } r && SequenceReferences.WouldCycle(Save.Sequences, host, r.Sequence)).ToList();
+        var cycling = content.Tracks.Where(track => (track.References ?? []).Any(r => SequenceReferences.WouldCycle(Save.Sequences, host, r.Sequence))).ToList();
         if (cycling.Count > 0)
         {
             return TimelinePasteResult.Empty with
             {
-                Errors = cycling.Select(track => $"Can't paste track \"{track.Name}\": \"{host}\" would play itself through \"{track.Reference!.Sequence}\".").ToList(),
+                Errors = cycling.Select(track => $"Can't paste track \"{track.Name}\": \"{host}\" would play itself through \"{track.References!.First(r => SequenceReferences.WouldCycle(Save.Sequences, host, r.Sequence)).Sequence}\".").ToList(),
             };
         }
         var tracks = Save.Sequences[sequence].Tracks;
@@ -713,8 +713,8 @@ public sealed class SequenceDocument : ISequenceChainLookup
         {
             save.Sequences[index].Name = name;
             // Tracks that play it follow the rename, so the reference does not go dangling.
-            foreach (var playing in save.Sequences.SelectMany(s => s.Tracks).Select(t => t.Reference).Where(r => r is not null && r.Sequence == oldName))
-                playing!.Sequence = name;
+            foreach (var playing in save.Sequences.SelectMany(s => s.Tracks).SelectMany(t => t.References ?? []).Where(r => r.Sequence == oldName))
+                playing.Sequence = name;
         }
         // A reference already naming the new name (left dangling by an edit outside the editor) would start playing it.
         if (ClosesCycle(Rename))
@@ -907,45 +907,78 @@ public sealed class SequenceDocument : ISequenceChainLookup
             save.Sequences[sequence].Tracks.Insert(slot, new SequenceTrackSave
             {
                 Name = name,
-                Reference = new SequenceReferenceSave { Sequence = target, Start = at },
+                References = [new SequenceReferenceSave { Sequence = target, Start = at }],
             }), trackAfter: slot);
         return null;
     }
 
-    /// <summary>Moves a reference track's clip to <paramref name="start"/> seconds. Returns why it was refused (not a reference, negative or not a number), or null.</summary>
-    public string? SetReferenceStart(IUndoManager undo, int sequence, int track, double start)
+    private SequenceReferenceSave? ClipAt(int sequence, int track, int clip) =>
+        Save.Sequences[sequence].Tracks[track].References is { } clips && clip >= 0 && clip < clips.Count ? clips[clip] : null;
+
+    /// <summary>
+    /// Appends a clip playing <paramref name="target"/> at <paramref name="start"/> seconds to the reference track
+    /// <paramref name="track"/> of sequence <paramref name="sequence"/> (a null <paramref name="length"/> is one run of the target; its clips are in list order, <see cref="SequenceTimeline.OrderedClips"/> orders them by start). One undo entry;
+    /// the clip is selected through the track. Returns why it was refused (not a reference track, no such sequence, or it
+    /// would close a cycle), or null.
+    /// </summary>
+    public string? AddReferenceClip(IUndoManager undo, int sequence, int track, string target, double start, double? length = null)
     {
-        if (Save.Sequences[sequence].Tracks[track].Reference is null) return "That track does not play a sequence.";
-        if (!double.IsFinite(start) || start < 0) return "Start must be 0 or more.";
+        if (Save.Sequences[sequence].Tracks[track].References is null) return "That track does not play a sequence.";
+        if (SequenceReferences.Find(Save.Sequences, target) is null) return $"There is no sequence named \"{target}\".";
+        if (!CanReference(sequence, target))
+            return $"\"{Save.Sequences[sequence].Name}\" cannot play \"{target}\": that would make the sequences play each other in a loop.";
+        double at = double.IsFinite(start) ? Math.Max(0, start) : 0;
         string name = Save.Sequences[sequence].Tracks[track].Name;
-        Edit(undo, $"Set Start of '{name}' to {Format(start)}",
-            save => save.Sequences[sequence].Tracks[track].Reference!.Start = start,
-            coalesceGroup: $"refstart:{sequence}:{track}");
+        Edit(undo, SequenceLabel.Named("Add", "Reference", target) + $" to '{name}'",
+            save => save.Sequences[sequence].Tracks[track].References!.Add(new SequenceReferenceSave { Sequence = target, Start = at, Length = length }),
+            trackAfter: track);
         return null;
     }
 
-    /// <summary>Sets a reference track's clip length in seconds. Returns why it was refused (not a reference, zero, negative or not a number), or null.</summary>
-    public string? SetReferenceLength(IUndoManager undo, int sequence, int track, double length)
+    /// <summary>Removes clip <paramref name="clip"/> (a list index) of a reference track. The track stays, possibly empty. Returns why it was refused, or null.</summary>
+    public string? DeleteReferenceClip(IUndoManager undo, int sequence, int track, int clip)
     {
-        if (Save.Sequences[sequence].Tracks[track].Reference is null) return "That track does not play a sequence.";
+        if (ClipAt(sequence, track, clip) is not { } playing) return "That track has no such clip.";
+        string name = Save.Sequences[sequence].Tracks[track].Name;
+        Edit(undo, $"Delete '{playing.Sequence}' from '{name}'", save => save.Sequences[sequence].Tracks[track].References!.RemoveAt(clip),
+            trackAfter: track);
+        return null;
+    }
+
+    /// <summary>Moves clip <paramref name="clip"/> (a list index) of a reference track to <paramref name="start"/> seconds. Returns why it was refused (not a reference, negative or not a number), or null.</summary>
+    public string? SetReferenceStart(IUndoManager undo, int sequence, int track, double start, int clip = 0)
+    {
+        if (ClipAt(sequence, track, clip) is null) return "That track does not play a sequence.";
+        if (!double.IsFinite(start) || start < 0) return "Start must be 0 or more.";
+        string name = Save.Sequences[sequence].Tracks[track].Name;
+        Edit(undo, $"Set Start of '{name}' to {Format(start)}",
+            save => save.Sequences[sequence].Tracks[track].References![clip].Start = start,
+            coalesceGroup: $"refstart:{sequence}:{track}:{clip}");
+        return null;
+    }
+
+    /// <summary>Sets clip <paramref name="clip"/>'s length in seconds. Returns why it was refused (not a reference, zero, negative or not a number), or null.</summary>
+    public string? SetReferenceLength(IUndoManager undo, int sequence, int track, double length, int clip = 0)
+    {
+        if (ClipAt(sequence, track, clip) is null) return "That track does not play a sequence.";
         if (!double.IsFinite(length) || length <= 0) return LengthRefusal;
         string name = Save.Sequences[sequence].Tracks[track].Name;
         Edit(undo, $"Set Length of '{name}' to {Format(length)}",
-            save => save.Sequences[sequence].Tracks[track].Reference!.Length = length,
-            coalesceGroup: $"reflength:{sequence}:{track}");
+            save => save.Sequences[sequence].Tracks[track].References![clip].Length = length,
+            coalesceGroup: $"reflength:{sequence}:{track}:{clip}");
         return null;
     }
 
     /// <summary>
-    /// Unsets a reference track's clip length, so it plays one run of its target and follows edits to it. Does nothing
+    /// Unsets clip <paramref name="clip"/>'s length, so it plays one run of its target and follows edits to it. Does nothing
     /// when it is already unset. Returns why it was refused (not a reference), or null.
     /// </summary>
-    public string? ClearReferenceLength(IUndoManager undo, int sequence, int track)
+    public string? ClearReferenceLength(IUndoManager undo, int sequence, int track, int clip = 0)
     {
-        if (Save.Sequences[sequence].Tracks[track].Reference is not { } reference) return "That track does not play a sequence.";
+        if (ClipAt(sequence, track, clip) is not { } reference) return "That track does not play a sequence.";
         if (reference.Length is null) return null;
         string name = Save.Sequences[sequence].Tracks[track].Name;
-        Edit(undo, $"Clear Length of '{name}'", save => save.Sequences[sequence].Tracks[track].Reference!.Length = null);
+        Edit(undo, $"Clear Length of '{name}'", save => save.Sequences[sequence].Tracks[track].References![clip].Length = null);
         return null;
     }
 
@@ -1409,7 +1442,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     private static bool HasTrackWithReferenceAndChains(SequenceListSave save) =>
-        save.Sequences.Any(sequence => sequence.Tracks.Any(track => track.Reference is not null && track.Chains.Count > 0));
+        save.Sequences.Any(sequence => sequence.Tracks.Any(track => track.References is not null && track.Chains.Count > 0));
 
     private bool AddsCycle(SequenceListSave copy) =>
         SequenceReferences.CyclicReferenceCount(copy.Sequences) > SequenceReferences.CyclicReferenceCount(Save.Sequences);

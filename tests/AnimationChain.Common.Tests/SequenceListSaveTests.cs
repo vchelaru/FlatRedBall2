@@ -104,14 +104,14 @@ public class SequenceListSaveTests
             Tracks =
             {
                 new SequenceTrackSave { Chains = { new SequenceChainReferenceSave { Chain = "Walk" } } },
-                new SequenceTrackSave { Reference = new SequenceReferenceSave { Sequence = "Other" } },
+                new SequenceTrackSave { References = [new SequenceReferenceSave { Sequence = "Other" }] },
             },
         });
 
         var tracks = JsonNode.Parse(save.ToJsonString())!["sequences"]![0]!["tracks"]!;
 
         tracks[0]!["chains"]![0]!.AsObject().ContainsKey("length").ShouldBeFalse();
-        tracks[1]!["reference"]!.AsObject().ContainsKey("length").ShouldBeFalse();
+        tracks[1]!["references"]![0]!.AsObject().ContainsKey("length").ShouldBeFalse();
     }
 
     [Fact]

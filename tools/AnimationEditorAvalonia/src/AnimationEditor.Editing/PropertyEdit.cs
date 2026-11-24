@@ -41,7 +41,7 @@ public static class PropertyEdit
 
     private static EditResult SetChainFlag(AnimationChainSave chain, bool current, bool value, Action apply)
     {
-        if (chain.IsLocked) return LockedFail(chain);
+        if (chain.IsLocked) return StructureEdit.LockedFail(chain);
         if (current == value) return Ok();
         apply();
         return Ok(chain.Name);
@@ -168,16 +168,13 @@ public static class PropertyEdit
     private static EditResult? CheckFrame(AnimationChainSave chain, AnimationFrameSave frame)
     {
         if (!chain.Frames.Contains(frame)) return Fail(EditErrorCode.NotFound, $"The frame is not in chain '{chain.Name}'.");
-        return chain.IsLocked ? LockedFail(chain) : null;
+        return chain.IsLocked ? StructureEdit.LockedFail(chain) : null;
     }
 
     private static (float, float, float, float) Coordinates(AnimationFrameSave frame) =>
         (frame.LeftCoordinate, frame.RightCoordinate, frame.TopCoordinate, frame.BottomCoordinate);
 
     private static string Address(AnimationChainSave chain, AnimationFrameSave frame) => $"{chain.Name}/{chain.Frames.IndexOf(frame)}";
-
-    private static EditResult LockedFail(AnimationChainSave chain) =>
-        Fail(EditErrorCode.Locked, $"Chain '{chain.Name}' is locked; unlock it first (set-chain-locked).");
 
     private static EditResult Ok(params string[] changed) => new(changed, [], []);
 

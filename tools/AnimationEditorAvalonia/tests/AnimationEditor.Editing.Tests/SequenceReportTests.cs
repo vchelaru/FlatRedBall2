@@ -87,8 +87,8 @@ public class SequenceReportTests : IDisposable
     public void Check_ReferenceProblems_AreErrors()
     {
         var save = SeqWorkspace.Build();
-        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Gone", Reference = new SequenceReferenceSave { Sequence = "Nope" } });
-        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Loop", Reference = new SequenceReferenceSave { Sequence = "Rest" } });
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Gone", References = [new SequenceReferenceSave { Sequence = "Nope" }] });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Loop", References = [new SequenceReferenceSave { Sequence = "Rest" }] });
 
         Check(save).Errors.Select(i => i.Code).ShouldBe(["missing-reference-target", "reference-cycle"], ignoreOrder: true);
     }
@@ -130,7 +130,7 @@ public class SequenceReportTests : IDisposable
     {
         var save = SeqWorkspace.Build();
         save.Sequences[0].Tracks[0].Chains[1].Chain = "Fly";
-        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Inner", Reference = new SequenceReferenceSave { Sequence = "Run", Start = 0.5, Length = 2 } });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Inner", References = [new SequenceReferenceSave { Sequence = "Run", Start = 0.5, Length = 2 }] });
         save.Save(_w.SeqPath);
         var doc = SequenceFileReader.Read(_w.SeqPath).Document!;
 
@@ -178,7 +178,7 @@ public class SequenceReportTests : IDisposable
         save.Sequences[0].Tracks.Add(new SequenceTrackSave
         {
             Name = "Clip", Continuous = true,
-            Reference = new SequenceReferenceSave { Sequence = "Tgt", Start = start, Length = clipLength },
+            References = [new SequenceReferenceSave { Sequence = "Tgt", Start = start, Length = clipLength }],
         });
         return save;
     }

@@ -14,7 +14,7 @@ public class TimelineReferencesTests
         new() { Name = name, Chains = { new SequenceChainReferenceSave { Source = "a.achx", Chain = name, Start = start } } };
 
     private static SequenceTrackSave RefTrack(string name, string target, double start = 0, double? length = null) =>
-        new() { Name = name, Reference = new SequenceReferenceSave { Sequence = target, Start = start, Length = length } };
+        new() { Name = name, References = [new SequenceReferenceSave { Sequence = target, Start = start, Length = length }] };
 
     private static List<SequenceSave> File() => new()
     {
@@ -24,6 +24,21 @@ public class TimelineReferencesTests
 
     // Every chain cycle is 0.75 s.
     private static double? Cycle(SequenceChainReferenceSave _) => 0.75;
+
+    [Fact]
+    public void For_TwoClipsOnOneTrack_NextClipCutsThePreviousOne_AndOnlyTheFirstListsRows()
+    {
+        var file = File();
+        file[0].Tracks[1].References!.Add(new SequenceReferenceSave { Sequence = "Earth", Start = 2 });
+
+        var clips = TimelineReferences.For(file[0], file, Cycle);
+
+        clips.Count.ShouldBe(2);
+        clips[0].End.ShouldBe(2, 1e-9);           // 1 .. 3.5 cut at the second clip's start
+        clips[1].Start.ShouldBe(2);
+        clips[0].Rows.Count.ShouldBeGreaterThan(0);
+        clips[1].Rows.ShouldBeEmpty();
+    }
 
     [Fact]
     public void For_ReferenceTrack_ClipIsItsLength()
@@ -54,7 +69,7 @@ public class TimelineReferencesTests
     public void For_MissingTarget_IsDrawnAtTheMissingLength_AndCannotBeResized()
     {
         var file = File();
-        file[0].Tracks[1].Reference!.Sequence = "Gone";
+        file[0].Tracks[1].References![0].Sequence = "Gone";
 
         var reference = TimelineReferences.For(file[0], file, Cycle).Single();
 
@@ -159,7 +174,7 @@ public class TimelineReferencesTests
     public void For_LengthShorterThanTheTarget_ClipIsThatPartOfTheTarget()
     {
         var file = File();
-        file[0].Tracks[1].Reference!.Length = 0.625;
+        file[0].Tracks[1].References![0].Length = 0.625;
 
         TimelineReferences.For(file[0], file, Cycle).Single().Length.ShouldBe(0.625, 1e-9);
     }

@@ -49,7 +49,7 @@ public class ReferenceFilmstripTests
     private static (SequenceReferenceSave Reference, SequenceSave Target, List<SequenceSave> File) Setup(SequenceSave target, double? length = null)
     {
         var reference = Reference(target.Name, length);
-        var holder = new SequenceSave { Name = "Holder", Tracks = { new SequenceTrackSave { Name = "Link", Reference = reference } } };
+        var holder = new SequenceSave { Name = "Holder", Tracks = { new SequenceTrackSave { Name = "Link", References = [reference] } } };
         return (reference, target, new List<SequenceSave> { holder, target });
     }
 
@@ -138,7 +138,7 @@ public class ReferenceFilmstripTests
         var inner = new SequenceSave { Name = "Inner", Tracks = { ChainTrack("Run") } };
         var (reference, target, file) = Setup(new SequenceSave
         {
-            Name = "Outer", Tracks = { new SequenceTrackSave { Name = "Nest", Reference = Reference("Inner") }, ChainTrack("Walk") },
+            Name = "Outer", Tracks = { new SequenceTrackSave { Name = "Nest", References = [Reference("Inner")] }, ChainTrack("Walk") },
         });
         file.Add(inner);
 

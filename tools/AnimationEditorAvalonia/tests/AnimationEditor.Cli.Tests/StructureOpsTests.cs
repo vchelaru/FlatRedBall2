@@ -192,4 +192,17 @@ public class StructureOpsTests : IDisposable
         add["region"].GetProperty("required").GetBoolean().ShouldBeFalse();
         add["texture"].GetProperty("required").GetBoolean().ShouldBeTrue();
     }
+
+    [Theory]
+    [InlineData("""{"op":"delete-frame","frame":"Walk/0"}""")]
+    [InlineData("""{"op":"add-shape","frame":"Walk/0","type":"rect"}""")]
+    [InlineData("""{"op":"add-frame-event","frame":"Walk/0","name":"Step"}""")]
+    [InlineData("""{"op":"set-frame-offset","frame":"Walk/0","x":1}""")]
+    public async Task LockedChain_EveryOpFamilyNamesTheUnlockOp(string op)
+    {
+        var r = await Edit("hero.achx", $$"""{"ops":[{"op":"set-chain-locked","chain":"Walk","value":true},{{op}}]}""");
+
+        r.Code.ShouldBe(1);
+        (r.Out + r.Err).ShouldContain("Chain 'Walk' is locked; unlock it first (set-chain-locked).");
+    }
 }

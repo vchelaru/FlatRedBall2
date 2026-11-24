@@ -213,7 +213,7 @@ public static class SequenceEdit
 
     /// <summary>
     /// Adds a track named after <paramref name="target"/> that plays that sequence once from <paramref name="start"/> seconds,
-    /// at zero-based <paramref name="index"/> (default 0). Its clip is block 0 of the track.
+    /// at zero-based <paramref name="index"/> (default 0). Its clip is block 0 of the track; add-block adds more.
     /// </summary>
     public static EditResult AddReferenceTrack(SequenceDocument doc, IUndoManager undo, string sequence, string target, double start, int? index)
     {
@@ -282,19 +282,39 @@ public static class SequenceEdit
     /// seconds, <paramref name="length"/> seconds long (null: one cycle, following the chain). The source must be in the
     /// library and have the chain. A null <paramref name="start"/> is the end of the block that plays last on the track
     /// (0 on an empty track); a null <paramref name="source"/> is the library's only source (several is an error that lists them).
+    /// On a reference track the block is a clip playing <paramref name="sequence"/> instead, and <paramref name="chain"/> and
+    /// <paramref name="source"/> are not used; the clip's end is that of its target at its current length.
     /// </summary>
-    public static EditResult AddBlock(SequenceDocument doc, IUndoManager undo, string track, string? source, string chain, double? start, double? length)
+    public static EditResult AddBlock(SequenceDocument doc, IUndoManager undo, string track, string? source, string? chain, double? start, double? length,
+        string? sequence = null)
     {
         var at = SequenceAddress.ResolveTrack(doc.Save, track);
         if (!at.Ok) return FromAddress(at);
         var owner = doc.Save.Sequences[at.Value!.Sequence];
         var target = owner.Tracks[at.Value.Track];
-        if (target.Reference is not null)
-            return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{target.Name}' plays a sequence, so it cannot hold chain blocks.");
         var badStart = start is { } given ? CheckStart(given) : null;
         if (badStart is not null) return badStart;
         var badLength = length is { } l ? CheckLength(l) : null;
         if (badLength is not null) return badLength;
+        if (target.References is { } clips)
+        {
+            if (chain is not null || source is not null)
+                return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{target.Name}' plays sequences, so it holds clips: give sequence, not source or chain.");
+            if (sequence is null) return Fail(EditErrorCode.InvalidValue, $"Track '{owner.Name}/{target.Name}' plays sequences: give the sequence to play.");
+            var to = SequenceAddress.ResolveSequence(doc.Save, sequence);
+            if (!to.Ok) return FromAddress(to);
+            var targetName = doc.Save.Sequences[to.Value!.Sequence].Name;
+            if (!doc.CanReference(at.Value.Sequence, targetName))
+                return Fail(EditErrorCode.WouldCycle, $"'{owner.Name}' cannot play '{targetName}': that would make the sequences play each other in a loop.");
+            undo.SealCoalescing();
+            double clipStart = start ?? ClipTrackEnd(doc, at.Value.Sequence, target);
+            var added = doc.AddReferenceClip(undo, at.Value.Sequence, at.Value.Track, targetName, clipStart, length);
+            if (added is not null) return Fail(EditErrorCode.Refused, added);
+            return Ok($"{owner.Name}/{target.Name}/{doc.Save.Sequences[at.Value.Sequence].Tracks[at.Value.Track].References!.Count - 1}");
+        }
+        if (sequence is not null)
+            return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{target.Name}' holds chain blocks, so it cannot play a sequence.");
+        if (chain is null) return Fail(EditErrorCode.InvalidValue, $"Track '{owner.Name}/{target.Name}' holds chain blocks: give the chain.");
 
         if (source is null)
         {
@@ -319,6 +339,18 @@ public static class SequenceEdit
         return Ok($"{owner.Name}/{target.Name}/{doc.Save.Sequences[at.Value.Sequence].Tracks[at.Value.Track].Chains.Count - 1}");
     }
 
+    /// <summary>The end in seconds of the clip that starts last on a reference track (its full length); 0 when empty or when its target plays nothing.</summary>
+    private static double ClipTrackEnd(SequenceDocument doc, int sequence, SequenceTrackSave track)
+    {
+        var ordered = SequenceTimeline.OrderedClips(track);
+        if (ordered.Count == 0) return 0;
+        var last = ordered[^1];
+        double targetLength = SequenceReferences.Plays(doc.Save.Sequences, doc.Save.Sequences[sequence].Name, last.Sequence)
+            && SequenceReferences.Find(doc.Save.Sequences, last.Sequence) is { } found
+            ? SequenceTimeline.Length(doc.Save.Sequences, found, r => doc.CycleLength(r) ?? 0) : 0;
+        return Math.Round(last.Start + SequenceTimeline.FullLength(last.Length, targetLength), 6);
+    }
+
     /// <summary>The end in seconds of the block that starts last on a chain track (its full length, nothing follows to cut it); 0 when empty.</summary>
     private static double TrackEnd(SequenceDocument doc, SequenceTrackSave track)
     {
@@ -328,7 +360,7 @@ public static class SequenceEdit
         return Math.Round(last.Start + SequenceTimeline.FullLength(last.Length, doc.CycleLength(last) ?? 0), 6);
     }
 
-    /// <summary>Moves a block to <paramref name="start"/> seconds (0 or more). On a reference track block 0 is the clip.</summary>
+    /// <summary>Moves a block to <paramref name="start"/> seconds (0 or more). On a reference track the block is a clip (index in list order).</summary>
     public static EditResult SetBlockStart(SequenceDocument doc, IUndoManager undo, string block, double start)
     {
         var at = SequenceAddress.ResolveBlock(doc.Save, block);
@@ -339,10 +371,10 @@ public static class SequenceEdit
         var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
 
         undo.SealCoalescing();
-        if (track.Reference is { } clip)
+        if (track.References is { } clips)
         {
-            if (clip.Start == start) return Ok();
-            var refusedClip = doc.SetReferenceStart(undo, a.Sequence, a.Track, start);
+            if (clips[a.Block].Start == start) return Ok();
+            var refusedClip = doc.SetReferenceStart(undo, a.Sequence, a.Track, start, a.Block);
             return refusedClip is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refusedClip);
         }
         if (track.Chains[a.Block].Start == start) return Ok();
@@ -364,10 +396,10 @@ public static class SequenceEdit
         var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
 
         undo.SealCoalescing();
-        if (track.Reference is { } clip)
+        if (track.References is { } clips)
         {
-            if (clip.Length == length) return Ok();
-            var refusedClip = doc.SetReferenceLength(undo, a.Sequence, a.Track, length);
+            if (clips[a.Block].Length == length) return Ok();
+            var refusedClip = doc.SetReferenceLength(undo, a.Sequence, a.Track, length, a.Block);
             return refusedClip is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refusedClip);
         }
         if (track.Chains[a.Block].Length == length) return Ok();
@@ -377,7 +409,7 @@ public static class SequenceEdit
 
     /// <summary>
     /// Unsets a block's length, so it plays one cycle of its chain (a clip, one run of its target) and follows edits to
-    /// it. On a reference track block 0 is the clip. Already unset is a no-op.
+    /// it. On a reference track the block is a clip (index in list order). Already unset is a no-op.
     /// </summary>
     public static EditResult ClearBlockLength(SequenceDocument doc, IUndoManager undo, string block)
     {
@@ -387,10 +419,10 @@ public static class SequenceEdit
         var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
 
         undo.SealCoalescing();
-        if (track.Reference is { } clip)
+        if (track.References is { } clips)
         {
-            if (clip.Length is null) return Ok();
-            var refused = doc.ClearReferenceLength(undo, a.Sequence, a.Track);
+            if (clips[a.Block].Length is null) return Ok();
+            var refused = doc.ClearReferenceLength(undo, a.Sequence, a.Track, a.Block);
             return refused is null ? Ok(block) : Fail(EditErrorCode.InvalidValue, refused);
         }
         if (track.Chains[a.Block].Length is null) return Ok();
@@ -400,7 +432,7 @@ public static class SequenceEdit
 
     /// <summary>
     /// Sets a block's length so it ends at <paramref name="end"/> seconds: end - start, from the block's current start.
-    /// On a reference track block 0 is the clip.
+    /// On a reference track the block is a clip (index in list order).
     /// </summary>
     public static EditResult SetBlockEnd(SequenceDocument doc, IUndoManager undo, string block, double end)
     {
@@ -408,7 +440,7 @@ public static class SequenceEdit
         if (!at.Ok) return FromAddress(at);
         var a = at.Value!;
         var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
-        double start = track.Reference is { } clip ? clip.Start : track.Chains[a.Block].Start;
+        double start = track.References is { } clips ? clips[a.Block].Start : track.Chains[a.Block].Start;
         if (!double.IsFinite(end) || end <= start)
             return Fail(EditErrorCode.InvalidValue, $"The end {end.ToString(System.Globalization.CultureInfo.InvariantCulture)} must be after the block's start {start.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
 
@@ -426,8 +458,8 @@ public static class SequenceEdit
         var a = at.Value!;
         var owner = doc.Save.Sequences[a.Sequence];
         var track = owner.Tracks[a.Track];
-        if (track.Reference is not null)
-            return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{track.Name}' plays a sequence, so its clip has no chain to set.");
+        if (track.References is not null)
+            return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{track.Name}' plays sequences, so its clips have no chain to set.");
 
         var wanted = source ?? track.Chains[a.Block].Source;
         var listed = FindSource(doc, wanted);
@@ -444,14 +476,18 @@ public static class SequenceEdit
         return Ok(block);
     }
 
-    /// <summary>Deletes a block of a chain track; later blocks of the track shift down by one. A reference track is deleted whole.</summary>
+    /// <summary>Deletes a block of a chain track, or a clip of a reference track (the track stays, possibly empty); later blocks of the track shift down by one.</summary>
     public static EditResult DeleteBlock(SequenceDocument doc, IUndoManager undo, string block)
     {
         var at = SequenceAddress.ResolveBlock(doc.Save, block);
         if (!at.Ok) return FromAddress(at);
         var a = at.Value!;
-        if (doc.Save.Sequences[a.Sequence].Tracks[a.Track].Reference is not null)
-            return Fail(EditErrorCode.WrongTrackKind, "A track that plays a sequence has no chain blocks to delete; delete the track instead.");
+        if (doc.Save.Sequences[a.Sequence].Tracks[a.Track].References is not null)
+        {
+            undo.SealCoalescing();
+            var refused = doc.DeleteReferenceClip(undo, a.Sequence, a.Track, a.Block);
+            return refused is null ? Ok(block) : Fail(EditErrorCode.Refused, refused);
+        }
 
         undo.SealCoalescing();
         doc.DeleteChain(undo, a.Sequence, a.Track, a.Block);

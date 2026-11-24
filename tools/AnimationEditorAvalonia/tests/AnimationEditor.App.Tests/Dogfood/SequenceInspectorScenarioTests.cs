@@ -313,7 +313,7 @@ public class SequenceInspectorScenarioTests
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         var save = SequenceListSave.FromFile(boss);
         var combo = new SequenceSave { Name = "Combo" };
-        combo.Tracks.Add(new SequenceTrackSave { Name = "Attack", Reference = new SequenceReferenceSave { Sequence = "Attack", Length = 2 } });
+        combo.Tracks.Add(new SequenceTrackSave { Name = "Attack", References = [new SequenceReferenceSave { Sequence = "Attack", Length = 2 }] });
         save.Sequences.Insert(0, combo);
         save.Save(boss);
         await editor.OpenAsync(boss);
@@ -326,7 +326,7 @@ public class SequenceInspectorScenarioTests
         editor.Press(Key.Delete);
         editor.Press(Key.Enter);
 
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].Reference!.Length.ShouldBeNull();
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[0].References![0].Length.ShouldBeNull();
         inspector.ReferenceLengthField.Value.ShouldBe(0.5m);
         editor.UndoLabels.ShouldBe(new[] { "Clear Length of 'Attack'" });
     }

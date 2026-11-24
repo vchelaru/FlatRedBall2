@@ -93,7 +93,7 @@ public class SequenceThumbnailScenarioTests
         string boss = WriteFixture(editor, "Hero");
         var save = SequenceListSave.FromFile(boss);
         var wrap = new SequenceSave { Name = "Wrap" };
-        wrap.Tracks.Add(new SequenceTrackSave { Name = "Link", Reference = new SequenceReferenceSave { Sequence = "Hero" } });
+        wrap.Tracks.Add(new SequenceTrackSave { Name = "Link", References = [new SequenceReferenceSave { Sequence = "Hero" }] });
         save.Sequences.Insert(0, wrap);
         save.Save(boss);
         await editor.OpenProjectFolderAsync();

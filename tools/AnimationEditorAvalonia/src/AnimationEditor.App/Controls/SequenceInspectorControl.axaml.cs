@@ -234,8 +234,9 @@ public partial class SequenceInspectorControl : UserControl
     // A track that plays another sequence shows its clip: which sequence, where it starts and how long it lasts.
     private void ShowReference(SequenceTrackSave track, bool force)
     {
-        ReferenceSection.IsVisible = track.Reference is not null;
-        if (track.Reference is not { } reference) return;
+        ReferenceSection.IsVisible = track.References is not null;
+        // The Inspector shows the track's first clip (by start); the other clips are edited on the timeline.
+        if (SequenceTimeline.OrderedClips(track).FirstOrDefault() is not { } reference) { ReferenceSection.IsVisible = false; return; }
         ReferenceSequenceText.Text = reference.Sequence;
         PutOrMixed(ReferenceStartField, (decimal)reference.Start, force);
         PutOrMixed(ReferenceLengthField, (decimal)_document!.ClipLength(reference), force);
@@ -256,9 +257,16 @@ public partial class SequenceInspectorControl : UserControl
     {
         if (_refreshing || _track is not { } track) return;
         if (start && ReferenceStartField.Value is { } at)
-            Commit(document => document.SetReferenceStart(_undo!, _sequence, track, (double)at));
+            Commit(document => document.SetReferenceStart(_undo!, _sequence, track, (double)at, FirstClipIndex(document, track)));
         else if (!start && ReferenceLengthField.Value is { } length)
-            Commit(document => document.SetReferenceLength(_undo!, _sequence, track, (double)length));
+            Commit(document => document.SetReferenceLength(_undo!, _sequence, track, (double)length, FirstClipIndex(document, track)));
+    }
+
+    // The list index of the clip the Inspector shows: the track's earliest.
+    private int FirstClipIndex(SequenceDocument document, int track)
+    {
+        var clips = document.Save.Sequences[_sequence].Tracks[track].References!;
+        return clips.IndexOf(SequenceTimeline.OrderedClips(document.Save.Sequences[_sequence].Tracks[track])[0]);
     }
 
     private void ShowChain(SequenceChainReferenceSave reference, bool force)

@@ -216,7 +216,7 @@ public static class StructureEdit
         Fail(EditErrorCode.IndexOutOfRange, $"The {what} index {index} is out of range: valid indexes are 0 to {count - 1}.");
 
     internal static EditResult LockedFail(AnimationChainSave chain) =>
-        Fail(EditErrorCode.Locked, $"Chain '{chain.Name}' is locked; unlock it in the editor first.");
+        Fail(EditErrorCode.Locked, $"Chain '{chain.Name}' is locked; unlock it first (set-chain-locked).");
 
     private static EditResult Ok(params string[] changed) => new(changed, [], []);
 

@@ -533,7 +533,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     public bool IsDropTargetNewTrack => DropPreview is { Kind: TimelineDropKind.NewTrack };
 
     // A track that plays a sequence takes no chains: a chip dropped on it or a chain dragged onto it is refused.
-    private bool TakesChains(int track) => Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && sequence.Tracks[track].Reference is null;
+    private bool TakesChains(int track) => Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && sequence.Tracks[track].References is null;
 
     private TimelineDropPlan PlanDrop(LibraryChip chip, Point point) =>
         Sequence is null
@@ -1290,7 +1290,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             && ReferenceOn(track) is { Expandable: true } ? IsReferenceExpanded(track) : null;
         // Go to Sequence is offered on the single selected reference track, disabled with a reason when its target is missing.
         string? referenceTarget = target == TimelineMenuTarget.TrackHeader && _model.Kind == TimelineSelectionKind.Tracks && _model.Tracks.Count == 1
-            && track >= 0 && track < Sequence.Tracks.Count ? Sequence.Tracks[track].Reference?.Sequence : null;
+            && track >= 0 && track < Sequence.Tracks.Count ? Sequence.Tracks[track].References?.FirstOrDefault()?.Sequence : null;
         string? goToDisabledReason = referenceTarget is not null && _document is { } doc
             ? TimelineMenuLayout.GoToSequenceDisabledReason(doc.Save.Sequences, referenceTarget) : null;
         var groups = TimelineMenuLayout.For(target, Sequence.Tracks.Any(t => !t.Visible), moves, referenceExpanded,

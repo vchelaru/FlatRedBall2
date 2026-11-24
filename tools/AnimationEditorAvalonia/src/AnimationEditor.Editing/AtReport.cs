@@ -98,12 +98,12 @@ public static class AtReport
         {
             var v = KeyframeSampler.SampleShape(sprite.Chain, sprite.Unit, sprite.FrameIndex, sprite.ElapsedInFrame, shape);
             var points = shape is PolygonSave polygon
-                ? KeyframeSampler.SampleShapePoints(sprite.Chain, sprite.Unit, sprite.FrameIndex, sprite.ElapsedInFrame, polygon).Select(p => (p.X, p.Y)).ToList()
+                ? KeyframeSampler.SampleShapePoints(sprite.Chain, sprite.Unit, sprite.FrameIndex, sprite.ElapsedInFrame, polygon).Select(p => (AnimationDescriber.PlainZero(p.X), AnimationDescriber.PlainZero(p.Y))).ToList()
                 : [];
-            return new AtShape(EditAddress.TypeName(shape), shape.Name, v.X, v.Y, shape is PolygonSave ? 0 : v.SizeX, shape is AARectSave ? v.SizeY : 0, points);
+            return new AtShape(EditAddress.TypeName(shape), shape.Name, AnimationDescriber.PlainZero(v.X), AnimationDescriber.PlainZero(v.Y), shape is PolygonSave ? 0 : v.SizeX, shape is AARectSave ? v.SizeY : 0, points);
         }).ToList() ?? [];
         string trackName = sprite.Track >= 0 && sprite.Track < tracks.Count ? tracks[sprite.Track].Name : "";
-        return new AtSprite(sprite.Track, trackName, sprite.Chain.Name, sprite.FrameIndex, sample.OffsetX, sample.OffsetY, shapes,
+        return new AtSprite(sprite.Track, trackName, sprite.Chain.Name, sprite.FrameIndex, AnimationDescriber.PlainZero(sample.OffsetX), AnimationDescriber.PlainZero(sample.OffsetY), shapes,
             sample.Color, sprite.Frame.FlipHorizontal, sprite.Frame.FlipVertical, sprite.Frame.FlipDiagonal, sprite.Frame.Events);
     }
 
@@ -194,5 +194,5 @@ public static class AtReport
         w.WriteEndObject();
     }
 
-    private static string Num(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+    private static string Num(double v) => AnimationDescriber.PlainZero(v.ToString("0.###", CultureInfo.InvariantCulture));
 }

@@ -24,11 +24,12 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// A <c>"version"</c> that is not a whole number of at least 1 is rejected with a <see cref="JsonException"/>.
 /// </para>
 /// <para>
-/// A track may carry a <c>"reference"</c> object (<see cref="SequenceReferenceSave"/>) in place of chains, playing another
-/// sequence of the file by name. It is an additive key, so the format version stays 1 and older readers keep it as an
+/// A track may carry a <c>"references"</c> array of clips (<see cref="SequenceReferenceSave"/>, one clip is a one-element array) in place of chains, playing other
+/// sequences of the file by name, in order like chain blocks. The key is additive, so the format version stays 1 and older readers keep it as an
 /// unknown property. A reference to a missing sequence, or one whose target plays the holding sequence back (a cycle,
 /// <see cref="SequenceReferences.CycleThrough"/>), is kept as written and plays nothing. A track with both a reference and a
-/// non-empty <c>"chains"</c> is rejected with a <see cref="JsonException"/> naming the sequence and track.
+/// non-empty <c>"chains"</c> is rejected with a <see cref="JsonException"/> naming the sequence and track, and so is one with both
+/// <c>"references"</c> and the legacy single <c>"reference"</c> object (read as a one-clip list, written back as <c>"references"</c>).
 /// </para>
 /// </remarks>
 public class SequenceListSave
@@ -150,18 +151,23 @@ public class SequenceListSave
         };
         if (!track.Visible) result["visible"] = false;
         if (track.Continuous) result["continuous"] = true;
-        if (track.Reference is { } playing)
+        if (track.References is { } playing)
         {
-            var reference = new JsonObject
+            var clips = new JsonArray();
+            foreach (var clip in playing)
             {
-                ["sequence"] = playing.Sequence,
-                ["start"] = Clean(playing.Start),
-            };
-            if (playing.Length is { } length) reference["length"] = Clean(length);
-            result["reference"] = AppendUnknown(reference, playing.UnknownProperties);
+                var reference = new JsonObject
+                {
+                    ["sequence"] = clip.Sequence,
+                    ["start"] = Clean(clip.Start),
+                };
+                if (clip.Length is { } length) reference["length"] = Clean(length);
+                clips.Add((JsonNode)AppendUnknown(reference, clip.UnknownProperties));
+            }
+            result["references"] = clips;
         }
         // A reference track has no chains; the key stays for every other track, as it always was.
-        if (track.Reference is null || track.Chains.Count > 0) result["chains"] = chains;
+        if (track.References is null || track.Chains.Count > 0) result["chains"] = chains;
         return AppendUnknown(result, track.UnknownProperties);
     }
 
@@ -219,17 +225,27 @@ public class SequenceListSave
         // "x", "y", "z" and "flipHorizontal" are listed so they are dropped unread, not kept as unknown properties: files
         // written before tracks lost their offset, Z and flip still hold them, and saving must not write them back. Sprites
         // sit at their frames' offsets, draw with their frames' flips and stack in track order.
-        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "continuous", "reference", "chains");
-        if (node.Node.ContainsKey("reference"))
+        CaptureUnknown(node.Node, track.UnknownProperties, "name", "x", "y", "z", "flipHorizontal", "visible", "continuous", "reference", "references", "chains");
+        bool legacy = node.Node.ContainsKey("reference");
+        if (legacy && node.Node.ContainsKey("references"))
+            throw new JsonException(
+                $"Sequence \"{sequenceName}\", track \"{track.Name}\" has both \"reference\" and \"references\". Keep \"references\".");
+        if (legacy || node.Node.ContainsKey("references"))
         {
-            var reference = node.Object("reference");
-            track.Reference = new SequenceReferenceSave
+            // The legacy single "reference" object is a one-clip list; it is written back as "references".
+            var clips = legacy ? new List<SeqjObject> { node.Object("reference") } : node.Objects("references").ToList();
+            track.References = new List<SequenceReferenceSave>();
+            foreach (var clip in clips)
             {
-                Sequence = reference.String("sequence"),
-                Start = reference.Double("start"),
-                Length = reference.OptionalDouble("length"),
-            };
-            CaptureUnknown(reference.Node, track.Reference.UnknownProperties, "sequence", "start", "length");
+                var reference = new SequenceReferenceSave
+                {
+                    Sequence = clip.String("sequence"),
+                    Start = clip.Double("start"),
+                    Length = clip.OptionalDouble("length"),
+                };
+                CaptureUnknown(clip.Node, reference.UnknownProperties, "sequence", "start", "length");
+                track.References.Add(reference);
+            }
         }
         foreach (var chain in node.Objects("chains"))
         {
@@ -244,7 +260,7 @@ public class SequenceListSave
             track.Chains.Add(reference);
         }
         // Readers disagree on which one plays, so the file is refused rather than read one way. An empty "chains" is fine.
-        if (track.Reference is not null && track.Chains.Count > 0)
+        if (track.References is not null && track.Chains.Count > 0)
             throw new JsonException(
                 $"Sequence \"{sequenceName}\", track \"{track.Name}\" has both a reference and chains; a track plays one or the other. Remove one.");
         return track;
