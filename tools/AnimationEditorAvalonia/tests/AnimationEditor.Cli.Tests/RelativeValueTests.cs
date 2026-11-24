@@ -184,6 +184,15 @@ public class RelativeValueTests : InlineBatchTests
     }
 
     [Fact]
+    public async Task Lengths_Relative_AreInTheFilesUnit()
+    {
+        await Ok("hero.achx", "set-unit unit=millisecond", "set-frame-length Walk/0 length=+50", "set-chain-length Idle length=+250");
+
+        Frames("hero.achx", "Walk")[0].FrameLength.ShouldBe(150f);
+        Frames("hero.achx", "Idle").Single().FrameLength.ShouldBe(750f);
+    }
+
+    [Fact]
     public async Task ShapeFields_ChangeFromTheShapesOwnValues()
     {
         await Ok("hero.achx", "set-rect Walk/2/rect/Hitbox x=+1 y=\"- 1\" scaleX=*2 scaleY=/2", "set-shape-common Walk/2/rect/* x=+1");
