@@ -440,6 +440,9 @@ public static class EditOps
 
         var tsxBefore = session.IsNativeTsx ? TsxOpPolicy.Take(session) : null;
         var associations = new List<string>();
+        var chainsBefore = ops.Any(op => op.Spec.Name is "rename-chain" or "delete-chain")
+            ? session.Document.AnimationChains.Select(c => c.Name).ToList()
+            : null;
 
         foreach (var op in ops)
         {
@@ -515,6 +518,8 @@ public static class EditOps
 
         // A .tsx save leaves out what a tileset cannot hold (a chain with no frames), so the document says nothing about the saved file.
         if (!session.IsNativeTsx) warnings.AddRange(CheckReport.RaisedWarnings(before, after));
+        if (chainsBefore is not null)
+            warnings.AddRange(BrokenSequenceBlocks.Warnings(session.Path, chainsBefore.Except(session.Document.AnimationChains.Select(c => c.Name)).ToHashSet()));
         var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path)).Distinct().ToList();
         return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
     }
