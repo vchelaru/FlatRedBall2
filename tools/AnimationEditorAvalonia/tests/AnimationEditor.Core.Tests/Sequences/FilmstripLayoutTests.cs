@@ -274,7 +274,7 @@ public class FilmstripLayoutTests
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.2f, LeftCoordinate = 0, RightCoordinate = 0.5f, TopCoordinate = 0, BottomCoordinate = 0.25f });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0, LeftCoordinate = 0, RightCoordinate = 0.25f, TopCoordinate = 0, BottomCoordinate = 0.5f, FlipDiagonal = true });
 
-        var frames = FilmstripLayout.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => (64, 64));
+        var frames = FilmstripLayout.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => true);
 
         frames[0].Duration.ShouldBe(0.2, 1e-6);
         (frames[0].SpriteWidth, frames[0].SpriteHeight).ShouldBe((32.0, 16.0));
@@ -289,7 +289,7 @@ public class FilmstripLayoutTests
         var chain = new AnimationChainSave();
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.2f });
 
-        var frame = FilmstripLayout.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null).Single();
+        var frame = FilmstripLayout.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => false).Single();
 
         (frame.SpriteWidth, frame.SpriteHeight).ShouldBe((0.0, 0.0));
     }

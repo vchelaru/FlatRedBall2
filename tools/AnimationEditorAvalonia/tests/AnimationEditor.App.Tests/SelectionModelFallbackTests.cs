@@ -67,7 +67,7 @@ public class SelectionModelFallbackTests
             Dispatcher.UIThread.RunJobs();
 
             var text = await window.Clipboard!.TryGetTextAsync();
-            Assert.True(ClipboardPayload.TryDeserialize(text!, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _));
+            Assert.True(ClipboardPayload.TryDeserialize(text!, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out var frames, out _));
             Assert.NotNull(frames);
             Assert.Single(frames!);
         }

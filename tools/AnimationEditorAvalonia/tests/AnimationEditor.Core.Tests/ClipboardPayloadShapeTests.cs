@@ -18,7 +18,7 @@ public class ClipboardPayloadShapeTests
     private static AnimationFrameSave RoundTripFrame(AnimationFrameSave frame)
     {
         var xml = ClipboardPayload.Serialize(new List<AnimationFrameSave> { frame }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _),
+        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out var frames, out _),
             "frame payload did not round-trip");
         return Assert.Single(frames!);
     }
@@ -165,7 +165,7 @@ public class ClipboardPayloadShapeTests
         chain.Frames.Add(frame);
 
         var xml = ClipboardPayload.Serialize(new List<AnimationChainSave> { chain }, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out var chains, out _, out _));
+        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out var chains, out _, out _));
 
         var rtChain = Assert.Single(chains!);
         Assert.Equal("IdleDown", rtChain.Name);
@@ -181,7 +181,7 @@ public class ClipboardPayloadShapeTests
         var rect = new AARectSave { Name = "BulletOrigin", X = 1f, Y = 2f, ScaleX = 3f, ScaleY = 4f };
 
         var xml = ClipboardPayload.Serialize(rect);
-        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out _, out var shapes));
+        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out _, out var shapes));
 
         var rt = Assert.IsType<AARectSave>(Assert.Single(shapes!));
         Assert.Equal("BulletOrigin", rt!.Name);
@@ -194,7 +194,7 @@ public class ClipboardPayloadShapeTests
         var circle = new CircleSave { Name = "Hit", X = 5f, Y = 6f, Radius = 7f };
 
         var xml = ClipboardPayload.Serialize(circle);
-        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out _, out var shapes));
+        Assert.True(ClipboardPayload.TryDeserialize(xml, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out _, out var shapes));
 
         var rt = Assert.IsType<CircleSave>(Assert.Single(shapes!));
         Assert.Equal("Hit", rt!.Name);

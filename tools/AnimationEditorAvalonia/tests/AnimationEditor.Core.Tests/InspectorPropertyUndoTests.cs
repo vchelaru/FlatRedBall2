@@ -378,7 +378,7 @@ public class InspectorPropertyUndoTests
         chain.Frames.Add(frame);
 
         // Move/resize to pixel rect (4,8,12,16) on a 64x64 texture
-        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, 4, 8, 12, 16, 64, 64);
+        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, 4, 8, 12, 16);
         Assert.True(ctx.UndoManager.CanUndo);
 
         ctx.UndoManager.Undo();
@@ -401,7 +401,7 @@ public class InspectorPropertyUndoTests
             f.TopCoordinate = 0f; f.BottomCoordinate = 1f;
         }
 
-        ctx.AppCommands.SetFramePixelRegion(frames, 4, 8, 12, 16, 64, 64);
+        ctx.AppCommands.SetFramePixelRegion(frames, 4, 8, 12, 16);
 
         Assert.All(frames, f => Assert.Equal(4f / 64f, f.LeftCoordinate, precision: 5));
         Assert.All(frames, f => Assert.Equal(16f / 64f, f.RightCoordinate, precision: 5));
@@ -418,8 +418,8 @@ public class InspectorPropertyUndoTests
         frame.TopCoordinate = 0f; frame.BottomCoordinate = 1f;
         chain.Frames.Add(frame);
 
-        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 3, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
-        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 32, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 3, pixelY: null, pixelW: null, pixelH: null);
+        ctx.AppCommands.SetFramePixelRegion(new[] { frame }, pixelX: 32, pixelY: null, pixelW: null, pixelH: null);
 
         Assert.Single(ctx.UndoManager.UndoHistory);
         ctx.UndoManager.Undo();
@@ -440,7 +440,7 @@ public class InspectorPropertyUndoTests
         frames[1].LeftCoordinate = 32f / 64; frames[1].RightCoordinate = 40f / 64;
         frames[1].TopCoordinate = 16f / 64; frames[1].BottomCoordinate = 32f / 64;
 
-        ctx.AppCommands.SetFramePixelRegion(frames, pixelX: 5, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+        ctx.AppCommands.SetFramePixelRegion(frames, pixelX: 5, pixelY: null, pixelW: null, pixelH: null);
 
         Assert.Equal(5f / 64f, frames[0].LeftCoordinate, precision: 5);
         Assert.Equal(5f / 64f, frames[1].LeftCoordinate, precision: 5);

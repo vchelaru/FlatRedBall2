@@ -5,8 +5,8 @@ using Xunit;
 namespace AnimationEditor.Core.Tests;
 
 /// <summary>
-/// Tests for <see cref="FrameDisplayValues"/> — UV coordinate → pixel / tile-index
-/// conversion helpers used by the property inspector panel.
+/// Tests for <see cref="FrameDisplayValues"/> — a frame's region as the whole
+/// pixels shown by the property inspector panel.
 /// </summary>
 public class FrameDisplayValuesTests
 {
@@ -25,108 +25,108 @@ public class FrameDisplayValuesTests
 
     [Fact]
     public void GetPixelX_OriginFrame_ReturnsZero()
-        => Assert.Equal(0, FrameDisplayValues.GetPixelX(Frame(0f, 0.5f, 0f, 0.5f), 256));
+        => Assert.Equal(0, FrameDisplayValues.GetPixelX(Frame(0f, 128f, 0f, 128f)));
 
     [Fact]
     public void GetPixelX_HalfwayLeft_ReturnsHalfTextureWidth()
-        => Assert.Equal(128, FrameDisplayValues.GetPixelX(Frame(0.5f, 1f, 0f, 1f), 256));
+        => Assert.Equal(128, FrameDisplayValues.GetPixelX(Frame(128f, 256f, 0f, 256f)));
 
     [Fact]
     public void GetPixelX_Rounds_NotTruncates()
-        // 0.496 * 256 = 127.0 → rounds to 127; 0.502 * 256 = 128.5 → rounds to 129
-        => Assert.Equal(129, FrameDisplayValues.GetPixelX(Frame(0.502f, 1f, 0f, 1f), 256));
+        // 128.512 → rounds to 129
+        => Assert.Equal(129, FrameDisplayValues.GetPixelX(Frame(128.512f, 256f, 0f, 256f)));
 
     [Fact]
     public void GetPixelX_FullWidth_ReturnsTextureWidth()
-        => Assert.Equal(512, FrameDisplayValues.GetPixelX(Frame(1f, 1f, 0f, 1f), 512));
+        => Assert.Equal(512, FrameDisplayValues.GetPixelX(Frame(512f, 512f, 0f, 512f)));
 
     [Fact]
     public void GetPixelX_OddTextureWidth_RoundsCorrectly()
-        => Assert.Equal(100, FrameDisplayValues.GetPixelX(Frame(0.1f, 0.5f, 0f, 1f), 1000));
+        => Assert.Equal(100, FrameDisplayValues.GetPixelX(Frame(100f, 500f, 0f, 1000f)));
 
     // ── GetPixelY ─────────────────────────────────────────────────────────────
 
     [Fact]
     public void GetPixelY_TopEdge_ReturnsZero()
-        => Assert.Equal(0, FrameDisplayValues.GetPixelY(Frame(0f, 0.5f, 0f, 0.5f), 128));
+        => Assert.Equal(0, FrameDisplayValues.GetPixelY(Frame(0f, 64f, 0f, 64f)));
 
     [Fact]
     public void GetPixelY_HalfwayTop_ReturnsHalfTextureHeight()
-        => Assert.Equal(64, FrameDisplayValues.GetPixelY(Frame(0f, 0.5f, 0.5f, 1f), 128));
+        => Assert.Equal(64, FrameDisplayValues.GetPixelY(Frame(0f, 64f, 64f, 128f)));
 
     [Fact]
     public void GetPixelY_Rounds_NotTruncates()
-        // 0.503 * 128 = 64.4 → rounds to 64
-        => Assert.Equal(64, FrameDisplayValues.GetPixelY(Frame(0f, 0.5f, 0.503f, 1f), 128));
+        // 64.384 → rounds to 64
+        => Assert.Equal(64, FrameDisplayValues.GetPixelY(Frame(0f, 64f, 64.384f, 128f)));
 
     [Fact]
     public void GetPixelY_FullHeight_ReturnsTextureHeight()
-        => Assert.Equal(256, FrameDisplayValues.GetPixelY(Frame(0f, 1f, 1f, 1f), 256));
+        => Assert.Equal(256, FrameDisplayValues.GetPixelY(Frame(0f, 256f, 256f, 256f)));
 
     // ── GetPixelWidth ─────────────────────────────────────────────────────────
 
     [Fact]
     public void GetPixelWidth_HalfUvRange_ReturnsHalfTexture()
-        => Assert.Equal(128, FrameDisplayValues.GetPixelWidth(Frame(0f, 0.5f, 0f, 1f), 256));
+        => Assert.Equal(128, FrameDisplayValues.GetPixelWidth(Frame(0f, 128f, 0f, 256f)));
 
     [Fact]
     public void GetPixelWidth_FullUvRange_ReturnsFullTextureWidth()
-        => Assert.Equal(512, FrameDisplayValues.GetPixelWidth(Frame(0f, 1f, 0f, 1f), 512));
+        => Assert.Equal(512, FrameDisplayValues.GetPixelWidth(Frame(0f, 512f, 0f, 512f)));
 
     [Fact]
     public void GetPixelWidth_ZeroRange_ReturnsMinimumOne()
         // left == right → zero width → clamped to 1
-        => Assert.Equal(1, FrameDisplayValues.GetPixelWidth(Frame(0.5f, 0.5f, 0f, 1f), 256));
+        => Assert.Equal(1, FrameDisplayValues.GetPixelWidth(Frame(128f, 128f, 0f, 256f)));
 
     [Fact]
     public void GetPixelWidth_NegativeRange_ReturnsMinimumOne()
         // right < left (malformed) → clamped to 1
-        => Assert.Equal(1, FrameDisplayValues.GetPixelWidth(Frame(0.8f, 0.2f, 0f, 1f), 256));
+        => Assert.Equal(1, FrameDisplayValues.GetPixelWidth(Frame(204.8f, 51.2f, 0f, 256f)));
 
     [Fact]
     public void GetPixelWidth_RoundsCorrectly()
-        // (0.625 - 0.125) * 64 = 32.0 exactly
-        => Assert.Equal(32, FrameDisplayValues.GetPixelWidth(Frame(0.125f, 0.625f, 0f, 1f), 64));
+        // 40 - 8 = 32
+        => Assert.Equal(32, FrameDisplayValues.GetPixelWidth(Frame(8f, 40f, 0f, 64f)));
 
     [Fact]
     public void GetPixelWidth_SubPixelRange_RoundsUpToOne()
-        // range = 0.001, texture 64px → 0.064 → rounds to 0 → clamp to 1
-        => Assert.Equal(1, FrameDisplayValues.GetPixelWidth(Frame(0f, 0.001f, 0f, 1f), 64));
+        // 0.064 → rounds to 0 → clamp to 1
+        => Assert.Equal(1, FrameDisplayValues.GetPixelWidth(Frame(0f, 0.064f, 0f, 64f)));
 
     // ── GetPixelHeight ────────────────────────────────────────────────────────
 
     [Fact]
     public void GetPixelHeight_HalfUvRange_ReturnsHalfTexture()
-        => Assert.Equal(64, FrameDisplayValues.GetPixelHeight(Frame(0f, 1f, 0.25f, 0.75f), 128));
+        => Assert.Equal(64, FrameDisplayValues.GetPixelHeight(Frame(0f, 128f, 32f, 96f)));
 
     [Fact]
     public void GetPixelHeight_FullUvRange_ReturnsFullTextureHeight()
-        => Assert.Equal(256, FrameDisplayValues.GetPixelHeight(Frame(0f, 1f, 0f, 1f), 256));
+        => Assert.Equal(256, FrameDisplayValues.GetPixelHeight(Frame(0f, 256f, 0f, 256f)));
 
     [Fact]
     public void GetPixelHeight_ZeroRange_ReturnsMinimumOne()
-        => Assert.Equal(1, FrameDisplayValues.GetPixelHeight(Frame(0f, 1f, 0.5f, 0.5f), 256));
+        => Assert.Equal(1, FrameDisplayValues.GetPixelHeight(Frame(0f, 256f, 128f, 128f)));
 
     [Fact]
     public void GetPixelHeight_NegativeRange_ReturnsMinimumOne()
-        => Assert.Equal(1, FrameDisplayValues.GetPixelHeight(Frame(0f, 1f, 0.9f, 0.1f), 256));
+        => Assert.Equal(1, FrameDisplayValues.GetPixelHeight(Frame(0f, 256f, 230.4f, 25.6f)));
 
     [Fact]
     public void GetPixelHeight_RoundsCorrectly()
-        // (0.75 - 0.25) * 64 = 32.0
-        => Assert.Equal(32, FrameDisplayValues.GetPixelHeight(Frame(0f, 1f, 0.25f, 0.75f), 64));
+        // 48 - 16 = 32
+        => Assert.Equal(32, FrameDisplayValues.GetPixelHeight(Frame(0f, 64f, 16f, 48f)));
 
     // ── Round-trip consistency ────────────────────────────────────────────────
 
     [Fact]
     public void PixelXAndWidth_RoundTrip_MatchesOriginalRegion()
     {
-        // A 32×32 frame starting at (64, 48) on a 256×256 texture
-        var frame = Frame(64f/256, (64+32f)/256, 48f/256, (48+32f)/256);
-        Assert.Equal(64,  FrameDisplayValues.GetPixelX(frame, 256));
-        Assert.Equal(32,  FrameDisplayValues.GetPixelWidth(frame, 256));
-        Assert.Equal(48,  FrameDisplayValues.GetPixelY(frame, 256));
-        Assert.Equal(32,  FrameDisplayValues.GetPixelHeight(frame, 256));
+        // A 32×32 frame starting at (64, 48)
+        var frame = Frame(64f, 64+32f, 48f, 48+32f);
+        Assert.Equal(64,  FrameDisplayValues.GetPixelX(frame));
+        Assert.Equal(32,  FrameDisplayValues.GetPixelWidth(frame));
+        Assert.Equal(48,  FrameDisplayValues.GetPixelY(frame));
+        Assert.Equal(32,  FrameDisplayValues.GetPixelHeight(frame));
     }
 
 }

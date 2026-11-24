@@ -40,7 +40,7 @@ public class FrameLengthUnitCommandsTests
         var ctx = Open(TimeMeasurementUnit.Millisecond);
         var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
 
-        ctx.AppCommands.AddFrameFromPixelBounds(chain, "a.png", 0, 0, 15, 15, 64, 64);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "a.png", 0, 0, 15, 15);
 
         Assert.Equal(100f, chain.Frames[0].FrameLength);
     }
@@ -62,7 +62,7 @@ public class FrameLengthUnitCommandsTests
     [Fact]
     public void BuildBatch_MillisecondUnit_DefaultIs100()
     {
-        var result = BatchFrameBuilder.BuildBatch(null, 1, false, FrameLengthUnit.Milliseconds);
+        var result = BatchFrameBuilder.BuildBatch(null, 1, false, FrameLengthUnit.Milliseconds, null);
         Assert.Equal(100f, result.Frames[0].FrameLength);
     }
 

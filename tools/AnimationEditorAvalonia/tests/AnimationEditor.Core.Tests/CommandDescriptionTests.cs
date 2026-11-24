@@ -464,7 +464,7 @@ public class CommandDescriptionTests
         var expected = "Set Texture";
         var frame = new AnimationFrameSave();
         var cmd = new SetFrameTextureNameCommand(frame,
-            oldName: null, newName: null,
+            oldName: null, newName: null, textureSize: _ => null,
             commands: null!, events: null!);
 
         Assert.Equal(expected, cmd.Description);
@@ -476,7 +476,7 @@ public class CommandDescriptionTests
         var expected = "Set Texture: old.png";
         var frame = new AnimationFrameSave();
         var cmd = new SetFrameTextureNameCommand(frame,
-            oldName: TestPaths.Abs("textures", "old.png"), newName: null,
+            oldName: TestPaths.Abs("textures", "old.png"), newName: null, textureSize: _ => null,
             commands: null!, events: null!);
 
         Assert.Equal(expected, cmd.Description);
@@ -488,7 +488,7 @@ public class CommandDescriptionTests
         var expected = "Set Texture: sprite.png";
         var frame = new AnimationFrameSave();
         var cmd = new SetFrameTextureNameCommand(frame,
-            oldName: null, newName: TestPaths.Abs("textures", "sprite.png"),
+            oldName: null, newName: TestPaths.Abs("textures", "sprite.png"), textureSize: _ => null,
             commands: null!, events: null!);
 
         Assert.Equal(expected, cmd.Description);

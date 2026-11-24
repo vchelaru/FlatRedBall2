@@ -114,7 +114,7 @@ public class WorkflowTutorialTests
         var chain = TestHelpers.MakeChain(acls, "Run");
 
         // Doc example: first run frame covers roughly the left half of a 128×128 sprite sheet
-        ctx.AppCommands.AddFrameFromPixelBounds(chain, "Running.png", 0, 0, 64, 128, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "Running.png", 0, 0, 64, 128);
 
         var frame = chain.Frames[0];
         Assert.Equal(0f,   frame.LeftCoordinate,   precision: 5);

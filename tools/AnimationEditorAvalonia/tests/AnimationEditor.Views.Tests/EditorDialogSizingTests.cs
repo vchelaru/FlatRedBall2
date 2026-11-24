@@ -90,7 +90,7 @@ public class EditorDialogSizingTests
     {
         var host = new OptionsCapturingDialogHost();
         await EditorDialogs.ShowAdjustOffsetsAsync(
-            host, appCommands: null!, chain: new AnimationChainSave(), getTextureHeight: _ => null);
+            host, appCommands: null!, chain: new AnimationChainSave());
         AssertAutoSized(host.CapturedOptions);
     }
 }

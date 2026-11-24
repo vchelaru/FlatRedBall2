@@ -390,7 +390,7 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.SortAnimationsAlphabetically),
             ctx => Sync(() => ctx.AppCommands.SortAnimationsAlphabetically())); // Zebra,Alpha -> Alpha,Zebra
         yield return Row(nameof(IAppCommands.AdjustOffsetsJustifyBottom),
-            ctx => Sync(() => ctx.AppCommands.AdjustOffsetsJustifyBottom(Zebra(ctx), _ => 32f)));
+            ctx => Sync(() => ctx.AppCommands.AdjustOffsetsJustifyBottom(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.AdjustOffsetsAdjustAll),
             ctx => Sync(() => ctx.AppCommands.AdjustOffsetsAdjustAll(Zebra(ctx), 5f, 5f, relative: true)));
         yield return Row(nameof(IAppCommands.ScaleFrameTimesProportional),
@@ -400,7 +400,7 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.AddMultipleFrames),
             ctx => Sync(() => ctx.AppCommands.AddMultipleFrames(Zebra(ctx), 2, incrementUV: false)));
         yield return Row(nameof(IAppCommands.AddFrameFromPixelBounds),
-            ctx => Sync(() => ctx.AppCommands.AddFrameFromPixelBounds(Zebra(ctx), "sheet.png", 0, 0, 8, 8, 64, 64)));
+            ctx => Sync(() => ctx.AppCommands.AddFrameFromPixelBounds(Zebra(ctx), "sheet.png", 0, 0, 8, 8)));
         yield return Row(nameof(IAppCommands.SetFrameTextureName),
             ctx => Sync(() => ctx.AppCommands.SetFrameTextureName(Zebra(ctx).Frames[0], "set.png")));
         yield return Row(nameof(IAppCommands.SetAllFramesTextureName),
@@ -430,7 +430,7 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.SetShapeKeyframeCurve),
             ctx => Sync(() => ctx.AppCommands.SetShapeKeyframeCurve(new[] { Rect(ctx) }, ShapeKeyframeGroup.Size, KeyframeCurveChoice.Bounce)));
         yield return Row(nameof(IAppCommands.SetFramePixelRegion),
-            ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(new[] { Zebra(ctx).Frames[0] }, 4, 8, 12, 16, 64, 64)));
+            ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(new[] { Zebra(ctx).Frames[0] }, 4, 8, 12, 16)));
         yield return Row(nameof(IAppCommands.SetRectProps),
             ctx => Sync(() => ctx.AppCommands.SetRectProps(Zebra(ctx).Frames[0], Rect(ctx), "Renamed", 5f, 6f, 7f, 8f)));
         yield return Row(nameof(IAppCommands.SetCircleProps),

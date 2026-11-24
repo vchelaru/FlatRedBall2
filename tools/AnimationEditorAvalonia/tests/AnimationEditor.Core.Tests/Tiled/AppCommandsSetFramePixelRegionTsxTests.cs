@@ -53,7 +53,7 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
         var frame0 = chain.Frames[0];
         var frame1 = chain.Frames[1];
 
-        _ctx.AppCommands.SetFramePixelRegion([frame0], pixelX: null, pixelY: null, pixelW: 32, pixelH: 32, bmpW: 64, bmpH: 64);
+        _ctx.AppCommands.SetFramePixelRegion([frame0], pixelX: null, pixelY: null, pixelW: 32, pixelH: 32);
 
         Assert.Equal(0.5f, frame0.RightCoordinate, precision: 4);
         // Frame 1 keeps its own origin (tile 4: col 0, row 1) and takes the same 2x2-tile size.
@@ -74,7 +74,7 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
         var chain = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single();
         var frame1 = chain.Frames[1];
 
-        _ctx.AppCommands.SetFramePixelRegion([chain.Frames[0]], pixelX: null, pixelY: null, pixelW: 32, pixelH: null, bmpW: 64, bmpH: 64);
+        _ctx.AppCommands.SetFramePixelRegion([chain.Frames[0]], pixelX: null, pixelY: null, pixelW: 32, pixelH: null);
         Assert.Equal(0.5f, frame1.RightCoordinate, precision: 4);
 
         _ctx.UndoManager.Undo();
@@ -90,7 +90,7 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
         var chain = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single();
         var frame1 = chain.Frames[1];
 
-        _ctx.AppCommands.SetFramePixelRegion([chain.Frames[0]], pixelX: 32, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+        _ctx.AppCommands.SetFramePixelRegion([chain.Frames[0]], pixelX: 32, pixelY: null, pixelW: null, pixelH: null);
 
         Assert.Equal(0f, frame1.LeftCoordinate, precision: 4);
         Assert.Equal(0.25f, frame1.RightCoordinate, precision: 4);
@@ -108,7 +108,7 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
         chain.Frames.Add(frame1);
         _ctx.Acls.AnimationChains.Add(chain);
 
-        _ctx.AppCommands.SetFramePixelRegion([frame0], pixelX: null, pixelY: null, pixelW: 32, pixelH: null, bmpW: 64, bmpH: 64);
+        _ctx.AppCommands.SetFramePixelRegion([frame0], pixelX: null, pixelY: null, pixelW: 32, pixelH: null);
 
         Assert.Equal(0.5f, frame0.RightCoordinate, precision: 4);
         Assert.Equal(0.25f, frame1.RightCoordinate, precision: 4);

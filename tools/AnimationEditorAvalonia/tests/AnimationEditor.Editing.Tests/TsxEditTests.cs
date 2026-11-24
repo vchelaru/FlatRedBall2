@@ -135,7 +135,7 @@ public class TsxEditTests : IDisposable
         var s = await OpenTsx();
         var walk = s.Document.AnimationChains[0];
         // A rect off the tile grid cannot be written back as a tile animation.
-        s.Commands.SetFramePixelRegion([walk.Frames[0]], (NumericEdit)1f, (NumericEdit)1f, (NumericEdit)15f, (NumericEdit)15f, 48, 32);
+        s.Commands.SetFramePixelRegion([walk.Frames[0]], (NumericEdit)1f, (NumericEdit)1f, (NumericEdit)15f, (NumericEdit)15f);
 
         var save = s.Save();
 

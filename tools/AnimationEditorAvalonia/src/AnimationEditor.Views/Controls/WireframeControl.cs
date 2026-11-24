@@ -1307,8 +1307,8 @@ public class WireframeControl : TextureViewport
         float unionR = float.MinValue, unionB = float.MinValue;
         foreach (var frame in chain.Frames)
         {
-            unionL = Math.Min(unionL, frame.LeftCoordinate );
-            unionT = Math.Min(unionT, frame.TopCoordinate );
+            unionL = Math.Min(unionL, frame.LeftCoordinate);
+            unionT = Math.Min(unionT, frame.TopCoordinate);
             unionR = Math.Max(unionR, frame.RightCoordinate);
             unionB = Math.Max(unionB, frame.BottomCoordinate);
         }

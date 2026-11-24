@@ -286,28 +286,6 @@ public class DragHandleApplierTests
         Assert.True(result.Bottom - result.Top >= 1f);
     }
 
-    // ── UV conversion ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public void ToUvCoords_DividesByBitmapDimensions()
-    {
-        var (l, t, r, b) = DragHandleApplier.ToUvCoords(new BoundsRect(10f, 20f, 50f, 80f), 100f, 100f);
-        Assert.Equal(0.1f, l);
-        Assert.Equal(0.2f, t);
-        Assert.Equal(0.5f, r);
-        Assert.Equal(0.8f, b);
-    }
-
-    [Fact]
-    public void ToUvCoords_FullBitmapBounds_ReturnsOneByOne()
-    {
-        var (l, t, r, b) = DragHandleApplier.ToUvCoords(new BoundsRect(0f, 0f, 100f, 100f), 100f, 100f);
-        Assert.Equal(0f, l);
-        Assert.Equal(0f, t);
-        Assert.Equal(1f, r);
-        Assert.Equal(1f, b);
-    }
-
     [Fact]
     public void Apply_None_LeavesRectUnchanged()
     {

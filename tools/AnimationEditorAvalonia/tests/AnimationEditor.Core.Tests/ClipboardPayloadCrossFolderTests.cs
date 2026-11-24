@@ -26,7 +26,7 @@ public class ClipboardPayloadCrossFolderTests
         string sourceFolder = TestPaths.AbsDir("Project", "Animations", "Player");
 
         var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, sourceFolder);
-        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out var chains, out _, out _);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out var chains, out _, out _);
 
         var expected = new[]
         {
@@ -44,7 +44,7 @@ public class ClipboardPayloadCrossFolderTests
         string sourceFolder = TestPaths.AbsDir("Project", "Animations", "Player");
 
         var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, sourceFolder);
-        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out var frames, out _);
 
         Assert.Equal(TexturePathHelper.ResolveDisplayPath("sheet.png", sourceFolder), frames!.Single().TextureName);
     }
@@ -56,7 +56,7 @@ public class ClipboardPayloadCrossFolderTests
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } };
 
         var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
-        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out var frames, out _);
 
         Assert.Equal("sheet.png", frames!.Single().TextureName);
     }
@@ -69,7 +69,7 @@ public class ClipboardPayloadCrossFolderTests
         var payload = new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } };
 
         var text = ClipboardPayload.SerializeFromPayload(payload, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, TestPaths.AbsDir("Project", "Animations", "Player"));
-        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, out _, out var frames, out _);
+        ClipboardPayload.TryDeserialize(text, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => null, out _, out var frames, out _);
 
         Assert.Equal(absolutePath, frames!.Single().TextureName);
     }
