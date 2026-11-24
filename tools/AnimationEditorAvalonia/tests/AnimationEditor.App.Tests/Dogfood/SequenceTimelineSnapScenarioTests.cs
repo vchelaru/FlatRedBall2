@@ -87,6 +87,93 @@ public class SequenceTimelineSnapScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task DraggingAReferenceClip_NearAnotherClipsEnd_LandsExactlyOnIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
+        var save = SequenceListSave.FromFile(boss);
+        var combo = new SequenceSave { Name = "Combo" };
+        combo.Tracks.Add(new SequenceTrackSave { Name = "A", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 0 } });
+        combo.Tracks.Add(new SequenceTrackSave { Name = "B", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 1 } });
+        save.Sequences.Insert(0, combo);
+        save.Save(boss);
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+
+        // Clip A plays 0 to 0.5. Grab B inside its body and drop its start 3 px past A's end.
+        editor.DragHold(At(editor, 1, 1.1), At(editor, 1, 0.6, dx: 3));
+
+        timeline.SnapGuideTime!.Value.ShouldBe(0.5, 1e-6);
+        editor.DragRelease(At(editor, 1, 0.6, dx: 3));
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[1].Reference!.Start.ShouldBe(0.5, 1e-6);
+    }
+
+    // Combo: a reference clip of Attack (0.5 s) on track 0 at 3.0, and a Walk block (0.5 s) on track 1 at walkStart.
+    private static async Task<string> OpenClipBesideChain(AnimationEditorHarness editor, double walkStart)
+    {
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
+        var save = SequenceListSave.FromFile(boss);
+        var combo = new SequenceSave { Name = "Combo" };
+        combo.Tracks.Add(new SequenceTrackSave { Name = "Clip", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 3.0 } });
+        combo.Tracks.Add(Track("Chain", ("Walk", walkStart, null)));
+        save.Sequences.Insert(0, combo);
+        save.Save(boss);
+        await editor.OpenAsync(boss);
+        return boss;
+    }
+
+    private static SequenceReferenceSave SavedClip(string path) => SequenceListSave.FromFile(path).Sequences[0].Tracks[0].Reference!;
+
+    [AvaloniaFact]
+    public async Task DraggingAReferenceClip_NearAChainBlocksStart_LandsItsEndExactlyOnIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        // Walk plays 1.13 to 1.63. The clip is 0.5 s, so its end on 1.13 puts its start at 0.63.
+        string boss = await OpenClipBesideChain(editor, 1.13);
+        var timeline = Timeline(editor);
+
+        editor.DragHold(At(editor, 0, 3.2), At(editor, 0, 0.83, dx: 1));
+
+        timeline.SnapGuideTime!.Value.ShouldBe(1.13, 1e-6);
+        timeline.SnapGuide!.Value.Track.ShouldBe(1);
+        editor.DragRelease(At(editor, 0, 0.83, dx: 1));
+        SavedClip(boss).Start.ShouldBe(0.63, 1e-6);
+    }
+
+    [AvaloniaFact]
+    public async Task DraggingAReferenceClip_NearAChainBlocksEnd_LandsItsStartExactlyOnIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        // Walk plays 1.13 to 1.63.
+        string boss = await OpenClipBesideChain(editor, 1.13);
+        var timeline = Timeline(editor);
+
+        editor.DragHold(At(editor, 0, 3.2), At(editor, 0, 1.83, dx: 1));
+
+        timeline.SnapGuideTime!.Value.ShouldBe(1.63, 1e-6);
+        timeline.SnapGuide!.Value.Track.ShouldBe(1);
+        editor.DragRelease(At(editor, 0, 1.83, dx: 1));
+        SavedClip(boss).Start.ShouldBe(1.63, 1e-6);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(3.13, 3.63, 0.63)] // Walk plays 3.13 to 3.63: the clip's trim edge lands on Walk's end
+    [InlineData(3.23, 3.23, 0.23)] // Walk plays 3.23 to 3.73: the trim edge lands on Walk's start
+    public async Task TrimmingAReferenceClip_NearAChainBlockEdge_LandsExactlyOnIt(double walkStart, double target, double expectedLength)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = await OpenClipBesideChain(editor, walkStart);
+        var timeline = Timeline(editor);
+
+        // The clip plays 3.0 to 3.5; grab its right edge and drop it 1 px past the target.
+        editor.DragHold(At(editor, 0, 3.5, dx: -2), At(editor, 0, target, dx: 1));
+
+        timeline.SnapGuideTime!.Value.ShouldBe(target, 1e-6);
+        editor.DragRelease(At(editor, 0, target, dx: 1));
+        SavedClip(boss).Length!.Value.ShouldBe(expectedLength, 1e-6);
+    }
+
+    [AvaloniaFact]
     public async Task DraggingTheRightEdge_AtVeryHighZoom_IsFreeBetweenTargets()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

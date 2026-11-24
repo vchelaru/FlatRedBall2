@@ -51,6 +51,24 @@ public class TimelineSnapTargetsTests
     }
 
     [Fact]
+    public void Others_OffersEveryReferenceClipsStartAndEnd_NeverTheDraggedClip()
+    {
+        var blocks = Blocks(Track(Ref("Walk", 0)));
+        var other = new SequenceReferenceSave { Start = 4 };
+        var dragged = new SequenceReferenceSave { Start = 9 };
+        var clips = new[]
+        {
+            new TimelineReference(1, other, TargetLength: 2, IsMissing: false, System.Array.Empty<InheritedRow>()),
+            new TimelineReference(2, dragged, TargetLength: 1, IsMissing: false, System.Array.Empty<InheritedRow>()),
+        };
+
+        var targets = TimelineSnapTargets.Others(blocks, (SequenceChainReferenceSave?)null, 0, clips, dragged);
+
+        targets.Where(t => t.Kind == SnapKind.ChainEdge && t.Track == 1).Select(t => t.Time).ShouldBe(new[] { 4.0, 6.0 });
+        targets.ShouldNotContain(t => t.Track == 2);
+    }
+
+    [Fact]
     public void Others_AChainCutByTheDraggedOne_OffersNoPlayedEnd_OnlyItsFullEnd()
     {
         var early = Ref("Run", 0, length: 2);    // asks for 0..2, cut at 1 by the dragged Walk
