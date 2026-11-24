@@ -18,6 +18,7 @@ A game project that copied this skill has no FRB2 checkout beside it: set the fu
 | `render <file> --out <dir> [options]` | Writes PNGs without the editor, see Rendering below. |
 | `edit <file> --ops ops.json [--json]` | Applies the ops in order, then saves once. |
 | `--schema [--json]` | Lists every op (animation ops, then `sequenceOps` in JSON) with its fields, types and allowed values. Starts with a one-line example ops file (a `{"ops":[...]}` object, never a bare array). Run it before writing an ops file; it is the source of truth for ops. |
+| `--version` | One line: `aecli <version>+<commit> built <UTC time>`. Compare the commit to `git rev-parse --short=8 HEAD` to tell if the built exe is behind the source (rebuild if so). |
 
 Exit codes: 0 ok, 1 the command ran and found a problem or failed, 2 bad command line or ops file (with `--json` also `{success:false, errors:[{code:"UsageError", message}]}` on stdout; text mode prints the message and one hint line). Not-found names carry "Did you mean ..." or the list of valid names in the message. `--json` output on `edit` and `new` is `{success, changed, errors:[{op, code, message}], warnings}`. Branch on `code` (full list in `--schema`): `NotFound` (unknown chain, shape or file), `IndexOutOfRange`, `InvalidValue` (out of range), `InvalidAddress` (malformed address or selector), `NoMatch` (selector matched nothing), `WrongShapeType`, `Ambiguous`, `Refused`; `Unspecified` is only a fallback.
 

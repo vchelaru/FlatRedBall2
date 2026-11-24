@@ -20,6 +20,7 @@ public static class CliApp
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2) or a chain (--chain <name> --frame 0 | --at 0.3)
               --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  [--json]
           --schema [--json]                      list the operations and their fields
+          --version                              build version, source commit and build time (UTC)
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
         """;
 
@@ -30,6 +31,12 @@ public static class CliApp
         if (args[0] is "-h" or "--help" or "help")
         {
             stdout.WriteLine(Usage);
+            return 0;
+        }
+
+        if (args[0] == "--version")
+        {
+            stdout.WriteLine(BuildInfo.Describe());
             return 0;
         }
 
