@@ -5,7 +5,7 @@ description: "aecli, the command-line tool for reading and editing .achx/.achj a
 
 # aecli
 
-Headless front end to the AnimationEditor's editing code (`tools/AnimationEditorAvalonia/src/AnimationEditor.Cli`, logic in `AnimationEditor.Editing`). Run it from the repo with `dotnet run --project tools/AnimationEditorAvalonia/src/AnimationEditor.Cli -- <args>`. For the animation format itself see the `animation` skill.
+Headless front end to the AnimationEditor's editing code (`tools/AnimationEditorAvalonia/src/AnimationEditor.Cli`, logic in `AnimationEditor.Editing`). Build once with `dotnet build tools/AnimationEditorAvalonia/src/AnimationEditor.Cli`, then call the exe directly: `tools/AnimationEditorAvalonia/src/AnimationEditor.Cli/bin/Debug/net10.0/aecli.exe <args>` (~0.35 s per call; `dotnet run` costs 5-9 s and `dotnet run --no-build` 2-3 s on every call). Rebuild after the CLI source changes. For the animation format itself see the `animation` skill.
 
 | Command | Does |
 |---|---|
