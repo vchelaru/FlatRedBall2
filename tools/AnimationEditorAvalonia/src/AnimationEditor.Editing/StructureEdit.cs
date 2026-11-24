@@ -1,6 +1,8 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Paths;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -58,6 +60,74 @@ public static class StructureEdit
         var copy = commands.DuplicateChain(source, ChainFlip.None, newName);
         return copy is null ? Fail(EditErrorCode.Refused, $"Could not duplicate chain '{source.Name}'.") : Ok(copy.Name);
     }
+
+    /// <summary>
+    /// Appends copies of the chains of the .achx/.achj <paramref name="sourcePath"/> that <paramref name="pattern"/> (a name
+    /// or glob) matches, in that file's order and as one undo step. Textures are referenced where they are, and lengths are
+    /// converted to the receiving file's unit. <paramref name="newName"/> renames a single copy. A name already in use fails
+    /// the whole import. The source file is only read.
+    /// </summary>
+    public static EditResult ImportChains(
+        IProjectManager projectManager, IAppCommands commands, string sourcePath, string pattern, string? newName)
+    {
+        var sourceName = Path.GetFileName(sourcePath);
+        if (Path.GetExtension(sourcePath).ToLowerInvariant() is not (".achx" or ".achj"))
+            return Fail(EditErrorCode.UnsupportedFile, $"Chains can only be imported from an .achx or .achj: {sourcePath}");
+        if (!File.Exists(sourcePath)) return Fail(EditErrorCode.NotFound, $"File not found: {sourcePath}");
+        if (projectManager.FileName is { } current && new FilePath(sourcePath) == new FilePath(current))
+            return Fail(EditErrorCode.Refused, $"{sourceName} is the file being edited; use duplicate-chain to copy a chain inside one file.");
+
+        var read = AnimationFileReader.Read(sourcePath);
+        if (read.Document is not { } source) return Fail(EditErrorCode.IoFailed, read.Error!);
+
+        List<AnimationChainSave> chains;
+        if (EditSelectors.IsGlob(pattern))
+        {
+            var names = EditSelectors.ExpandChains(source, pattern);
+            if (!names.Ok) return Fail(names.Code, $"{sourceName}: {names.Error}");
+            chains = source.AnimationChains.Where(c => names.Targets!.Contains(c.Name)).ToList();
+            var twice = chains.GroupBy(c => c.Name).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            if (twice.Count > 0)
+                return Fail(EditErrorCode.Ambiguous, $"{sourceName}: more than one chain is named {Quoted(twice)}; rename them in the editor first.");
+        }
+        else
+        {
+            var chain = EditAddress.ResolveChain(source, pattern);
+            if (!chain.Ok) return Fail(chain.Code, $"{sourceName}: {chain.Error}");
+            chains = [chain.Value!];
+        }
+
+        if (newName is not null)
+        {
+            if (chains.Count > 1)
+                return Fail(EditErrorCode.InvalidValue, $"name is for a single chain, but '{pattern}' matches {chains.Count} chains.");
+            newName = newName.Trim();
+            if (CheckNewChainName(projectManager, newName) is { } refused) return refused;
+            chains[0].Name = newName;
+        }
+
+        var document = projectManager.AnimationChainListSave!;
+        var taken = document.AnimationChains.Select(c => c.Name).ToHashSet();
+        var clashes = chains.Where(c => taken.Contains(c.Name)).Select(c => c.Name).ToList();
+        if (clashes.Count > 0)
+            return Fail(EditErrorCode.DuplicateName,
+                $"The file already has chains named {Quoted(clashes)}; rename them, or import one chain at a time with name=<new name>.");
+
+        // Only the chains that come along need their textures to convert a UV file.
+        source.AnimationChains = chains;
+        try { AnimationFileLoader.ConvertToEditorCoordinates(source, new FilePath(sourcePath)); }
+        catch (InvalidOperationException ex) { return Fail(EditErrorCode.UnsupportedFile, $"{sourceName}: {ex.Message}"); }
+
+        ClipboardPayload.Retarget(chains, Path.GetDirectoryName(sourcePath)!, FrameLengthUnit.Of(source), FrameLengthUnit.Of(document));
+        var folder = Path.GetDirectoryName(projectManager.FileName) ?? string.Empty;
+        foreach (var frame in chains.SelectMany(c => c.Frames))
+            frame.TextureName = TexturePathHelper.NormalizeStoredTextureName(frame.TextureName, folder);
+
+        commands.PasteChains(chains, document.AnimationChains.Count);
+        return Ok([.. chains.Select(c => c.Name)]);
+    }
+
+    private static string Quoted(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"'{n}'"));
 
     /// <summary>Moves <paramref name="chain"/> so it ends up at zero-based <paramref name="index"/>.</summary>
     public static EditResult ReorderChain(

@@ -1,5 +1,4 @@
 using AnimationEditor.Core.Paths;
-using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.IO;
 
@@ -7,7 +6,7 @@ namespace AnimationEditor.Core.Models
 {
     /// <summary>
     /// Per-tab in-memory editor model cache so tab switches can swap project state
-    /// without re-reading and re-parsing the <c>.achx</c> from disk.
+    /// without re-parsing the <c>.achx</c> from disk.
     /// </summary>
     public static class TabEditorCache
     {
@@ -19,6 +18,7 @@ namespace AnimationEditor.Core.Models
         {
             tab.CachedEditorModel = pm.AnimationChainListSave;
             tab.CachedOnDiskCoordinateType = pm.OnDiskCoordinateType;
+            tab.CachedDiskHash = TryHashDisk(tab.Path);
             tab.CachedDiskWriteTimeUtc = TryReadDiskWriteTimeUtc(tab.Path);
             tab.CachedTsxState = pm.CaptureTsxState();
             tab.CachedReferencedPngs = pm.ReferencedPngs;
@@ -26,12 +26,18 @@ namespace AnimationEditor.Core.Models
 
         /// <summary>
         /// Returns <c>true</c> when <paramref name="tab"/> has a cached model and the on-disk
-        /// file has not changed since the cache was captured.
+        /// file's content has not changed since the cache was captured. Not its write time: two
+        /// writes in one clock tick share a time, and a copied-in file keeps its own older one. The
+        /// time decides only when the content can't be read (another process holds the file).
         /// </summary>
         public static bool HasFreshCache(TabEntry tab)
         {
             if (tab.CachedEditorModel == null)
                 return false;
+
+            var diskHash = TryHashDisk(tab.Path);
+            if (diskHash != null && tab.CachedDiskHash != null)
+                return diskHash.AsSpan().SequenceEqual(tab.CachedDiskHash);
 
             if (tab.CachedDiskWriteTimeUtc == null)
                 return true;
@@ -47,14 +53,9 @@ namespace AnimationEditor.Core.Models
         public static void Invalidate(TabEntry tab)
         {
             tab.CachedEditorModel = null;
+            tab.CachedDiskHash = null;
             tab.CachedDiskWriteTimeUtc = null;
             tab.SaveFailed = false;
-        }
-
-        /// <summary>Refreshes only the on-disk timestamp after a save.</summary>
-        public static void RefreshDiskTimestamp(TabEntry tab)
-        {
-            tab.CachedDiskWriteTimeUtc = TryReadDiskWriteTimeUtc(tab.Path);
         }
 
         /// <summary>Copies cached editor state into <paramref name="pm"/>.</summary>
@@ -66,6 +67,9 @@ namespace AnimationEditor.Core.Models
             pm.RestoreTsxState(tab.CachedTsxState);
             pm.ReferencedPngs = tab.CachedReferencedPngs;
         }
+
+        private static byte[]? TryHashDisk(FilePath path) =>
+            string.IsNullOrEmpty(path.Original) ? null : HotReload.HotReloadWatcher.TryHash(path.FullPath);
 
         private static DateTime? TryReadDiskWriteTimeUtc(FilePath path)
         {
