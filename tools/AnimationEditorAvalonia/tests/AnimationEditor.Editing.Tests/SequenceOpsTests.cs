@@ -63,6 +63,22 @@ public class SequenceOpsTests : IDisposable
     }
 
     [Fact]
+    public void Apply_AddBlock_WithoutStartOrSource_LaterOpsSeeTheNewBlock()
+    {
+        var run = Apply("""
+            {"ops":[
+              {"op":"add-block","track":"Rest/Body","chain":"Walk"},
+              {"op":"add-block","track":"Rest/Body","chain":"Idle"}
+            ]}
+            """);
+
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+        var chains = Reload().Sequences[1].Tracks[0].Chains;
+        // Idle@0 auto 0.5, then Walk@0.5 auto 0.4, then Idle@0.9.
+        chains.Select(c => (c.Chain, c.Start)).ShouldBe([("Idle", 0.0), ("Walk", 0.5), ("Idle", 0.9)]);
+    }
+
+    [Fact]
     public void Apply_FailingOp_WritesNothing_AndNamesTheOp()
     {
         var before = _w.Bytes;
