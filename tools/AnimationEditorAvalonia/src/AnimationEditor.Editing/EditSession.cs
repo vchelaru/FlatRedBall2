@@ -27,6 +27,9 @@ public sealed class EditSession
     public ObjectFinder ObjectFinder { get; }
     public UndoManager Undo { get; } = new();
 
+    /// <summary>The files a batch wrote before its save, put back when it fails.</summary>
+    public FileRollback Rollback { get; } = new();
+
     /// <summary>The loaded document, in the editor's in-memory (pixel) representation.</summary>
     public AnimationChainListSave Document => _projectManager.AnimationChainListSave!;
 

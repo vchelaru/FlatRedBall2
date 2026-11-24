@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -288,6 +289,49 @@ public class AchxFailedSaveScenarioTests
         editor.CloseTab("hero.achx");
 
         editor.Dialogs.Shown.ShouldBeEmpty();
+    }
+
+    // A clean tab's cut must not overwrite an outside edit either: the tab has not read it yet.
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CuttingFromATabWhoseFileChanged_RefusesToWriteIt_AndClosingAsks(bool failedSave)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        (string hero, _) = await OpenTwoTabsAndFailTheFirstSave(editor);
+        UnusualProjectScenarioTests.MakeWritable(hero);
+        editor.ClickTab("hero.achx");
+        if (!failedSave) EditFirstFrame(editor, "16");
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        editor.Press(Key.X, RawInputModifiers.Control);
+        editor.ClickTab("boss.achx");
+        editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (32, 0, 16, 16)));
+        editor.Press(Key.V, RawInputModifiers.Control);
+        editor.WaitUntil(() => editor.Project.AnimationChains.Count == 2, TimeSpan.FromSeconds(5)).ShouldBeTrue();
+        SavedX(hero).ShouldBe(32);
+        editor.ProblemText!.ShouldContain("\"hero.achx\" changed on disk");
+        editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Cancel);
+
+        editor.CloseTab("hero.achx");
+
+        editor.Dialogs.Shown.ShouldBe(new[] { Prompt("hero.achx") });
+    }
+
+    [AvaloniaFact]
+    public async Task SaveAsOverAnotherTabsFile_ThatTabShowsTheSavedContent()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await OpenAsync(editor, "hero.achx");
+        string boss = await OpenAsync(editor, "boss.achx");
+        editor.ClickTab("hero.achx");
+        EditFirstFrame(editor, "8");
+        editor.Dialogs.AnswerNextSaveFile(boss);
+        editor.ClickMenu("MenuSaveAs");
+        editor.WaitUntil(() => SavedX(boss) == 8, TimeSpan.FromSeconds(5)).ShouldBeTrue();
+
+        editor.ClickTab("boss.achx");
+
+        editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(8);
     }
 
     [AvaloniaFact]

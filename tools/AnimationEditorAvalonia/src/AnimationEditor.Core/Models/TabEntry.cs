@@ -92,6 +92,12 @@ namespace AnimationEditor.Core.Models
         public TextureCoordinateType CachedOnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
         /// <summary>
+        /// What the file held when <see cref="CachedEditorModel"/> was last loaded, reloaded or saved. Null when
+        /// the model was never loaded from or saved to a file.
+        /// </summary>
+        public DiskState? CachedDiskState { get; set; }
+
+        /// <summary>
         /// Snapshot of this tab's native-tsx state (see <see cref="IProjectManager.CaptureTsxState"/>),
         /// captured alongside <see cref="CachedEditorModel"/> so a cache-hit tab switch restores
         /// <see cref="IProjectManager.IsNativeTsxProject"/>/<see cref="IProjectManager.TsxTileGrid"/>

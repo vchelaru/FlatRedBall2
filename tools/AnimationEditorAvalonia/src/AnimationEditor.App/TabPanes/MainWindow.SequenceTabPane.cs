@@ -421,7 +421,10 @@ public partial class MainWindow
         }
 
         /// <summary>Whether any open .seqj holds edits its file lacks (a failed save), for the window-close check.</summary>
-        public bool HasUnsavedEdits => _documents.Values.Any(document => document.HasUnsavedEdits);
+        public bool HasUnsavedEdits => UnsavedDocuments.Any();
+
+        /// <summary>The open documents holding edits their files lack.</summary>
+        public IEnumerable<SequenceDocument> UnsavedDocuments => _documents.Values.Where(document => document.HasUnsavedEdits);
 
         /// <summary>
         /// The window is closing: asks about each document with unsaved edits. Returns false when the user cancelled or a
@@ -429,7 +432,7 @@ public partial class MainWindow
         /// </summary>
         public async Task<bool> ConfirmWindowCloseAsync()
         {
-            foreach (var document in _documents.Values.Where(document => document.HasUnsavedEdits).ToList())
+            foreach (var document in UnsavedDocuments.ToList())
                 if (!await ConfirmCloseAsync(document)) return false;
             return true;
         }

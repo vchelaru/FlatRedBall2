@@ -22,6 +22,7 @@ namespace AnimationEditor.Core.Models
         public static void Invalidate(TabEntry tab)
         {
             tab.CachedEditorModel = null;
+            tab.CachedDiskState = null;
             tab.SaveFailed = false;
         }
 

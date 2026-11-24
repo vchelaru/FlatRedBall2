@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Keyframes;
@@ -78,6 +79,12 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string>? ItemsDeleted;
 
         /// <summary>
+        /// Raised after a rename, delete or cut leaves the document without chain names it had before: once per user action,
+        /// and never for undo or redo. Anything that refers to the chains by name is now broken.
+        /// </summary>
+        event Action<RemovedChainNames>? ChainNamesRemoved;
+
+        /// <summary>
         /// Fired when <see cref="LoadAnimationChain"/> fails — file not found, corrupt XML,
         /// or any other engine-side throw. The first argument is the attempted file path;
         /// the second is the exception. <c>RefreshTreeViewRequested</c> is NOT fired when
@@ -140,8 +147,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Swaps the editor to <paramref name="tab"/>'s cached in-memory model when the cache
         /// is fresh: the file holds what the editor last read from or wrote to it. A tab whose last save
         /// failed is kept even when the file changed; saving to that file is then refused (raising <see
-        /// cref="SaveFailed"/>, once here too) until it is reloaded. Does not clear or restore undo; the app
-        /// layer handles that.
+        /// cref="SaveFailed"/>, once here too) while the file differs, until it is reloaded. Does not clear or
+        /// restore undo; the app layer handles that.
         /// </summary>
         /// <returns><c>true</c> when the cache was applied; <c>false</c> when a disk load is needed.</returns>
         bool TryActivateTabFromCache(TabEntry tab);
@@ -180,13 +187,12 @@ namespace AnimationEditor.Core.CommandsAndState
         void SaveCurrentAnimationChainList(string? fileName = null);
         Task SaveCurrentAnimationChainListAsync();
         /// <summary>
-        /// Writes a document other than the current one to its own file, in that file's disk
-        /// format: a cross-document cut removes chains from a background tab's model, and unless
+        /// Writes a background tab's cached document to its own file, in that file's disk format: a cross-document cut removes chains from a background tab's model, and unless
         /// that model reaches disk the chain comes back from the file on the next load or reload.
-        /// A failure, or a file saving is paused for, is reported through <see cref="SaveFailed"/> and
-        /// returns false.
+        /// A failure, or a file that changed since the document was read or saved, is reported through <see
+        /// cref="SaveFailed"/> and returns false. Sets <see cref="TabEntry.SaveFailed"/> either way.
         /// </summary>
-        bool SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
+        bool SaveDocument(TabEntry tab);
         Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);

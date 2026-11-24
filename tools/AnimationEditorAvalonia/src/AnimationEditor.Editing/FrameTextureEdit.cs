@@ -50,7 +50,7 @@ public static class FrameTextureEdit
         return plan is null ? new TextureResolveResult(texturePath, Ok()) : ApplyChoice(plan, choice);
     }
 
-    private static TextureResolveResult ApplyChoice(TextureCopyPlan plan, TextureCopyChoice choice)
+    internal static TextureResolveResult ApplyChoice(TextureCopyPlan plan, TextureCopyChoice choice)
     {
         try
         {
