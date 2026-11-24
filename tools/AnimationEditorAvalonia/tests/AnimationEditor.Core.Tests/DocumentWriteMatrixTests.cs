@@ -24,6 +24,8 @@ public class DocumentWriteMatrixTests
     /// <summary>False only where the editor has no such command for the pair.</summary>
     private static bool Applies(DocAction action, DocType front, DocType background) => action switch
     {
+        // What is behind plays no part.
+        DocAction.SaveAsToAnotherFolder => background == DocType.Achx,
         // A name has an extension, so the target is always some file format.
         DocAction.SaveAsOntoAnotherFormat => background != DocType.Untitled,
         // The cross-file cut only saves file-backed tabs of the achx pane.
@@ -36,20 +38,31 @@ public class DocumentWriteMatrixTests
         _ => true,
     };
 
-    /// <summary>#2030: a .seqj drops edits whose save failed when its file changes outside. The fix deletes this and the theory below it.</summary>
-    private static bool IsBug2030(DocAction action, DocType front, DocType background) =>
-        action == DocAction.OutsideChangeOverUnsavedEdits && front == DocType.Seqj;
+    /// <summary>The issue of a row that is a real bug and how the row fails, or null. The fix deletes the line.</summary>
+    private static (string Issue, string Failure)? KnownBug(DocAction action, DocType front) => (action, front) switch
+    {
+        (DocAction.OutsideChangeOverUnsavedEdits, DocType.Seqj) => ("#2030", "a refused save says so"),
+        (DocAction.SaveAsToAnotherFolder, DocType.Achx or DocType.Achj) => ("#2031", "the new file names files that are not there"),
+        (DocAction.SaveAsToAnotherFolder, DocType.Tsx) => ("#2016", "the new file names files that are not there"),
+        _ => null,
+    };
 
     public static IEnumerable<object[]> Rows() =>
-        Documents.Rows(Actions, (action, front, background) => Applies(action, front, background) && !IsBug2030(action, front, background));
+        Documents.Rows(Actions, (action, front, background) => Applies(action, front, background) && KnownBug(action, front) is null);
 
-    public static IEnumerable<object[]> RowsOf2030() => Documents.Rows(Actions, IsBug2030);
+    public static IEnumerable<object[]> KnownBugRows() =>
+        Documents.Rows(Actions, (action, front, background) => Applies(action, front, background) && KnownBug(action, front) is not null);
 
-    // Passes while the row fails, so the fix has to delete it.
+    // Passes while the row fails the way its issue says, so the fix has to delete its line.
     [Theory]
-    [MemberData(nameof(RowsOf2030))]
-    public Task Action_LosesUnsavedEdits_UntilIssue2030IsFixed(DocAction action, DocType front, DocType background) =>
-        Assert.ThrowsAnyAsync<Exception>(() => Action_KeepsEveryDocument(action, front, background));
+    [MemberData(nameof(KnownBugRows))]
+    public async Task KnownBug_StillFails(DocAction action, DocType front, DocType background)
+    {
+        var (issue, failure) = KnownBug(action, front)!.Value;
+        Exception? thrown = await Record.ExceptionAsync(() => Action_KeepsEveryDocument(action, front, background));
+        Assert.True(thrown != null, $"{issue} is fixed: delete its line from KnownBug.");
+        Assert.Contains(failure, thrown.Message);
+    }
 
     [Theory]
     [MemberData(nameof(Rows))]
@@ -86,6 +99,17 @@ public class DocumentWriteMatrixTests
                 current.Path.ShouldBe(copy);
                 if (original != null) File.ReadAllBytes(original).ShouldBe(before[original]);
                 written.Add(copy);
+                break;
+            case DocAction.SaveAsToAnotherFolder:
+                string folder = Directory.CreateDirectory(Path.Combine(editor.Folder, "moved")).FullName;
+                string moved = Path.Combine(folder, Documents.FrontName + (front == DocType.Untitled ? ".achj" : front.Extension()));
+                await editor.SaveAsAsync(current, moved);
+                Documents.MissingReferences(moved).ShouldBeEmpty("the new file names files that are not there");
+                // They are still the files they were, and stay so when it is edited.
+                editor.ShouldBeAsExpected();
+                editor.Edit(current);
+                editor.Messages.ShouldBeEmpty();
+                written.Add(moved);
                 break;
             case DocAction.SaveAsOntoAnotherFormat:
                 string target = Documents.Write(editor.InFolderOf(current, ""), background, "closed");
@@ -190,7 +214,7 @@ public class DocumentWriteMatrixTests
                 editor.Edit(current);
                 // Its tiles and lengths reach the tileset, beside the tileset's own animation. A tileset something is pushed
                 // to does not open as a document.
-                Documents.TileAnimations(back.Path!).ShouldBe(["0: 0@100 1@250 2@100", "11: 8@100 9@250"]);
+                Documents.TileAnimations(back.Path!).ShouldBe(["0: 0@100 1@250 2@100", "4: 4@200", "11: 8@100 9@250", "12: 12@200"]);
                 written.AddRange([current.Path, back.Path]);
                 editor.Forget(back);
                 break;
@@ -221,7 +245,7 @@ public class DocumentWriteMatrixTests
     {
         public required DocType Type { get; init; }
         public required string Name { get; init; }
-        public required string Folder { get; init; }
+        public required string Folder { get; set; }
         public required Expected Expected { get; set; }
         public string? Path { get; set; }
         public TabEntry? Tab { get; init; }
@@ -354,7 +378,9 @@ public class DocumentWriteMatrixTests
                 Ctx.AppCommands.FileDialogService = new StubFileDialogService(path);
                 await Ctx.AppCommands.SaveCurrentAnimationChainListAsync();
             }
-            if (!refused) document.Path = path;
+            if (refused) return;
+            document.Path = path;
+            document.Folder = Path.GetDirectoryName(path)!;
         }
 
         public void Reload(Document document)
@@ -380,7 +406,7 @@ public class DocumentWriteMatrixTests
 
         /// <summary>What the editor holds for <paramref name="document"/>.</summary>
         public List<string> LinesOf(Document document) =>
-            document.Sequences is { } sequences ? Documents.Lines(sequences.Save)
+            document.Sequences is { } sequences ? Documents.Lines(sequences.Save, document.Folder)
             : Documents.Lines((document == _live ? Ctx.ProjectManager.AnimationChainListSave : document.Tab!.CachedEditorModel)!, document.Folder);
 
         public void Dispose()

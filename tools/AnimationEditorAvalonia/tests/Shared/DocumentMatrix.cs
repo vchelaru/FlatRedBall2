@@ -24,6 +24,7 @@ public enum DocAction
     Save,
     Autosave,
     SaveAs,
+    SaveAsToAnotherFolder,
     SaveAsOntoAnotherFormat,
     SaveBackgroundDocument,
     Reload,
@@ -74,14 +75,15 @@ public sealed class Expected
     public static Expected Of(SequenceListSave sequences) =>
         new(null, SequenceListSave.FromJsonString(sequences.ToJsonString()));
 
-    /// <summary>The fixture <c>Documents.Write</c> writes for <paramref name="type"/>, not what reading it gives.</summary>
+    /// <summary>
+    /// The fixture <c>Documents.Write</c> writes for <paramref name="type"/>, not what reading it gives. It names other
+    /// files by full path, so it stays the same document when that moves.
+    /// </summary>
     public static Expected Fixture(string folder, DocType type, string name, AnimationChainSave chain)
     {
-        if (type == DocType.Seqj) return Of(Documents.Sequences(name));
-        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        list.AnimationChains.Add(chain);
-        var expected = Of(list);
-        foreach (AnimationFrameSave frame in expected.Chains[0].Frames) frame.TextureName = Path.Combine(folder, frame.TextureName);
+        if (type == DocType.Seqj) return Of(Documents.Resolved(Documents.Sequences(name), folder));
+        var expected = Of(Documents.List(name, chain));
+        foreach (AnimationFrameSave frame in expected.Chains.SelectMany(listed => listed.Frames)) frame.TextureName = Path.Combine(folder, frame.TextureName);
         return expected;
     }
 
@@ -101,7 +103,7 @@ public sealed class Expected
     }
 
     /// <summary>The document as text, one line per chain or sequence, in order. <paramref name="folder"/> is the file's.</summary>
-    public List<string> Lines(string folder) => List is null ? Documents.Lines(Sequences) : Documents.Lines(List, folder);
+    public List<string> Lines(string folder) => List is null ? Documents.Lines(Sequences, folder) : Documents.Lines(List, folder);
 }
 
 /// <summary>The documents the matrix opens, and how it reads them back.</summary>
@@ -134,8 +136,8 @@ public static class Documents
             if (!File.Exists(path)) File.WriteAllBytes(path, Convert.FromBase64String(SheetPng));
     }
 
-    /// <summary>The document's own row of tiles, so two documents never hold the same cell.</summary>
-    private static int RowOf(string name) => name switch { FrontName => 0, BackgroundName => 2, _ => 3 };
+    /// <summary>The row of tiles of the document's first chain, the next one being its second's, so two open documents never hold the same cell.</summary>
+    private static int RowOf(string name) => name switch { FrontName => 0, BackgroundName => 2, _ => 1 };
 
     /// <summary>The top left pixel of a frame no document starts with, for an edit.</summary>
     public static (int Left, int Top) NewCell(string name) => (32, RowOf(name) * 16);
@@ -156,6 +158,25 @@ public static class Documents
                 BottomCoordinate = top + 16,
             });
         return chain;
+    }
+
+    /// <summary>A document of <paramref name="chain"/> and a second chain, so order is always compared.</summary>
+    public static AnimationChainListSave List(string name, AnimationChainSave chain)
+    {
+        int top = (RowOf(name) + 1) * 16;
+        var idle = new AnimationChainSave { Name = "Idle-" + name };
+        idle.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png",
+            FrameLength = 0.2f,
+            LeftCoordinate = 0,
+            RightCoordinate = 16,
+            TopCoordinate = top,
+            BottomCoordinate = top + 16,
+        });
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        list.AnimationChains.AddRange([chain, idle]);
+        return list;
     }
 
     /// <summary><see cref="PlainChain"/> with a value in every kind of member a chain, frame, event and shape has.</summary>
@@ -199,7 +220,7 @@ public static class Documents
         var sequence = new SequenceSave { Name = name, Loop = false };
         sequence.Tracks.Add(body);
         sequence.Tracks.Add(new SequenceTrackSave { Name = "Arms", Visible = false, Continuous = true });
-        return new SequenceListSave { Sources = { "clips.achx" }, Sequences = { sequence } };
+        return new SequenceListSave { Sources = { "clips.achx" }, Sequences = { sequence, new SequenceSave { Name = "Idle-" + name } } };
     }
 
     /// <summary>Writes the document <paramref name="name"/> of <paramref name="type"/> into <paramref name="folder"/> and returns its path.</summary>
@@ -207,8 +228,7 @@ public static class Documents
     {
         WriteTextures(folder);
         string path = Path.Combine(folder, name + type.Extension());
-        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        list.AnimationChains.Add(chain ?? ChainFor(type, name));
+        AnimationChainListSave list = List(name, chain ?? ChainFor(type, name));
         switch (type)
         {
             case DocType.Achx:
@@ -230,6 +250,14 @@ public static class Documents
                       <animation>
                        <frame tileid="{tile}" duration="100"/>
                        <frame tileid="{tile + 1}" duration="250"/>
+                      </animation>
+                     </tile>
+                     <tile id="{tile + 4}">
+                      <properties>
+                       <property name="Name" value="Idle-{name}"/>
+                      </properties>
+                      <animation>
+                       <frame tileid="{tile + 4}" duration="200"/>
                       </animation>
                      </tile>
                     </tileset>
@@ -312,8 +340,31 @@ public static class Documents
         return alone.ToJsonString();
     }).ToList();
 
-    public static List<string> Lines(SequenceListSave list) => list.Sequences.Select(sequence =>
-        new SequenceListSave { Sources = list.Sources, Sequences = { sequence } }.ToJsonString()).ToList();
+    /// <summary>Every member of each sequence and the sources it can use, as JSON, with a source named by its full path.</summary>
+    public static List<string> Lines(SequenceListSave list, string folder)
+    {
+        SequenceListSave resolved = Resolved(list, folder);
+        return resolved.Sequences.Select(sequence => new SequenceListSave { Sources = resolved.Sources, Sequences = { sequence } }.ToJsonString()).ToList();
+    }
+
+    /// <summary>A copy of <paramref name="list"/>, in <paramref name="folder"/>, that names its sources by full path.</summary>
+    public static SequenceListSave Resolved(SequenceListSave list, string folder)
+    {
+        SequenceListSave copy = SequenceListSave.FromJsonString(list.ToJsonString());
+        string FullPath(string source) => new FilePath(Path.Combine(folder, source)).FullPath;
+        copy.Sources = copy.Sources.Select(FullPath).ToList();
+        foreach (var reference in copy.Sequences.SelectMany(sequence => sequence.Tracks).SelectMany(track => track.Chains)) reference.Source = FullPath(reference.Source);
+        return copy;
+    }
+
+    /// <summary>The textures and sources the file at <paramref name="path"/> names that are not there.</summary>
+    public static List<string> MissingReferences(string path)
+    {
+        Expected document = Read(path);
+        IEnumerable<string> named = document.List is null ? document.Sequences.Sources
+            : document.Chains.SelectMany(chain => chain.Frames).Select(frame => frame.TextureName);
+        return named.Select(name => new FilePath(Path.Combine(Path.GetDirectoryName(path)!, name)).FullPath).Distinct().Where(file => !File.Exists(file)).ToList();
+    }
 
     /// <summary>Every document file under <paramref name="folder"/> with its bytes.</summary>
     public static Dictionary<string, byte[]> FileBytes(string folder) =>

@@ -58,10 +58,10 @@ public class DocumentWriteMatrixScenarioTests
         };
     }
 
-    /// <summary>The issue of a row that is a real bug, or null. Such a row is skipped while it fails; the fix deletes its line.</summary>
-    private static string? KnownBug(DocAction action, DocType front, DocType background) => (action, front, background) switch
+    /// <summary>The issue of a row that is a real bug and how it fails, or null. Such a row is skipped while it fails so; the fix deletes its line.</summary>
+    private static (string Issue, string Failure)? KnownBug(DocAction action, DocType front, DocType background) => (action, front, background) switch
     {
-        (DocAction.LeaveDuringRename, DocType.Untitled, DocType.Seqj) => "#2023",
+        (DocAction.LeaveDuringRename, DocType.Untitled, DocType.Seqj) => ("#2023", "has no header label"),
         _ => null,
     };
 
@@ -71,7 +71,7 @@ public class DocumentWriteMatrixScenarioTests
     [MemberData(nameof(Rows))]
     public async Task Action_KeepsEveryDocument(DocAction action, DocType front, DocType background)
     {
-        if (KnownBug(action, front, background) is not { } issue)
+        if (KnownBug(action, front, background) is not { } bug)
         {
             await RunAsync(action, front, background);
             return;
@@ -80,11 +80,11 @@ public class DocumentWriteMatrixScenarioTests
         {
             await RunAsync(action, front, background);
         }
-        catch (Exception)
+        catch (Exception ex) when (ex.Message.Contains(bug.Failure))
         {
-            Assert.Skip(issue);
+            Assert.Skip(bug.Issue);
         }
-        Assert.Fail($"{issue} is fixed: delete its line from KnownBug.");
+        Assert.Fail($"{bug.Issue} is fixed: delete its line from KnownBug.");
     }
 
     private static async Task RunAsync(DocAction action, DocType front, DocType background)
@@ -125,7 +125,7 @@ public class DocumentWriteMatrixScenarioTests
                 {
                     // A copy in the tab, which the file cannot store, and the banner says so. The source keeps it.
                     editor.ProblemText.ShouldNotBeNull();
-                    editor.Project.AnimationChains.Count.ShouldBe(2);
+                    editor.Project.AnimationChains.Count.ShouldBe(3);
                     current.OnlyTheFile = true;
                 }
                 else if (front != DocType.Seqj && !(front == DocType.Tsx && action == DocAction.CutShape))
@@ -142,8 +142,8 @@ public class DocumentWriteMatrixScenarioTests
                 SelectSequence(editor);
                 editor.Press(Key.V, RawInputModifiers.Control);
                 editor.Wait(TimeSpan.FromMilliseconds(100));
-                current.Expected.Sequences.Sequences.Add(back.Expected.Sequences.Sequences.Single());
-                back.Expected.Sequences.Sequences.Clear();
+                current.Expected.Sequences.Sequences.Add(back.Expected.Sequences.Sequences[0]);
+                back.Expected.Sequences.Sequences.RemoveAt(0);
                 break;
             case DocAction.SaveAsOntoOpenTab:
                 editor.Dialogs.AnswerNextSaveFile(back.Path);
@@ -333,7 +333,8 @@ public class DocumentWriteMatrixScenarioTests
         AnimationChainSave chain = editor.Project.AnimationChains[0];
         if (action != DocAction.CutShape)
         {
-            editor.ClickRow(chain);
+            // A chain is pasted after the selected one, a frame into it.
+            editor.ClickRow(action == DocAction.CutFrame ? chain : editor.Project.AnimationChains.Last());
             return;
         }
         editor.Expand(chain);
