@@ -543,7 +543,7 @@ namespace AnimationEditor.Core
             }
 
             var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(
-                AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), entryHintsForMap, satelliteHintsForMap);
+                AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset, targetPath), entryHintsForMap, satelliteHintsForMap);
 
             // No "ownership transfer" here: a chain's owner tile is a storage-slot choice (loaded,
             // computed once, or explicitly set), never re-derived from frame geometry after the
@@ -700,7 +700,8 @@ namespace AnimationEditor.Core
             _tsxDormantHintsByChain = updatedDormant;
 
             TsxChainsNotFullySaved = mapped
-                .Where(r => r.Warnings.Count > 0 || r.EntryTileId == null || Tiled.TsxLossyDataCheck.DroppedKinds(r.SourceChain).Count > 0)
+                .Where(r => r.Warnings.Count > 0 || r.EntryTileId == null
+                    || Tiled.TsxLossyDataCheck.DroppedKinds(r.SourceChain, AnimationChainListSave.TimeMeasurementUnit).Count > 0)
                 .Select(r => r.SourceChain).ToHashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
 
             return mapped.SelectMany(r => r.Warnings)
@@ -1030,9 +1031,11 @@ namespace AnimationEditor.Core
         /// <summary>
         /// Builds a <see cref="Tiled.TilesetAnimationInfo"/> from <paramref name="tileset"/>, which
         /// both <see cref="SaveTsxProject"/> and <see cref="GetChainNamesWithTsxIssues"/> need.
+        /// <paramref name="path"/> is the tsx's file, or null for the open one.
         /// </summary>
-        private static Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset)
+        private Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset, string? path = null)
         {
+            path ??= FileName;
             var image = tileset.Image;
             var (textureWidth, textureHeight) = Tiled.TiledAnimationToAchjMapper.GetTextureSize(tileset);
             return new Tiled.TilesetAnimationInfo
@@ -1044,6 +1047,7 @@ namespace AnimationEditor.Core
                 Margin = tileset.Margin,
                 TileSpacing = tileset.Spacing,
                 ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
+                Folder = string.IsNullOrEmpty(path) ? string.Empty : new FilePath(path).GetDirectoryContainingThis().FullPath,
                 TextureWidth = textureWidth,
                 TextureHeight = textureHeight,
             };

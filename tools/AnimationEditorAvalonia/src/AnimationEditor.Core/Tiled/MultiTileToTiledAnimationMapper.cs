@@ -1,3 +1,4 @@
+using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
@@ -153,12 +154,12 @@ public static class MultiTileToTiledAnimationMapper
             for (var dx = 0; dx < footprintColumns; dx++)
                 perOffset[(dx, dy)] = [];
 
-        var tilesetBaseName = new FilePath(tilesetInfo.ImageFileName).NoPath;
+        FilePath Resolve(string name) => new(TexturePathHelper.ResolveDisplayPath(name, tilesetInfo.Folder));
+        var tilesetImage = Resolve(tilesetInfo.ImageFileName);
 
         foreach (var frame in chain.Frames)
         {
-            var textureBaseName = new FilePath(frame.TextureName).NoPath;
-            if (!string.Equals(textureBaseName, tilesetBaseName, StringComparison.OrdinalIgnoreCase))
+            if (frame.TextureName != tilesetInfo.ImageFileName && Resolve(frame.TextureName) != tilesetImage)
                 return Empty($"chain \"{chain.Name}\": references a different texture (\"{frame.TextureName}\") than the open tileset (\"{tilesetInfo.ImageFileName}\") - skipped.");
 
             var rect = AchjToTiledAnimationMapper.FrameRectPixels(frame, coordinateType, tilesetInfo);
