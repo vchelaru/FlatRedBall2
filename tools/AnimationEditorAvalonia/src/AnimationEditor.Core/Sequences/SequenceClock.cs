@@ -68,8 +68,13 @@ public sealed class SequenceClock
     {
         if (!IsPlaying) return;
         double next = Time + seconds;
-        if (next >= length && !loop) IsPlaying = false;
-        if (next >= length && loop && length > 0) Pass += (int)(next / length);
-        Time = SequenceTimeline.WrapTime(next, length, loop);
+        if (loop)
+        {
+            Time = SequenceTimeline.WrapTime(next, length, out int passes);
+            Pass += passes;
+            return;
+        }
+        if (next >= length) IsPlaying = false;
+        Time = SequenceTimeline.WrapTime(next, length, loop: false);
     }
 }
