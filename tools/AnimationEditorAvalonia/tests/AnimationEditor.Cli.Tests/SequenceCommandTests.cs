@@ -197,6 +197,81 @@ public class SequenceCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task DuplicateSequence_CopiesRightAfter_WithGivenOrFreeName_AndKeepsReferenceTargets()
+    {
+        var file = WriteSeq();
+        var save = SequenceListSave.FromFile(file);
+        save.Sequences.Add(new SequenceSave { Name = "Idle" });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Play", Reference = new SequenceReferenceSave { Sequence = "Run" } });
+        save.Save(file);
+
+        var r = await Edit(file, """
+            {"ops":[
+              {"op":"duplicate-sequence","sequence":"Run","name":"Sprint"},
+              {"op":"duplicate-sequence","sequence":"Idle"}
+            ]}
+            """);
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var after = SequenceListSave.FromFile(file);
+        after.Sequences.Select(s => s.Name).ShouldBe(["Run", "Sprint", "Idle", "Idle 2"]);
+        after.Sequences[1].Tracks[0].Chains.Select(c => c.Chain).ShouldBe(["Walk", "Idle"]);
+        after.Sequences[3].Tracks[0].Reference!.Sequence.ShouldBe("Run");
+    }
+
+    [Fact]
+    public async Task DuplicateSequence_TakenName_FailsAndWritesNothing()
+    {
+        var file = WriteSeq();
+        var before = File.ReadAllBytes(file);
+
+        var r = await Edit(file, """{"ops":[{"op":"duplicate-sequence","sequence":"Run","name":"Run"}]}""", "--json");
+
+        r.Code.ShouldBe(1);
+        using var doc = JsonDocument.Parse(r.Out);
+        doc.RootElement.GetProperty("errors")[0].GetProperty("code").GetString().ShouldBe("DuplicateName");
+        File.ReadAllBytes(file).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task CopyTrack_CopiesBlocksAcrossSequences_NamedFreeAndInsertedAtIndex()
+    {
+        var file = WriteSeq();
+        var save = SequenceListSave.FromFile(file);
+        save.Sequences.Add(new SequenceSave { Name = "Idle" });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Body" });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Shadow" });
+        save.Save(file);
+
+        var r = await Edit(file, """{"ops":[{"op":"copy-track","track":"Run/Body","to":"Idle","index":1}]}""");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var after = SequenceListSave.FromFile(file);
+        after.Sequences[1].Tracks.Select(t => t.Name).ShouldBe(["Body", "Body 2", "Shadow"]);
+        after.Sequences[1].Tracks[1].Continuous.ShouldBeTrue();
+        after.Sequences[1].Tracks[1].Chains.Select(c => (c.Chain, c.Start, c.Length)).ShouldBe([("Walk", 0.0, (double?)0.8), ("Idle", 1.0, null)]);
+        after.Sequences[0].Tracks.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task CopyTrack_ReferenceTrackThatWouldCycle_FailsAndWritesNothing()
+    {
+        var file = WriteSeq();
+        var save = SequenceListSave.FromFile(file);
+        save.Sequences.Add(new SequenceSave { Name = "Idle" });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Run", Reference = new SequenceReferenceSave { Sequence = "Run" } });
+        save.Save(file);
+        var before = File.ReadAllBytes(file);
+
+        var r = await Edit(file, """{"ops":[{"op":"copy-track","track":"Idle/Run","to":"Run"}]}""", "--json");
+
+        r.Code.ShouldBe(1);
+        using var doc = JsonDocument.Parse(r.Out);
+        doc.RootElement.GetProperty("errors")[0].GetProperty("code").GetString().ShouldBe("WouldCycle");
+        File.ReadAllBytes(file).ShouldBe(before);
+    }
+
+    [Fact]
     public async Task Schema_ListsSequenceOpsSeparately()
     {
         var text = await _w.RunAsync("--schema");

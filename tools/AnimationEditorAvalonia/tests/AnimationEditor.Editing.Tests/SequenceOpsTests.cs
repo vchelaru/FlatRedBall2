@@ -25,7 +25,7 @@ public class SequenceOpsTests : IDisposable
     {
         SequenceOps.Specs.Select(s => s.Name).ShouldBe(
         [
-            "add-sequence", "rename-sequence", "delete-sequence", "reorder-sequence", "set-sequence-loop",
+            "add-sequence", "rename-sequence", "delete-sequence", "reorder-sequence", "set-sequence-loop", "duplicate-sequence", "copy-track",
             "add-track", "rename-track", "delete-track", "reorder-track", "set-track-continuous", "add-reference-track",
             "add-source", "remove-source", "replace-source",
             "add-block", "set-block-start", "set-block-length", "set-block-end", "delete-block",
