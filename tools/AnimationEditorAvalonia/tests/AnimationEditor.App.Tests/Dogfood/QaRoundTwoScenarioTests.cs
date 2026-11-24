@@ -114,6 +114,32 @@ public class QaRoundTwoScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task CutFrame_PastedIntoAnotherDocumentsLockedChain_StaysWhereItWas()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string enemy = editor.WriteAchx("enemy.achx", AnimationEditorHarness.Chain("Bite", "sheet.png", (16, 0, 16, 16)));
+        await editor.OpenAsync(enemy);
+        AnimationChainSave bite = editor.ChainNamed("Bite");
+        editor.Click(editor.RowButton(bite, "Lock Animation"));
+        await editor.OpenAsync(hero);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        editor.ClickRow(walk.Frames[0]);
+
+        editor.Press(Key.X, RawInputModifiers.Control);
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.ClickTab("enemy.achx");
+        editor.ClickRow(bite);
+        editor.Press(Key.V, RawInputModifiers.Control);
+        editor.Wait(TimeSpan.FromMilliseconds(200));
+
+        bite.Frames.Count.ShouldBe(1, "the chain is locked");
+        AnimationEditorHarness.ReadSaved(hero).AnimationChains.Single().Frames.Count.ShouldBe(1);
+    }
+
+    [AvaloniaFact]
     public async Task FilteringOutTheSelectedChain_KeepsItVisible_SoDeleteNeverActsOnSomethingUnseen()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
