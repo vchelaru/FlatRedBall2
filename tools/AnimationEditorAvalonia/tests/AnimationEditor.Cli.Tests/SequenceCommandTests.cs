@@ -168,6 +168,26 @@ public class SequenceCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Edit_TwoOpsTouchingSameBlock_ListEachAddressOnce_InFirstSeenOrder()
+    {
+        const string ops = """
+            {"ops":[
+              {"op":"set-block-start","block":"Run/Body/1","start":1.2},
+              {"op":"set-block-start","block":"Run/Body/0","start":0.1},
+              {"op":"set-block-length","block":"Run/Body/1","length":0.5}
+            ]}
+            """;
+        var json = await Edit(WriteSeq(), ops, "--json");
+
+        json.Code.ShouldBe(0, json.Out + json.Err);
+        using var doc = JsonDocument.Parse(json.Out);
+        var changed = doc.RootElement.GetProperty("changed").EnumerateArray().Select(e => e.GetString()!).ToList();
+        changed.Count.ShouldBe(2);
+        changed[0].ShouldEndWith("Run/Body/1");
+        changed[1].ShouldEndWith("Run/Body/0");
+    }
+
+    [Fact]
     public async Task Edit_SetBlockChain_RepointsChainAndSource_KeepingStartAndLength()
     {
         var file = WriteSeq();
