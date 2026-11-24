@@ -103,7 +103,28 @@ public class TiledTilesetSyncRunnerTests
     }
 
     [Fact]
-    public void SyncAll_ChainOnAnotherTexture_KeepsTheTileItHadPushedAndWarnsNamingBothImages()
+    public void SyncAll_ChainOnASameNamedImage_KeepsTheTileItHadPushedAndWarnsNamingBothImages()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = "sub/Heroes.png";
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
+
+        outcome.Changed.ShouldBeFalse();
+        var warning = outcome.Warnings.Single();
+        warning.ShouldContain("\"Walk\"");
+        warning.ShouldContain("/sub/Heroes.png\"");
+        warning.ShouldContain("image is \"" + new AnimationEditor.Core.Paths.FilePath(Path.Combine(tempDir, "Heroes.png")).FullPath + "\"");
+        warning.ShouldContain("Tile 0 keeps its animation");
+    }
+
+    [Fact]
+    public void SyncAll_ChainMovedToADifferentlyNamedImage_ClearsTheTileItHadPushedWithoutWarning()
     {
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         var tsxPath = WriteFixtureTileset(tempDir);
@@ -115,12 +136,8 @@ public class TiledTilesetSyncRunnerTests
             frame.TextureName = "Other.png";
         var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
 
-        outcome.Changed.ShouldBeFalse();
-        var warning = outcome.Warnings.Single();
-        warning.ShouldContain("\"Walk\"");
-        warning.ShouldContain("/Other.png\"");
-        warning.ShouldContain("/Heroes.png\"");
-        warning.ShouldContain("Tile 0 keeps its animation");
+        outcome.Warnings.ShouldBeEmpty();
+        Loader.Default().LoadTileset(tsxPath).Tiles.ShouldBeEmpty();
     }
 
     [Fact]
@@ -171,7 +188,7 @@ public class TiledTilesetSyncRunnerTests
     }
 
     [Fact]
-    public void SyncAll_TileOfAChainOnAnotherTexture_CanBeTakenByAnotherChain()
+    public void SyncAll_TileOfAChainOnASameNamedImage_CanBeTakenByAnotherChain()
     {
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         var tsxPath = WriteFixtureTileset(tempDir);
@@ -180,13 +197,13 @@ public class TiledTilesetSyncRunnerTests
         TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
 
         foreach (var frame in achj.AnimationChains[0].Frames)
-            frame.TextureName = "Other.png";
+            frame.TextureName = "sub/Heroes.png";
         var run = AchjWithWalkChain().AnimationChains[0];
         run.Name = "Run";
         achj.AnimationChains.Add(run);
         var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
 
-        outcome.Warnings.ShouldBeEmpty();
+        outcome.Warnings.Single().ShouldNotContain("keeps its animation");
         Loader.Default().LoadTileset(tsxPath).Tiles.Single().GetProperty<StringProperty>("achjAnimationName").Value.ShouldBe("Run");
     }
 

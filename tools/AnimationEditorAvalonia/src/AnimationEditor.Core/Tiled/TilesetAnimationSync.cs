@@ -69,10 +69,10 @@ public static class TilesetAnimationSync
 
         var changed = false;
 
-        // A chain that is wholly on another texture keeps the tile it wrote before: the texture may be a copy of the
-        // tileset's image, so the animation may still be wanted. It is reported below.
-        var chainsOnAnotherTexture = results
-            .Where(r => r.EntryTileId is null && r.SkippedTexture is not null)
+        // A chain that is wholly on another image of the same name keeps the tile it wrote before: the image may be a
+        // copy of the tileset's, so the animation may still be wanted. It is reported below.
+        var chainsOnASameNamedImage = results
+            .Where(r => r.EntryTileId is null && r.SkippedTexture is { IsSameFileName: true })
             .Select(r => r.ChainName)
             .ToHashSet();
         var keptTileIds = new Dictionary<string, uint>();
@@ -80,7 +80,7 @@ public static class TilesetAnimationSync
         foreach (var staleTileId in previouslyTrackedTileIds.Except(newTileIds))
         {
             var staleTile = tilesById[staleTileId];
-            if (GetStringProperty(staleTile, AnimationNamePropertyName) is { } chainName && chainsOnAnotherTexture.Contains(chainName))
+            if (GetStringProperty(staleTile, AnimationNamePropertyName) is { } chainName && chainsOnASameNamedImage.Contains(chainName))
             {
                 keptTileIds[chainName] = staleTileId;
                 continue;
@@ -100,10 +100,9 @@ public static class TilesetAnimationSync
         {
             warnings.AddRange(result.Warnings);
             // Any other texture is silent, because most chains of a big project belong to another tileset.
-            var keepsATile = keptTileIds.TryGetValue(result.ChainName, out var keptTileId);
-            if (result.SkippedTexture is { } skipped && (keepsATile || skipped.IsSameFileName))
+            if (result.SkippedTexture is { IsSameFileName: true } skipped)
                 warnings.Add($"chain \"{result.ChainName}\": frames on \"{skipped.Texture}\" were not pushed, because the tileset's image is \"{skipped.Image}\"." +
-                    (keepsATile ? $" Tile {keptTileId} keeps its animation." : ""));
+                    (keptTileIds.TryGetValue(result.ChainName, out var keptTileId) ? $" Tile {keptTileId} keeps its animation." : ""));
             if (result.EntryTileId is not { } tileId)
                 continue;
 
