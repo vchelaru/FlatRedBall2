@@ -41,8 +41,11 @@ public class FilePath : IComparable, IEquatable<FilePath>
     public string NoPath => RemovePath(FullPath);
 
     private string? _fullPathCache;
-    /// <summary>Forward-slashed, ../-collapsed, current-dir-prepended-if-relative. Case preserved.</summary>
-    public string FullPath => _fullPathCache ??= RemoveDotDotSlash(StandardizeInternal(Original ?? ""));
+    /// <summary>
+    /// Forward-slashed, ../-collapsed, current-dir-prepended-if-relative. Case preserved. A network
+    /// path keeps its root (<c>//server/share/a.png</c>), and ../ stops at the share.
+    /// </summary>
+    public string FullPath => _fullPathCache ??= Standardize(Original ?? "");
 
     private string? _standardizedCache;
     /// <summary>Same as <see cref="FullPath"/> but lower-cased for case-insensitive comparison.</summary>
@@ -56,7 +59,7 @@ public class FilePath : IComparable, IEquatable<FilePath>
         {
             if (_standardizedCaseSensitive == null && Original != null)
             {
-                _standardizedCaseSensitive = RemoveDotDotSlash(StandardizeInternal(Original));
+                _standardizedCaseSensitive = Standardize(Original);
             }
             return _standardizedCaseSensitive;
         }
@@ -128,24 +131,34 @@ public class FilePath : IComparable, IEquatable<FilePath>
     // global) are dropped.
     // ---------------------------------------------------------------------
 
-    private static void ReplaceSlashes(ref string s)
+    private static string Standardize(string path)
+        => IsNetwork(path) ? StandardizeNetwork(path) : RemoveDotDotSlash(StandardizeInternal(path));
+
+    private static bool IsNetwork(string path)
+        => path.Length > 2 && path[0] is ('/' or '\\') && path[1] is ('/' or '\\') && path[2] is not ('/' or '\\');
+
+    private static string StandardizeNetwork(string path)
     {
-        bool isNetwork = s.StartsWith(@"\\");
-        if (isNetwork) s = s.Substring(2);
-        s = s.Replace('\\', '/');
-        if (isNetwork) s = @"\\" + s;
+        path = path.Replace('\\', '/');
+        var segments = new List<string>();
+        foreach (var segment in path.Substring(2).Split('/'))
+        {
+            // Before the first segment is added, "." is the root of a \\.\ device path.
+            if (segment == "" || (segment == "." && segments.Count > 0)) continue;
+            if (segment != "..") segments.Add(segment);
+            else if (segments.Count > 2) segments.RemoveAt(segments.Count - 1);
+        }
+        return "//" + string.Join('/', segments) + (path.EndsWith('/') ? "/" : "");
     }
 
     private static string StandardizeInternal(string fileNameToFix)
     {
-        bool isNetwork = fileNameToFix.StartsWith(@"\\");
-        ReplaceSlashes(ref fileNameToFix);
+        fileNameToFix = fileNameToFix.Replace('\\', '/');
 
-        if (!isNetwork && IsRelative(fileNameToFix))
+        if (IsRelative(fileNameToFix))
         {
             var relativeDirectory = (Environment.CurrentDirectory + "/").Replace('\\', '/');
             fileNameToFix = relativeDirectory + fileNameToFix;
-            ReplaceSlashes(ref fileNameToFix);
         }
 
         var beforeFix = fileNameToFix;
@@ -275,7 +288,9 @@ public class FilePath : IComparable, IEquatable<FilePath>
         {
             start++;
         }
-        if (start == 0) return path;
+        // Windows stops ../ at the share, so nothing outside "", "", server, share is reachable.
+        int sharedRootParts = IsNetwork(path) || IsNetwork(relativeTo) ? 4 : 1;
+        if (start < sharedRootParts) return path;
 
         var result = "";
         for (int i = start; i < relParts.Length; i++)

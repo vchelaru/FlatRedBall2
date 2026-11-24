@@ -92,8 +92,14 @@ namespace AnimationEditor.Core.Models
         public TextureCoordinateType CachedOnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
         /// <summary>
+        /// Hash of the file at <see cref="Path"/> when <see cref="CachedEditorModel"/> was captured, or
+        /// null when it could not be read. Used to detect external edits while the tab was in the background.
+        /// </summary>
+        public byte[]? CachedDiskHash { get; set; }
+
+        /// <summary>
         /// UTC last-write time of <see cref="Path"/> when <see cref="CachedEditorModel"/> was
-        /// captured. Used to detect external edits while the tab was in the background.
+        /// captured. Compared only when a hash is missing, since a locked file still has a time.
         /// </summary>
         public DateTime? CachedDiskWriteTimeUtc { get; set; }
 
