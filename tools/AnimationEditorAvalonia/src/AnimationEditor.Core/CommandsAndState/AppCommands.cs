@@ -1,4 +1,5 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.Sequences;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
@@ -250,6 +251,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <c>"3 shapes"</c>). The app layer shows an undo toast in response.
         /// </summary>
         public event Action<string>? ItemsDeleted;
+
+        /// <inheritdoc cref="IAppCommands.ChainNamesRemoved"/>
+        public event Action<RemovedChainNames>? ChainNamesRemoved;
 
         /// <summary>
         /// Fired after <see cref="SaveCurrentAnimationChainListAsync"/> successfully saves a file.
@@ -618,15 +622,17 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <inheritdoc/>
         /// <inheritdoc cref="IAppCommands.SaveDocument"/>
-        public void SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat)
+        public bool SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat)
         {
             try
             {
                 HotReloadWatcher.RunOwnSave(targetPath, () => _pm.SaveAnimationChainList(document, targetPath, diskFormat));
+                return true;
             }
             catch (Exception ex)
             {
                 SaveFailed?.Invoke(ex.Message);
+                return false;
             }
         }
 
@@ -845,12 +851,21 @@ namespace AnimationEditor.Core.CommandsAndState
             // Capture which chains will actually be removed (so the toast count is honest)
             // before the command runs and removes them.
             var valid = animationChains.Where(c => acls.AnimationChains.Contains(c)).ToList();
-            _undoManager.Execute(new DeleteChainsCommand(animationChains, acls, this, _events, _selectedState));
+            ExecuteRemovingChainNames("Deleting", acls, new DeleteChainsCommand(animationChains, acls, this, _events, _selectedState));
             if (valid.Count > 0)
             {
                 string label = valid.Count == 1 ? valid[0].Name : $"{valid.Count} animations";
                 ItemsDeleted?.Invoke(label);
             }
+        }
+
+        // The one path for a command that renames or deletes a chain. Undo and redo do not come through here, so they report nothing.
+        private void ExecuteRemovingChainNames(string verb, AnimationChainListSave acls, IUndoableCommand command)
+        {
+            var before = acls.AnimationChains.Select(c => c.Name).ToList();
+            _undoManager.Execute(command);
+            var removed = before.Except(acls.AnimationChains.Select(c => c.Name)).ToList();
+            if (removed.Count > 0) ChainNamesRemoved?.Invoke(new RemovedChainNames(acls, verb, removed));
         }
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
@@ -1049,7 +1064,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 commands.Add(new DeleteChainsCommand(chainList, acls, this, _events, _selectedState));
 
             int total = chainList.Count + frameList.Count + shapeList.Count;
-            _undoManager.Execute(new DeleteWithSelectionCommand(
+            ExecuteRemovingChainNames("Deleting", acls, new DeleteWithSelectionCommand(
                 new CompositeCommand(commands, $"Delete {total} Items"),
                 shapes.OfType<ShapeSave>().ToList(), _selectedState));
 
@@ -1154,7 +1169,7 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 if (_pm.IsChainNameAuto(chain)) return true;
                 if (_pm.GetTsxOwnerTileId(chain) is null) return false;
-                _undoManager.Execute(new RenameChainCommand(chain, chain.Name, null, _pm, this, _events));
+                Rename(null);
                 return true;
             }
             if (chain.Name == newName) return true;
@@ -1164,8 +1179,15 @@ namespace AnimationEditor.Core.CommandsAndState
                 acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
                 return false;
 
-            _undoManager.Execute(new RenameChainCommand(chain, chain.Name, newName, _pm, this, _events));
+            Rename(newName);
             return true;
+
+            void Rename(string? name)
+            {
+                var command = new RenameChainCommand(chain, chain.Name, name, _pm, this, _events);
+                if (_pm.AnimationChainListSave is { } document) ExecuteRemovingChainNames("Renaming", document, command);
+                else _undoManager.Execute(command);
+            }
         }
 
         public Func<string?>? CanvasDefaultTexturePath { get; set; }
@@ -2740,7 +2762,7 @@ namespace AnimationEditor.Core.CommandsAndState
             string desc = chains.Count == 1
                 ? $"Cut Animation '{(sourcesToRemove.Count > 0 ? sourcesToRemove[0].Name : chains[0].Name)}'"
                 : $"Cut {chains.Count} Animations";
-            _undoManager.Execute(new CompositeCommand(cmds, desc));
+            ExecuteRemovingChainNames("Cutting", acls, new CompositeCommand(cmds, desc));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteFramesCut"/>

@@ -205,6 +205,10 @@ public partial class ProjectPanelControl : UserControl
 
     public void Clear() => SetEntries(Array.Empty<AchxFileEntry>());
 
+    /// <summary>The scanned files, without those under bin/obj while that exclusion is on. The search box does not narrow them.</summary>
+    public IEnumerable<AchxFileEntry> IncludedEntries =>
+        _allEntries.Where(f => ExcludeBinObjCheck.IsChecked != true || !BinObjPathFilter.IsExcluded(f.RelativePath));
+
     private void Rebuild()
     {
         _pendingNode = null;
@@ -212,10 +216,7 @@ public partial class ProjectPanelControl : UserControl
         TreeRoots.Clear();
 
         var excludeBinObj = ExcludeBinObjCheck.IsChecked == true;
-        var files = excludeBinObj
-            ? _allEntries.Where(f => !BinObjPathFilter.IsExcluded(f.RelativePath)).ToList()
-            : _allEntries.ToList();
-        files = RelativePathSearchFilter.Filter(files, f => f.RelativePath, _searchQuery).ToList();
+        var files = RelativePathSearchFilter.Filter(IncludedEntries.ToList(), f => f.RelativePath, _searchQuery).ToList();
         var extraFolders = ProjectTreeFolderFilter.Select(
             _allFolderPaths, ShowAllFolders, excludeBinObj, _searchQuery);
 
@@ -531,9 +532,7 @@ public partial class ProjectPanelControl : UserControl
         else
         {
             var extension = NewAnimationFileNaming.ResolveExtension(
-                _allEntries
-                    .Where(f => ExcludeBinObjCheck.IsChecked != true || !BinObjPathFilter.IsExcluded(f.RelativePath))
-                    .Select(f => f.FileName));
+                IncludedEntries.Select(f => f.FileName));
             suggested = NewAnimationFileNaming.SuggestFileName(SiblingFileNames(folderNode), extension);
         }
 
