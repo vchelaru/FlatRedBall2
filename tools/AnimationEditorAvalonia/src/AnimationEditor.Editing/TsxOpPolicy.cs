@@ -25,6 +25,9 @@ internal static class TsxOpPolicy
     public static EditResult? Check(EditSession session, EditOp op)
     {
         var name = op.Spec.Name;
+        if (!session.IsNativeTsx && name == "import-chain" && Path.GetExtension(op.Values["from"]).Equals(".tsx", StringComparison.OrdinalIgnoreCase))
+            return Fail(EditErrorCode.WrongFileKind, "import-chain reads an .achx or .achj; chains cannot be imported from a Tiled .tsx.");
+
         if (!session.IsNativeTsx)
             return name == "set-chain-owner-tile"
                 ? Fail(EditErrorCode.WrongFileKind, "set-chain-owner-tile applies to a Tiled .tsx; an .achx/.achj has no owner tiles.")
@@ -39,6 +42,7 @@ internal static class TsxOpPolicy
             {
                 "set-chain-locked" => "Locking is editor state that a Tiled .tsx cannot store, so set-chain-locked has no effect on the file.",
                 "set-unit" => "A Tiled .tsx stores durations in milliseconds and has no time unit setting.",
+                "import-chain" => "import-chain works between .achx/.achj files; chains cannot be imported into a Tiled .tsx.",
                 "set-frame-texture" => "A Tiled tileset has one image, so a frame's texture cannot change.",
                 _ => $"{Stores}, so {name} cannot be kept in a .tsx (the editor disables it for tilesets too).",
             });

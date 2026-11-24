@@ -100,6 +100,12 @@ public static class EditOps
             new("chain", "string", true, "Chain name."),
             new("name", "string", false, "Name of the copy, unique in the file. Default: the source name with a number added (Walk becomes Walk2)."),
         ]),
+        new("import-chain", "Appends copies of chains of another .achx/.achj, at the end, in the source file's order, with everything the chain stores (flags, lock, frames, shapes, events). Textures are referenced where they are and lengths converted to this file's unit; the source file is only read. A name this file already has fails the batch listing every clash, and nothing is written. Not for a .tsx.",
+        [
+            new("chain", "string", true, "Chain name in the source file, or a glob (Walk*) to import every match."),
+            new("from", "string", true, "Source .achx/.achj, relative to the animation file or absolute. Not the file itself (use duplicate-chain)."),
+            new("name", "string", false, "Name of the copy, unique in the file; only when chain matches a single chain."),
+        ]),
         new("reorder-chain", "Moves a chain so it ends up at the given position in the file.",
         [
             new("chain", "string", true, "Chain name."),
@@ -444,6 +450,7 @@ public static class EditOps
     public static async Task<EditRunResult> ApplyAsync(EditSession session, IReadOnlyList<EditOp> ops)
     {
         var before = CheckReport.Run(session.Document, session.Path);
+        var allowed = before;
         var changed = new List<string>();
         var warnings = new List<string>();
         if (!before.Ok)
@@ -481,6 +488,7 @@ public static class EditOps
                     new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {expansion.Error}"], warnings, [expansion.Code]),
                     [op.Index]);
 
+            var chainCount = session.Document.AnimationChains.Count;
             foreach (var target in expansion.Ops)
             {
                 var result = await ApplyOneAsync(session, target.Op);
@@ -494,10 +502,17 @@ public static class EditOps
                 }
                 changed.AddRange(result.ChangedItems);
             }
+
+            // Errors the imported chains already had in their own file do not count against the batch.
+            if (op.Spec.Name == "import-chain")
+            {
+                var imported = new AnimationChainListSave { AnimationChains = session.Document.AnimationChains[chainCount..], CoordinateType = session.Document.CoordinateType };
+                allowed = new CheckReport([.. allowed.Issues, .. CheckReport.Run(imported, session.Path).Errors]);
+            }
         }
 
         var after = CheckReport.Run(session.Document, session.Path);
-        var added = CheckReport.NewErrors(before, after);
+        var added = CheckReport.NewErrors(allowed, after);
         if (added.Count > 0)
             return new EditRunResult(
                 new EditResult([], added.Select(i => $"The edit would raise the count of check errors [{i.Code}]: {i.Message}").ToList(), warnings,
@@ -525,6 +540,7 @@ public static class EditOps
         if (!save.Success)
             return new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
 
+        warnings.AddRange(CheckReport.NewErrors(before, after).Select(i => $"The imported chains bring a check error [{i.Code}]: {i.Message}"));
         // A .tsx save leaves out what a tileset cannot hold (a chain with no frames), so the document says nothing about the saved file.
         if (!session.IsNativeTsx) warnings.AddRange(CheckReport.RaisedWarnings(before, after));
         if (chainsBefore is not null)
@@ -561,6 +577,11 @@ public static class EditOps
             case "duplicate-chain":
                 return Task.FromResult(WithChain(doc, op, c =>
                     StructureEdit.DuplicateChain(session.ProjectManager, session.Commands, c, op.Values.GetValueOrDefault("name"))));
+            case "import-chain":
+                return Task.FromResult(StructureEdit.ImportChains(
+                    session.ProjectManager, session.Commands,
+                    Path.GetFullPath(Path.Combine(Path.GetDirectoryName(session.Path) ?? string.Empty, op.Values["from"])),
+                    op.Values["chain"], op.Values.GetValueOrDefault("name")));
             case "reorder-chain":
                 return Task.FromResult(WithChain(doc, op, c =>
                     StructureEdit.ReorderChain(session.ProjectManager, session.Commands, c, int.Parse(op.Values["index"], CultureInfo.InvariantCulture))));

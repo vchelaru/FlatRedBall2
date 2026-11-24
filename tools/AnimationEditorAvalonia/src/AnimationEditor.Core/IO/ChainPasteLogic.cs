@@ -60,19 +60,20 @@ public static class ChainPasteLogic
     /// matched by the names the pasted chains still carry from the clipboard. When no
     /// source chain is present (e.g. pasting into a different project, or the source was
     /// deleted), the block is appended at the end. The pasted block's relative order is
-    /// preserved.
+    /// preserved. A given <paramref name="insertIndex"/> wins over all of that.
     /// </summary>
     public static void InsertPastedChains(
         AnimationChainListSave acls,
         IReadOnlyList<AnimationChainSave> pastedChains,
-        IReadOnlyList<AnimationChainSave>? anchorChains = null)
+        IReadOnlyList<AnimationChainSave>? anchorChains = null,
+        int? insertIndex = null)
     {
         if (pastedChains.Count == 0) return;
 
         var sourceNames = pastedChains.Select(c => c.Name).ToHashSet();
-        int insertIndex = anchorChains is { Count: > 0 }
+        int slot = insertIndex ?? (anchorChains is { Count: > 0 }
             ? ResolveBlockInsertIndexAfterAnchors(acls, anchorChains)
-            : ResolveBlockInsertIndexAfterAnchorNames(acls, sourceNames);
+            : ResolveBlockInsertIndexAfterAnchorNames(acls, sourceNames));
 
         var existingNames = acls.AnimationChains.Select(c => c.Name).ToList();
         foreach (var chain in pastedChains)
@@ -81,6 +82,6 @@ public static class ChainPasteLogic
             existingNames.Add(chain.Name);
         }
 
-        InsertChainBlockAt(acls, pastedChains, insertIndex);
+        InsertChainBlockAt(acls, pastedChains, slot);
     }
 }

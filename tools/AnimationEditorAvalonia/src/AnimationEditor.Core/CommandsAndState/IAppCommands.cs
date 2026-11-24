@@ -660,9 +660,10 @@ namespace AnimationEditor.Core.CommandsAndState
         void SyncHotReloadWatcher();
 
         /// <summary>Pastes clipboard chains into the project: renames each to be unique and inserts
-        /// the block below its source rows (see <see cref="IO.ChainPasteLogic"/>). Undoable.
+        /// the block below its source rows (see <see cref="IO.ChainPasteLogic"/>), or at
+        /// <paramref name="insertIndex"/> when given. Undoable.
         /// </summary>
-        void PasteChains(IReadOnlyList<AnimationChainSave> chains);
+        void PasteChains(IReadOnlyList<AnimationChainSave> chains, int? insertIndex = null);
 
         /// <summary>Adds clipboard frames to <paramref name="chain"/>. Undoable.
         /// <paramref name="insertIndex"/> <c>null</c> appends; a value inserts the frames
