@@ -55,6 +55,8 @@ public sealed record TilesetAnimationInfo
     /// <summary>The same geometry as a <see cref="TileGrid"/>, for the shared cell math.</summary>
     public TileGrid Grid => new(TileWidth, TileHeight, Margin, TileSpacing);
     public required string ImageFileName { get; init; }
+    /// <summary>The folder a relative <see cref="ImageFileName"/> or frame texture name is resolved against.</summary>
+    public string Folder { get; init; } = string.Empty;
     /// <summary>Required only when the source uses <see cref="TextureCoordinateType.UV"/> frames,
     /// to convert normalized (0-1) coordinates to pixels.</summary>
     public int? TextureWidth { get; init; }
