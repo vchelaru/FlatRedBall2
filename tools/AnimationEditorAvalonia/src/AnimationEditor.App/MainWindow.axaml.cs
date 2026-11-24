@@ -103,6 +103,7 @@ public partial class MainWindow : Window
     private bool _suppressPreviewPromotion;
 
     // ── Tab drag state ────────────────────────────────────────────────────────
+    private Border? _activeTabBorder;
     private TabEntry? _dragTab;
     private double _dragStartX;
     private bool _isDragging;
@@ -453,6 +454,10 @@ public partial class MainWindow : Window
     {
         _tabManager.ActiveChanged += BindWireframeCamera;
         _tabManager.ActiveChanged += _ => Dispatcher.UIThread.InvokeAsync(RebuildTabStrip);
+        // Only on a change of active tab: a rebuild for any other reason (a background close, a reorder)
+        // must leave the strip where the user scrolled it. Background runs after the rebuild and its layout.
+        _tabManager.ActiveChanged += _ => Dispatcher.UIThread.Post(
+            () => _activeTabBorder?.BringIntoView(), DispatcherPriority.Background);
         // Persist the open-tab session on every change (open / switch / close / reorder), not just
         // on graceful window close — a debugger Stop or crash never fires Closed and would otherwise
         // lose the session (issue #439). Called synchronously so the write lands before any kill;
@@ -477,6 +482,7 @@ public partial class MainWindow : Window
     private void RebuildTabStrip()
     {
         TabStrip.Children.Clear();
+        _activeTabBorder = null;
 
         var tabs = _tabManager.Tabs;
         TabBarBorder.IsVisible = tabs.Count > 0;
@@ -690,6 +696,7 @@ public partial class MainWindow : Window
             };
 
             TabStrip.Children.Add(tabBorder);
+            if (isActive) _activeTabBorder = tabBorder;
         }
     }
 
