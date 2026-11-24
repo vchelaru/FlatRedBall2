@@ -40,7 +40,7 @@ does: `ClickRow`/`RightClickRow`+`PickTreeMenuItem`/`Expand`/`RowButton` on the 
 through the opened menus, so toggles behave), `ClickTab`/`CloseTab` on the strip. `ScriptedDialogs`
 answers the confirm, prompt, Save/Don't Save/Cancel and file-picker seams; an unanswered dialog
 fails the scenario. Read results from `Project`, `Services.SelectedState`, `Nodes`,
-`VisibleChainHeaders`, `UndoLabels`, `HistoryRows`, `ErrorBannerText`/`ToastText`, `TabLabels` and
+`VisibleChainHeaders`, `UndoLabels`, `HistoryRows`, `ProblemText`/`InfoText`, `TabLabels` and
 `ReadSaved`. Add a new gesture there first, then fix what it finds. Landmines the harness already
 encodes, so do not rediscover them: hit-testing needs a render tick after layout
 (`AvaloniaHeadlessPlatform.ForceRenderTimerTick`), `DispatcherTimer`s tick only while the test
