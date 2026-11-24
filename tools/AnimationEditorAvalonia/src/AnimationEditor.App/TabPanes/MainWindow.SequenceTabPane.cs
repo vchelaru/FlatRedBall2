@@ -141,10 +141,13 @@ public partial class MainWindow
         private bool IsShown(string path) =>
             !_watcherDisposed && _document is { } document && document.Path == new FilePath(path);
 
-        /// <summary>The sequence file itself was rewritten (git pull, another editor, an agent): read it again, keeping what still applies.</summary>
+        /// <summary>
+        /// The sequence file itself was rewritten (git pull, another editor, an agent): read it again, keeping what still
+        /// applies, unless the document holds edits the file lacks.
+        /// </summary>
         private void OnFileChangedOnDisk(string path)
         {
-            if (IsShown(path)) ReloadShownFromDisk(_document!);
+            if (IsShown(path) && !_document!.KeepUnsavedEdits()) ReloadShownFromDisk(_document);
         }
 
         private void ReloadShownFromDisk(SequenceDocument document)
@@ -165,6 +168,7 @@ public partial class MainWindow
             if (!result.Changed)
             {
                 ResumePendingRename(rename);
+                _window.UpdateStatusBar();
                 return;
             }
             // The history describes the old file; undoing into it would write that back over the new one.
@@ -403,7 +407,7 @@ public partial class MainWindow
                 ShowDeletedInfo(document.Path);
             else if (result.Error is { } error)
                 _window.ShowProblem($"Could not reload {document.Path.NoPath}: {error}");
-            else if (document.StaleOnDiskReason is { } stale)
+            else if (document.StaleOnDiskReason is { } stale && !document.HasUnsavedEdits)
                 // Still the same unreadable file: saving stays paused, so say so again.
                 _window.ShowProblem($"Could not reload {document.Path.NoPath}: {stale}");
             else if (result.Changed)

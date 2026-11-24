@@ -493,7 +493,7 @@ namespace AnimationEditor.Core.CommandsAndState
             // The undo manager is shared by every tab, so the save state shown (and asked about on close) must be this tab's.
             if (tab.SaveFailed)
                 _undoManager.MarkSaveFailed();
-            else if (_undoManager.SaveState == SaveState.Failed)
+            else
                 _undoManager.MarkSaved();
             RestoreTabSelection(tab);
             RefreshEditorSurfaceForActiveProject(tab.Path.FullPath);
@@ -607,9 +607,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     $"Could not save {new FilePath(path).NoPath}: it changed on disk and couldn't be reloaded ({staleReason}). Pick another name.");
                 return true;
             }
-            SaveFailed?.Invoke(
-                $"\"{System.IO.Path.GetFileName(path)}\" changed on disk and couldn't be reloaded ({staleReason}). " +
-                "Saving would overwrite that change. Fix the file and use File > Reload from Disk to drop the edits, or Save As a different file.");
+            SaveFailed?.Invoke(SaveTarget.UnreadableOnDiskMessage(path, staleReason));
             return true;
         }
 
@@ -621,9 +619,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var file = new FilePath(path);
             if (state == null || state.Path != file || !state.HasChanged(file)) return false;
-            SaveFailed?.Invoke(
-                $"\"{file.NoPath}\" changed on disk, and this tab has edits that could not be saved. " +
-                "Saving would overwrite that change. Use File > Reload from Disk to drop the edits, or Save As a different file.");
+            SaveFailed?.Invoke(SaveTarget.ChangedOnDiskMessage(path));
             return true;
         }
 
