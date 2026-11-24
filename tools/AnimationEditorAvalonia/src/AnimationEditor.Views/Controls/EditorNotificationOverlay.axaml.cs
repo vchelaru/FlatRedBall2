@@ -119,6 +119,13 @@ public partial class EditorNotificationOverlay : UserControl
         _errorBannerTimer.Start();
     }
 
+    /// <summary>Takes down the PROBLEM banner when it starts with <paramref name="prefix"/>, for a problem that is now settled.</summary>
+    public void HideProblem(string prefix)
+    {
+        if (ErrorBannerText.Text?.StartsWith(prefix, StringComparison.Ordinal) == true)
+            HideErrorBanner();
+    }
+
     private async Task AutoHideItemDeletedAsync(CancellationToken token)
     {
         try

@@ -360,7 +360,7 @@ public partial class MainWindow
                 // Our own saves go through the watcher's guard so their change events do not reload the document.
                 document.SaveRunner = _watcher.RunOwnSave;
                 // The same toast an achx shows (MainWindow wires AppCommands.SaveFailed), so a failed write is never silent.
-                document.SaveFailed += message => _window.ShowProblem($"Auto save failed — {message}");
+                document.SaveFailed += message => _window.ShowProblem($"{AutoSaveFailedPrefix}{message}");
                 // Open and tab restore both create the document here, so this is where the remembered sequence applies.
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));

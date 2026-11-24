@@ -950,8 +950,13 @@ public partial class MainWindow : Window
     private void CloseTabCore(TabEntry tab)
     {
         PaneFor(tab).Closing(tab);
+        bool wasActive = tab == _tabManager.ActiveTab;
         _tabManager.Close(tab.Path);
-        ShowActiveTabAfterClose();
+        // A front tab that stays is the live document; showing it again would load it over its own unsaved edits.
+        if (wasActive)
+            ShowActiveTabAfterClose();
+        else
+            RebuildTabStrip();
     }
 
     /// <summary>
@@ -1314,7 +1319,7 @@ public partial class MainWindow : Window
         _appCommands.IsDocumentTabInFront = () => _tabManager.ActiveTab?.Kind is null or TabKind.Achx;
         _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));
         _appCommands.SaveFailed += message =>
-            Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"Auto save failed — {message}"));
+            Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"{AutoSaveFailedPrefix}{message}"));
         _appCommands.InfoRaised += message => Dispatcher.UIThread.InvokeAsync(() => ShowInfo(message));
 
         Notifications.WireUndo(Undo);
@@ -2564,13 +2569,19 @@ public partial class MainWindow : Window
 
         var problems = new List<string>();
         var ready = new List<string>();
+        bool savedEdits = false;
         foreach (var source in sources)
         {
-            if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } tab
-                && _achxPane.SaveFailedEdits(tab) is { } reason)
-                problems.Add($"{new FilePath(source).NoPath}: not converted, its unsaved edits could not be saved ({reason})");
-            else
-                ready.Add(source);
+            if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } tab && _achxPane.HasFailedSave(tab))
+            {
+                if (_achxPane.SaveFailedEdits(tab) is { } reason)
+                {
+                    problems.Add($"{new FilePath(source).NoPath}: not converted, its unsaved edits could not be saved ({reason})");
+                    continue;
+                }
+                savedEdits = true;
+            }
+            ready.Add(source);
         }
 
         var batch = AchxToAchjBatch.Convert(ready);
@@ -2597,9 +2608,12 @@ public partial class MainWindow : Window
             await Dispatcher.UIThread.InvokeAsync(() =>
                 ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}"));
         else
+        {
+            if (savedEdits) Notifications.HideProblem(AutoSaveFailedPrefix);
             ShowStatusMessage(skipped > 0
                 ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
                 : $"Converted {converted} to .achj.");
+        }
     }
 
     /// <summary>
@@ -7598,6 +7612,8 @@ public partial class MainWindow : Window
     /// disk"). Shows the top-right toast for about 6 s; hovering keeps it. The status bar message is separate.
     /// </summary>
     public void ShowInfo(string message) => Notifications.ShowInfo(message);
+
+    private const string AutoSaveFailedPrefix = "Auto save failed — ";
 
     /// <summary>
     /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",

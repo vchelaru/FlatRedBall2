@@ -60,7 +60,7 @@ public class NotificationEntryPointGuardTests
     public void OutsideTheOverlay_NotificationsAreReachedOnlyThroughTheEntryPoints()
     {
         var access = new Regex(@"\bNotifications\.(\w+)");
-        var allowed = new HashSet<string>(TwoEntryPoints) { "ShowItemDeleted", "WireUndo" };
+        var allowed = new HashSet<string>(TwoEntryPoints) { "ShowItemDeleted", "WireUndo", "HideProblem" };
         var offenders = SourceFiles()
             .SelectMany(file => access.Matches(file.Text).Select(match => (File: Path.GetFileName(file.Path), Member: match.Groups[1].Value)))
             .Where(use => !allowed.Contains(use.Member))
