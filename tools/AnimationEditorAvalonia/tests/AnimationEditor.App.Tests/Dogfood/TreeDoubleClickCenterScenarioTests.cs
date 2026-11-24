@@ -44,4 +44,23 @@ public class TreeDoubleClickCenterScenarioTests
         editor.Preview.PanOffset.X.ShouldBe(-30f * editor.Preview.Zoom, 0.01f);
         editor.Preview.PanOffset.Y.ShouldBe(-10f * editor.Preview.Zoom, 0.01f);
     }
+
+    [AvaloniaFact]
+    public async Task DoubleClickPolygonRow_CentersPreviewOnItsPoints_NotItsOrigin()
+    {
+        var (editor, frame, _) = await OpenAsync();
+        using var _e = editor;
+        editor.RightClickRow(frame);
+        editor.PickTreeMenuItem("Add Polygon");
+        PolygonSave poly = frame.ShapesSave!.PolygonSaves.Single();
+        poly.X = 0; poly.Y = 0;
+        poly.Points.Clear();
+        poly.Points.Add(new Vector2Save { X = 40, Y = 20 });
+        poly.Points.Add(new Vector2Save { X = 60, Y = 20 });
+        poly.Points.Add(new Vector2Save { X = 60, Y = 40 });
+        editor.Expand(frame);
+        editor.DoubleClickRow(poly);
+        editor.Preview.PanOffset.X.ShouldBe(-50f * editor.Preview.Zoom, 0.01f);
+        editor.Preview.PanOffset.Y.ShouldBe(30f * editor.Preview.Zoom, 0.01f);
+    }
 }

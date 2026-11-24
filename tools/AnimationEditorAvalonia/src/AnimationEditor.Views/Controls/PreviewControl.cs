@@ -1276,6 +1276,21 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         RaiseViewChanged();
     }
 
+    /// <summary>
+    /// Pans to where a tree row's object draws (<see cref="PreviewCenterTarget"/>): a frame row to its sprite,
+    /// a shape row to the shape. A row outside every chain uses its stored values; other rows do nothing.
+    /// </summary>
+    public void CenterOnRow(object row)
+    {
+        var frame = row as AnimationFrameSave ?? FindOwningFrame(row);
+        var chain = FindOwningChain(frame);
+        var target = frame is null || chain is null
+            ? PreviewCenterTarget.ForUnattached(row)
+            : PreviewCenterTarget.For(chain, DocumentUnit, chain.Frames.IndexOf(frame), row);
+        if (target is { } p)
+            CenterOnEntityPoint(p.X, p.Y);
+    }
+
     /// <summary>Test-only: adds a horizontal guide at the given world-Y coordinate.</summary>
     public void AddHGuide(float worldY) { _hGuides.Add(worldY); OnGuideAdded(); }
 

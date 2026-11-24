@@ -8460,13 +8460,16 @@ public partial class MainWindow : Window
                 WireframeCtrl.CenterOnFrame(frame);
                 // Bring the sprite into view in the preview too — center on the frame's
                 // offset, not the entity origin, or a large-offset frame stays off-screen.
-                PreviewCtrl.CenterOnEntityPoint(frame.RelativeX, frame.RelativeY);
+                PreviewCtrl.CenterOnRow(frame);
                 return true;
             case ShapeSave shape when isLabelDoubleTap:
+                // Rename still starts (#234), but the preview also goes to the shape (#1925): the
+                // label is where most double-clicks on a shape row land.
+                PreviewCtrl.CenterOnRow(shape);
                 BeginInlineRename(vm, shape.Name);
                 return true;
             case ShapeSave shape:
-                PreviewCtrl.CenterOnEntityPoint(shape.X, shape.Y);
+                PreviewCtrl.CenterOnRow(shape);
                 return true;
             default:
                 return false;
