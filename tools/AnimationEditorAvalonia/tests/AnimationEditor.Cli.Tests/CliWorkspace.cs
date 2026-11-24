@@ -39,6 +39,14 @@ public sealed class CliWorkspace : IDisposable
         return new CliOutput(code, o.ToString(), e.ToString());
     }
 
+    public async Task<CliOutput> RunWithStdinAsync(string stdin, params string[] args)
+    {
+        var o = new StringWriter();
+        var e = new StringWriter();
+        var code = await CliApp.RunAsync(args, o, e, new StringReader(stdin));
+        return new CliOutput(code, o.ToString(), e.ToString());
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(Dir)) Directory.Delete(Dir, recursive: true);
