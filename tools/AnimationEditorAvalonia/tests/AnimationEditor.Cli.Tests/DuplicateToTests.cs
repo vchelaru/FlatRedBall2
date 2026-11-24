@@ -14,6 +14,8 @@ public abstract class InlineBatchTests : IDisposable
 
     public void Dispose() => _w.Dispose();
 
+    protected void Write(string file, string text) => _w.Write(file, text);
+
     protected string Raw(string file) => File.ReadAllText(_w.PathOf(file));
 
     /// <summary>The batch succeeds; returns what it reports as changed.</summary>
@@ -345,6 +347,53 @@ public class BulkDeleteTests : InlineBatchTests
         await AddEvents();
 
         await Fails("hero.achx", code, $"delete-frame-event {address}");
+    }
+
+    /// <summary>A selector covering two chains of one name is refused even when the first holds nothing it could target.</summary>
+    [Theory]
+    [InlineData("set-frame-event */*/event/0 name=X")]
+    [InlineData("delete-frame-event */*/event/*")]
+    [InlineData("duplicate-frame-event */*/event/0 to=Walk/0")]
+    [InlineData("set-shape-common */*/rect/* x=9")]
+    [InlineData("delete-shape W/*/rect/Hitbox")]
+    public async Task EventOrShapeSelector_ChainNameHeldTwice_IsAmbiguous(string op)
+    {
+        await AddEvents();
+        Write("hero.achx", Raw("hero.achx").Replace("<Name>Idle</Name>", "<Name>W</Name>")
+            .Replace("</AnimationChainArraySave>", Walk("hero.achx").Replace("<Name>Walk</Name>", "<Name>W</Name>") + "</AnimationChainArraySave>"));
+
+        (await Fails("hero.achx", "Ambiguous", op)).ShouldContain("'W'");
+    }
+
+    [Theory]
+    [InlineData("set-frame-length */* length=0.7")]
+    [InlineData("duplicate-frame */* to=Walk")]
+    [InlineData("duplicate-frame-event Walk/0/event/0 to=*/*")]
+    public async Task FrameSelector_ChainNameHeldTwiceAndTheFirstIsEmpty_IsAmbiguous(string op)
+    {
+        await AddEvents();
+        Write("hero.achx", Raw("hero.achx").Replace("<Name>Idle</Name>", "<Name>W</Name>")
+            .Replace("<CoordinateType>Pixel</CoordinateType>", "<CoordinateType>Pixel</CoordinateType><AnimationChain><Name>W</Name></AnimationChain>"));
+
+        (await Fails("hero.achx", "Ambiguous", op)).ShouldContain("'W'");
+    }
+
+    [Fact]
+    public async Task ShapeSelector_ChainNameWithASlashAndNoSuchShape_IsStillSkipped()
+    {
+        Write("hero.achx", Raw("hero.achx").Replace("<Name>Idle</Name>", "<Name>A/B</Name>"));
+
+        await Ok("hero.achx", "set-shape-common */*/rect/Hitbox x=9");
+
+        Frames("hero.achx", "Walk")[2].ShapesSave!.AARectSaves.Single().X.ShouldBe(9f);
+    }
+
+    /// <summary>The Walk chain's XML.</summary>
+    private string Walk(string file)
+    {
+        var xml = Raw(file);
+        var start = xml.IndexOf("<AnimationChain>", StringComparison.Ordinal);
+        return xml[start..(xml.IndexOf("</AnimationChain>", StringComparison.Ordinal) + "</AnimationChain>".Length)];
     }
 
     [Fact]

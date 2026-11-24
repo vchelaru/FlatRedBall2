@@ -51,6 +51,9 @@ public static class EditSelectors
         var targets = new List<string>();
         foreach (var name in chains.Targets!)
         {
+            // Checked here because a chain without frames, or frames without the shape or event, leaves no target to fail on later.
+            var resolved = EditAddress.ResolveChain(doc, name);
+            if (resolved.Code == EditErrorCode.Ambiguous) return Fail(resolved.Error!, resolved.Code);
             var chain = doc.AnimationChains.First(c => c.Name == name);
             var indexes = ParseIndexes(parts[1], chain.Frames.Count, name);
             if (indexes.Error is not null) return Fail(indexes.Error, indexes.Code);

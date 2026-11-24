@@ -130,7 +130,7 @@ public static class EditOps
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
         ]),
-        new("duplicate-frame", "Inserts a copy of a frame with everything on it: texture, region, offset, flips, color, keyframes, shapes and events. Without to and index it lands right after the source; with either, the selected frames land as one block per destination chain, in the order written. Move a frame by duplicating it and deleting the source in the same batch.",
+        new("duplicate-frame", "Inserts a copy of a frame: texture, region, length, offset, flips, color, keyframes, events, and shapes with their geometry and keyframes. Without to and index it lands right after the source; with either, the selected frames land as one block per destination chain, in the order written. Move a frame by duplicating it and deleting the source in the same batch.",
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex, or a frame selector (Walk/2-5)."),
             new("to", "string", false, "Destination chain, one exact name. Default: the source's own chain. Must be unlocked; the source's chain may be locked."),
