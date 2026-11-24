@@ -1,8 +1,12 @@
+using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using System.Text.Json;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -117,5 +121,68 @@ public class UntitledScenarioTests
         second.Tabs.ActiveTab!.Path.FullPath.ShouldEndWith("hero.achx");
         second.Nodes.Select(node => node.Header).ShouldContain("Walk");
         Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+    }
+
+    private static void ShouldShowTheAnimationEditor(AnimationEditorHarness editor)
+    {
+        editor.Control<Control>("AnimationsBlock").IsVisible.ShouldBeTrue();
+        editor.Control<Control>("AchxEditorPane").IsVisible.ShouldBeTrue();
+        editor.Control<Control>("SequenceEditorPane").IsVisible.ShouldBeFalse();
+        editor.Control<Control>("PngPaneGrid").IsVisible.ShouldBeFalse();
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Not saved", "the status bar describes the Untitled document");
+    }
+
+    [AvaloniaTheory]
+    [InlineData("boss.seqj")]
+    [InlineData("sheet.png")]
+    public async Task FileNew_FromATabOfAnotherKind_ShowsTheAnimationEditor(string front)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string png = editor.WritePng("sheet.png", 64, 64);
+        if (front == "sheet.png") await editor.OpenPngTabAsync(png);
+        else await editor.OpenAsync(editor.WriteSeqj(front, "Attack"));
+        editor.Dialogs.AnswerNextSaveFile(null);
+
+        editor.ClickMenu("MenuNew");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+
+        ShouldShowTheAnimationEditor(editor);
+        editor.Click(editor.Control<Button>("AddChainBtn"));
+        editor.Press(Key.Enter);
+        editor.Project.AnimationChains.Count.ShouldBe(1);
+        editor.ClickTab(front);
+        editor.Control<Control>("AnimationsBlock").IsVisible.ShouldBeFalse("the tab left for the new one still shows its own pane");
+    }
+
+    [AvaloniaFact]
+    public void CrashRecovery_WhenTheRestoredTabIsASeqj_ShowsTheAnimationEditor()
+    {
+        string folder = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            string seqj = Path.Combine(folder, "boss.seqj");
+            SequenceListSave sequences = new SequenceListSave();
+            sequences.Sequences.Add(new SequenceSave { Name = "Attack" });
+            sequences.Save(seqj);
+            string recovery = Path.Combine(folder, "recovery.achx");
+            AnimationChainListSave recovered = new AnimationChainListSave();
+            recovered.AnimationChains.Add(new AnimationChainSave { Name = "Recovered" });
+            recovered.Save(recovery);
+            string settings = Path.Combine(folder, "settings");
+            var settingsFile = AppSettingsLocation.ForApplicationDataRoot(settings);
+            Directory.CreateDirectory(settingsFile.GetDirectoryContainingThis().FullPath);
+            File.WriteAllText(settingsFile.FullPath, JsonSerializer.Serialize(
+                new AppSettingsModel { OpenTabPaths = new List<string> { seqj }, ActiveTabPath = seqj }));
+
+            using AnimationEditorHarness editor = new AnimationEditorHarness(settings, recovery);
+            editor.WaitUntil(() => editor.TabLabels.Count == 2, TimeSpan.FromSeconds(5)).ShouldBeTrue();
+
+            ShouldShowTheAnimationEditor(editor);
+            editor.VisibleChainHeaders.ShouldBe(new[] { "Recovered" });
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     }
 }

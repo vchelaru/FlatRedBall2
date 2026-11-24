@@ -2,6 +2,7 @@ using AnimationEditor.Core.Sequences;
 using FlatRedBall2.AnimationEditorCommon;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Shouldly;
 
 namespace AnimationEditor.App.Tests.Dogfood;
@@ -76,7 +77,7 @@ public class SequenceDiskCatchUpScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task SeqjBecameInvalidWhileAway_SwitchBackShowsTheBanner_KeepsTheDocument_PausesSaving_AndRecoversWhenFixed()
+    public async Task SeqjBecameInvalidWhileAway_SwitchBackShowsTheBanner_KeepsTheDocument_PausesSaving_AndKeepsAnEditMadeThenUntilAReload()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (seqj, _) = await OpenSeqjThenAchxAsync(editor);
@@ -94,8 +95,10 @@ public class SequenceDiskCatchUpScenarioTests
         File.ReadAllText(seqj).ShouldBe(foreign, "saving is paused so the other program's file is not destroyed");
 
         Rewrite(seqj, "Attack", "Idle", "Die");
-        (await editor.WaitUntilAsync(() => editor.SequenceNames.Contains("Die"), TimeSpan.FromSeconds(6)))
-            .ShouldBeTrue("the next valid file recovers through the live path");
+        (await editor.WaitUntilAsync(() => editor.ProblemText?.Contains("edits that could not be saved") == true, TimeSpan.FromSeconds(6)))
+            .ShouldBeTrue("the edit made while saving was paused is not in the file");
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle", "Sequence" });
+        editor.ClickMenu("MenuReloadFromDisk");
         editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle", "Die" });
     }
 
@@ -199,5 +202,84 @@ public class SequenceDiskCatchUpScenarioTests
 
         editor.InfoText!.ShouldContain("deleted from disk");
         editor.SequenceNames.ShouldBe(new[] { "Attack" });
+    }
+
+    // boss.seqj holds "Attack" and an added "Sequence" that a read-only file refused; the file is writable again.
+    private static void FailASave(AnimationEditorHarness editor, string seqj)
+    {
+        UnusualProjectScenarioTests.MakeUnwritable(seqj);
+        try
+        {
+            editor.Click(editor.Control<Button>("AddSequenceButton"));
+            editor.Press(Key.Escape);
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(seqj);
+        }
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
+    }
+
+    private static void ShouldKeepTheEditsAndTheFileUntilAReload(AnimationEditorHarness editor, string seqj)
+    {
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Sequence" });
+        editor.UndoLabels.ShouldBe(new[] { "Add Sequence 'Sequence'" });
+        editor.ProblemText!.ShouldContain("\"boss.seqj\" changed on disk");
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save Failed");
+
+        editor.Click(editor.Control<Button>("AddSequenceButton"));
+        editor.Press(Key.Escape);
+        SequenceListSave.FromFile(seqj).Sequences.Select(s => s.Name).ShouldBe(new[] { "Attack", "Die" }, "the next edit must not overwrite the newer file");
+
+        editor.ClickMenu("MenuReloadFromDisk");
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Die" });
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
+    }
+
+    [AvaloniaFact]
+    public async Task SeqjWithAFailedSave_RewrittenWhileAway_KeepsTheEditsUntilAReload()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = editor.WriteAchx("hero.achx");
+        string seqj = editor.WriteSeqj("boss.seqj", "Attack");
+        await editor.OpenAsync(seqj);
+        FailASave(editor, seqj);
+        await editor.OpenAsync(hero);
+
+        Rewrite(seqj, "Attack", "Die");
+        editor.ClickTab("boss.seqj");
+        editor.Layout();
+
+        ShouldKeepTheEditsAndTheFileUntilAReload(editor, seqj);
+    }
+
+    [AvaloniaFact]
+    public async Task SeqjWithAFailedSave_RewrittenWhileInFront_KeepsTheEditsUntilAReload()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string seqj = editor.WriteSeqj("boss.seqj", "Attack");
+        await editor.OpenAsync(seqj);
+        FailASave(editor, seqj);
+
+        Rewrite(seqj, "Attack", "Die");
+        await editor.WaitUntilAsync(() => editor.ProblemText?.Contains("changed on disk") == true || editor.SequenceNames.Contains("Die"), TimeSpan.FromSeconds(6));
+
+        ShouldKeepTheEditsAndTheFileUntilAReload(editor, seqj);
+    }
+
+    // The unsaved edits went into the file some other way: the reload changes no sequence, but nothing is unsaved any more.
+    [AvaloniaFact]
+    public async Task ReloadFromDiskMenu_OfAFileThatHoldsTheUnsavedEdits_ShowsItAsSaved()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string seqj = editor.WriteSeqj("boss.seqj", "Attack");
+        await editor.OpenAsync(seqj);
+        editor.ClickMenu("MenuEnableHotReload");
+        FailASave(editor, seqj);
+        Rewrite(seqj, "Attack", "Sequence");
+
+        editor.ClickMenu("MenuReloadFromDisk");
+
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
     }
 }
