@@ -1,6 +1,10 @@
+using System.Collections;
+using System.Reflection;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -103,51 +107,124 @@ public class AnimationCloneHelperTests
         Assert.NotSame(source.ShapesSave.Shapes[0], copy.ShapesSave.Shapes[0]);
     }
 
-    // Guards against a field added to the save model later but never cloned: every scalar field is
-    // set to a non-default value by reflection, so the test fails as soon as a clone misses one.
-    [Fact]
-    public void CloneChain_EveryScalarFieldNonDefault_CopiesEveryScalarField()
+    public static TheoryData<string> CopyPaths => new() { "Clone", "Clipboard chain", "Clipboard frame", "Clipboard shapes" };
+
+    // Guards against a field added to the save model later but never copied: every stored member, of every
+    // shape type, gets a distinct non-default value by reflection, so the test fails as soon as a copy misses one.
+    [Theory]
+    [MemberData(nameof(CopyPaths))]
+    public void Copy_EveryStoredMemberNonDefault_CopiesEveryStoredMember(string path)
     {
-        var source = new AnimationChainSave();
-        SetEveryScalarFieldNonDefault(source);
+        int counter = 100;
+        var source = (AnimationChainSave)CreateFilled(typeof(AnimationChainSave), ref counter);
+        var frame = source.Frames[0];
+        var differences = new List<string>();
 
-        var copy = AnimationCloneHelper.CloneChain(source);
-
-        AssertScalarFieldsEqual(source, copy);
-    }
-
-    [Fact]
-    public void CloneFrame_EveryScalarFieldNonDefault_CopiesEveryScalarField()
-    {
-        var source = new AnimationFrameSave();
-        SetEveryScalarFieldNonDefault(source);
-
-        var copy = AnimationCloneHelper.CloneFrame(source);
-
-        AssertScalarFieldsEqual(source, copy);
-    }
-
-    private static IEnumerable<System.Reflection.FieldInfo> ScalarFields(Type type) =>
-        type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-            .Where(f => f.FieldType == typeof(string) || f.FieldType.IsValueType);
-
-    private static void SetEveryScalarFieldNonDefault(object target)
-    {
-        foreach (var field in ScalarFields(target.GetType()))
+        switch (path)
         {
-            var type = Nullable.GetUnderlyingType(field.FieldType) ?? field.FieldType;
-            object value =
-                type == typeof(string) ? "set" :
-                type == typeof(bool) ? !(bool)(field.GetValue(target) ?? false) :
-                type.IsEnum ? Enum.GetValues(type).Cast<object>().Last() :
-                Convert.ChangeType(7, type);
-            field.SetValue(target, value);
+            case "Clone":
+                Compare(source, AnimationCloneHelper.CloneChain(source), "chain", differences);
+                break;
+            case "Clipboard chain":
+                Compare(source, RoundTrip(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = [source] }).Chains![0], "chain", differences);
+                break;
+            case "Clipboard frame":
+                Compare(frame, RoundTrip(new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = [frame] }).Frames![0], "frame", differences);
+                break;
+            case "Clipboard shapes":
+                // One at a time and together: a single rectangle or circle has its own clipboard format.
+                foreach (var shape in frame.ShapesSave!.Shapes)
+                    Compare(shape, RoundTrip(new CopySelectionPayload { Kind = CopySelectionKind.Shape, Shapes = [shape] }).Shapes![0], shape.GetType().Name, differences);
+                Compare(frame.ShapesSave.Shapes, RoundTrip(new CopySelectionPayload { Kind = CopySelectionKind.Shape, Shapes = frame.ShapesSave.Shapes }).Shapes, "shapes", differences);
+                break;
         }
+
+        differences.ShouldBeEmpty();
     }
 
-    private static void AssertScalarFieldsEqual(object expected, object actual)
+    private static (List<AnimationChainSave>? Chains, List<AnimationFrameSave>? Frames, List<object>? Shapes) RoundTrip(
+        CopySelectionPayload payload)
     {
-        foreach (var field in ScalarFields(expected.GetType()))
-            Assert.True(Equals(field.GetValue(expected), field.GetValue(actual)), $"{field.Name} was not cloned");
+        var unit = FrameLengthUnit.Seconds;
+        ClipboardPayload.TryDeserialize(ClipboardPayload.SerializeFromPayload(payload, unit), unit, _ => null,
+            out var chains, out var frames, out var shapes).ShouldBeTrue();
+        return (chains, frames, shapes);
+    }
+
+    private static bool IsScalar(Type type) => type == typeof(string) || type.IsValueType;
+
+    private static IEnumerable<MemberInfo> StoredMembers(Type type) =>
+        type.GetMembers(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m => m is FieldInfo || m is PropertyInfo { CanRead: true });
+
+    private static Type TypeOf(MemberInfo member) =>
+        member is FieldInfo field ? field.FieldType : ((PropertyInfo)member).PropertyType;
+
+    private static object? Get(MemberInfo member, object target) =>
+        member is FieldInfo field ? field.GetValue(target) : ((PropertyInfo)member).GetValue(target);
+
+    private static void Set(MemberInfo member, object target, object value)
+    {
+        if (member is FieldInfo field) field.SetValue(target, value);
+        else if (member is PropertyInfo { CanWrite: true } property) property.SetValue(target, value);
+    }
+
+    private static object CreateFilled(Type type, ref int counter)
+    {
+        var target = Activator.CreateInstance(type)!;
+        if (target is ShapesSave shapes)
+        {
+            foreach (var shapeType in typeof(ShapeSave).Assembly.GetTypes()
+                         .Where(t => t.IsSubclassOf(typeof(ShapeSave)) && !t.IsAbstract))
+                shapes.Add(CreateFilled(shapeType, ref counter));
+            return target;
+        }
+
+        foreach (var member in StoredMembers(type))
+        {
+            var memberType = TypeOf(member);
+            if (Get(member, target) is IList list)
+                list.Add(CreateFilled(memberType.GenericTypeArguments[0], ref counter));
+            else if (IsScalar(memberType))
+                Set(member, target, NonDefaultScalar(memberType, Get(member, target), ref counter));
+            else
+                Set(member, target, CreateFilled(memberType, ref counter));
+        }
+        return target;
+    }
+
+    private static object NonDefaultScalar(Type memberType, object? defaultValue, ref int counter)
+    {
+        var type = Nullable.GetUnderlyingType(memberType) ?? memberType;
+        counter++;
+        return type == typeof(string) ? $"set{counter}" :
+            type == typeof(bool) ? !(bool)(defaultValue ?? false) :
+            type.IsEnum ? Enum.GetValues(type).Cast<object>().Last() :
+            Convert.ChangeType(counter, type);
+    }
+
+    private static void Compare(object? expected, object? actual, string path, List<string> differences)
+    {
+        if (expected is null || actual is null || IsScalar(expected.GetType()))
+        {
+            if (!Equals(expected, actual)) differences.Add($"{path}: expected {expected ?? "null"}, copy has {actual ?? "null"}");
+            return;
+        }
+
+        if (ReferenceEquals(expected, actual)) differences.Add($"{path}: the copy shares the source's instance");
+        if (expected.GetType() != actual.GetType() && expected is not IEnumerable) differences.Add($"{path}: copied as {actual.GetType().Name}");
+        else if (expected is IEnumerable expectedItems)
+        {
+            var expectedList = expectedItems.Cast<object>().ToList();
+            var actualList = ((IEnumerable)actual).Cast<object>().ToList();
+            if (expectedList.Count != actualList.Count) differences.Add($"{path}: expected {expectedList.Count} items, copy has {actualList.Count}");
+            for (int i = 0; i < Math.Min(expectedList.Count, actualList.Count); i++)
+                Compare(expectedList[i], actualList[i], $"{path}[{expectedList[i].GetType().Name} {i}]", differences);
+        }
+        else
+        {
+            foreach (var member in StoredMembers(expected.GetType()))
+                Compare(Get(member, expected), Get(member, actual), $"{path}.{member.Name}", differences);
+        }
     }
 }
