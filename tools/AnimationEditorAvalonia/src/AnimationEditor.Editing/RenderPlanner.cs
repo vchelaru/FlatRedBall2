@@ -23,6 +23,9 @@ public sealed record RenderPlan(
 /// <summary>Builds a <see cref="RenderPlan"/> from a file with the editor's own scene logic; no drawing happens here.</summary>
 public static class RenderPlanner
 {
+    /// <summary>Why a frame index is refused for a sequence.</summary>
+    public const string FrameIsForChains = "--frame is for chains; use --at with a sequence.";
+
     /// <summary>The plan, or null with <paramref name="error"/>; <paramref name="usage"/> is true when the request itself is malformed.</summary>
     public static RenderPlan? Plan(RenderRequest request, out string? error, out bool usage)
     {
@@ -30,19 +33,38 @@ public static class RenderPlanner
         if (SequenceFileReader.IsSequenceFile(request.File))
             return PlanSequence(request, out error, out usage);
 
-        var read = AnimationFileReader.Read(request.File);
-        if (read.Document is null || Path.GetExtension(request.File).ToLowerInvariant() == ".tsx")
-        {
-            error = read.Error ?? "render supports .achx, .achj and .seqj files.";
-            return null;
-        }
-        return PlanChain(request, out error, out usage);
+        error = CheckChainFile(request.File, "render");
+        return error is null ? PlanChain(request, out error, out usage) : null;
+    }
+
+    /// <summary>Why <paramref name="file"/> cannot be read as an .achx/.achj, or null when it can.</summary>
+    internal static string? CheckChainFile(string file, string command)
+    {
+        var read = AnimationFileReader.Read(file);
+        return read.Document is null || Path.GetExtension(file).ToLowerInvariant() == ".tsx"
+            ? read.Error ?? $"{command} supports .achx, .achj and .seqj files."
+            : null;
+    }
+
+    /// <summary>The named chain (or the file's only one) and its unit, or null with <paramref name="error"/>. The chain has at least one frame.</summary>
+    internal static (AnimationChainSave Chain, FrameLengthUnit Unit)? OpenChain(string file, string? name, out string? error, out bool usage)
+    {
+        usage = false;
+        AnimationChainListSave list;
+        try { list = AnimationFileLoader.Load(file).List; }
+        catch (Exception ex) { error = $"Could not read {Path.GetFileName(file)}: {ex.Message}"; return null; }
+
+        int index = Pick(name, list.AnimationChains.Select(c => c.Name).ToList(), "chain", "--chain", "chains", out error, out usage);
+        if (index < 0) return null;
+        var chain = list.AnimationChains[index];
+        if (chain.Frames.Count == 0) { error = $"Chain '{chain.Name}' has no frames."; return null; }
+        return (chain, FrameLengthUnit.Of(list));
     }
 
     private static RenderPlan? PlanSequence(RenderRequest request, out string? error, out bool usage)
     {
         error = null; usage = false;
-        if (request.Frames is not null) { usage = true; error = "--frame is for chains; use --at with a sequence."; return null; }
+        if (request.Frames is not null) { usage = true; error = FrameIsForChains; return null; }
         var read = SequenceFileReader.Read(request.File);
         if (read.Document is null) { error = read.Error; return null; }
 
@@ -89,16 +111,8 @@ public static class RenderPlanner
         error = null; usage = false;
         if (request.Frames is not null && request.Times is not null) { usage = true; error = "give --frame or --at, not both."; return null; }
 
-        AnimationChainListSave list;
-        try { list = AnimationFileLoader.Load(request.File).List; }
-        catch (Exception ex) { error = $"Could not read {Path.GetFileName(request.File)}: {ex.Message}"; return null; }
+        if (OpenChain(request.File, request.Name, out error, out usage) is not var (chain, unit)) return null;
 
-        int index = Pick(request.Name, list.AnimationChains.Select(c => c.Name).ToList(), "chain", "--chain", "chains", out error, out usage);
-        if (index < 0) return null;
-        var chain = list.AnimationChains[index];
-        if (chain.Frames.Count == 0) { error = $"Chain '{chain.Name}' has no frames."; return null; }
-
-        var unit = FrameLengthUnit.Of(list);
         var spots = new List<(int Frame, double Elapsed, string Stem, string Label)>();
         if (request.Times is { } times)
             foreach (double time in times)

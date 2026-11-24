@@ -20,7 +20,8 @@ public static class CliApp
           edit <file> --op "<op> <address> key=value ..." [--op ...] [--json]   same, inline (see --schema); --ops - reads the file from stdin
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2 [--pass <n>]) or a chain (--chain <name> --frame 0 | --at 0.3)
               --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  --shapes  --sheet  [--json]
-          at <file.seqj> --time 0,4.2 [--sequence <name>] [--track <glob>] [--shapes-only] [--json]  per visible track: active chain, frame, sprite offset and the frame's shapes (position, size) at each time
+          at <file.seqj> --time 0,4.2 [--sequence <name>] [--track <glob>] [--pass <n>] [--shapes-only] [--json]  per visible track at each time: active chain, frame, sampled offset and color, flips, the frame's events and its shapes (position, size)
+          at <file.achx|.achj> --time 0,0.3 [--chain <name>] [--shapes-only] [--json]  the same for one chain (its loop, ping-pong and reverse apply). An event fires when its frame is entered; a time inside the frame lists it but does not mean it fires then
           --schema [--json]                      list the operations and their fields
           --version                              build version, source commit and build time (UTC)
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
@@ -32,93 +33,94 @@ public static class CliApp
         if (args.Length == 0) return cli.Usage("no command given.", showUsage: true);
         if (args[0] is "-h" or "--help" or "help")
         {
+            if (args.Skip(1).FirstOrDefault(a => a.StartsWith("--")) is { } extra) return cli.Usage(CliCommands.Help.Refusal(extra));
             stdout.WriteLine(Usage);
-            return 0;
-        }
-
-        if (args[0] == "--version")
-        {
-            stdout.WriteLine(BuildInfo.Describe());
             return 0;
         }
 
         var parsed = Arguments.Parse(args);
         if (parsed.Error is not null) return cli.Usage(parsed.Error);
-        cli.Json = parsed.Json;
+        var command = parsed.Command!;
+        cli.Json = parsed.Has("--json");
 
-        if (parsed.Schema) return cli.Schema();
-
-        switch (parsed.Command)
+        if (command.Name == "--schema") return cli.Schema();
+        if (command.Name == "--version")
         {
-            case "describe": return parsed.File is null ? cli.Usage("describe needs a file.") : cli.Describe(parsed.File, parsed.Values, parsed.Summary);
-            case "check": return parsed.File is null ? cli.Usage("check needs a file.") : cli.Check(parsed.File);
-            case "new": return parsed.File is null ? cli.Usage("new needs a file.") : cli.New(parsed.File);
+            stdout.WriteLine(BuildInfo.Describe());
+            return 0;
+        }
+
+        if (parsed.File is not { } file) return cli.Usage($"{command.Name} needs a file.");
+        if (command.WrongKind(file, parsed.Values.Keys) is { } wrongKind) return cli.Usage(wrongKind);
+
+        switch (command.Name)
+        {
+            case "describe": return cli.Describe(file, parsed.Values);
+            case "check": return cli.Check(file);
+            case "new": return cli.New(file);
             case "edit":
-                if (parsed.File is null) return cli.Usage("edit needs a file.");
-                if (parsed.OpsFile is null && parsed.InlineOps is not { Count: > 0 }) return cli.Usage("edit needs --ops <ops.json|-> or --op \"<op> <address> key=value ...\".");
-                if (parsed.OpsFile is not null && parsed.InlineOps is { Count: > 0 }) return cli.Usage("edit takes --ops or --op, not both.");
-                return await cli.EditAsync(parsed.File, parsed.OpsFile, parsed.InlineOps);
+                var opsFile = parsed.Value("--ops");
+                if (opsFile is null && parsed.InlineOps.Count == 0) return cli.Usage("edit needs --ops <ops.json|-> or --op \"<op> <address> key=value ...\".");
+                if (opsFile is not null && parsed.InlineOps.Count > 0) return cli.Usage("edit takes --ops or --op, not both.");
+                return await cli.EditAsync(file, opsFile, parsed.InlineOps);
             case "convert":
-                if (parsed.File is null) return cli.Usage("convert needs a file.");
-                if (parsed.To is not ("achj" or "achx")) return cli.Usage("convert needs --to achj or --to achx.");
-                return cli.Convert(parsed.File, parsed.To);
-            case "render":
-                if (parsed.File is null) return cli.Usage("render needs a file.");
-                return cli.Render(parsed.File, parsed.Values, parsed.Grid);
-            case "at":
-                if (parsed.File is null) return cli.Usage("at needs a file.");
-                return cli.At(parsed.File, parsed.Values);
-            default:
-                return cli.Usage($"unknown command '{parsed.Command}'.");
+                if (parsed.Value("--to") is not ("achj" or "achx")) return cli.Usage("convert needs --to achj or --to achx.");
+                return cli.Convert(file, parsed.Value("--to")!);
+            case "render": return cli.Render(file, parsed.Values);
+            case "at": return cli.At(file, parsed.Values);
+            default: throw new InvalidOperationException($"'{command.Name}' is in CliCommands but has no handler.");
         }
     }
 
-    private sealed record Arguments(string? Command, string? File, string? OpsFile, string? To, bool Json, bool Schema, string? Error,
-        IReadOnlyDictionary<string, string>? Values = null, bool Grid = false, bool Summary = false, IReadOnlyList<string>? InlineOps = null)
+    // Values holds every option given except --op, which repeats (InlineOps); a flag's value is "".
+    private sealed record Arguments(CliCommand? Command, string? File, IReadOnlyDictionary<string, string> Values, IReadOnlyList<string> InlineOps, string? Error)
     {
+        public bool Has(string option) => Values.ContainsKey(option);
+
+        public string? Value(string option) => Values.GetValueOrDefault(option);
+
         public static Arguments Parse(string[] args)
         {
-            string? command = null, file = null, ops = null, to = null;
-            bool json = false, schema = false, grid = false, summary = false;
+            string? name = null, file = null;
             var values = new Dictionary<string, string>();
             var inline = new List<string>();
+            var given = new List<string>();
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
-                switch (a)
+                if (!a.StartsWith("--") || (name is null && CliCommands.Find(a) is not null))
                 {
-                    case "--json": json = true; break;
-                    case "--schema": schema = true; break;
-                    case "--grid": grid = true; break;
-                    case "--shapes" or "--sheet" or "--shapes-only": values[a] = ""; break;
-                    case "--summary": summary = true; break;
-                    case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds" or "--time" or "--pass":
-                        if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
-                        values[a] = args[++i];
-                        break;
-                    case "--ops":
-                        if (i + 1 >= args.Length) return Bad("--ops needs a file.");
-                        ops = args[++i];
-                        break;
-                    case "--op":
-                        if (i + 1 >= args.Length) return Bad("--op needs an operation, e.g. --op \"set-frame-offset Walk/0 x=4\".");
-                        inline.Add(args[++i]);
-                        break;
-                    case "--to":
-                        if (i + 1 >= args.Length) return Bad("--to needs achj or achx.");
-                        to = args[++i];
-                        break;
-                    default:
-                        if (a.StartsWith("--")) return Bad($"unknown option '{a}'.");
-                        if (command is null) command = a;
-                        else if (file is null) file = a;
-                        else return Bad($"unexpected argument '{a}'.");
-                        break;
+                    if (name is null) name = a;
+                    else if (file is null && CliCommands.Find(name) is not { TakesFile: false }) file = a;
+                    else return Bad(Refused() ?? $"unexpected argument '{a}'.");
+                    continue;
                 }
-            }
-            return new Arguments(command, file, ops, to, json, schema, null, values, grid, summary, inline);
 
-            static Arguments Bad(string error) => new(null, null, null, null, false, false, error);
+                given.Add(a);
+                if (CliCommands.FindOption(a) is not { } option) return Bad(Refused() ?? $"unknown option '{a}'.");
+                string value = "";
+                if (option.Needs is not null)
+                {
+                    if (i + 1 >= args.Length) return Bad(Refused() ?? option.Needs);
+                    value = args[++i];
+                }
+                if (a == "--op") inline.Add(value);
+                else values[a] = value;
+            }
+
+            if (name is null) return Bad("no command given.");
+            if (Refused() is { } refused) return Bad(refused);
+            return new Arguments(CliCommands.Find(name), file, values, inline, null);
+
+            // The first error the command itself explains: there is no such command, or an option it does not take.
+            string? Refused()
+            {
+                if (name is null) return null;
+                if (CliCommands.Find(name) is not { } command) return $"unknown command '{name}'.";
+                return given.FirstOrDefault(g => command.Options.All(o => o.Name != g)) is { } extra ? command.Refusal(extra) : null;
+            }
+
+            static Arguments Bad(string error) => new(null, null, new Dictionary<string, string>(), [], error);
         }
     }
 
@@ -146,14 +148,13 @@ public static class CliApp
             return 0;
         }
 
-        public int Describe(string file, IReadOnlyDictionary<string, string>? values, bool summary)
+        public int Describe(string file, IReadOnlyDictionary<string, string> values)
         {
-            string? Value(string key) => values is not null && values.TryGetValue(key, out var v) ? v : null;
-            string? chain = Value("--chain"), sequence = Value("--sequence"), track = Value("--track");
+            string? chain = values.GetValueOrDefault("--chain"), sequence = values.GetValueOrDefault("--sequence"), track = values.GetValueOrDefault("--track");
+            bool summary = values.ContainsKey("--summary");
 
             if (SequenceFileReader.IsSequenceFile(file))
             {
-                if (chain is not null) return Usage("--chain applies to .achx/.achj files; a .seqj takes --sequence and --track.");
                 var seq = SequenceFileReader.Read(file);
                 if (seq.Document is null) return Failed(seq.Error!);
 
@@ -174,7 +175,6 @@ public static class CliApp
                 return 0;
             }
 
-            if (sequence is not null || track is not null) return Usage("--sequence and --track apply to .seqj files; an .achx/.achj takes --chain.");
             var read = AnimationFileReader.Read(file);
             if (read.Document is null) return Failed(read.Error!);
 
@@ -233,9 +233,9 @@ public static class CliApp
             return Report(result, null, $"Created {file}");
         }
 
-        public int Render(string file, IReadOnlyDictionary<string, string>? values, bool grid)
+        public int Render(string file, IReadOnlyDictionary<string, string> values)
         {
-            var outcome = RenderCommand.Run(file, values ?? new Dictionary<string, string>(), grid);
+            var outcome = RenderCommand.Run(file, values);
             if (outcome.UsageError is not null) return Usage(outcome.UsageError);
             if (Json)
             {
@@ -266,10 +266,12 @@ public static class CliApp
             return outcome.Success ? 0 : 1;
         }
 
-        public int At(string file, IReadOnlyDictionary<string, string>? values)
+        public int At(string file, IReadOnlyDictionary<string, string> values)
         {
-            if (!SequenceFileReader.IsSequenceFile(file)) return Usage("at needs a .seqj file.");
-            if (values is null || !values.TryGetValue("--time", out var timeText)) return Usage("at needs --time <seconds>[,<seconds>...].");
+            bool isSequence = SequenceFileReader.IsSequenceFile(file);
+            if (!isSequence && Path.GetExtension(file).ToLowerInvariant() is not (".achx" or ".achj"))
+                return Usage("at needs a .seqj, .achx or .achj file.");
+            if (!values.TryGetValue("--time", out var timeText)) return Usage("at needs --time <seconds>[,<seconds>...].");
             var times = new List<double>();
             foreach (var part in timeText.Split(',', StringSplitOptions.TrimEntries))
             {
@@ -277,12 +279,18 @@ public static class CliApp
                     return Usage("--time must be a comma list of times in seconds, 0 or more (0,2.15,4.2).");
                 times.Add(t);
             }
-            values.TryGetValue("--sequence", out var name);
+            values.TryGetValue("--sequence", out var sequence);
             values.TryGetValue("--track", out var track);
-            var report = AtReport.Build(file, name, times, track, values.ContainsKey("--shapes-only"), out var error, out var usage);
+            values.TryGetValue("--chain", out var chain);
+            bool shapesOnly = values.ContainsKey("--shapes-only");
+            if (!CliCommands.TryPass(values, out int pass, out var error)) return Usage(error!);
+
+            bool usage;
+            var report = isSequence
+                ? AtReport.BuildSequence(file, sequence, times, pass, track, shapesOnly, out error, out usage)
+                : AtReport.BuildChain(file, chain, times, shapesOnly, out error, out usage);
             if (report is null) return usage ? Usage(error!) : Failed(error!);
-            var (sequence, moments) = report.Value;
-            stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, sequence, moments)) + Environment.NewLine : AtReport.ToText(sequence, moments));
+            stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, report)) + Environment.NewLine : AtReport.ToText(report));
             return 0;
         }
 
@@ -292,13 +300,13 @@ public static class CliApp
             return Report(result, null, $"Created {result.ChangedItems.FirstOrDefault()}");
         }
 
-        public async Task<int> EditAsync(string file, string? opsFile, IReadOnlyList<string>? inlineOps)
+        public async Task<int> EditAsync(string file, string? opsFile, IReadOnlyList<string> inlineOps)
         {
             bool sequence = SequenceFileReader.IsSequenceFile(file);
             var specs = sequence ? SequenceOps.Specs : EditOps.Specs;
 
             OpsParse parsed;
-            if (inlineOps is { Count: > 0 })
+            if (inlineOps.Count > 0)
                 parsed = InlineOps.Parse(inlineOps, specs);
             else
             {
