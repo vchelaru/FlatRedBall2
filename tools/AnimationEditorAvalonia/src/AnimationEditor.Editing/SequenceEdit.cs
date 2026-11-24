@@ -128,7 +128,8 @@ public static class SequenceEdit
         var pasted = doc.PasteTracks(undo, dest.Value.Sequence, content, null, slot);
         if (pasted.Errors.Count > 0)
             return Fail(pasted.Tracks.Count == 0 ? EditErrorCode.WouldCycle : EditErrorCode.Refused, pasted.Errors[0]);
-        return Ok($"{owner.Name}/{owner.Tracks[pasted.Tracks[0]].Name}");
+        // The edit replaced the document's objects, so the sequence resolved above is the one from before it.
+        return Ok($"{owner.Name}/{doc.Save.Sequences[dest.Value.Sequence].Tracks[pasted.Tracks[0]].Name}");
     }
 
     /// <summary>
@@ -211,6 +212,20 @@ public static class SequenceEdit
         return Ok($"{owner.Name}/{target.Name}");
     }
 
+    /// <summary>Shows or hides a track. A hidden track is not drawn and keeps its blocks.</summary>
+    public static EditResult SetTrackVisible(SequenceDocument doc, IUndoManager undo, string track, bool visible)
+    {
+        var at = SequenceAddress.ResolveTrack(doc.Save, track);
+        if (!at.Ok) return FromAddress(at);
+        var owner = doc.Save.Sequences[at.Value!.Sequence];
+        var target = owner.Tracks[at.Value.Track];
+        if (target.Visible == visible) return Ok();
+
+        undo.SealCoalescing();
+        doc.SetTracksVisible(undo, at.Value.Sequence, [at.Value.Track], visible);
+        return Ok($"{owner.Name}/{target.Name}");
+    }
+
     /// <summary>
     /// Adds a track named after <paramref name="target"/> that plays that sequence once from <paramref name="start"/> seconds,
     /// at zero-based <paramref name="index"/> (default 0). Its clip is block 0 of the track; add-block adds more.
@@ -226,7 +241,7 @@ public static class SequenceEdit
         if (index is { } i && (i < 0 || i > owner.Tracks.Count)) return OutOfRange(i, owner.Tracks.Count + 1, "track slot");
         var targetName = doc.Save.Sequences[to.Value!.Sequence].Name;
         if (!doc.CanReference(at.Value.Sequence, targetName))
-            return Fail(EditErrorCode.WouldCycle, $"'{owner.Name}' cannot play '{targetName}': that would make the sequences play each other in a loop.");
+            return WouldCycle(owner.Name, targetName);
 
         undo.SealCoalescing();
         var slot = index ?? 0;
@@ -305,7 +320,7 @@ public static class SequenceEdit
             if (!to.Ok) return FromAddress(to);
             var targetName = doc.Save.Sequences[to.Value!.Sequence].Name;
             if (!doc.CanReference(at.Value.Sequence, targetName))
-                return Fail(EditErrorCode.WouldCycle, $"'{owner.Name}' cannot play '{targetName}': that would make the sequences play each other in a loop.");
+                return WouldCycle(owner.Name, targetName);
             undo.SealCoalescing();
             double clipStart = start ?? ClipTrackEnd(doc, at.Value.Sequence, target);
             var added = doc.AddReferenceClip(undo, at.Value.Sequence, at.Value.Track, targetName, clipStart, length);
@@ -494,6 +509,100 @@ public static class SequenceEdit
         return Ok(block);
     }
 
+    /// <summary>
+    /// Copies a block (or a clip of a reference track) to the end of the block list of track <paramref name="to"/> (default its
+    /// own), in any sequence of the file. A null <paramref name="start"/> is the block's own start on another track, and right
+    /// after the block on its own, where the editor's Duplicate puts it.
+    /// </summary>
+    public static EditResult DuplicateBlock(SequenceDocument doc, IUndoManager undo, string block, string? to, double? start)
+    {
+        var ends = ResolveEnds(doc, block, to, start, copy: true);
+        if (ends.Error is not null) return ends.Error;
+        var (from, dest) = (ends.From!, ends.To!);
+        if (start is not null || !SameTrack(from, dest)) return Place(doc, undo, from, dest, start, copy: true);
+
+        var track = doc.Save.Sequences[from.Sequence].Tracks[from.Track];
+        if (track.References is { } clips)
+            return Place(doc, undo, from, dest, Math.Round(clips[from.Block].Start + doc.ClipLength(clips[from.Block]), 6), copy: true);
+        undo.SealCoalescing();
+        doc.DuplicateChains(undo, from.Sequence, [new TimelineChainId(from.Track, from.Block)]);
+        return Ok(LastBlock(doc, dest));
+    }
+
+    /// <summary>
+    /// Moves a block (or a clip of a reference track) to track <paramref name="to"/> (default its own), in any sequence of the
+    /// file, and to <paramref name="start"/> seconds (default unchanged). On another track it becomes the last in the block
+    /// list, and later blocks of the old track shift down by one; on its own track it keeps its index.
+    /// </summary>
+    public static EditResult MoveBlock(SequenceDocument doc, IUndoManager undo, string block, string? to, double? start)
+    {
+        if (to is null && start is null) return Fail(EditErrorCode.InvalidValue, "move-block needs to, start or both.");
+        var ends = ResolveEnds(doc, block, to, start, copy: false);
+        if (ends.Error is not null) return ends.Error;
+        if (!SameTrack(ends.From!, ends.To!)) return Place(doc, undo, ends.From!, ends.To!, start, copy: false);
+        return start is { } at ? SetBlockStart(doc, undo, block, at) : Ok();
+    }
+
+    private static bool SameTrack(SeqAddr a, SeqAddr b) => a.Sequence == b.Sequence && a.Track == b.Track;
+
+    /// <summary>The block and the destination track of a move or copy, or why it is refused.</summary>
+    private static (SeqAddr? From, SeqAddr? To, EditResult? Error) ResolveEnds(SequenceDocument doc, string block, string? to, double? start, bool copy)
+    {
+        var at = SequenceAddress.ResolveBlock(doc.Save, block);
+        if (!at.Ok) return (null, null, FromAddress(at));
+        var dest = to is null ? new SeqAddrResult(at.Value! with { Block = -1 }, null) : SequenceAddress.ResolveTrack(doc.Save, to);
+        if (!dest.Ok) return (null, null, FromAddress(dest));
+        if (start is { } given && CheckStart(given) is { } badStart) return (null, null, badStart);
+
+        var (a, b) = (at.Value!, dest.Value!);
+        var owner = doc.Save.Sequences[b.Sequence];
+        var (from, target) = (doc.Save.Sequences[a.Sequence].Tracks[a.Track], owner.Tracks[b.Track]);
+        if (from.References is null != target.References is null)
+            return (null, null, Fail(EditErrorCode.WrongTrackKind, target.References is null
+                ? $"Track '{owner.Name}/{target.Name}' holds chain blocks, so it cannot take a clip."
+                : $"Track '{owner.Name}/{target.Name}' plays sequences, so it cannot take a chain block."));
+        // A clip that stays in its sequence closes no cycle that is not there already; another copy of one would.
+        if (from.References is { } clips && (copy || a.Sequence != b.Sequence)
+            && SequenceReferences.WouldCycle(doc.Save.Sequences, owner.Name, clips[a.Block].Sequence))
+            return (null, null, WouldCycle(owner.Name, clips[a.Block].Sequence));
+        return (a, b, null);
+    }
+
+    // Edits in place inside a gesture, as dragging a block to another track does, so it is one undo entry.
+    private static EditResult Place(SequenceDocument doc, IUndoManager undo, SeqAddr from, SeqAddr to, double? start, bool copy)
+    {
+        undo.SealCoalescing();
+        var before = doc.BeginGesture();
+        var source = doc.Save.Sequences[from.Sequence].Tracks[from.Track];
+        var target = doc.Save.Sequences[to.Sequence].Tracks[to.Track];
+        string name;
+        if (source.References is { } clips)
+        {
+            var clip = copy ? TimelineClipboard.CloneTracks([source])[0].References![from.Block] : clips[from.Block];
+            name = clip.Sequence;
+            clip.Start = start ?? clip.Start;
+            if (!copy) clips.RemoveAt(from.Block);
+            target.References!.Add(clip);
+        }
+        else
+        {
+            var chain = copy ? TimelineClipboard.CloneChains([source.Chains[from.Block]])[0] : source.Chains[from.Block];
+            name = chain.Chain;
+            chain.Start = start ?? chain.Start;
+            if (!copy) source.Chains.RemoveAt(from.Block);
+            target.Chains.Add(chain);
+        }
+        doc.CommitGesture(undo, $"{(copy ? "Duplicate" : "Move")} '{name}' to '{target.Name}'", before);
+        return Ok(LastBlock(doc, to));
+    }
+
+    private static string LastBlock(SequenceDocument doc, SeqAddr track)
+    {
+        var owner = doc.Save.Sequences[track.Sequence];
+        var target = owner.Tracks[track.Track];
+        return $"{owner.Name}/{target.Name}/{SequenceAddress.BlockCount(target) - 1}";
+    }
+
     // ---- helpers ----
 
     private static EditResult? CheckNewName(string name, IEnumerable<string> used, string what)
@@ -516,6 +625,9 @@ public static class SequenceEdit
         var wanted = source.Replace('\\', '/');
         return doc.Save.Sources.FirstOrDefault(s => string.Equals(s, wanted, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static EditResult WouldCycle(string owner, string target) =>
+        Fail(EditErrorCode.WouldCycle, $"'{owner}' cannot play '{target}': that would make the sequences play each other in a loop.");
 
     private static EditResult NoSuchSource(string source) =>
         Fail(EditErrorCode.NotFound, $"No source named '{source}' in the library.");

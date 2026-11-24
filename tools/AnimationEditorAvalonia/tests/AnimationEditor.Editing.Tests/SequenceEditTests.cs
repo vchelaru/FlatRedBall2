@@ -406,6 +406,156 @@ public class SequenceEditTests : IDisposable
         Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Run/Body", null, "Walk", null, null, sequence: "Rest")).CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void CopyTrack_WithinItsOwnSequence_ReturnsTheCopysNameAtEveryIndex(int index)
+    {
+        var s = _w.Open();
+
+        var r = Run(s, () => SequenceEdit.CopyTrack(s.Document, s.Undo, "Run/Body", "Run", index));
+
+        r.ChangedItems.ShouldBe(["Run/Body 2"]);
+        Seq(s, "Run").Tracks[index].Name.ShouldBe("Body 2");
+    }
+
+    [Fact]
+    public void CopyTrack_IntoAnEmptySequence_ReturnsTheCopy()
+    {
+        var s = _w.Open();
+        s.Document.AddSequence(s.Undo, "Fr");
+
+        Run(s, () => SequenceEdit.CopyTrack(s.Document, s.Undo, "Run/Body", "Fr", null)).ChangedItems.ShouldBe(["Fr/Body"]);
+
+        Seq(s, "Fr").Tracks.Single().Chains.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void SetTrackVisible_HidesAndShowsTheTrack_AndIsANoOpWhenAlreadySo()
+    {
+        var s = _w.Open();
+
+        Run(s, () => SequenceEdit.SetTrackVisible(s.Document, s.Undo, "Run/Body", false)).ChangedItems.ShouldBe(["Run/Body"]);
+        Run(s, () => SequenceEdit.SetTrackVisible(s.Document, s.Undo, "Run/Body", false), expectChange: false).ChangedItems.ShouldBeEmpty();
+
+        Seq(s, "Run").Tracks.Select(t => t.Visible).ShouldBe([false, true]);
+    }
+
+    [Theory]
+    [InlineData("Run/Body/0", 0.8, 0.8)]  // starts at 0, 0.8 long
+    [InlineData("Run/Body/1", 1.4, null)] // starts at 1, auto length, one cycle is 0.4
+    public void DuplicateBlock_NoToOrStart_LandsRightAfterTheBlockLikeTheEditor(string block, double start, double? length)
+    {
+        var s = _w.Open();
+
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, block, null, null)).ChangedItems.ShouldBe(["Run/Body/2"]);
+
+        var copy = Seq(s, "Run").Tracks[0].Chains[2];
+        (copy.Start, copy.Length).ShouldBe((start, length));
+    }
+
+    [Fact]
+    public void DuplicateBlock_ToAnotherTrack_KeepsTheStartUnlessGiven_AndUnknownProperties()
+    {
+        var s = _w.Open();
+        s.Document.Save.Sequences[0].Tracks[0].Chains[0].UnknownProperties["tag"] = "kept";
+
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, "Run/Body/0", "Rest/Body", 2.5)).ChangedItems.ShouldBe(["Rest/Body/1"]);
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, "Run/Body/1", "Run/Shadow", null)).ChangedItems.ShouldBe(["Run/Shadow/1"]);
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, "Run/Body/1", "Run/Body", 3)).ChangedItems.ShouldBe(["Run/Body/2"]);
+
+        var copy = Seq(s, "Rest").Tracks[0].Chains[1];
+        (copy.Source, copy.Chain, copy.Start, copy.Length, (string?)copy.UnknownProperties["tag"]).ShouldBe(("hero.achj", "Walk", 2.5, (double?)0.8, "kept"));
+        Seq(s, "Run").Tracks[1].Chains[1].Start.ShouldBe(1);
+        Seq(s, "Run").Tracks[0].Chains.Select(c => c.Start).ShouldBe([0.0, 1.0, 3.0]);
+    }
+
+    [Fact]
+    public void MoveBlock_ToAnotherTrack_IsTakenOutAndAppended()
+    {
+        var s = _w.Open();
+        s.Document.Save.Sequences[0].Tracks[0].Chains[0].UnknownProperties["tag"] = "kept";
+
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Run/Body/0", "Run/Shadow", null)).ChangedItems.ShouldBe(["Run/Shadow/1"]);
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Run/Body/0", "Rest/0", 2.5)).ChangedItems.ShouldBe(["Rest/Body/1"]);
+
+        Seq(s, "Run").Tracks[0].Chains.ShouldBeEmpty();
+        var moved = Seq(s, "Run").Tracks[1].Chains[1];
+        (moved.Chain, moved.Start, moved.Length, (string?)moved.UnknownProperties["tag"]).ShouldBe(("Walk", 0.0, (double?)0.8, "kept"));
+        Seq(s, "Rest").Tracks[0].Chains.Select(c => (c.Chain, c.Start)).ShouldBe([("Idle", 0.0), ("Walk", 2.5)]);
+    }
+
+    [Fact]
+    public void MoveBlock_OnItsOwnTrack_KeepsItsIndex()
+    {
+        var s = _w.Open();
+
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Run/Body/0", null, 4)).ChangedItems.ShouldBe(["Run/Body/0"]);
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Run/Body/0", "Run/Body", null), expectChange: false).Success.ShouldBeTrue();
+
+        Seq(s, "Run").Tracks[0].Chains.Select(c => c.Start).ShouldBe([4.0, 1.0]);
+    }
+
+    [Fact]
+    public void ReferenceTrack_ClipsMoveAndDuplicate_AndCyclesAreRefused()
+    {
+        var s = _w.Open();
+        SequenceEdit.AddReferenceTrack(s.Document, s.Undo, "Rest", "Run", 0.5, null).Success.ShouldBeTrue();
+        s.Document.AddSequence(s.Undo, "Fr");
+        SequenceEdit.AddReferenceTrack(s.Document, s.Undo, "Run", "Fr", 0, null).Success.ShouldBeTrue();
+        SequenceEdit.AddReferenceTrack(s.Document, s.Undo, "Rest", "Fr", 0, 1).Success.ShouldBeTrue();
+        s.Document.Save.Sequences[1].Tracks[0].References![0].UnknownProperties["tag"] = "kept";
+
+        // Run is 1.4 s long.
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, "Rest/Run/0", null, null)).ChangedItems.ShouldBe(["Rest/Run/1"]);
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, "Rest/Run/0", "Rest/Fr", null)).ChangedItems.ShouldBe(["Rest/Fr/1"]);
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Rest/Run/0", "Rest/Fr", 7)).ChangedItems.ShouldBe(["Rest/Fr/2"]);
+
+        var clips = Seq(s, "Rest").Tracks[0].References!;
+        clips.Select(c => (c.Sequence, c.Start, (string?)c.UnknownProperties["tag"])).ShouldBe([("Run", 1.9, "kept")]);
+        Seq(s, "Rest").Tracks[1].References!.Select(c => (c.Sequence, c.Start)).ShouldBe([("Fr", 0.0), ("Run", 0.5), ("Run", 7.0)]);
+
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Rest/Run/0", "Run/Fr", null)).CodeAt(0).ShouldBe(EditErrorCode.WouldCycle);
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, "Rest/Run/0", "Run/Fr", null)).CodeAt(0).ShouldBe(EditErrorCode.WouldCycle);
+    }
+
+    [Fact]
+    public void ReferenceTrack_ClipThatAlreadyCycles_CanMoveInItsSequence_ButNotBeCopied()
+    {
+        var save = SeqWorkspace.Build();
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Loop", References = [new SequenceReferenceSave { Sequence = "Rest" }] });
+        save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Other", References = [] });
+        save.Save(_w.SeqPath);
+        var s = _w.Open();
+
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, "Rest/Loop/0", null, null)).CodeAt(0).ShouldBe(EditErrorCode.WouldCycle);
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Rest/Loop/0", "Rest/Other", null)).ChangedItems.ShouldBe(["Rest/Other/0"]);
+    }
+
+    [Theory]
+    [InlineData("Run/Body/0", "Rest/Run", null, EditErrorCode.WrongTrackKind)]
+    [InlineData("Rest/Run/0", "Run/Body", null, EditErrorCode.WrongTrackKind)]
+    [InlineData("Run/Body/0", "Run/Shadow", -1.0, EditErrorCode.InvalidValue)]
+    [InlineData("Run/Body/0", "Run/Nope", null, EditErrorCode.NotFound)]
+    [InlineData("Run/Body/9", "Run/Shadow", null, EditErrorCode.IndexOutOfRange)]
+    public void MoveAndDuplicateBlock_Refusals(string block, string to, double? start, EditErrorCode code)
+    {
+        var s = _w.Open();
+        SequenceEdit.AddReferenceTrack(s.Document, s.Undo, "Rest", "Run", 0, null).Success.ShouldBeTrue();
+
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, block, to, start), expectChange: false).CodeAt(0).ShouldBe(code);
+        Run(s, () => SequenceEdit.DuplicateBlock(s.Document, s.Undo, block, to, start), expectChange: false).CodeAt(0).ShouldBe(code);
+    }
+
+    [Fact]
+    public void MoveBlock_NeitherToNorStart_Fails()
+    {
+        var s = _w.Open();
+
+        Run(s, () => SequenceEdit.MoveBlock(s.Document, s.Undo, "Run/Body/0", null, null), expectChange: false).CodeAt(0).ShouldBe(EditErrorCode.InvalidValue);
+    }
+
     [Fact]
     public void DeleteBlock_RemovesIt_AndShiftsLaterIndexes()
     {
