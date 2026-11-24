@@ -288,7 +288,7 @@ public static class AnimationDescriber
 
     private static string Num(float v) => PlainZero(v.ToString("0.###", CultureInfo.InvariantCulture));
 
-    /// <summary>Negative zero, stored by older flips or left by rounding, prints as 0.</summary>
+    /// <summary>Negative zero, stored by a flip of 0 or left by rounding, prints as 0.</summary>
     internal static string PlainZero(string number) => number == "-0" ? "0" : number;
 
     internal static float PlainZero(float v) => v == 0 ? 0 : v;

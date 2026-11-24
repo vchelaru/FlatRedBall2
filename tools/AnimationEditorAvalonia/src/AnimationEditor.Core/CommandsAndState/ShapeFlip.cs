@@ -8,8 +8,7 @@ namespace AnimationEditor.Core.CommandsAndState;
 /// about the entity origin (0,0) — the same space shape offsets live in at runtime
 /// (the runtime mirrors only the sprite and applies shape offsets verbatim, so the editor
 /// bakes the mirror into the data). Negation is its own exact inverse, so re-applying the
-/// same flip restores the original offsets with no rounding drift. A zero stays plain 0, so a flip
-/// never writes "-0" to disk.
+/// same flip restores the original offsets with no rounding drift.
 /// <para>
 /// Shared by <see cref="Commands.FlipCommand"/> (in-place flip) and the duplicate-with-flip
 /// path in <c>AppCommands.DuplicateChains</c> so both use identical logic.
@@ -17,32 +16,30 @@ namespace AnimationEditor.Core.CommandsAndState;
 /// </summary>
 public static class ShapeFlip
 {
-    internal static float Negate(float v) => v == 0 ? 0 : -v;
-
     /// <summary>Negates the offsets of <paramref name="shape"/> in place along each flipped axis.</summary>
     public static void Mirror(object shape, bool flipHorizontal, bool flipVertical)
     {
         switch (shape)
         {
             case AARectSave r:
-                if (flipHorizontal) r.X = Negate(r.X);
-                if (flipVertical)   r.Y = Negate(r.Y);
+                if (flipHorizontal) r.X = -r.X;
+                if (flipVertical)   r.Y = -r.Y;
                 break;
             case CircleSave c:
-                if (flipHorizontal) c.X = Negate(c.X);
-                if (flipVertical)   c.Y = Negate(c.Y);
+                if (flipHorizontal) c.X = -c.X;
+                if (flipVertical)   c.Y = -c.Y;
                 break;
             case PolygonSave p:
                 // Mirror the origin and every vertex so the polygon outline flips too.
                 if (flipHorizontal)
                 {
-                    p.X = Negate(p.X);
-                    foreach (var pt in p.Points) pt.X = Negate(pt.X);
+                    p.X = -p.X;
+                    foreach (var pt in p.Points) pt.X = -pt.X;
                 }
                 if (flipVertical)
                 {
-                    p.Y = Negate(p.Y);
-                    foreach (var pt in p.Points) pt.Y = Negate(pt.Y);
+                    p.Y = -p.Y;
+                    foreach (var pt in p.Points) pt.Y = -pt.Y;
                 }
                 break;
         }
@@ -72,16 +69,16 @@ public static class ShapeFlip
         switch (shape)
         {
             case AARectSave r:
-                (r.X, r.Y) = negate ? (Negate(r.Y), Negate(r.X)) : (r.Y, r.X);
+                (r.X, r.Y) = negate ? (-r.Y, -r.X) : (r.Y, r.X);
                 (r.ScaleX, r.ScaleY) = (r.ScaleY, r.ScaleX);
                 break;
             case CircleSave c:
-                (c.X, c.Y) = negate ? (Negate(c.Y), Negate(c.X)) : (c.Y, c.X);
+                (c.X, c.Y) = negate ? (-c.Y, -c.X) : (c.Y, c.X);
                 break;
             case PolygonSave p:
-                (p.X, p.Y) = negate ? (Negate(p.Y), Negate(p.X)) : (p.Y, p.X);
+                (p.X, p.Y) = negate ? (-p.Y, -p.X) : (p.Y, p.X);
                 foreach (var pt in p.Points)
-                    (pt.X, pt.Y) = negate ? (Negate(pt.Y), Negate(pt.X)) : (pt.Y, pt.X);
+                    (pt.X, pt.Y) = negate ? (-pt.Y, -pt.X) : (pt.Y, pt.X);
                 break;
         }
     }

@@ -136,22 +136,4 @@ public class ShapeFlipTests
         Assert.Equal(3, r.ScaleX);
         Assert.Equal(5, r.ScaleY);
     }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Flip_ZeroOffsets_StayPositiveZero(bool diagonal)
-    {
-        var polygon = new PolygonSave();
-        polygon.Points.Add(new Vector2Save());
-
-        foreach (var shape in new ShapeSave[] { new AARectSave(), new CircleSave(), polygon })
-        {
-            if (diagonal) ShapeFlip.Transpose(shape, flipHorizontal: true, flipVertical: false);
-            else ShapeFlip.Mirror(shape, flipHorizontal: true, flipVertical: true);
-
-            Assert.False(float.IsNegative(shape.X) || float.IsNegative(shape.Y), shape.GetType().Name);
-        }
-        Assert.False(float.IsNegative(polygon.Points[0].X) || float.IsNegative(polygon.Points[0].Y));
-    }
 }

@@ -59,11 +59,11 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             {
                 case FlipAxis.Horizontal:
                     frame.FlipHorizontal = !frame.FlipHorizontal;
-                    frame.RelativeX = ShapeFlip.Negate(frame.RelativeX);   // mirror sprite offset about the entity origin
+                    frame.RelativeX = -frame.RelativeX;   // mirror sprite offset about the entity origin
                     break;
                 case FlipAxis.Vertical:
                     frame.FlipVertical = !frame.FlipVertical;
-                    frame.RelativeY = ShapeFlip.Negate(frame.RelativeY);
+                    frame.RelativeY = -frame.RelativeY;
                     break;
                 case FlipAxis.Diagonal:
                     frame.FlipDiagonal = !frame.FlipDiagonal;
@@ -76,7 +76,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                     // toggled after horizontal or vertical (issue #592 follow-up).
                     bool negateRelative = frame.FlipHorizontal ^ frame.FlipVertical;
                     (frame.RelativeX, frame.RelativeY) = negateRelative
-                        ? (ShapeFlip.Negate(frame.RelativeY), ShapeFlip.Negate(frame.RelativeX))
+                        ? (-frame.RelativeY, -frame.RelativeX)
                         : (frame.RelativeY, frame.RelativeX);
                     break;
             }

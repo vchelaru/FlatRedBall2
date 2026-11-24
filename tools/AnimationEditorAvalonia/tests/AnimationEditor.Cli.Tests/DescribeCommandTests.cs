@@ -137,7 +137,7 @@ public class DescribeCommandTests : IDisposable
     [Fact]
     public async Task NegativeZero_PrintsAsZero_TextAndJson()
     {
-        // Files flipped by an older editor hold -0; -0.0001 rounds to it.
+        // A flip of 0 stores -0; -0.0001 rounds to it.
         _w.Write("neg.achj", """
             { "fileRelativeTextures": true, "timeMeasurementUnit": "Second", "coordinateType": "Pixel",
               "animationChains": [ { "name": "Walk", "frames": [
