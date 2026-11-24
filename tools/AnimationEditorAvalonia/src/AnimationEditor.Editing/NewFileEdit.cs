@@ -49,11 +49,12 @@ public static class NewFileEdit
         if (!overwrite && File.Exists(path)) return AlreadyExists(name);
 
         var save = new SequenceListSave();
-        save.Sequences.Add(new SequenceSave { Name = "Sequence" });
+        var sequence = new SequenceSave { Name = "Sequence" };
+        save.Sequences.Add(sequence);
         try
         {
             save.Save(path);
-            return Created(path);
+            return Created(path) with { Sequence = sequence.Name };
         }
         catch (Exception ex)
         {

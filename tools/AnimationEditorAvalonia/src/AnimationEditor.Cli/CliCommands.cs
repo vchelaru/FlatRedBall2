@@ -15,8 +15,10 @@ internal sealed record CliOption(string Name, string? Needs = null, bool? ForSeq
 /// <summary>A command and every option it takes. Parsing and the error text both read this, so an option not listed here is refused.</summary>
 internal sealed record CliCommand(string Name, bool TakesFile, params CliOption[] Options)
 {
+    public CliOption? Find(string option) => Options.FirstOrDefault(o => o.Name == option);
+
     public string Refusal(string option) =>
-        $"{Name} does not take {option}; it takes {(Options.Length == 0 ? "no options" : string.Join(", ", Options.AsEnumerable()))}.";
+        $"{Name} does not take {option}{(CliCommands.Find(option) is null ? "" : $" (run 'aecli {option}' on its own)")}; it takes {(Options.Length == 0 ? "no options" : string.Join(", ", Options.AsEnumerable()))}.";
 
     /// <summary>The error when <paramref name="file"/> is of the kind one of the <paramref name="given"/> options is not for, or null.</summary>
     public string? WrongKind(string file, IEnumerable<string> given)
@@ -42,9 +44,6 @@ internal static class CliCommands
     private static readonly CliOption Track = Value("--track", true, SequenceAndTrackAreNotForChains);
     private static readonly CliOption Pass = Value("--pass", true, "--pass is for .seqj sequences.");
 
-    /// <summary>What <c>aecli help</c> takes; it is not in <see cref="Find"/> because it runs before parsing.</summary>
-    public static readonly CliCommand Help = new("help", TakesFile: false);
-
     private static readonly CliCommand[] All =
     [
         new("describe", true, Chain, Sequence, Track, Flag("--summary"), Json),
@@ -61,6 +60,7 @@ internal static class CliCommands
         new("at", true, Value("--time"), Sequence, Track, Chain, Pass, Flag("--shapes-only"), Json),
         new("--schema", false, Json),
         new("--version", false),
+        new("help", false),
     ];
 
     private static readonly Dictionary<string, CliCommand> ByName = All.ToDictionary(c => c.Name);

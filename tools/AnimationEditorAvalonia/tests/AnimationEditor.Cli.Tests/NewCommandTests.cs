@@ -43,4 +43,16 @@ public class NewCommandTests : IDisposable
         r.Out.ShouldContain("j.achx");
         r.Out.ShouldContain("\"success\":true");
     }
+
+    [Fact]
+    public async Task SequenceFile_NamesTheSequenceItCreated()
+    {
+        var text = await _w.RunAsync("new", _w.PathOf("a.seqj"));
+        var json = await _w.RunAsync("new", _w.PathOf("b.seqj"), "--json");
+        var animation = await _w.RunAsync("new", _w.PathOf("c.achx"), "--json");
+
+        text.Out.ShouldContain("a.seqj with sequence 'Sequence'");
+        json.Out.ShouldContain("\"sequence\":\"Sequence\"");
+        animation.Out.ShouldNotContain("\"sequence\"");
+    }
 }

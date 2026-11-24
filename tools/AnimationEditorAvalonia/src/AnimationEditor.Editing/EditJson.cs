@@ -15,7 +15,7 @@ public static class EditJson
     }
 
     /// <summary>
-    /// <c>{"success","changed":[],"errors":[{"op"?,"code","message"}],"warnings":[]}</c>. <paramref name="errorOps"/>
+    /// <c>{"success","changed":[],"sequence"?,"errors":[{"op"?,"code","message"}],"warnings":[]}</c>. <paramref name="errorOps"/>
     /// is parallel to the errors and may be null.
     /// </summary>
     public static void WriteResult(Utf8JsonWriter w, EditResult result, IReadOnlyList<int?>? errorOps = null)
@@ -25,6 +25,7 @@ public static class EditJson
         w.WriteStartArray("changed");
         foreach (var c in result.ChangedItems) w.WriteStringValue(c);
         w.WriteEndArray();
+        if (result.Sequence is not null) w.WriteString("sequence", result.Sequence);
         w.WriteStartArray("errors");
         for (int i = 0; i < result.Errors.Count; i++)
         {

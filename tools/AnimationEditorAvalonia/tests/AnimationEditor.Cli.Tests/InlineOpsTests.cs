@@ -143,4 +143,20 @@ public class InlineOpsTests : IDisposable
         d.RootElement.GetProperty("ops").EnumerateArray().All(o => o.TryGetProperty("inline", out var _)).ShouldBeTrue();
         d.RootElement.GetProperty("sequenceOps").EnumerateArray().All(o => o.TryGetProperty("inline", out var _)).ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task OpWithNoRequiredField_TakesItsFirstFieldUnkeyed()
+    {
+        var path = _w.PathOf("fresh.seqj");
+        (await _w.RunAsync("new", path)).Code.ShouldBe(0);
+
+        var r = await _w.RunAsync(Inline(path, "add-sequence Run", "add-sequence name=Idle", "add-sequence"));
+        var twice = await _w.RunAsync(Inline(path, "add-sequence Run Idle"));
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        SequenceFileReader.Read(path).Document!.Sequences.Select(s => s.Name).ShouldBe(["Sequence", "Run", "Idle", "Sequence 2"]);
+        InlineOps.Form(SequenceOps.Specs.Single(s => s.Name == "add-sequence")).ShouldBe("add-sequence [<name>]");
+        twice.Code.ShouldBe(2);
+        twice.Err.ShouldContain("unexpected 'Idle'");
+    }
 }
