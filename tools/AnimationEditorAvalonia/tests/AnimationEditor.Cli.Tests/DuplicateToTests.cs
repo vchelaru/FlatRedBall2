@@ -40,6 +40,8 @@ public abstract class InlineBatchTests : IDisposable
         return error.GetProperty("message").GetString()!;
     }
 
+    protected async Task<string> Describe(string file) => (await _w.RunAsync("describe", _w.PathOf(file))).Out;
+
     private Task<CliOutput> Edit(string file, string[] ops) =>
         _w.RunAsync(["edit", _w.PathOf(file), "--json", .. ops.SelectMany(o => new[] { "--op", o })]);
 
