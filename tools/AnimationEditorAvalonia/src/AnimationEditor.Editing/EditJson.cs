@@ -62,6 +62,7 @@ public static class EditJson
     {
         w.WriteStartObject();
         w.WriteString("format", "{\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}");
+        w.WriteString("inline", InlineOps.Syntax);
         w.WriteString("selectors", EditOps.SelectorSyntax);
         w.WriteString("tsx", EditOps.TsxNote);
         w.WriteStartArray("errorCodes");
@@ -84,6 +85,7 @@ public static class EditJson
         w.WriteStartObject();
         w.WriteString("op", spec.Name);
         w.WriteString("description", spec.Description);
+        w.WriteString("inline", InlineOps.Form(spec));
         w.WriteStartArray("fields");
         foreach (var f in spec.Fields)
         {
@@ -125,6 +127,7 @@ public static class EditJson
         sb.AppendLine("Example ops file: " + EditOps.ExampleFile);
         sb.AppendLine("Animation files (.achx/.achj). Ops file: {\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}, applied in order.");
         sb.AppendLine("Addresses: chain Walk, frame Walk/2 (zero-based), shape Walk/2/rect/Hitbox (rect|circle|polygon).");
+        sb.AppendLine(InlineOps.Syntax);
         sb.AppendLine(EditOps.SelectorSyntax);
         sb.AppendLine(EditOps.TsxNote);
         sb.AppendLine("Error codes (--json errors[].code): " + string.Join(", ", Enum.GetNames<EditErrorCode>()) + ".");
@@ -145,6 +148,7 @@ public static class EditJson
         {
             sb.AppendLine();
             sb.AppendLine($"{spec.Name}: {spec.Description}");
+            sb.AppendLine($"  inline: {InlineOps.Form(spec)}");
             foreach (var f in spec.Fields)
             {
                 var values = f.Values is null ? "" : $" [{string.Join("|", f.Values)}]";

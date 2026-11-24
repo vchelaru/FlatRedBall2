@@ -13,7 +13,8 @@ public sealed record ExportSourceChain(AnimationChainSave Chain, FrameLengthUnit
 
 /// <summary>One animation's contribution to a composed frame: its current frame at its (possibly glided) offset and color.</summary>
 public sealed record ExportLayer(
-    AnimationChainSave Chain, AnimationFrameSave Frame, float OffsetX, float OffsetY, ResolvedFrameColor Color);
+    AnimationChainSave Chain, AnimationFrameSave Frame, float OffsetX, float OffsetY, ResolvedFrameColor Color,
+    IReadOnlyList<ExportShape>? Shapes = null);
 
 /// <summary>A composed frame: the layers to draw back to front, shown for <see cref="DelayTicks"/> (the format's delay unit).</summary>
 public sealed record ExportTimelineFrame(IReadOnlyList<ExportLayer> Layers, int DelayTicks);

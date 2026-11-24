@@ -20,6 +20,7 @@ internal static class RenderCommand
         if (!values.TryGetValue("--out", out var outDir)) return Usage("render needs --out <dir>.");
         if (values.ContainsKey("--sequence") && values.ContainsKey("--chain")) return Usage("give --sequence or --chain, not both.");
 
+        bool shapes = values.ContainsKey("--shapes"), sheet = values.ContainsKey("--sheet");
         int scale = 4;
         if (values.TryGetValue("--scale", out var scaleText) && !(int.TryParse(scaleText, NumberStyles.None, CultureInfo.InvariantCulture, out scale) && scale is >= 1 and <= MaxScale))
             return Usage($"--scale must be a whole number from 1 to {MaxScale}.");
@@ -61,7 +62,10 @@ internal static class RenderCommand
         StillImages images;
         try
         {
-            images = StillImageRenderer.Render(plan.Frames, plan.ResolveTexture, new StillRenderOptions(scale, transparent, background, grid, bounds));
+            var options = new StillRenderOptions(scale, transparent, background, grid, bounds, shapes);
+            images = sheet
+                ? StillImageRenderer.RenderSheet(plan.Frames, plan.Labels, plan.ResolveTexture, options)
+                : StillImageRenderer.Render(plan.Frames, plan.ResolveTexture, options);
         }
         catch (InvalidOperationException ex)
         {
@@ -74,7 +78,7 @@ internal static class RenderCommand
             var files = new List<string>();
             for (int i = 0; i < images.Pngs.Count; i++)
             {
-                var path = Path.GetFullPath(Path.Combine(outDir, plan.Stems[i] + ".png"));
+                var path = Path.GetFullPath(Path.Combine(outDir, (sheet ? plan.Name + "_sheet" : plan.Stems[i]) + ".png"));
                 File.WriteAllBytes(path, images.Pngs[i]);
                 files.Add(path);
             }

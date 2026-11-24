@@ -15,9 +15,9 @@ namespace AnimationEditor.Editing;
 /// <param name="Frames">Chain frame indexes; null when not given.</param>
 public sealed record RenderRequest(string File, string? Name, IReadOnlyList<double>? Times, IReadOnlyList<int>? Frames);
 
-/// <summary>The images to draw: one file-name stem and one composed frame each, back to front, ready for the renderer.</summary>
+/// <summary>The images to draw: one file-name stem, one caption (the time or frame, for a contact sheet) and one composed frame each, back to front, ready for the renderer.</summary>
 public sealed record RenderPlan(
-    string Name, IReadOnlyList<string> Stems, IReadOnlyList<ExportTimelineFrame> Frames, Func<AnimationFrameSave, string?> ResolveTexture);
+    string Name, IReadOnlyList<string> Stems, IReadOnlyList<string> Labels, IReadOnlyList<ExportTimelineFrame> Frames, Func<AnimationFrameSave, string?> ResolveTexture);
 
 /// <summary>Builds a <see cref="RenderPlan"/> from a file with the editor's own scene logic; no drawing happens here.</summary>
 public static class RenderPlanner
@@ -63,13 +63,14 @@ public static class RenderPlanner
             var layers = SequenceScene.At(document, index, time).Select(sprite =>
             {
                 var sample = sprite.Sample();
-                return new ExportLayer(sprite.Chain, sprite.Frame, sample.OffsetX, sample.OffsetY, sample.Color);
+                return new ExportLayer(sprite.Chain, sprite.Frame, sample.OffsetX, sample.OffsetY, sample.Color,
+                    ExportShapes.Sample(sprite.Chain, sprite.Unit, sprite.FrameIndex, sprite.ElapsedInFrame));
             }).ToList();
             frames.Add(new ExportTimelineFrame(layers, 0));
         }
         string name = sequences[index].Name;
         var textureOf = SpriteTextures(document, index, times);
-        return new RenderPlan(name, times.Select(t => Stem(name, Time(t))).ToList(), frames, frame => textureOf.GetValueOrDefault(frame));
+        return new RenderPlan(name, times.Select(t => Stem(name, Time(t))).ToList(), times.Select(t => Time(t) + "s").ToList(), frames, frame => textureOf.GetValueOrDefault(frame));
     }
 
     // The texture of every frame the requested times can show, resolved through the sprite's own source.
@@ -97,32 +98,33 @@ public static class RenderPlanner
         if (chain.Frames.Count == 0) { error = $"Chain '{chain.Name}' has no frames."; return null; }
 
         var unit = FrameLengthUnit.Of(list);
-        var spots = new List<(int Frame, double Elapsed, string Stem)>();
+        var spots = new List<(int Frame, double Elapsed, string Stem, string Label)>();
         if (request.Times is { } times)
             foreach (double time in times)
             {
                 var (frame, elapsed) = ChainClock.Locate(chain, time, unit);
-                spots.Add((frame, elapsed, Stem(chain.Name, Time(time))));
+                spots.Add((frame, elapsed, Stem(chain.Name, Time(time)), Time(time) + "s"));
             }
         else
             foreach (int frame in request.Frames ?? [0])
             {
                 if (frame < 0 || frame >= chain.Frames.Count)
                 { error = $"Frame {frame} is out of range; chain '{chain.Name}' has {chain.Frames.Count} frame(s), 0 to {chain.Frames.Count - 1}."; return null; }
-                spots.Add((frame, 0, Stem(chain.Name, $"frame{frame}")));
+                spots.Add((frame, 0, Stem(chain.Name, $"frame{frame}"), $"frame {frame}"));
             }
 
         var frames = spots.Select(spot =>
         {
             var sample = KeyframeSampler.Sample(chain, unit, spot.Frame, spot.Elapsed);
-            var layer = new ExportLayer(chain, chain.Frames[spot.Frame], sample.OffsetX, sample.OffsetY, sample.Color);
+            var layer = new ExportLayer(chain, chain.Frames[spot.Frame], sample.OffsetX, sample.OffsetY, sample.Color,
+                ExportShapes.Sample(chain, unit, spot.Frame, spot.Elapsed));
             return new ExportTimelineFrame([layer], 0);
         }).ToList();
         string folder = Path.GetDirectoryName(Path.GetFullPath(request.File)) ?? "";
         string? Resolve(AnimationFrameSave frame) =>
             string.IsNullOrEmpty(frame.TextureName) ? null
             : Path.GetFullPath(Path.IsPathRooted(frame.TextureName) ? frame.TextureName : Path.Combine(folder, frame.TextureName));
-        return new RenderPlan(chain.Name, spots.Select(s => s.Stem).ToList(), frames, Resolve);
+        return new RenderPlan(chain.Name, spots.Select(s => s.Stem).ToList(), spots.Select(s => s.Label).ToList(), frames, Resolve);
     }
 
     // The index of the named item, or the only one when no name is given; -1 with an error (usage when the request is at fault).

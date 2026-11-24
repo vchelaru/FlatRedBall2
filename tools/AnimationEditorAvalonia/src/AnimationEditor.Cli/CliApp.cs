@@ -17,20 +17,28 @@ public static class CliApp
           new <file> [--json]                    create an empty .achx/.achj/.seqj
           convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
+          edit <file> --op "<op> <address> key=value ..." [--op ...] [--json]   same, inline (see --schema); --ops - reads the file from stdin
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2) or a chain (--chain <name> --frame 0 | --at 0.3)
-              --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  [--json]
+              --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  --shapes  --sheet  [--json]
           at <file.seqj> --time 0,4.2 [--sequence <name>] [--json]  per visible track: active chain, frame, sprite offset and the frame's shapes (position, size) at each time
           --schema [--json]                      list the operations and their fields
+          --version                              build version, source commit and build time (UTC)
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
         """;
 
-    public static async Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr)
+    public static async Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, TextReader? stdin = null)
     {
-        var cli = new Invocation(stdout, stderr) { Json = args.Contains("--json") };
+        var cli = new Invocation(stdout, stderr, stdin ?? TextReader.Null) { Json = args.Contains("--json") };
         if (args.Length == 0) return cli.Usage("no command given.", showUsage: true);
         if (args[0] is "-h" or "--help" or "help")
         {
             stdout.WriteLine(Usage);
+            return 0;
+        }
+
+        if (args[0] == "--version")
+        {
+            stdout.WriteLine(BuildInfo.Describe());
             return 0;
         }
 
@@ -47,8 +55,9 @@ public static class CliApp
             case "new": return parsed.File is null ? cli.Usage("new needs a file.") : cli.New(parsed.File);
             case "edit":
                 if (parsed.File is null) return cli.Usage("edit needs a file.");
-                if (parsed.OpsFile is null) return cli.Usage("edit needs --ops <ops.json>.");
-                return await cli.EditAsync(parsed.File, parsed.OpsFile);
+                if (parsed.OpsFile is null && parsed.InlineOps is not { Count: > 0 }) return cli.Usage("edit needs --ops <ops.json|-> or --op \"<op> <address> key=value ...\".");
+                if (parsed.OpsFile is not null && parsed.InlineOps is { Count: > 0 }) return cli.Usage("edit takes --ops or --op, not both.");
+                return await cli.EditAsync(parsed.File, parsed.OpsFile, parsed.InlineOps);
             case "convert":
                 if (parsed.File is null) return cli.Usage("convert needs a file.");
                 if (parsed.To is not ("achj" or "achx")) return cli.Usage("convert needs --to achj or --to achx.");
@@ -65,13 +74,14 @@ public static class CliApp
     }
 
     private sealed record Arguments(string? Command, string? File, string? OpsFile, string? To, bool Json, bool Schema, string? Error,
-        IReadOnlyDictionary<string, string>? Values = null, bool Grid = false, bool Summary = false)
+        IReadOnlyDictionary<string, string>? Values = null, bool Grid = false, bool Summary = false, IReadOnlyList<string>? InlineOps = null)
     {
         public static Arguments Parse(string[] args)
         {
             string? command = null, file = null, ops = null, to = null;
             bool json = false, schema = false, grid = false, summary = false;
             var values = new Dictionary<string, string>();
+            var inline = new List<string>();
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -80,6 +90,7 @@ public static class CliApp
                     case "--json": json = true; break;
                     case "--schema": schema = true; break;
                     case "--grid": grid = true; break;
+                    case "--shapes" or "--sheet": values[a] = ""; break;
                     case "--summary": summary = true; break;
                     case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds" or "--time":
                         if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
@@ -88,6 +99,10 @@ public static class CliApp
                     case "--ops":
                         if (i + 1 >= args.Length) return Bad("--ops needs a file.");
                         ops = args[++i];
+                        break;
+                    case "--op":
+                        if (i + 1 >= args.Length) return Bad("--op needs an operation, e.g. --op \"set-frame-offset Walk/0 x=4\".");
+                        inline.Add(args[++i]);
                         break;
                     case "--to":
                         if (i + 1 >= args.Length) return Bad("--to needs achj or achx.");
@@ -101,13 +116,13 @@ public static class CliApp
                         break;
                 }
             }
-            return new Arguments(command, file, ops, to, json, schema, null, values, grid, summary);
+            return new Arguments(command, file, ops, to, json, schema, null, values, grid, summary, inline);
 
             static Arguments Bad(string error) => new(null, null, null, null, false, false, error);
         }
     }
 
-    private sealed class Invocation(TextWriter stdout, TextWriter stderr)
+    private sealed class Invocation(TextWriter stdout, TextWriter stderr, TextReader stdin)
     {
         public bool Json { get; set; }
 
@@ -276,17 +291,25 @@ public static class CliApp
             return Report(result, null, $"Created {result.ChangedItems.FirstOrDefault()}");
         }
 
-        public async Task<int> EditAsync(string file, string opsFile)
+        public async Task<int> EditAsync(string file, string? opsFile, IReadOnlyList<string>? inlineOps)
         {
-            string text;
-            try { text = File.ReadAllText(opsFile); }
-            catch (Exception ex) { return Usage($"cannot read the ops file {opsFile}: {ex.Message}"); }
+            bool sequence = SequenceFileReader.IsSequenceFile(file);
+            var specs = sequence ? SequenceOps.Specs : EditOps.Specs;
 
-            if (SequenceFileReader.IsSequenceFile(file))
-                return EditSequence(file, text);
-
-            var parsed = EditOps.Parse(text);
+            OpsParse parsed;
+            if (inlineOps is { Count: > 0 })
+                parsed = InlineOps.Parse(inlineOps, specs);
+            else
+            {
+                string text;
+                try { text = opsFile == "-" ? stdin.ReadToEnd() : File.ReadAllText(opsFile!); }
+                catch (Exception ex) { return Usage($"cannot read the ops {(opsFile == "-" ? "from stdin" : $"file {opsFile}")}: {ex.Message}"); }
+                parsed = EditOps.Parse(text, specs);
+            }
             if (parsed.Ops is null) return Usage(parsed.Error!);
+
+            if (sequence)
+                return EditSequence(file, parsed.Ops);
 
             var open = await EditSession.OpenAsync(file);
             if (open.Session is null) return Report(open.Result, null, null);
@@ -298,20 +321,17 @@ public static class CliApp
             return Report(run.Result, run.ErrorOps, applied);
         }
 
-        private int EditSequence(string file, string opsText)
+        private int EditSequence(string file, IReadOnlyList<EditOp> ops)
         {
-            var parsed = SequenceOps.Parse(opsText);
-            if (parsed.Ops is null) return Usage(parsed.Error!);
-
             var open = SequenceSession.Open(file);
             if (open.Session is null) return Report(open.Result, null, null);
 
-            var run = SequenceOps.Apply(open.Session, parsed.Ops);
+            var run = SequenceOps.Apply(open.Session, ops);
             var warnings = open.Result.Warnings.Concat(run.Result.Warnings).ToList();
             var result = run.Result with { Warnings = warnings };
             var applied = result.ChangedItems.Count == 0
                 ? $"No changes; {Path.GetFileName(file)} left as it was."
-                : $"Applied {parsed.Ops.Count} op(s) and saved {Path.GetFileName(file)}.";
+                : $"Applied {ops.Count} op(s) and saved {Path.GetFileName(file)}.";
             return Report(result, run.ErrorOps, applied);
         }
 

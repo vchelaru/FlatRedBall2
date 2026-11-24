@@ -3463,6 +3463,91 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     internal static PreviewShapeInfo[] ShapeDrawOrder(PreviewShapeInfo[] shapes) =>
         shapes.OrderBy(sh => sh.IsHovered ? 2 : sh.IsSelected ? 1 : 0).ToArray();
 
+    /// <summary>Draws collision shapes as the preview does: <paramref name="cx"/>, <paramref name="cy"/> is the entity origin on the canvas, <paramref name="om"/> the pixels per offset unit.</summary>
+    internal static void DrawShapes(SKCanvas canvas, PreviewShapeInfo[] shapes, float cx, float cy, float om)
+    {
+        using var shapePaint   = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
+        using var selectedPaint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 2f,   IsAntialias = true };
+
+        foreach (var sh in ShapeDrawOrder(shapes))
+        {
+            var paint = sh.IsSelected || sh.IsHovered ? selectedPaint : shapePaint;
+            paint.Color = sh.IsSelected
+                ? EditorColors.SelectedShape
+                : sh.IsHovered ? EditorColors.HoveredShape : EditorColors.Shape;
+
+            // Shape coords: X right, Y up (FRB convention); negate Y for screen
+            float sx = cx + sh.X * om;
+            float sy = cy - sh.Y * om;
+
+            if (sh.Kind == PreviewShapeKind.Polygon)
+            {
+                // A self-intersecting outline breaks the runtime's collision, so it is drawn in
+                // red whether or not it is selected.
+                if (sh.IsSelfIntersecting)
+                    paint.Color = EditorColors.InvalidShape;
+                using var path = BuildPolygonPath(sh, sx, sy, om);
+                canvas.DrawPath(path, paint);
+                if (sh.IsSelected)
+                    DrawPolygonOrigin(canvas, sx, sy);
+                if (sh.IsSelected && !sh.IsLocked)
+                    DrawPolygonHandles(canvas, sh, sx, sy, om);
+            }
+            else if (sh.Kind == PreviewShapeKind.Rect)
+            {
+                float hw = sh.Param1 * om;
+                float hh = sh.Param2 * om;
+                if (sh.IsSelected && !sh.IsLocked)
+                    DrawShapeHandles(canvas, sx - hw, sy - hh, sx + hw, sy + hh);
+                canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), paint);
+            }
+            else
+            {
+                float sr = sh.Param1 * om;
+                if (sh.IsSelected)
+                {
+                    // Draw the bounding square outline for the circle so handles have context.
+                    using var boxPaint = new SKPaint
+                    {
+                        Color       = EditorColors.SelectedShapeBounds,
+                        Style       = SKPaintStyle.Stroke,
+                        StrokeWidth = 1f,
+                        PathEffect  = SKPathEffect.CreateDash(new float[] { 4f, 4f }, 0f),
+                    };
+                    if (!sh.IsLocked)
+                        DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
+                    canvas.DrawRect(new SKRect(sx - sr, sy - sr, sx + sr, sy + sr), boxPaint);
+                }
+                canvas.DrawCircle(sx, sy, sh.Param1 * om, paint);
+            }
+
+            if (sh.IsPendingCut)
+            {
+                using var cutPaint = new SKPaint
+                {
+                    Color = EditorColors.PendingCut,
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = 2f,
+                    IsAntialias = true,
+                    PathEffect = SKPathEffect.CreateDash(new float[] { 6f, 4f }, 0f),
+                };
+                if (sh.Kind == PreviewShapeKind.Polygon)
+                {
+                    using var cutPath = BuildPolygonPath(sh, sx, sy, om);
+                    canvas.DrawPath(cutPath, cutPaint);
+                }
+                else if (sh.Kind == PreviewShapeKind.Rect)
+                {
+                    float hw = sh.Param1 * om;
+                    float hh = sh.Param2 * om;
+                    canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), cutPaint);
+                }
+                else
+                    canvas.DrawCircle(sx, sy, sh.Param1 * om, cutPaint);
+            }
+        }
+    }
+
     // Small "+" at the polygon's X/Y, which its vertices are relative to (#1352). A fixed screen
     // size and a dark underlay so it reads at any zoom and over any texture.
     private static void DrawPolygonOrigin(SKCanvas canvas, float x, float y)
@@ -3596,90 +3681,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         }
 
         // Collision shapes (AxisAlignedRectangles, Circles and Polygons).
-        if (s.Shapes.Length > 0)
-        {
-            float om = s.OffsetMultiplier * s.Zoom;
-            using var shapePaint   = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
-            using var selectedPaint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 2f,   IsAntialias = true };
-
-            foreach (var sh in ShapeDrawOrder(s.Shapes))
-            {
-                var paint = sh.IsSelected || sh.IsHovered ? selectedPaint : shapePaint;
-                paint.Color = sh.IsSelected
-                    ? EditorColors.SelectedShape
-                    : sh.IsHovered ? EditorColors.HoveredShape : EditorColors.Shape;
-
-                // Shape coords: X right, Y up (FRB convention); negate Y for screen
-                float sx = cx + sh.X * om;
-                float sy = cy - sh.Y * om;
-
-                if (sh.Kind == PreviewShapeKind.Polygon)
-                {
-                    // A self-intersecting outline breaks the runtime's collision, so it is drawn in
-                    // red whether or not it is selected.
-                    if (sh.IsSelfIntersecting)
-                        paint.Color = EditorColors.InvalidShape;
-                    using var path = BuildPolygonPath(sh, sx, sy, om);
-                    canvas.DrawPath(path, paint);
-                    if (sh.IsSelected)
-                        DrawPolygonOrigin(canvas, sx, sy);
-                    if (sh.IsSelected && !sh.IsLocked)
-                        DrawPolygonHandles(canvas, sh, sx, sy, om);
-                }
-                else if (sh.Kind == PreviewShapeKind.Rect)
-                {
-                    float hw = sh.Param1 * om;
-                    float hh = sh.Param2 * om;
-                    if (sh.IsSelected && !sh.IsLocked)
-                        DrawShapeHandles(canvas, sx - hw, sy - hh, sx + hw, sy + hh);
-                    canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), paint);
-                }
-                else
-                {
-                    float sr = sh.Param1 * om;
-                    if (sh.IsSelected)
-                    {
-                        // Draw the bounding square outline for the circle so handles have context.
-                        using var boxPaint = new SKPaint
-                        {
-                            Color       = EditorColors.SelectedShapeBounds,
-                            Style       = SKPaintStyle.Stroke,
-                            StrokeWidth = 1f,
-                            PathEffect  = SKPathEffect.CreateDash(new float[] { 4f, 4f }, 0f),
-                        };
-                        if (!sh.IsLocked)
-                            DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
-                        canvas.DrawRect(new SKRect(sx - sr, sy - sr, sx + sr, sy + sr), boxPaint);
-                    }
-                    canvas.DrawCircle(sx, sy, sh.Param1 * om, paint);
-                }
-
-                if (sh.IsPendingCut)
-                {
-                    using var cutPaint = new SKPaint
-                    {
-                        Color = EditorColors.PendingCut,
-                        Style = SKPaintStyle.Stroke,
-                        StrokeWidth = 2f,
-                        IsAntialias = true,
-                        PathEffect = SKPathEffect.CreateDash(new float[] { 6f, 4f }, 0f),
-                    };
-                    if (sh.Kind == PreviewShapeKind.Polygon)
-                    {
-                        using var cutPath = BuildPolygonPath(sh, sx, sy, om);
-                        canvas.DrawPath(cutPath, cutPaint);
-                    }
-                    else if (sh.Kind == PreviewShapeKind.Rect)
-                    {
-                        float hw = sh.Param1 * om;
-                        float hh = sh.Param2 * om;
-                        canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), cutPaint);
-                    }
-                    else
-                        canvas.DrawCircle(sx, sy, sh.Param1 * om, cutPaint);
-                }
-            }
-        }
+        DrawShapes(canvas, s.Shapes, cx, cy, s.OffsetMultiplier * s.Zoom);
 
         // Dragged guide value label - drawn last so it stays on top of shapes.
         if (s.ShowUserGuides && s.DraggedGuideIdx >= 0)
