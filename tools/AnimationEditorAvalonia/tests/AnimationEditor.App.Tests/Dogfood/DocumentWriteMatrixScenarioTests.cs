@@ -142,7 +142,8 @@ public class DocumentWriteMatrixScenarioTests
                 SelectSequence(editor);
                 editor.Press(Key.V, RawInputModifiers.Control);
                 editor.Wait(TimeSpan.FromMilliseconds(100));
-                current.Expected.Sequences.Sequences.Add(back.Expected.Sequences.Sequences[0]);
+                // After the selected one.
+                current.Expected.Sequences.Sequences.Insert(1, back.Expected.Sequences.Sequences[0]);
                 back.Expected.Sequences.Sequences.RemoveAt(0);
                 break;
             case DocAction.SaveAsOntoOpenTab:
