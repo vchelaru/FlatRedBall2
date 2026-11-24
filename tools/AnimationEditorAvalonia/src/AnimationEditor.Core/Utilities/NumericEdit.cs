@@ -32,11 +32,14 @@ public readonly struct NumericEdit
 
     /// <summary>The edited value of an item whose value is currently <paramref name="current"/>.
     /// An edit that overflows leaves the value unchanged.</summary>
-    public decimal Apply(decimal current)
+    public decimal Apply(decimal current) => TryApply(current, out decimal value) ? value : current;
+
+    /// <summary><see cref="Apply(decimal)"/> for callers that must report an edit that overflows: returns false for one.</summary>
+    public bool TryApply(decimal current, out decimal value)
     {
         try
         {
-            return _op switch
+            value = _op switch
             {
                 '+' => current + _operand,
                 '-' => current - _operand,
@@ -44,14 +47,27 @@ public readonly struct NumericEdit
                 '/' => current / _operand,
                 _ => _operand,
             };
+            return true;
         }
         catch (OverflowException)
+        {
+            value = default;
+            return false;
+        }
+    }
+
+    public float Apply(float current)
+    {
+        if (!IsRelative) return (float)_operand;
+        try
+        {
+            return (float)Apply((decimal)current);
+        }
+        catch (OverflowException) // current does not fit a decimal
         {
             return current;
         }
     }
-
-    public float Apply(float current) => (float)Apply((decimal)current);
 
     /// <summary>Rounds to the nearest integer, for whole-pixel and color-channel fields.</summary>
     public int Apply(int current) => (int)Math.Round(Apply((decimal)current), MidpointRounding.AwayFromZero);

@@ -165,8 +165,8 @@ public static class ShapeEdit
         {
             if (points.Count < 3)
                 return Fail(EditErrorCode.InvalidValue, $"A polygon needs at least 3 points; {points.Count} given.");
-            if (points.Any(p => !float.IsFinite(p.X) || !float.IsFinite(p.Y)))
-                return Fail(EditErrorCode.InvalidValue, "Polygon points must be finite numbers.");
+            if (points.Any(p => !NumberFields.InRange(p.X) || !NumberFields.InRange(p.Y)))
+                return Fail(EditErrorCode.InvalidValue, $"A polygon point is out of range: valid values are {NumberFields.RangeText}.");
         }
 
         var (nx, ny) = (x ?? polygon.X, y ?? polygon.Y);
@@ -207,13 +207,13 @@ public static class ShapeEdit
     }
 
     private static EditResult? CheckPosition(float? x, float? y) =>
-        (x is { } a && !float.IsFinite(a)) || (y is { } b && !float.IsFinite(b))
-            ? Fail(EditErrorCode.InvalidValue, "x and y must be finite numbers.")
+        (x is { } a && !NumberFields.InRange(a)) || (y is { } b && !NumberFields.InRange(b))
+            ? Fail(EditErrorCode.InvalidValue, $"x or y is out of range: valid values are {NumberFields.RangeText}.")
             : null;
 
     private static EditResult? CheckPositive(float? value, string field) =>
-        value is { } v && !(float.IsFinite(v) && v > 0f)
-            ? Fail(EditErrorCode.InvalidValue, $"{field} must be greater than zero (a shape's scale and radius are half-extents).")
+        value is { } v && !(NumberFields.InRange(v) && v > 0f)
+            ? Fail(EditErrorCode.InvalidValue, $"{field} must be greater than zero and at most {NumberFields.Max} (a shape's scale and radius are half-extents).")
             : null;
 
     internal static string Address(AnimationChainSave chain, AnimationFrameSave frame, string type, string name) =>

@@ -64,6 +64,7 @@ public static class EditJson
         w.WriteStartObject();
         w.WriteString("format", "{\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}");
         w.WriteString("inline", InlineOps.Syntax);
+        w.WriteString("relative", EditOps.RelativeSyntax);
         w.WriteString("selectors", EditOps.SelectorSyntax);
         w.WriteString("tsx", EditOps.TsxNote);
         w.WriteStartArray("errorCodes");
@@ -93,6 +94,7 @@ public static class EditJson
             w.WriteStartObject();
             w.WriteString("name", f.Name);
             w.WriteString("type", f.Type);
+            if (f.Relative) w.WriteBoolean("relative", true);
             w.WriteBoolean("required", f.Required);
             w.WriteString("description", f.Description);
             if (f.Values is not null)
@@ -131,6 +133,7 @@ public static class EditJson
         sb.AppendLine("Animation files (.achx/.achj). Ops file: {\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}, applied in order.");
         sb.AppendLine("Addresses: chain Walk, frame Walk/2 (zero-based), shape Walk/2/rect/Hitbox (rect|circle|polygon).");
         sb.AppendLine(InlineOps.Syntax);
+        sb.AppendLine(EditOps.RelativeSyntax);
         sb.AppendLine(EditOps.SelectorSyntax);
         sb.AppendLine(EditOps.TsxNote);
         sb.AppendLine("Error codes (--json errors[].code): " + string.Join(", ", Enum.GetNames<EditErrorCode>()) + ".");
@@ -155,7 +158,7 @@ public static class EditJson
             foreach (var f in spec.Fields)
             {
                 var values = f.Values is null ? "" : $" [{string.Join("|", f.Values)}]";
-                sb.AppendLine($"  {f.Name}  {f.Type}{values}  {(f.Required ? "required" : "optional")}  {f.Description}");
+                sb.AppendLine($"  {f.Name}  {f.Type}{(f.Relative ? " or relative" : "")}{values}  {(f.Required ? "required" : "optional")}  {f.Description}");
             }
         }
     }

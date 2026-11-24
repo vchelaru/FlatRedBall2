@@ -35,6 +35,7 @@ public class FrameLengthUnitGuardTests
         "Core/ViewModels/TreeBuilder.cs",
         "Views/Dialogs/EditorDialogs.cs",
         "Editing/AnimationDescriber.cs", // prints lengths in the file's own unit, labelled with it
+        "Editing/EditOps.cs", // reads the raw value a relative edit starts from; both are in the file's unit
         "Editing/CheckReport.cs", // only compares the raw value with zero
     };
 
