@@ -303,6 +303,9 @@ public static class EditOps
     private const string CopyDescription =
         "What to do when the texture is outside the animation file's folder: keep references it in place (default), copy copies it next to the file, overwrite copies over a different same-named file.";
 
+    /// <summary>A minimal valid one-line ops file, shown first in <c>--schema</c> and in the wrong-shape error.</summary>
+    public const string ExampleFile = "{\"ops\":[{\"op\":\"rename-chain\",\"chain\":\"Walk\",\"to\":\"Run\"}]}";
+
     /// <summary>Validates the text of an ops file: JSON shape, known ops, known fields, field types. Nothing is applied.</summary>
     public static OpsParse Parse(string json) => Parse(json, Specs);
 
@@ -317,7 +320,7 @@ public static class EditOps
         {
             if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("ops", out var array)
                 || array.ValueKind != JsonValueKind.Array)
-                return Bad("The ops file must be an object with an \"ops\" array.");
+                return Bad($"The ops file must be an object with an \"ops\" array, not a bare array. Example: {ExampleFile}");
 
             var ops = new List<EditOp>();
             int index = 0;

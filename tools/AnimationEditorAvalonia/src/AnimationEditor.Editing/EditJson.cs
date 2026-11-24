@@ -105,6 +105,7 @@ public static class EditJson
     public static string SchemaText()
     {
         var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Example ops file: " + EditOps.ExampleFile);
         sb.AppendLine("Animation files (.achx/.achj). Ops file: {\"ops\":[{\"op\":\"<name>\", ...fields}, ...]}, applied in order.");
         sb.AppendLine("Addresses: chain Walk, frame Walk/2 (zero-based), shape Walk/2/rect/Hitbox (rect|circle|polygon).");
         sb.AppendLine(EditOps.SelectorSyntax);
