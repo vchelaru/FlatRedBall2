@@ -173,7 +173,7 @@ public class CheckWarningTests : IDisposable
     public async Task EditSequence_SeveralClipsOnAReferenceTrack_AreCountedOneByOne()
     {
         var path = WriteSeq();
-        await EditWarnings(path, "add-sequence Long", "add-reference-track Long target=Run");
+        await EditWarnings(path, "add-sequence name=Long", "add-reference-track Long target=Run");
 
         // Run lasts 1.5 s, so each later clip cuts the one before it.
         (await EditWarnings(path, "add-block Long/Run sequence=Run start=0.5", "add-block Long/Run sequence=Run start=1"))
