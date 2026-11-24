@@ -451,6 +451,7 @@ public static class EditOps
 
         var tsxBefore = session.IsNativeTsx ? TsxOpPolicy.Take(session) : null;
         var associations = new List<string>();
+        var chainsBefore = BrokenSequenceBlocks.ChainsAtRisk(session.Document, ops);
 
         foreach (var op in ops)
         {
@@ -526,6 +527,8 @@ public static class EditOps
 
         // A .tsx save leaves out what a tileset cannot hold (a chain with no frames), so the document says nothing about the saved file.
         if (!session.IsNativeTsx) warnings.AddRange(CheckReport.RaisedWarnings(before, after));
+        if (chainsBefore is not null)
+            warnings.AddRange(BrokenSequenceBlocks.Warnings(session.Document, session.Path, chainsBefore));
         var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path)).Distinct().ToList();
         return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
     }
