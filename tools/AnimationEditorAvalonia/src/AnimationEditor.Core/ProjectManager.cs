@@ -69,6 +69,8 @@ namespace AnimationEditor.Core
         /// a real name, so it's never auto-renamed again.</summary>
         private HashSet<AnimationChainSave> _tsxSyntheticNamedChains = new(ReferenceEqualityComparer.Instance);
 
+        private Tiled.TsxUserProperties? _tsxUserProperties;
+
         /// <summary>Each chain's own <see cref="AnimationChainSave.Frames"/> contents as of the
         /// most recent save where it had a real (non-null) entry tile id -- i.e. the frame-object
         /// sequence that produced <see cref="_tsxEntryTileIdsByChain"/>'s current value for that
@@ -442,6 +444,7 @@ namespace AnimationEditor.Core
                 tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out var syntheticNamedChains);
 
             _tsxTileset = tileset;
+            _tsxUserProperties = Tiled.TsxUserProperties.Read(tileset);
             AnimationChainListSave = acls;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(satelliteTileIdsByChain, ReferenceEqualityComparer.Instance);
@@ -557,7 +560,7 @@ namespace AnimationEditor.Core
             mapped = YieldCollidingFreshClaims(mapped, entryHintsForMap, satelliteHintsForMap);
 
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
-            Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped);
+            Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped, _tsxUserProperties);
             Tiled.TsxWriter.Write(workingTileset, targetPath ?? FileName!);
             _tsxTileset = workingTileset;
 
@@ -798,6 +801,7 @@ namespace AnimationEditor.Core
         /// always replace these fields wholesale rather than mutating them in place.</summary>
         private sealed record TsxState(
             DotTiled.Tileset Tileset,
+            Tiled.TsxUserProperties? UserProperties,
             Dictionary<AnimationChainSave, uint> EntryTileIdsByChain,
             Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> SatelliteTileIdsByChain,
             HashSet<AnimationChainSave> SyntheticNamedChains,
@@ -807,7 +811,7 @@ namespace AnimationEditor.Core
         /// <inheritdoc/>
         public object? CaptureTsxState() =>
             _tsxTileset is null ? null : new TsxState(
-                _tsxTileset, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain, _tsxSyntheticNamedChains,
+                _tsxTileset, _tsxUserProperties, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain, _tsxSyntheticNamedChains,
                 _tsxLastNonEmptyFramesByChain, _tsxDormantHintsByChain);
 
         /// <inheritdoc/>
@@ -816,6 +820,7 @@ namespace AnimationEditor.Core
             if (state is TsxState tsxState)
             {
                 _tsxTileset = tsxState.Tileset;
+                _tsxUserProperties = tsxState.UserProperties;
                 _tsxEntryTileIdsByChain = tsxState.EntryTileIdsByChain;
                 _tsxSatelliteTileIdsByChain = tsxState.SatelliteTileIdsByChain;
                 _tsxSyntheticNamedChains = tsxState.SyntheticNamedChains;
@@ -825,6 +830,7 @@ namespace AnimationEditor.Core
             else
             {
                 _tsxTileset = null;
+                _tsxUserProperties = null;
                 _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
                 _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
                 _tsxSyntheticNamedChains = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);

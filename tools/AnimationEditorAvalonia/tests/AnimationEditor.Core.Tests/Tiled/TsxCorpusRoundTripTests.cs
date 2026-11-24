@@ -358,7 +358,6 @@ public class TsxCorpusRoundTripTests : IDisposable
     private static readonly Op[] EveryEdit = [Op.EditSave, Op.EditSaveOneLine, Op.SaveAs];
     private static readonly Op[] WholeFile = [Op.EditSaveOneLine, Op.SaveAs];
 
-    private const string NameProperty = "#2014 A: a Name property the editor did not write is removed";
     private const string TileOrder = "#2013 B: tiles are sorted by id";
     private const string EditedTile = "#2013 C: an edited tile loses what DotTiled does not model";
     private const string TextIndent = "#2013 D: multi-line text in an edited tile gains a space per line";
@@ -370,11 +369,6 @@ public class TsxCorpusRoundTripTests : IDisposable
 
     private static readonly Loss[] KnownLosses =
     [
-        new(NameProperty, EveryOp,
-        [
-            "tile with an empty Name property", "tile with an int Name property",
-            "unanimated tile with a Name property", "unanimated tile with an int Name property",
-        ]),
         new(TileOrder, EveryOp, ["tiles in display order (1.7)"]),
         // A whole-file rewrite regenerates every tile, so it loses the same.
         new(EditedTile, EveryEdit,
@@ -423,7 +417,6 @@ public class TsxCorpusRoundTripTests : IDisposable
 
     [Theory]
     [MemberData(nameof(Cases), [null])]
-    [MemberData(nameof(Cases), NameProperty, Skip = NameProperty)]
     [MemberData(nameof(Cases), TileOrder, Skip = TileOrder)]
     [MemberData(nameof(Cases), EditedTile, Skip = EditedTile)]
     [MemberData(nameof(Cases), TextIndent, Skip = TextIndent)]

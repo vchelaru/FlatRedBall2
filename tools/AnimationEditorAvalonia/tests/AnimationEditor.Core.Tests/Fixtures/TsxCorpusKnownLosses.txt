@@ -118,12 +118,6 @@ throws NotSupportedException
 ## tile unknown child [EditSave, EditSaveOneLine, SaveAs]
 -   <future a="1">
 -    "text"
-## tile with an empty Name property [Save, EditSave, EditSaveOneLine, SaveAs]
--   <properties>
--    <property name="Name" value="">
-## tile with an int Name property [Save, EditSave, EditSaveOneLine, SaveAs]
--   <properties>
--    <property name="Name" type="int" value="4">
 ## tileoffset unknown attribute [EditSaveOneLine, SaveAs]
 -  <tileoffset future="1" x="2" y="-3">
 +  <tileoffset x="2" y="-3">
@@ -139,12 +133,6 @@ throws NotSupportedException
 ## transformations unknown attribute [EditSaveOneLine, SaveAs]
 -  <transformations future="1" hflip="1" preferuntransformed="1" rotate="1" vflip="0">
 +  <transformations hflip="1" preferuntransformed="1" rotate="1" vflip="0">
-## unanimated tile with a Name property [Save, EditSave, EditSaveOneLine, SaveAs]
--   <properties>
--    <property name="Name" value="Gold chest">
-## unanimated tile with an int Name property [Save, EditSave, EditSaveOneLine, SaveAs]
--   <properties>
--    <property name="Name" type="int" value="4">
 ## unknown element after the last tile [EditSave, EditSaveOneLine, SaveAs]
 -  <future a="1">
 ## unknown element after the wangsets [EditSaveOneLine]
