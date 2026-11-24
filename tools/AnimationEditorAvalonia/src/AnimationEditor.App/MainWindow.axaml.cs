@@ -5622,13 +5622,15 @@ public partial class MainWindow : Window
         {
             if (e.Source is not Control src) return;
             var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-            if (tvi?.DataContext is TreeNodeVm { Data: AnimationFrameSave frame })
+            if (tvi?.DataContext is TreeNodeVm { Data: AnimationFrameSave } frameVm)
             {
                 // Post at Background priority so we run after the higher-priority
                 // SelectionChanged → RefreshAll dispatch has completed.  This prevents
                 // a same-texture RefreshAll from overwriting our queued scroll.
+                // The shared handler centers both panels; the DoubleTapped route never
+                // reaches a frame row's press (#1925), so this is the only path that fires.
                 Dispatcher.UIThread.Post(
-                    () => WireframeCtrl.CenterOnFrame(frame),
+                    () => HandleAnimTreeNodeDoubleTap(frameVm),
                     DispatcherPriority.Background);
             }
             else if (tvi?.DataContext is TreeNodeVm chainVm && chainVm.Data is AnimationChainSave chain

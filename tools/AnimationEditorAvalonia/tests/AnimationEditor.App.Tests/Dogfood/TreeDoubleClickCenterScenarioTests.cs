@@ -1,0 +1,47 @@
+using Avalonia.Headless.XUnit;
+using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
+
+namespace AnimationEditor.App.Tests.Dogfood;
+
+/// <summary>Double-clicking a tree row brings the preview to that row's object (#1925).</summary>
+public class TreeDoubleClickCenterScenarioTests
+{
+    private static async Task<(AnimationEditorHarness Editor, AnimationFrameSave Frame, AARectSave Rect)> OpenAsync()
+    {
+        var editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        AnimationFrameSave frame = walk.Frames[0];
+        editor.Expand(walk);
+        editor.RightClickRow(frame);
+        editor.PickTreeMenuItem("Add AxisAlignedRectangle");
+        AARectSave rect = frame.ShapesSave!.AARectSaves.Single();
+        rect.X = 30; rect.Y = -10;
+        frame.RelativeX = 12; frame.RelativeY = 7;
+        editor.Expand(frame);
+        return (editor, frame, rect);
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickFrameRow_CentersPreviewOnFrameOffset()
+    {
+        var (editor, frame, _) = await OpenAsync();
+        using var _e = editor;
+        editor.DoubleClickRow(frame); editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.Preview.PanOffset.X.ShouldBe(-12f * editor.Preview.Zoom, 0.01f);
+        editor.Preview.PanOffset.Y.ShouldBe(7f * editor.Preview.Zoom, 0.01f);
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickShapeRow_CentersPreviewOnShape()
+    {
+        var (editor, _, rect) = await OpenAsync();
+        using var _e = editor;
+        editor.DoubleClickRow(rect);
+        editor.Preview.PanOffset.X.ShouldBe(-30f * editor.Preview.Zoom, 0.01f);
+        editor.Preview.PanOffset.Y.ShouldBe(-10f * editor.Preview.Zoom, 0.01f);
+    }
+}
