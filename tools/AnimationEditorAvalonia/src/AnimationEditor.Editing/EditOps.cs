@@ -40,6 +40,7 @@ public static class EditOps
     private static readonly IReadOnlyList<string> ColorOperationValues = ["multiply", "add"];
     private static readonly IReadOnlyList<string> UnitValues = ["second", "millisecond"];
     private static readonly IReadOnlyList<string> ShapeTypeValues = ["rect", "circle", "polygon"];
+    private static readonly IReadOnlyList<string> ChainLengthModeValues = ["proportional", "even"];
     private static readonly IReadOnlyList<string> FrameGroupValues = ["offset", "color"];
     private static readonly IReadOnlyList<string> ShapeGroupValues = ["offset", "size", "points"];
     private static readonly IReadOnlyList<string> CurveValues =
@@ -54,7 +55,7 @@ public static class EditOps
         + "or a list of numbers and ranges (Walk/0,3,7 or Walk/0,2-3,6), and the chain may be a glob with * and ? (Walk*/0-2). "
         + "Shape addresses take the same frame selector, and the shape name may be * or a glob (Walk/*/rect/Hitbox). "
         + "Event addresses take the same frame selector, and the event index takes the same forms as a frame index (*/*/event/*, Walk/0/event/1-2). "
-        + "Chain ops delete-chain, set-chain-loop, set-chain-pingpong, set-chain-reverse and set-chain-locked take a glob (Walk*, *). "
+        + "Chain ops delete-chain, set-chain-loop, set-chain-pingpong, set-chain-reverse, set-chain-locked, set-chain-length, invert-frame-order and justify-offsets-bottom take a glob (Walk*, *). "
         + "Selectors work on every op that addresses a frame, event or shape except reorder-frame, reorder-shape, rename-shape and the add-/duplicate-/reorder-/rename-chain ops; those take one exact address. "
         + "A selector expands when its op starts, in chain order then in the order written; delete-frame, duplicate-frame and delete-frame-event run from the highest index down so every index means the state before the op. "
         + "A selector that matches nothing is an error (NoMatch), as is any index past a chain's end. Any failing target fails the whole batch and nothing is written. "
@@ -161,6 +162,20 @@ public static class EditOps
             new("chain", "string", true, "Chain name."),
             new("value", "boolean", true, "true to lock."),
         ]),
+        new("set-chain-length", "Rescales a chain's frame lengths so they add up to length, in the file's own time unit. That is one forward pass: describe shows the played cycle in seconds, twice as long for a ping-pong chain. Every resulting frame length must be in set-frame-length's range, and proportional needs a total above 0. Fails on a locked chain or one with no frames. A .tsx stores whole milliseconds, so its frames are rounded on save.",
+        [
+            new("chain", "string", true, "Chain name, or a glob (Walk*)."),
+            new("length", "number", true, "Sum of the frame lengths in the file's time unit."),
+            new("mode", "string", false, "proportional (default) keeps the ratios between frames; even gives every frame length / frame count.", ChainLengthModeValues),
+        ]),
+        new("invert-frame-order", "Reverses the order of a chain's frames (set-chain-reverse keeps the order and plays it backward). Fails on a locked chain.",
+        [
+            new("chain", "string", true, "Chain name, or a glob (Walk*)."),
+        ]),
+        new("justify-offsets-bottom", "Sets every frame's relative Y to half its region height, so each frame's bottom edge is at y = 0; X is left as it is. Fails on a locked chain, or when a frame's region size is unknown (whole texture, size not readable).",
+        [
+            new("chain", "string", true, "Chain name, or a glob (Walk*)."),
+        ]),
         new("set-frame-length", "Sets one frame's length in the file's own time unit (see describe). Valid range: 0.001 to 60 seconds, or 1 to 60000 milliseconds.",
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
@@ -215,6 +230,10 @@ public static class EditOps
             new("y", "number", false, "Center Y."),
             new("scaleX", "number", false, "Half-width, greater than 0."),
             new("scaleY", "number", false, "Half-height, greater than 0."),
+        ]),
+        new("match-frame-size", "Centers a rect on its frame's offset and sizes it to the frame's region. Fails when the region size is unknown (whole texture, size not readable).",
+        [
+            new("shape", "string", true, "Rect address or selector: Chain/frameIndex/rect/name."),
         ]),
         new("set-circle", "Sets a circle's center and radius. Give at least one; omitted ones are left as they are.",
         [
@@ -553,7 +572,7 @@ public static class EditOps
                     : Fail(shape.Error!, shape.Code));
             }
             case "set-frame-texture":
-                return SetFrameTextureAsync(session, op);
+                return Task.FromResult(SetFrameTexture(session, op));
             case "add-chain":
                 return Task.FromResult(StructureEdit.AddChain(session.ProjectManager, session.Commands, op.Values["name"]));
             case "delete-chain":
@@ -585,6 +604,13 @@ public static class EditOps
                 return Task.FromResult(WithChain(doc, op, c => PropertyEdit.SetChainReverse(session.Commands, c, Flag(op, "value"))));
             case "set-chain-locked":
                 return Task.FromResult(WithChain(doc, op, c => PropertyEdit.SetChainLocked(session.Commands, c, Flag(op, "value"))));
+            case "set-chain-length":
+                return Task.FromResult(WithChain(doc, op, c => PropertyEdit.SetChainLength(
+                    session.ProjectManager, session.Commands, c, Number(op, "length")!.Value, op.Values.GetValueOrDefault("mode") == "even")));
+            case "invert-frame-order":
+                return Task.FromResult(WithChain(doc, op, c => StructureEdit.InvertFrameOrder(session.Commands, c)));
+            case "justify-offsets-bottom":
+                return Task.FromResult(WithChain(doc, op, c => PropertyEdit.JustifyOffsetsBottom(session.Commands, c)));
             case "set-frame-length":
                 return Task.FromResult(WithFrame(doc, op, (chain, frame) =>
                     PropertyEdit.SetFrameLength(session.ProjectManager, session.Commands, chain, frame, Number(op, "length")!.Value)));
@@ -613,6 +639,9 @@ public static class EditOps
             case "set-rect":
                 return Task.FromResult(WithShape<AARectSave>(doc, op, "rect", rect =>
                     ShapeEdit.SetRect(session.Commands, session.ObjectFinder, rect, Number(op, "x"), Number(op, "y"), Number(op, "scaleX"), Number(op, "scaleY"))));
+            case "match-frame-size":
+                return Task.FromResult(WithShape<AARectSave>(doc, op, "rect", rect =>
+                    ShapeEdit.MatchFrameSize(session.Commands, session.ObjectFinder, rect)));
             case "set-circle":
                 return Task.FromResult(WithShape<CircleSave>(doc, op, "circle", circle =>
                     ShapeEdit.SetCircle(session.Commands, session.ObjectFinder, circle, Number(op, "x"), Number(op, "y"), Number(op, "radius"))));
@@ -677,17 +706,16 @@ public static class EditOps
             : TsxEdit.ClearChainOwnerTile(session.ProjectManager, session.Commands, chain);
     }
 
-    private static Task<EditResult> SetFrameTextureAsync(EditSession session, EditOp op)
+    private static EditResult SetFrameTexture(EditSession session, EditOp op) => WithFrame(session.Document, op, (chain, frame) =>
     {
-        var frame = EditAddress.ResolveFrame(session.Document, op.Values["frame"]);
-        if (!frame.Ok) return Task.FromResult(Fail(frame.Error!, frame.Code));
+        // Before the texture is resolved, since that may copy the file.
+        if (chain.IsLocked) return StructureEdit.LockedFail(chain);
 
         var resolved = ResolveTexture(session, op);
-        if (resolved.AbsolutePath is null) return Task.FromResult(resolved.Result);
-
-        return Task.FromResult(FrameTextureEdit.SetResolved(
-            session.ProjectManager, session.Commands, [frame.Value!], resolved.AbsolutePath, new HeaderTextureProbe()));
-    }
+        return resolved.AbsolutePath is null
+            ? resolved.Result
+            : FrameTextureEdit.SetResolved(session.ProjectManager, session.Commands, [frame], resolved.AbsolutePath, new HeaderTextureProbe());
+    });
 
     /// <summary>The op's texture as an absolute path inside the project, after applying its <c>copy</c> choice.</summary>
     private static TextureResolveResult ResolveTexture(EditSession session, EditOp op)

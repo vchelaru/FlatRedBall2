@@ -16,7 +16,7 @@ internal static class TsxOpPolicy
     [
         "rename-chain", "add-chain", "delete-chain", "duplicate-chain", "reorder-chain",
         "add-frame", "add-frames-grid", "delete-frame", "duplicate-frame", "reorder-frame",
-        "set-frame-length", "set-frame-region", "set-chain-owner-tile",
+        "set-frame-length", "set-chain-length", "invert-frame-order", "set-frame-region", "set-chain-owner-tile",
     ];
 
     private const string Stores = "A Tiled tile animation holds only frame rectangles and durations";

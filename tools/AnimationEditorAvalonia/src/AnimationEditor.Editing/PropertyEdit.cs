@@ -2,6 +2,7 @@ using System.Globalization;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
@@ -47,6 +48,72 @@ public static class PropertyEdit
         return Ok(chain.Name);
     }
 
+    // ---- every frame of a chain ----
+
+    /// <summary>
+    /// Sets the sum of a chain's frame lengths (one forward pass, whatever its ping-pong flag) in the file's own time unit,
+    /// keeping the ratios between frames or, with <paramref name="even"/>, giving every frame the same length. Each
+    /// resulting frame length must be in <see cref="SetFrameLength"/>'s range.
+    /// </summary>
+    public static EditResult SetChainLength(
+        IProjectManager projectManager, IAppCommands commands, AnimationChainSave chain, float length, bool even)
+    {
+        if (chain.IsLocked) return StructureEdit.LockedFail(chain);
+        if (chain.Frames.Count == 0)
+            return Fail(EditErrorCode.InvalidValue, $"Chain '{chain.Name}' has no frames, so it has no length to set.");
+
+        float total = chain.Frames.Sum(f => f.FrameLength);
+        if (!even && total <= 0)
+            return Fail(EditErrorCode.InvalidValue,
+                $"The frame lengths of chain '{chain.Name}' add up to 0, so there are no ratios to keep; use mode=even.");
+
+        // The scaler runs on stand-ins first, so an out-of-range frame fails before anything changes.
+        var scaled = chain.Frames.Select(f => new AnimationFrameSave { FrameLength = f.FrameLength }).ToList();
+        if (even) FrameTimeScaler.ApplySetAllSame(scaled, length);
+        else FrameTimeScaler.ApplyKeepProportional(scaled, length);
+
+        var unit = FrameLengthUnit.Of(projectManager.AnimationChainListSave);
+        for (int i = 0; i < scaled.Count; i++)
+            if (CheckLength(unit, scaled[i].FrameLength, $"{chain.Name}/{i}") is { } bad) return bad;
+
+        // Scaling leaves float noise, so a total this close is the same total, not an edit.
+        bool unchanged = even
+            ? chain.Frames.All(f => f.FrameLength == scaled[0].FrameLength)
+            : Math.Abs(total - length) <= length * 1e-6f;
+        if (unchanged) return Ok();
+
+        if (even) commands.ScaleFrameTimesSetAllSame(chain, length);
+        else commands.ScaleFrameTimesProportional(chain, length);
+        return Ok(chain.Name);
+    }
+
+    /// <summary>
+    /// Sets every frame's relative Y so the bottom of its region sits at y = 0; X is left alone. A frame whose region
+    /// size is unknown fails rather than being skipped (the editor skips it).
+    /// </summary>
+    public static EditResult JustifyOffsetsBottom(IAppCommands commands, AnimationChainSave chain)
+    {
+        if (chain.IsLocked) return StructureEdit.LockedFail(chain);
+        foreach (var frame in chain.Frames)
+            if (CheckRegionSize(commands, chain, frame) is { } bad) return bad;
+
+        var before = chain.Frames.Select(f => f.RelativeY).ToList();
+        commands.AdjustOffsetsJustifyBottom(chain);
+        return chain.Frames.Select(f => f.RelativeY).SequenceEqual(before) ? Ok() : Ok(chain.Name);
+    }
+
+    /// <summary>Why the pixel size of a frame's region cannot be used, or null when it can.</summary>
+    internal static EditResult? CheckRegionSize(IAppCommands commands, AnimationChainSave chain, AnimationFrameSave frame)
+    {
+        if (FrameRegion.IsUnset(frame, commands.GetTextureSize))
+            return Fail(EditErrorCode.UnsupportedFile,
+                $"The size of frame {Address(chain, frame)} is unknown: it shows its whole texture, whose size could not be read "
+                + $"({(string.IsNullOrEmpty(frame.TextureName) ? "no texture" : frame.TextureName)}). Use a PNG that exists.");
+        return frame.RightCoordinate > frame.LeftCoordinate && frame.BottomCoordinate > frame.TopCoordinate
+            ? null
+            : Fail(EditErrorCode.InvalidValue, $"The region of frame {Address(chain, frame)} has no size; set it with set-frame-region.");
+    }
+
     // ---- frames ----
 
     /// <summary>Sets one frame's length in the file's own time unit, within that unit's inspector range.</summary>
@@ -57,10 +124,7 @@ public static class PropertyEdit
         if (check is not null) return check;
 
         var unit = FrameLengthUnit.Of(projectManager.AnimationChainListSave);
-        if (!float.IsFinite(length) || (decimal)length < unit.Minimum || (decimal)length > unit.Maximum)
-            return Fail(EditErrorCode.InvalidValue,
-                $"A frame length of {length.ToString(CultureInfo.InvariantCulture)} is out of range: valid lengths are " +
-                $"{unit.Minimum.ToString(CultureInfo.InvariantCulture)} to {unit.Maximum.ToString(CultureInfo.InvariantCulture)} {unit.Name}.");
+        if (CheckLength(unit, length, Address(chain, frame)) is { } bad) return bad;
 
         if (frame.FrameLength == length) return Ok();
         commands.SetFrameLength([frame], length);
@@ -164,6 +228,14 @@ public static class PropertyEdit
     // ---- helpers ----
 
     private static NumericEdit? Edit(float? value) => value is { } v ? (NumericEdit)v : null;
+
+    private static EditResult? CheckLength(FrameLengthUnit unit, float length, string address) =>
+        // Scaling can land a hair outside a limit (9 x 0.1 scaled to 0.009), which is not an out-of-range length.
+        !float.IsFinite(length) || length < (float)unit.Minimum * (1 - 1e-6f) || length > (float)unit.Maximum * (1 + 1e-6f)
+            ? Fail(EditErrorCode.InvalidValue,
+                $"A frame length of {length.ToString(CultureInfo.InvariantCulture)} for {address} is out of range: valid lengths are " +
+                $"{unit.Minimum.ToString(CultureInfo.InvariantCulture)} to {unit.Maximum.ToString(CultureInfo.InvariantCulture)} {unit.Name}.")
+            : null;
 
     private static EditResult? CheckFrame(AnimationChainSave chain, AnimationFrameSave frame)
     {
