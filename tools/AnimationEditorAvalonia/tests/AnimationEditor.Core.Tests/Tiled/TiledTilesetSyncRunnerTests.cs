@@ -171,6 +171,63 @@ public class TiledTilesetSyncRunnerTests
     }
 
     [Fact]
+    public void SyncAll_AnotherChainsTileIsClearedAtACellOfASameNamedFrame_IsNotNamed()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        var idle = new AnimationChainSave { Name = "Idle" };
+        idle.Frames.Add(AchjWithWalkChain().AnimationChains[0].Frames[1]);
+        achj.AnimationChains.Add(idle);
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        // Walk keeps tile 0 through its first frame. Tile 1 is cleared because Idle is gone.
+        achj.AnimationChains.Remove(idle);
+        achj.AnimationChains[0].Frames[1].TextureName = "sub/Heroes.png";
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
+
+        Loader.Default().LoadTileset(tsxPath).Tiles.Select(t => t.ID).ShouldBe([0u]);
+        outcome.Warnings.Single().ShouldNotContain("cleared");
+    }
+
+    [Fact]
+    public void SyncAll_RenamedChainWithAFrameOnADifferentlyNamedImageFirst_NamesTheClearedTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        var chain = achj.AnimationChains[0];
+        chain.Name = "Renamed";
+        foreach (var frame in chain.Frames)
+            frame.TextureName = "sub/Heroes.png";
+        chain.Frames.Insert(0, new AnimationFrameSave { TextureName = "Other.png", LeftCoordinate = 48, RightCoordinate = 64, BottomCoordinate = 16 });
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
+
+        outcome.Warnings.Single().ShouldEndWith("Tile 0 was cleared.");
+    }
+
+    [Fact]
+    public void SyncAll_OneAssociatedTilesetCannotBeRead_TheOthersImagesStillDoNotWarn()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var forestTsx = WriteFixtureTileset(Directory.CreateDirectory(Path.Combine(tempDir, "forest")).FullName);
+        var caveTsx = WriteFixtureTileset(Directory.CreateDirectory(Path.Combine(tempDir, "cave")).FullName);
+        var achj = AchjWithWalkChain();
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = "forest/Heroes.png";
+
+        var outcomes = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(tempDir, "Hero.achx"),
+            [Path.Combine(tempDir, "Missing.tsx"), caveTsx, forestTsx]);
+
+        outcomes.Select(o => o.Success).ShouldBe([false, true, true]);
+        outcomes[1].Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void SyncAll_FramesPointedBackAtTheImage_ArePushedAgain()
     {
         var tempDir = Directory.CreateTempSubdirectory().FullName;
