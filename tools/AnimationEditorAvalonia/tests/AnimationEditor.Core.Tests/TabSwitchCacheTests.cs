@@ -5,6 +5,8 @@ using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -99,6 +101,87 @@ public class TabSwitchCacheTests : IDisposable
         Assert.Equal(2, _pm.LoadCallCount);
         Assert.Equal("After", _ctx.SelectedState.SelectedChain!.Name);
     }
+
+    // Two writes in one clock tick share a time, and a copied-in file keeps its own older one.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task TryActivateTabFromCache_WhenDiskContentChangedWithoutANewerTime_ReturnsFalse(int daysFromCaptured)
+    {
+        var captured = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        string path = WriteAchx("stale.achx", "Before");
+        File.SetLastWriteTimeUtc(path, captured);
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        WriteAchx("stale.achx", "Behind"); // Same length as "Before".
+        File.SetLastWriteTimeUtc(path, captured.AddDays(daysFromCaptured));
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenDiskFileIsNewerWithTheSameContent_ReturnsTrue()
+    {
+        string path = WriteAchx("touched.achx", "Walk");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenLockedOnLeaveThenEdited_ReturnsFalse()
+    {
+        string path = WriteAchx("locked.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        using (Lock(path))
+            _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        WriteAchx("locked.achx", "After");
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenEditedAndLockedOnReturn_ReturnsFalse()
+    {
+        string path = WriteAchx("locked.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        WriteAchx("locked.achx", "After");
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(1));
+
+        using (Lock(path))
+            _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeFalse();
+    }
+
+    // A lock is what usually makes a save fail, so the edits that save lost must survive the switch.
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenSaveFailedOnALockedFile_KeepsTheEdits()
+    {
+        string path = WriteAchx("locked.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _pm.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        _ctx.UndoManager.MarkSaveFailed();
+        using (Lock(path))
+            _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+        _pm.AnimationChainListSave!.AnimationChains[0].Name.ShouldBe("Renamed");
+        tab.SaveFailed.ShouldBeTrue();
+    }
+
+    private static FileStream Lock(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.None);
 
     [Fact]
     public async Task TryActivateTabFromCache_WithSelectedFrame_RestoresFrameSelection()
