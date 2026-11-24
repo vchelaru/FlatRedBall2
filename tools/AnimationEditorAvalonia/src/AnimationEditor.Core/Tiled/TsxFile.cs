@@ -47,7 +47,7 @@ internal sealed class TsxFile(FilePath path, TsxSource source, Tileset tileset)
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException(ProjectManager.ChangedOnDiskMessage(target, ex.Message), ex);
+                throw new InvalidOperationException(SaveTarget.UnreadableOnDiskMessage(target.FullPath, ex.Message), ex);
             }
             var merged = disk.WithText(TsxWriter.Render(disk, _diskTileset, tileset));
             TsxWriter.Write(merged, merged.Text, target);

@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Shouldly;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -234,5 +235,45 @@ public class TabKindScenarioTests
         editor.Layout();
 
         editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk" });
+    }
+
+    // The save state is the shared undo manager's, which a .seqj and an Untitled tab reset.
+    [AvaloniaTheory]
+    [InlineData("hero.achx", "boss.seqj", true)]
+    [InlineData("hero.achx", "boss.seqj", false)]
+    [InlineData("hero.achx", "Untitled", false)]
+    [InlineData("Tiles.tsx", "boss.seqj", true)]
+    public async Task ComingBackToASavedDocument_ShowsItAsSaved(string document, string front, bool close)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string path = Path.Combine(editor.ProjectFolder, document);
+        if (document == "Tiles.tsx")
+            File.WriteAllText(path, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <tileset version="1.10" tiledversion="1.12.2" name="Tiles" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+                 <image source="sheet.png" width="64" height="64"/>
+                 <tile id="0"><animation><frame tileid="0" duration="100"/><frame tileid="1" duration="100"/></animation></tile>
+                </tileset>
+                """);
+        else
+            editor.WriteAchx(document, AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
+        if (front == "Untitled")
+        {
+            editor.Dialogs.AnswerNextSaveFile(null);
+            editor.ClickMenu("MenuNew");
+        }
+        else
+        {
+            await editor.OpenAsync(editor.WriteSeqj(front, "Attack"));
+        }
+
+        if (close) editor.CloseTab(front);
+        else editor.ClickTab(document);
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+
+        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
     }
 }

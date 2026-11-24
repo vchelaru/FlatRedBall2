@@ -41,7 +41,6 @@ public class DocumentWriteMatrixTests
     /// <summary>The issue of a row that is a real bug and how the row fails, or null. The fix deletes the line.</summary>
     private static (string Issue, string Failure)? KnownBug(DocAction action, DocType front) => (action, front) switch
     {
-        (DocAction.OutsideChangeOverUnsavedEdits, DocType.Seqj) => ("#2030", "a refused save says so"),
         (DocAction.SaveAsToAnotherFolder, DocType.Achx or DocType.Achj) => ("#2031", "the new file names files that are not there"),
         _ => null,
     };

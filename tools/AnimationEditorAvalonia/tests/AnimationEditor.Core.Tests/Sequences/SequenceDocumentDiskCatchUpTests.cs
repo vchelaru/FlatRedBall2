@@ -124,7 +124,7 @@ public class SequenceDocumentDiskCatchUpTests
     }
 
     [Fact]
-    public void ReloadIfChangedOnDisk_InvalidJson_KeepsTheDocument_PausesSaving_AndRecoversOnTheNextValidFile()
+    public void ReloadIfChangedOnDisk_InvalidJson_KeepsTheDocument_PausesSaving_AndKeepsAnEditMadeThenUntilAReload()
     {
         using var dir = new TestHelpers.TempDir();
         string path = WriteSeqj(dir.Path, "Idle");
@@ -146,7 +146,11 @@ public class SequenceDocumentDiskCatchUpTests
         document.StaleOnDiskReason.ShouldNotBeNull();
 
         WriteSeqj(dir.Path, "Idle", "Die");
-        var recovered = document.ReloadIfChangedOnDisk();
+        document.ReloadIfChangedOnDisk().Changed.ShouldBeFalse("the edit made while saving was paused is not in the file");
+        Names(document).ShouldBe(new[] { "Idle", "Sequence" });
+        document.SaveToDisk();
+        SequenceListSave.FromFile(path).Sequences.Select(s => s.Name).ShouldBe(new[] { "Idle", "Die" });
+        var recovered = document.ReloadFromDisk();
 
         recovered.Changed.ShouldBeTrue();
         recovered.Error.ShouldBeNull();

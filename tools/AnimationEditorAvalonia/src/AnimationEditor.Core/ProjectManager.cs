@@ -728,10 +728,6 @@ namespace AnimationEditor.Core
                 .ToList();
         }
 
-        internal static string ChangedOnDiskMessage(FilePath file, string reason) =>
-            $"\"{file.NoPath}\" changed on disk and couldn't be reloaded ({reason}). " +
-            "Saving would overwrite that change. Fix the file and use File > Reload from Disk to drop the edits, or Save As a different file.";
-
         /// <inheritdoc/>
         public bool MoveTsxProject(FilePath path)
         {
