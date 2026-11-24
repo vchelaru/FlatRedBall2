@@ -1272,7 +1272,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     {
         var target = new FilePath(newPath);
         if (target.Extension != "seqj")
-            return $"{target.NoPath} is not a .seqj file. Give it a .seqj extension.";
+            return IO.SaveTarget.WrongTypeMessage(newPath, "a .seqj");
         if (target == Path)
         {
             SaveToDisk();

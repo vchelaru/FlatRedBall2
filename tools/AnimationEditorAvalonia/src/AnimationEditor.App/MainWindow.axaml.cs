@@ -935,6 +935,9 @@ public partial class MainWindow : Window
         Close();
     }
 
+    private bool IsOpenInTabOtherThan(TabEntry? own, string path) =>
+        _tabManager.Tabs.Any(tab => tab != own && tab.Path == new FilePath(path));
+
     private async Task CloseTabAsync(TabEntry tab)
     {
         // Closing the active tab moves the user to another one, which is a history entry.
@@ -947,8 +950,13 @@ public partial class MainWindow : Window
     private void CloseTabCore(TabEntry tab)
     {
         PaneFor(tab).Closing(tab);
+        bool wasActive = tab == _tabManager.ActiveTab;
         _tabManager.Close(tab.Path);
-        ShowActiveTabAfterClose();
+        // A front tab that stays is the live document; showing it again would load it over its own unsaved edits.
+        if (wasActive)
+            ShowActiveTabAfterClose();
+        else
+            RebuildTabStrip();
     }
 
     /// <summary>
@@ -1307,12 +1315,11 @@ public partial class MainWindow : Window
         _appCommands.TsxSaveCompletedWithWarnings += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowProblem($"Saved {new FilePath(path).NoPath}, but not every change applied — {string.Join(" ", warnings)}"));
-        _appCommands.IsPathOpenInAnotherTab = path =>
-            _tabManager.Tabs.Any(tab => tab != _tabManager.ActiveTab && tab.Path == new FilePath(path));
+        _appCommands.IsPathOpenInAnotherTab = path => IsOpenInTabOtherThan(_tabManager.ActiveTab, path);
         _appCommands.IsDocumentTabInFront = () => _tabManager.ActiveTab?.Kind is null or TabKind.Achx;
         _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));
         _appCommands.SaveFailed += message =>
-            Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"Auto save failed — {message}"));
+            Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"{AutoSaveFailedPrefix}{message}"));
         _appCommands.InfoRaised += message => Dispatcher.UIThread.InvokeAsync(() => ShowInfo(message));
 
         Notifications.WireUndo(Undo);
@@ -2553,15 +2560,33 @@ public partial class MainWindow : Window
     /// originals that actually converted -- a skipped (an .achj already exists) or failed file stays
     /// put. Recycling is the safety net for an accidental convert, which is why the confirm names
     /// it. Open tabs on a recycled original are closed, same reason as
-    /// <see cref="DeleteProjectFileAsync"/>.
+    /// <see cref="DeleteProjectFileAsync"/>; one whose last save failed is saved first, and when that
+    /// fails again its file is left out and named.
     /// </summary>
     private async Task ConvertToAchjAsync(IReadOnlyList<string> sources, string confirmText)
     {
         if (!await _appCommands.ConfirmAsync(confirmText, "Convert to .achj")) return;
 
-        var batch = AchxToAchjBatch.Convert(sources);
+        var problems = new List<string>();
+        var ready = new List<string>();
+        bool savedEdits = false;
+        foreach (var source in sources)
+        {
+            if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } tab && _achxPane.HasFailedSave(tab))
+            {
+                if (_achxPane.SaveFailedEdits(tab) is { } reason)
+                {
+                    problems.Add($"{new FilePath(source).NoPath}: not converted, its unsaved edits could not be saved ({reason})");
+                    continue;
+                }
+                savedEdits = true;
+            }
+            ready.Add(source);
+        }
+
+        var batch = AchxToAchjBatch.Convert(ready);
         int converted = 0, skipped = batch.Skipped.Count();
-        var problems = new List<string>(batch.Failed.Select(f => $"{new FilePath(f.SourcePath).NoPath}: {f.Error}"));
+        problems.AddRange(batch.Failed.Select(f => $"{new FilePath(f.SourcePath).NoPath}: {f.Error}"));
         foreach (var file in batch.Converted)
         {
             var source = file.SourcePath;
@@ -2579,11 +2604,16 @@ public partial class MainWindow : Window
         }
 
         if (problems.Count > 0)
-            ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}");
+            // Posted because a failed save's own banner is, and would replace this one.
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}"));
         else
+        {
+            if (savedEdits) Notifications.HideProblem(AutoSaveFailedPrefix);
             ShowStatusMessage(skipped > 0
                 ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
                 : $"Converted {converted} to .achj.");
+        }
     }
 
     /// <summary>
@@ -3174,6 +3204,11 @@ public partial class MainWindow : Window
             $"Export as {format.Name}", format.Extension,
             new[] { new FileTypeChoice(format.Extension, format.FileTypeDescription) });
         if (string.IsNullOrEmpty(path)) return;
+        if (SaveTarget.IsAnotherType(path, format.Extension))
+        {
+            ShowProblem(SaveTarget.WrongTypeMessage(path, "a ." + format.Extension));
+            return;
+        }
 
         try
         {
@@ -7577,6 +7612,8 @@ public partial class MainWindow : Window
     /// disk"). Shows the top-right toast for about 6 s; hovering keeps it. The status bar message is separate.
     /// </summary>
     public void ShowInfo(string message) => Notifications.ShowInfo(message);
+
+    private const string AutoSaveFailedPrefix = "Auto save failed — ";
 
     /// <summary>
     /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",

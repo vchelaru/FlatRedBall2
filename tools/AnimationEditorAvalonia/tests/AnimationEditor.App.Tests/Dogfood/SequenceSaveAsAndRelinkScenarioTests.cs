@@ -232,6 +232,23 @@ public class SequenceSaveAsAndRelinkScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task SaveAs_OntoTheTabsOwnFile_Writes()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteBoss(editor);
+        await editor.OpenAsync(boss);
+        File.Delete(boss);
+
+        editor.Dialogs.AnswerNextSaveFile(boss);
+        editor.Press(Key.S, RawInputModifiers.Control | RawInputModifiers.Shift);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
+
+        editor.ProblemText.ShouldBeNull();
+        File.Exists(boss).ShouldBeTrue();
+        editor.TabLabels.ShouldBe(new[] { "boss.seqj" });
+    }
+
+    [AvaloniaFact]
     public async Task SaveAs_ToAName_ThatIsNotSeqj_IsRefused_NothingIsWritten()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
