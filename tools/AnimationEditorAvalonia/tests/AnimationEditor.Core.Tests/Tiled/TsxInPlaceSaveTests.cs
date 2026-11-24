@@ -325,6 +325,62 @@ public sealed class TsxInPlaceSaveTests : IDisposable
     }
 
     [Theory]
+    [InlineData("Copy.tsx")]
+    [InlineData("Copies/Copy.tsx")]
+    public async Task SaveAs_RealWatcher_OutsideChangeNotReloadedYet_IsReloadedFromTheCopy(string name)
+    {
+        var path = Write(Xml);
+        var target = Path.Combine(_dir.Path, name);
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var watcher = new HotReloadWatcher();
+        ctx.AppCommands.HotReloadWatcher = watcher;
+        ctx.AppCommands.WireHotReloadWatcher();
+        ctx.AppCommands.AutosaveOnChange = true;
+        await ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        File.WriteAllText(path, Xml.Replace(
+            "</tileset>", " <tile id=\"9\">\n  <animation>\n   <frame tileid=\"9\" duration=\"1\"/>\n  </animation>\n </tile>\n</tileset>"));
+        SetFirstDuration((ProjectManager)ctx.ProjectManager, 400);
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        for (var i = 0; i < 40 && ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Count < 3; i++)
+            await Task.Delay(100);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Select(chain => chain.Name).ShouldBe(["ID:0", "Run", "ID:9"]);
+        new FilePath(ctx.ProjectManager.FileName!).ShouldBe(new FilePath(target));
+    }
+
+    [Theory]
+    [InlineData("./Heroes.png")]
+    [InlineData("../a/Heroes.png")]
+    [InlineData("..\\a\\Heroes.png")]
+    [InlineData("art\\Heroes.png")]
+    [InlineData("art//Heroes.png")]
+    public void MoveTsxProject_ImagePathNotInItsShortestForm_OutsideChangesAreStillTaken(string image)
+    {
+        var folder = Directory.CreateDirectory(Path.Combine(_dir.Path, "a")).FullName;
+        var other = Directory.CreateDirectory(Path.Combine(_dir.Path, "b", "c")).FullName;
+        var pm = Open(Write(Xml.Replace("Heroes.png", image), "a/Heroes.tsx"));
+        // The same folder, another one, and back.
+        foreach (var copy in new[] { Path.Combine(folder, "1.tsx"), Path.Combine(other, "2.tsx"), Path.Combine(folder, "3.tsx") })
+        {
+            pm.SaveTsxProject(copy);
+            pm.MoveTsxProject(new FilePath(copy));
+            var milliseconds = int.Parse(Path.GetFileNameWithoutExtension(copy)) * 100;
+            var disk = File.ReadAllText(copy).Replace("</tileset>", " <!-- outside -->\n</tileset>");
+            File.WriteAllText(copy, disk);
+            SetFirstDuration(pm, milliseconds + 300);
+
+            pm.SaveTsxProject(copy).ShouldBeEmpty();
+
+            File.ReadAllText(copy).ShouldContain("<!-- outside -->");
+            File.ReadAllText(copy).ShouldContain($"duration=\"{milliseconds + 300}\"");
+        }
+    }
+
+    [Theory]
     [InlineData("<image source=\"{0}\"/>", "art/Heroes.png", "../art/Heroes.png")]
     [InlineData("<image source=\"{0}\"/>", "../a &amp; b.png", "../../a &amp; b.png")]
     [InlineData("<image source='{0}'/>", "Copies/Heroes.png", "Heroes.png")]

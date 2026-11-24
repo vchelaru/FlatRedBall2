@@ -112,7 +112,7 @@ public static class TexturePathHelper
     /// <summary>A relative path as seen from another folder; unchanged when it is absolute, a URL, or on another drive.</summary>
     public static string Rebase(string path, FilePath fromFolder, FilePath toFolder)
     {
-        if (path.Length == 0 || path.Contains("://") || path[0] is '/' or '\\' || path.AsSpan(1).StartsWith(":"))
+        if (fromFolder == toFolder || path.Length == 0 || path.Contains("://") || path[0] is '/' or '\\' || path.AsSpan(1).StartsWith(":"))
             return path;
         var rebased = ComputeStorePath(ResolveDisplayPath(path, fromFolder.FullPath), toFolder.FullPath);
         return rebased == new FilePath(rebased).FullPath ? path : rebased;

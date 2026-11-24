@@ -14,13 +14,14 @@ internal sealed class TsxFile(FilePath path, TsxSource source, Tileset tileset)
 {
     public FilePath Path { get; private set; } = path;
 
-    /// <summary>The image as the tileset names it, relative to <see cref="Path"/>.</summary>
-    public string ImageSource { get; private set; } =
-        tileset.Image is { HasValue: true, Value: { Source.HasValue: true } image } ? image.Source.Value : string.Empty;
+    /// <summary>The image as <see cref="Path"/> names it.</summary>
+    public string ImageSource => TexturePathHelper.Rebase(
+        _openedImageSource, _opened.Path.GetDirectoryContainingThis(), Path.GetDirectoryContainingThis());
 
     /// <summary>The text as opened. Every save starts from it, so an undone edit leaves the opened bytes.</summary>
     private TsxSource _opened = source;
     private Tileset _openedTileset = tileset;
+    private string _openedImageSource = Layout(tileset).ImageSource;
 
     /// <summary>What was last read from or written to <see cref="Path"/>.</summary>
     private string _diskText = source.Text;
@@ -51,6 +52,7 @@ internal sealed class TsxFile(FilePath path, TsxSource source, Tileset tileset)
             }
             var merged = disk.WithText(TsxWriter.Render(disk, _diskTileset, tileset));
             TsxWriter.Write(merged, merged.Text, target);
+            _openedImageSource = ImageSource;
             (_opened, _openedTileset, _diskText, _diskTileset) = (merged, tileset, merged.Text, tileset);
             _writtenText = merged.Text;
             LacksOutsideChange = true;
@@ -75,7 +77,6 @@ internal sealed class TsxFile(FilePath path, TsxSource source, Tileset tileset)
     /// <summary>Makes the file a Save As just wrote <paramref name="tileset"/> to this one.</summary>
     public void SetPath(FilePath path, Tileset tileset)
     {
-        ImageSource = TexturePathHelper.Rebase(ImageSource, Path.GetDirectoryContainingThis(), path.GetDirectoryContainingThis());
         (Path, _diskText, _diskTileset) = (path, _writtenText, tileset);
     }
 }
