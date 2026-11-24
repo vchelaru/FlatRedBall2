@@ -1334,6 +1334,22 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return null;
     }
 
+    /// <summary>
+    /// Points one chain block at <paramref name="chain"/> of <paramref name="source"/> (a library entry), keeping its start
+    /// and length. The caller has checked the source and chain exist.
+    /// </summary>
+    public void SetChainTarget(IUndoManager undo, int sequence, int track, int block, string source, string chain)
+    {
+        var reference = Save.Sequences[sequence].Tracks[track].Chains[block];
+        if (reference.Source == source && reference.Chain == chain) return;
+        Edit(undo, $"Set Chain of '{reference.Chain}' to '{chain}'", save =>
+        {
+            var target = save.Sequences[sequence].Tracks[track].Chains[block];
+            target.Source = source;
+            target.Chain = chain;
+        });
+    }
+
     /// <summary>Writes the file. A failure is reported through <see cref="SaveError"/>, not thrown.</summary>
     public void SaveToDisk()
     {
