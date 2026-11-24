@@ -55,6 +55,26 @@ public static class FrameDetailEdit
         return Ok(EventAddress(chain, frame, index));
     }
 
+    /// <summary>
+    /// Appends a copy of an event to every frame of <paramref name="targets"/> (null: to its own frame), one undo step
+    /// per frame. Only the target chains must be unlocked.
+    /// </summary>
+    public static EditResult DuplicateFrameEvent(IAppCommands commands, FrameEventRef source, IReadOnlyList<FrameRef>? targets)
+    {
+        var range = CheckEventIndex(source.Chain, source.Frame, source.Index);
+        if (range is not null) return range;
+
+        var copied = source.Frame.Events[source.Index];
+        var changed = new List<string>();
+        foreach (var (chain, frame) in targets ?? [new FrameRef(source.Chain, source.Frame)])
+        {
+            var added = AddFrameEvent(commands, chain, frame, copied.Name, copied.Data);
+            if (!added.Success) return added;
+            changed.AddRange(added.ChangedItems);
+        }
+        return Ok([.. changed]);
+    }
+
     /// <summary>Removes the event at <paramref name="index"/>; later events shift down.</summary>
     public static EditResult DeleteFrameEvent(IAppCommands commands, AnimationChainSave chain, AnimationFrameSave frame, int index)
     {

@@ -9,6 +9,9 @@ public sealed record AddressResult<T>(T? Value, string? Error, EditErrorCode Cod
     public bool Ok => Value is not null;
 }
 
+/// <summary>A frame and the chain that holds it.</summary>
+public sealed record FrameRef(AnimationChainSave Chain, AnimationFrameSave Frame);
+
 /// <summary>A frame event addressed by its position; the index is not checked against the frame's events.</summary>
 public sealed record FrameEventRef(AnimationChainSave Chain, AnimationFrameSave Frame, int Index);
 

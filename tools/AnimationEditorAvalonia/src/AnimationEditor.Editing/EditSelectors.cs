@@ -51,6 +51,9 @@ public static class EditSelectors
         var targets = new List<string>();
         foreach (var name in chains.Targets!)
         {
+            // Checked here because a chain without frames, or frames without the shape or event, leaves no target to fail on later.
+            var resolved = EditAddress.ResolveChain(doc, name);
+            if (resolved.Code == EditErrorCode.Ambiguous) return Fail(resolved.Error!, resolved.Code);
             var chain = doc.AnimationChains.First(c => c.Name == name);
             var indexes = ParseIndexes(parts[1], chain.Frames.Count, name);
             if (indexes.Error is not null) return Fail(indexes.Error, indexes.Code);
@@ -90,12 +93,40 @@ public static class EditSelectors
             : new SelectorExpansion(targets, null);
     }
 
+    /// <summary>
+    /// Expands <c>Chain/frameSelector/event/indexSelector</c>. The event index takes the same forms as a frame index,
+    /// in the order written. Events a frame does not have are skipped; matching no event at all is an error.
+    /// </summary>
+    public static SelectorExpansion ExpandEvents(AnimationChainListSave doc, string address)
+    {
+        var parts = address.Split('/');
+        if (parts.Length != 4 || parts[2] != "event")
+            return Fail($"'{address}' is not an event address; expected Chain/frameIndex/event/index.", EditErrorCode.InvalidAddress);
+
+        var frames = ExpandFrames(doc, $"{parts[0]}/{parts[1]}");
+        if (!frames.Ok) return frames;
+
+        var targets = new List<string>();
+        foreach (var frameAddress in frames.Targets!)
+        {
+            var split = frameAddress.LastIndexOf('/');
+            var chain = doc.AnimationChains.First(c => c.Name == frameAddress[..split]);
+            var frame = chain.Frames[int.Parse(frameAddress[(split + 1)..], CultureInfo.InvariantCulture)];
+            var indexes = ParseIndexes(parts[3], frame.Events.Count, frameAddress, "event index", skipMissing: true);
+            if (indexes.Error is not null) return Fail(indexes.Error, indexes.Code);
+            targets.AddRange(indexes.Indexes!.Select(i => $"{frameAddress}/event/{i.ToString(CultureInfo.InvariantCulture)}"));
+        }
+        return targets.Count == 0
+            ? Fail($"'{address}' matches no events.", EditErrorCode.NoMatch)
+            : new SelectorExpansion(targets, null);
+    }
+
     private static bool NameMatches(string pattern, string name) => IsGlob(pattern) ? GlobMatches(pattern, name) : pattern == name;
 
     internal static bool GlobMatches(string pattern, string text) =>
         Regex.IsMatch(text, "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$", RegexOptions.Singleline);
 
-    internal static (IReadOnlyList<int>? Indexes, string? Error, EditErrorCode Code) ParseIndexes(string text, int count, string chainName, string noun = "frame")
+    internal static (IReadOnlyList<int>? Indexes, string? Error, EditErrorCode Code) ParseIndexes(string text, int count, string chainName, string noun = "frame", bool skipMissing = false)
     {
         if (text == "*") return (Enumerable.Range(0, count).ToList(), null, EditErrorCode.Unspecified);
 
@@ -104,12 +135,13 @@ public static class EditSelectors
         {
             var range = item.Split('-');
             if (range.Length > 2 || range.Any(p => p.Length == 0 || !p.All(char.IsAsciiDigit) || p.Length > 9))
-                return (null, $"'{text}' is not a {noun} selector: use *, a number, a range like 2-5, or a list like 0,3,7.", EditErrorCode.InvalidAddress);
+                return (null, $"'{text}' is not a valid {noun} selector: use *, a number, a range like 2-5, or a list like 0,3,7.", EditErrorCode.InvalidAddress);
 
             var from = int.Parse(range[0], CultureInfo.InvariantCulture);
             var to = int.Parse(range[^1], CultureInfo.InvariantCulture);
             if (to < from)
                 return (null, $"The range '{item}' runs backwards; write it low to high.", EditErrorCode.InvalidAddress);
+            if (to >= count && skipMissing) to = count - 1;
             if (to >= count)
                 return (null, $"{char.ToUpperInvariant(noun[0])}{noun[1..]} index {to} is out of range: '{chainName}' has {count} {noun}(s).", EditErrorCode.IndexOutOfRange);
             for (int i = from; i <= to; i++)
@@ -127,7 +159,7 @@ internal sealed record ExpandedOp(EditOp Op, string? Target);
 /// <summary>Turns an op whose address fields are selectors into one op per target (#1811).</summary>
 internal static class SelectorExpander
 {
-    private static readonly HashSet<string> ChainOps = ["set-chain-loop", "set-chain-pingpong", "set-chain-reverse", "set-chain-locked", "set-chain-owner-tile"];
+    private static readonly HashSet<string> ChainOps = ["delete-chain", "set-chain-loop", "set-chain-pingpong", "set-chain-reverse", "set-chain-locked", "set-chain-owner-tile"];
 
     private static readonly HashSet<string> FrameOps =
     [
@@ -139,7 +171,7 @@ internal static class SelectorExpander
     /// <summary>Frame ops that shift the indexes after the target, so targets run from the highest index down.</summary>
     private static readonly HashSet<string> ShiftingOps = ["delete-frame", "duplicate-frame"];
 
-    private static readonly HashSet<string> EventOps = ["set-frame-event", "delete-frame-event"];
+    private static readonly HashSet<string> EventOps = ["set-frame-event", "delete-frame-event", "duplicate-frame-event"];
 
     private static readonly HashSet<string> ShapeOps =
     [
@@ -154,7 +186,9 @@ internal static class SelectorExpander
         if (ChainOps.Contains(name) && EditSelectors.IsGlob(op.Values["chain"]))
             return Build(op, "chain", EditSelectors.ExpandChains(doc, op.Values["chain"]), t => t);
 
-        if (FrameOps.Contains(name) && IsFrameSelector(op.Values["frame"]))
+        // With a destination every selected frame is one block, so the op resolves the selector itself.
+        var isBlock = name == "duplicate-frame" && (op.Values.ContainsKey("to") || op.Values.ContainsKey("index"));
+        if (!isBlock && FrameOps.Contains(name) && IsFrameSelector(op.Values["frame"]))
         {
             var expansion = EditSelectors.ExpandFrames(doc, op.Values["frame"]);
             if (expansion.Ok && ShiftingOps.Contains(name))
@@ -165,8 +199,13 @@ internal static class SelectorExpander
         if (EventOps.Contains(name))
         {
             var parts = op.Values["event"].Split('/');
-            if (parts.Length == 4 && parts[2] == "event" && IsFrameSelector($"{parts[0]}/{parts[1]}"))
-                return Build(op, "event", EditSelectors.ExpandFrames(doc, $"{parts[0]}/{parts[1]}"), t => $"{t}/event/{parts[3]}");
+            if (parts.Length == 4 && parts[2] == "event" && (IsFrameSelector($"{parts[0]}/{parts[1]}") || EditSelectors.IsIndexSelector(parts[3])))
+            {
+                var expansion = EditSelectors.ExpandEvents(doc, op.Values["event"]);
+                if (expansion.Ok && name == "delete-frame-event")
+                    expansion = new SelectorExpansion(HighestFirst(expansion.Targets!), null);
+                return Build(op, "event", expansion, t => t);
+            }
         }
 
         if (ShapeOps.Contains(name))
@@ -177,6 +216,27 @@ internal static class SelectorExpander
         }
 
         return ([new ExpandedOp(op, null)], null, EditErrorCode.Unspecified);
+    }
+
+    /// <summary>The frames a frame address or frame selector names, in selector order.</summary>
+    public static (IReadOnlyList<FrameRef>? Frames, string? Error, EditErrorCode Code) ResolveFrames(AnimationChainListSave doc, string address)
+    {
+        IReadOnlyList<string> addresses = [address];
+        if (IsFrameSelector(address))
+        {
+            var expansion = EditSelectors.ExpandFrames(doc, address);
+            if (!expansion.Ok) return (null, expansion.Error, expansion.Code);
+            addresses = expansion.Targets!;
+        }
+
+        var frames = new List<FrameRef>();
+        foreach (var one in addresses)
+        {
+            var frame = EditAddress.ResolveFrame(doc, one);
+            if (!frame.Ok) return (null, frame.Error, frame.Code);
+            frames.Add(new FrameRef(EditAddress.ResolveChain(doc, one.Split('/')[0]).Value!, frame.Value!));
+        }
+        return (frames, null, EditErrorCode.Unspecified);
     }
 
     private static bool IsFrameSelector(string address)
@@ -197,8 +257,9 @@ internal static class SelectorExpander
         return (ops, null, EditErrorCode.Unspecified);
     }
 
-    private static IReadOnlyList<string> HighestFirst(IReadOnlyList<string> frameAddresses) =>
-        frameAddresses
+    /// <summary>Addresses ending in an index, reordered so each parent's items run from the last to the first.</summary>
+    private static IReadOnlyList<string> HighestFirst(IReadOnlyList<string> addresses) =>
+        addresses
             .GroupBy(a => a[..a.LastIndexOf('/')])
             .SelectMany(g => g.OrderByDescending(a => int.Parse(a[(a.LastIndexOf('/') + 1)..], CultureInfo.InvariantCulture)))
             .ToList();
