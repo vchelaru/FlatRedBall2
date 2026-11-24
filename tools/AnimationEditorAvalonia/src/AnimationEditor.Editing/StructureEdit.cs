@@ -186,6 +186,28 @@ public static class StructureEdit
             : Ok($"{chain.Name}/{chain.Frames.IndexOf(copy)}");
     }
 
+    /// <summary>
+    /// Inserts copies of <paramref name="sources"/>, in order and as one block, at zero-based <paramref name="index"/> of
+    /// <paramref name="to"/> (null: at the end). A null <paramref name="to"/> is each source's own chain. Only the
+    /// destination must be unlocked.
+    /// </summary>
+    public static EditResult DuplicateFramesTo(
+        IAppCommands commands, IReadOnlyList<FrameRef> sources, AnimationChainSave? to, int? index)
+    {
+        var changed = new List<string>();
+        foreach (var block in sources.GroupBy(s => to ?? s.Chain))
+        {
+            var chain = block.Key;
+            if (chain.IsLocked) return LockedFail(chain);
+            var slot = index ?? chain.Frames.Count;
+            if (slot < 0 || slot > chain.Frames.Count) return OutOfRange(slot, chain.Frames.Count + 1, "frame");
+
+            commands.PasteFrames(chain, block.Select(s => s.Frame).ToList(), slot);
+            changed.AddRange(Enumerable.Range(slot, block.Count()).Select(i => $"{chain.Name}/{i}"));
+        }
+        return Ok([.. changed]);
+    }
+
     /// <summary>Moves <paramref name="frame"/> so it ends up at zero-based <paramref name="index"/> of its chain.</summary>
     public static EditResult ReorderFrame(IAppCommands commands, AnimationChainSave chain, AnimationFrameSave frame, int index)
     {
