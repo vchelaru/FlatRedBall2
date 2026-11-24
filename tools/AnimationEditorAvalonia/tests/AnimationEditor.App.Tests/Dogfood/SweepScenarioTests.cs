@@ -64,7 +64,7 @@ public class SweepScenarioTests
         editor.ClickMenu("MenuAssociateTiledTileset");
         editor.Wait(TimeSpan.FromMilliseconds(200));
 
-        editor.ErrorBannerText.ShouldNotBeNull().ShouldContain("hero.tiledsync");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("hero.tiledsync");
         File.ReadAllText(sync).ShouldBe("{ not json");
     }
 

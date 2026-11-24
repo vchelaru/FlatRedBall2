@@ -3125,8 +3125,14 @@ public partial class MainWindow : Window
     /// <summary>"Associate Tiled Tileset…" menu command (issue #1133) -- picks a .tsx via the
     /// same open-file dialog seam as everything else, then hands off to
     /// <see cref="IAppCommands.AddAssociatedTiledTilesetViaDialogAsync"/>.</summary>
-    private void OnAssociateTiledTilesetClick(object? sender, RoutedEventArgs e) =>
-        _ = _appCommands.AddAssociatedTiledTilesetViaDialogAsync();
+    private async void OnAssociateTiledTilesetClick(object? sender, RoutedEventArgs e)
+    {
+        // The status bar also shows it, as it does for a save's sync, but a refused command gets the banner.
+        void OnFailed(string path, Exception ex) => ShowProblem($"Could not associate the tileset: {ex.Message}");
+        _appCommands.TiledSyncFailed += OnFailed;
+        try { await _appCommands.AddAssociatedTiledTilesetViaDialogAsync(); }
+        finally { _appCommands.TiledSyncFailed -= OnFailed; }
+    }
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
         _ = _appCommands.ExportAsync(ExportFormat.PixiJs);

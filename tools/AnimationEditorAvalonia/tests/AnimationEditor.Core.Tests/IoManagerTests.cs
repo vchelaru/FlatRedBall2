@@ -274,7 +274,7 @@ public class IoManagerTests
         Assert.Contains("hero.tiledsync", reported?.Message);
     }
 
-    // The lock shuts out a reader but not a replacement: on Windows FileShare.Delete does that, elsewhere any lock.
+    // Outside Windows a lock does not stop the file from being replaced.
     [Fact]
     public void AddAssociatedTiledTilesetPath_TiledSyncFileInUse_IsLeftAloneAndReported()
     {
@@ -285,7 +285,7 @@ public class IoManagerTests
         var reported = false;
         ctx.IoManager.TiledSyncParseFailed += (_, _) => reported = true;
 
-        using (new FileStream(syncPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Delete))
+        using (new FileStream(syncPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/hero.achx", dir.Path + "/Heroes.tsx");
 
         Assert.Contains("Enemies.tsx", File.ReadAllText(syncPath));

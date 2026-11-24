@@ -167,7 +167,7 @@ public class EditRollbackTests : IDisposable
         var r = await Edit("associate-tileset tiles.tsx");
 
         r.Code.ShouldBe(0, r.Out + r.Err);
-        if (OperatingSystem.IsWindows()) r.Out.ShouldContain("was not updated"); // elsewhere the open file is replaced
+        r.Out.ShouldContain("was not updated");
     }
 
     // #1992: the associations in a file that cannot be read stay in it.

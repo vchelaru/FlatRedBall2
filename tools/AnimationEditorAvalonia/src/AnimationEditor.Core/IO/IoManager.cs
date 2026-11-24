@@ -81,23 +81,29 @@ namespace AnimationEditor.Core.IO
             }
         }
 
+        /// <summary>The associations of <paramref name="achxFile"/> (none when it has no <c>.tiledsync</c>), or null when
+        /// the file cannot be read, which is reported and must never be written over: it may still hold some.</summary>
         private AETiledSyncSave? TryLoadTiledSyncSettings(string achxFile)
         {
             var fileToLoad = GetTiledSyncCompanionFileFor(new FilePath(achxFile));
 
             // No file at all legitimately means "no associations configured" -- stay silent.
-            if (!fileToLoad.Exists()) return null;
+            if (!fileToLoad.Exists()) return new AETiledSyncSave();
 
             try
             {
                 var json = File.ReadAllText(fileToLoad.FullPath);
-                return JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
+                var settings = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
+                return settings?.TiledTilesetPaths is null
+                    ? throw new InvalidDataException($"{nameof(AETiledSyncSave.TiledTilesetPaths)} is not a list.")
+                    : settings;
             }
             catch (Exception e)
             {
                 // The file exists but is corrupt -- this must not look identical to "no
                 // associations," or Tiled sync silently disables itself with zero indication.
-                TiledSyncParseFailed?.Invoke(achxFile, e);
+                TiledSyncParseFailed?.Invoke(achxFile, new InvalidDataException(
+                    $"Could not read the Tiled sync file {fileToLoad.NoPath}, so it was left as it is. Fix or delete it. {e.Message}", e));
                 return null;
             }
         }
@@ -120,7 +126,9 @@ namespace AnimationEditor.Core.IO
             var achxFolder = achxFilePath.GetDirectoryContainingThis();
             var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
 
-            var settings = TryLoadTiledSyncSettings(achxFile) ?? new AETiledSyncSave();
+            var settings = TryLoadTiledSyncSettings(achxFile);
+            if (settings == null) return;
+
             var alreadyAssociated = settings.TiledTilesetPaths
                 .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));
             if (!alreadyAssociated)
