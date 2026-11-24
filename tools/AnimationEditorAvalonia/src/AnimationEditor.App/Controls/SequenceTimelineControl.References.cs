@@ -49,7 +49,7 @@ public sealed partial class SequenceTimelineControl
 
     /// <summary>Whether reference track <paramref name="track"/> lists its inherited tracks. False for any other track.</summary>
     public bool IsReferenceExpanded(int track) =>
-        Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && sequence.Tracks[track].Reference is not null
+        Sequence is { } sequence && track >= 0 && track < sequence.Tracks.Count && sequence.Tracks[track].References is not null
         && _expandedReferences.Contains(ExpandedKey(sequence, track));
 
     /// <summary>Expands or collapses reference track <paramref name="track"/>. Nothing happens for a track that is not a reference or inherits nothing.</summary>
@@ -97,6 +97,19 @@ public sealed partial class SequenceTimelineControl
         return null;
     }
 
+    /// <summary>
+    /// Appends a clip playing sequence <paramref name="name"/> to reference track <paramref name="track"/> from
+    /// <paramref name="start"/> seconds. One undo entry. Returns why it was refused (it would play itself through a cycle), or null.
+    /// </summary>
+    public string? AddReferenceClip(string name, int track, double start)
+    {
+        if (_document is null || _undo is null || Sequence is null) return "Open a sequence first.";
+        if (_document.AddReferenceClip(_undo, _sequenceIndex, track, name, start) is { } error) return error;
+        SetSelection(null, track);
+        Rebuild();
+        return null;
+    }
+
     /// <summary>The sequences the right-click menu offers to add as a reference: all but this one and any that would close a cycle.</summary>
     public IReadOnlyList<string> ReferenceCandidates =>
         _document is { } document && Sequence is not null ? document.ReferenceCandidates(_sequenceIndex) : Array.Empty<string>();
@@ -105,6 +118,19 @@ public sealed partial class SequenceTimelineControl
     /// Whether a sequence called <paramref name="name"/> dropped at <paramref name="point"/> (this control's coordinates) would add a
     /// reference: anywhere under the ruler, as long as it would not make the sequences play each other in a loop.
     /// </summary>
+    // The reference track whose clip band is under the point, or null: a sequence dropped there is appended to it as a clip.
+    private int? ReferenceLaneAt(Point point)
+    {
+        if (Sequence is not { } sequence) return null;
+        var row = Viewport.RowAt(point.Y, sequence.Tracks.Count);
+        if (row.Kind != TimelineRowKind.Track || row.Track < 0 || row.Track >= sequence.Tracks.Count || sequence.Tracks[row.Track].References is null) return null;
+        double inLane = point.Y - Viewport.LaneTop(row.Track);
+        return inLane >= TimelineLayout.BodyTop && inLane <= TimelineLayout.BodyBottom ? row.Track : null;
+    }
+
+    /// <summary>The reference track a sequence dragged from the list would be appended to as a clip, or null (a gap or the new-track row adds a track).</summary>
+    public int? SequenceDropClipTrack => _sequenceGhost is { } ghost ? ReferenceLaneAt(ghost.Point) : null;
+
     public bool CanDropSequence(string name, Point point) =>
         _document is { } document && Sequence is not null && point.Y >= TimelineViewport.RulerHeight
         && new Rect(Bounds.Size).Contains(point) && document.CanReference(_sequenceIndex, name);
@@ -127,7 +153,7 @@ public sealed partial class SequenceTimelineControl
 
     /// <summary>The gap between lanes a sequence dragged from the list would be inserted into, or null when it makes the front track on the new-track row or is not over a drop.</summary>
     public int? SequenceDropSlot =>
-        _sequenceGhost is { } ghost && TimelineDropPlan.ForSequence(Viewport, TrackCount, ghost.Point.Y) is { Kind: TimelineDropKind.Gap } plan ? plan.Row : null;
+        _sequenceGhost is { } ghost && ReferenceLaneAt(ghost.Point) is null && TimelineDropPlan.ForSequence(Viewport, TrackCount, ghost.Point.Y) is { Kind: TimelineDropKind.Gap } plan ? plan.Row : null;
 
     /// <summary>The y of the insertion line for <see cref="SequenceDropSlot"/>, in this control's coordinates.</summary>
     public double? SequenceDropLineY => SequenceDropSlot is { } slot ? TrackReorder.SlotY(Viewport, slot) : null;
@@ -141,6 +167,11 @@ public sealed partial class SequenceTimelineControl
         _sequenceGhost = null;
         InvalidateVisual();
         if (!CanDropSequence(name, point)) return false;
+        if (ReferenceLaneAt(point) is { } lane)
+        {
+            if (AddReferenceClip(name, lane, Math.Max(0, Viewport.TimeAt(point.X))) is { } clipError) ErrorRaised?.Invoke(clipError);
+            return true;
+        }
         var plan = TimelineDropPlan.ForSequence(Viewport, TrackCount, point.Y);
         if (AddSequenceReference(name, plan.Kind == TimelineDropKind.Gap ? plan.Row : 0) is { } error) ErrorRaised?.Invoke(error);
         return true;
@@ -435,6 +466,14 @@ public sealed partial class SequenceTimelineControl
         context.FillRectangle(new SolidColorBrush(color, 0.08), lanes);
         if (SequenceDropSlot is not null) return; // a gap shows the reorder's insertion line instead (DrawSequenceGap)
         double length = GhostLength(ghost.Name);
+        if (SequenceDropClipTrack is { } clipTrack)
+        {
+            // Over a reference lane: a dashed ghost clip where the pointer is.
+            var onLane = new Rect(Viewport.XAt(Math.Max(0, Viewport.TimeAt(ghost.Point.X))), Viewport.LaneTop(clipTrack) + TimelineLayout.BodyTop,
+                Math.Max(1, length * Viewport.PixelsPerSecond), TimelineViewport.LaneHeight - 2 * TimelineLayout.BodyTop);
+            context.DrawRectangle(null, new Pen(new SolidColorBrush(color), 2, new DashStyle(new double[] { 4, 3 }, 0)), onLane, 3, 3);
+            return;
+        }
         double top = Viewport.LaneTop(TimelineViewport.NewTrackLane);
         var rect = new Rect(Viewport.XAt(_playhead), top + TimelineLayout.BodyTop, Math.Max(1, length * Viewport.PixelsPerSecond), TimelineViewport.LaneHeight - 2 * TimelineLayout.BodyTop);
         context.DrawRectangle(null, new Pen(new SolidColorBrush(color), 2, new DashStyle(new double[] { 4, 3 }, 0)), rect, 3, 3);

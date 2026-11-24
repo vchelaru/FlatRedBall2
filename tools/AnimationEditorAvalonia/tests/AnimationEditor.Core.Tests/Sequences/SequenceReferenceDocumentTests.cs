@@ -417,7 +417,7 @@ public class SequenceReferenceDocumentTests
         document.SetReferenceLength(undo, 0, 0, 4).ShouldBeNull();
 
         var tracks = document.Save.Sequences[0].Tracks;
-        tracks.Count(t => t.Reference?.Sequence == "Earth").ShouldBe(2);
+        tracks.Count(t => t.References?[0].Sequence == "Earth").ShouldBe(2);
         tracks.Select(t => t.Name).Distinct().Count().ShouldBe(tracks.Count);
         tracks[1].References![0].Length.ShouldBeNull();
         document.SequenceLength(0).ShouldBe(4, 1e-6);
@@ -652,7 +652,7 @@ public class SequenceReferenceDocumentTests
     }
 
     private static string ReferenceOf(SequenceDocument document, string sequence) =>
-        document.Save.Sequences.Single(s => s.Name == sequence).Tracks.Single(t => t.Reference is not null).Reference!.Sequence;
+        document.Save.Sequences.Single(s => s.Name == sequence).Tracks.Single(t => t.References is not null).References![0].Sequence;
 
     [Fact]
     public void DuplicateSequences_HolderAndTarget_CopyPlaysTheCopiedTarget()

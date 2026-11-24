@@ -381,10 +381,29 @@ public class SequenceEditTests : IDisposable
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Rest/Run/0", 2)).Success.ShouldBeTrue();
         Run(s, () => SequenceEdit.SetBlockLength(s.Document, s.Undo, "Rest/Run/0", 3)).Success.ShouldBeTrue();
         Run(s, () => SequenceEdit.SetBlockStart(s.Document, s.Undo, "Rest/Run/1", 2)).CodeAt(0).ShouldBe(EditErrorCode.IndexOutOfRange);
-        Run(s, () => SequenceEdit.DeleteBlock(s.Document, s.Undo, "Rest/Run/0")).CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
 
         var clip = Seq(s, "Rest").Tracks[0].References![0];
         (clip.Start, clip.Length).ShouldBe((2.0, (double?)3));
+
+        // Deleting the last clip leaves an empty reference track (the track is not deleted).
+        Run(s, () => SequenceEdit.DeleteBlock(s.Document, s.Undo, "Rest/Run/0")).Success.ShouldBeTrue();
+        Seq(s, "Rest").Tracks[0].References.ShouldNotBeNull().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReferenceTrack_AddBlockAppendsClipsAfterTheLastOne()
+    {
+        var s = _w.Open();
+        SequenceEdit.AddReferenceTrack(s.Document, s.Undo, "Rest", "Run", 0, null).Success.ShouldBeTrue();
+
+        Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Run", null, null, null, null, sequence: "Run")).Success.ShouldBeTrue();
+        Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Run", null, null, 9, 2, sequence: "Run")).Success.ShouldBeTrue();
+
+        var clips = Seq(s, "Rest").Tracks[0].References!;
+        clips.Select(c => (c.Start, c.Length)).ShouldBe([(0.0, (double?)null), (clips[1].Start, null), (9.0, (double?)2)], ignoreOrder: false);
+        clips[1].Start.ShouldBeGreaterThan(0);
+        Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Run", null, "Walk", null, null)).CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
+        Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Run/Body", null, "Walk", null, null, sequence: "Rest")).CodeAt(0).ShouldBe(EditErrorCode.WrongTrackKind);
     }
 
     [Fact]
