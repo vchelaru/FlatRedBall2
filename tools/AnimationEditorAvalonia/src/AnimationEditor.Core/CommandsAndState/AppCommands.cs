@@ -730,6 +730,10 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action<string, int>? TiledSyncSucceeded;
 
         /// <inheritdoc/>
+        public event Action<IReadOnlyList<string>>? TiledSyncWarned;
+        private bool _tiledSyncWarned;
+
+        /// <inheritdoc/>
         public Func<string, bool>? IsTsxPathOpenAsNativeProject { get; set; }
 
         public void AddAssociatedTiledTileset(string tsxAbsolutePath)
@@ -781,6 +785,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         private void SyncAssociatedTiledTilesets(string achxPath)
         {
+            if (_tiledSyncWarned)
+            {
+                _tiledSyncWarned = false;
+                TiledSyncWarned?.Invoke([]);
+            }
+
             var acls = _pm.AnimationChainListSave;
             if (acls == null) return;
 
@@ -810,16 +820,22 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
-            foreach (var outcome in outcomes)
+            foreach (var outcome in outcomes.Where(o => o.Success && o.Changed))
+                TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
+
+            // Relative to the .achx, because two tilesets can have the same file name.
+            var achxFolder = new FilePath(achxPath).GetDirectoryContainingThis();
+            var warnings = outcomes
+                .SelectMany(o => o.Warnings.Select(w => $"{new FilePath(o.TsxPath).RelativeTo(achxFolder)}: {w}"))
+                .ToList();
+            if (warnings.Count > 0)
             {
-                if (outcome.Success)
-                {
-                    if (outcome.Changed)
-                        TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
-                }
-                else
-                    TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);
+                _tiledSyncWarned = true;
+                TiledSyncWarned?.Invoke(warnings);
             }
+
+            foreach (var outcome in outcomes.Where(o => !o.Success))
+                TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);
         }
 
         /// <summary>

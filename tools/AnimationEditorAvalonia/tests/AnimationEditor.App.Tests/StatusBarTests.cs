@@ -384,4 +384,52 @@ public class StatusBarTests
         }
     }
 
+    [AvaloniaFact]
+    public void TiledSyncStatus_ShowsWarning_WhileAChainIsLeftOutOfTheTileset()
+    {
+        var dir = Directory.CreateTempSubdirectory().FullName;
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var achxPath = Path.Combine(dir, "Hero.achx");
+            ctx.ProjectManager.FileName = achxPath;
+            ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir));
+            var frame = new AnimationFrameSave { TextureName = "sub/Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { frame } });
+            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
+
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Tiled sync warning", label.Text);
+            Assert.Contains("Heroes.tsx: chain \"Walk\"", ToolTip.GetTip(label) as string);
+            var dot = window.FindControl<Ellipse>("TiledSyncDot")!;
+            Assert.Equal(Avalonia.Media.Color.FromRgb(0xf0, 0xc6, 0x74), ((Avalonia.Media.ISolidColorBrush)dot.Fill!).Color);
+
+            File.Move(Path.Combine(dir, "Hero.tiledsync"), Path.Combine(dir, "Hero.tiledsync.bak"));
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(window.FindControl<StackPanel>("TiledSyncStatusPanel")!.IsVisible);
+
+            File.Move(Path.Combine(dir, "Hero.tiledsync.bak"), Path.Combine(dir, "Hero.tiledsync"));
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Tiled sync warning", label.Text);
+            Assert.True(window.FindControl<StackPanel>("TiledSyncStatusPanel")!.IsVisible);
+
+            frame.TextureName = "Heroes.png";
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Tiled sync OK", label.Text);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
 }
