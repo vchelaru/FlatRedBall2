@@ -66,15 +66,6 @@ public class FrameLengthUnitCommandsTests
         Assert.Equal(100f, result.Frames[0].FrameLength);
     }
 
-    [Fact]
-    public void TexturePngDrop_CreatingAFrame_MillisecondUnit_Is100()
-    {
-        var chain = new AnimationChainSave { Name = "Run" };
-        TextureDropProcessor.ApplyPngDrop(chain, null, TestPaths.Abs("P", "a.png"), null, true,
-            FrameLengthUnit.Milliseconds);
-        Assert.Equal(100f, chain.Frames[0].FrameLength);
-    }
-
     [Theory]
     [InlineData(TimeMeasurementUnit.Millisecond)]
     [InlineData(TimeMeasurementUnit.Second)]

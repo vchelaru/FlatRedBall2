@@ -265,6 +265,24 @@ public class PixelDocumentTests : IDisposable
         _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[0].ShouldBeSameAs(open[0]);
     }
 
+    // A frame with no texture has no size to convert by, so its stored numbers pass through both ways.
+    [Fact]
+    public void LoadAnimationChain_UvFileWithATexturelessFrame_LeavesItsRegionAlone()
+    {
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(Frame("", 0.25f, 0f, 0.5f, 0.75f));
+        list.AnimationChains.Add(chain);
+        var path = PathOf("old.achx");
+        list.Save(path);
+        var before = File.ReadAllBytes(path);
+
+        Region(Open(path)[0]).ShouldBe((0.25f, 0f, 0.5f, 0.75f));
+
+        _ctx.ProjectManager.SaveAnimationChainList(path);
+        File.ReadAllBytes(path).ShouldBe(before);
+    }
+
     [Fact]
     public void RecoveryFile_LeftInUvByAnOlderEditor_IsReadAsPixels()
     {

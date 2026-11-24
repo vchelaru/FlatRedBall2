@@ -15,7 +15,8 @@ internal static class TextureCoordinateConverter
 {
     /// <summary>
     /// Converts <paramref name="list"/> from UV to pixels in place; no-op when it already holds pixels. A UV region
-    /// on a texture whose size can't be read has no pixel value, so it becomes <see cref="FrameRegion.Unset"/>.
+    /// on a texture whose size can't be read has no pixel value, so it becomes <see cref="FrameRegion.Unset"/>; a frame
+    /// with no texture is left alone.
     /// </summary>
     internal static void ToPixels(AnimationChainListSave list, Func<string, (int Width, int Height)?> textureSize)
     {
@@ -24,6 +25,7 @@ internal static class TextureCoordinateConverter
         var sizeOf = Cached(textureSize);
         foreach (var frame in Frames(list))
         {
+            if (string.IsNullOrEmpty(frame.TextureName)) continue;
             var region = FrameRegion.Of(frame);
             (sizeOf(frame.TextureName) is { } size ? ToPixels(region, size) : FrameRegion.Unset).ApplyTo(frame);
         }
