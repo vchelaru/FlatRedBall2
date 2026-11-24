@@ -16,6 +16,7 @@ A game project that copied this skill has no FRB2 checkout beside it: set the fu
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
 | `render <file> --out <dir> [options]` | Writes PNGs without the editor, see Rendering below. |
+| `at <file.seqj> --time 0,4.2 [--sequence S] [--json]` | What the sequence shows at each time: per visible track (front first) chain, frame, sprite offset and that frame's shapes with position and size (rect scale, circle radius, polygon points) as the editor samples them. Use it to check hitbox gating without running the game. |
 | `edit <file> --ops ops.json [--json]` | Applies the ops in order, then saves once. |
 | `--schema [--json]` | Lists every op (animation ops, then `sequenceOps` in JSON) with its fields, types and allowed values. Starts with a one-line example ops file (a `{"ops":[...]}` object, never a bare array). Run it before writing an ops file; it is the source of truth for ops. |
 

@@ -19,6 +19,7 @@ public static class CliApp
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2) or a chain (--chain <name> --frame 0 | --at 0.3)
               --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  [--json]
+          at <file.seqj> --time 0,4.2 [--sequence <name>] [--json]  per visible track: active chain, frame, sprite offset and the frame's shapes (position, size) at each time
           --schema [--json]                      list the operations and their fields
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
         """;
@@ -55,6 +56,9 @@ public static class CliApp
             case "render":
                 if (parsed.File is null) return cli.Usage("render needs a file.");
                 return cli.Render(parsed.File, parsed.Values, parsed.Grid);
+            case "at":
+                if (parsed.File is null) return cli.Usage("at needs a file.");
+                return cli.At(parsed.File, parsed.Values);
             default:
                 return cli.Usage($"unknown command '{parsed.Command}'.");
         }
@@ -77,7 +81,7 @@ public static class CliApp
                     case "--schema": schema = true; break;
                     case "--grid": grid = true; break;
                     case "--summary": summary = true; break;
-                    case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds":
+                    case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds" or "--time":
                         if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
                         values[a] = args[++i];
                         break;
@@ -245,6 +249,25 @@ public static class CliApp
                 foreach (var (_, message) in outcome.Errors) stderr.WriteLine($"aecli: {message}");
             }
             return outcome.Success ? 0 : 1;
+        }
+
+        public int At(string file, IReadOnlyDictionary<string, string>? values)
+        {
+            if (!SequenceFileReader.IsSequenceFile(file)) return Usage("at needs a .seqj file.");
+            if (values is null || !values.TryGetValue("--time", out var timeText)) return Usage("at needs --time <seconds>[,<seconds>...].");
+            var times = new List<double>();
+            foreach (var part in timeText.Split(',', StringSplitOptions.TrimEntries))
+            {
+                if (!double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var t) || t < 0 || !double.IsFinite(t))
+                    return Usage("--time must be a comma list of times in seconds, 0 or more (0,2.15,4.2).");
+                times.Add(t);
+            }
+            values.TryGetValue("--sequence", out var name);
+            var report = AtReport.Build(file, name, times, out var error, out var usage);
+            if (report is null) return usage ? Usage(error!) : Failed(error!);
+            var (sequence, moments) = report.Value;
+            stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, sequence, moments)) + Environment.NewLine : AtReport.ToText(sequence, moments));
+            return 0;
         }
 
         public int Convert(string file, string to)
