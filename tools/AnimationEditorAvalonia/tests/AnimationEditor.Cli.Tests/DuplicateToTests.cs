@@ -21,17 +21,12 @@ public abstract class InlineBatchTests : IDisposable
     protected string Raw(string file) => File.ReadAllText(_w.PathOf(file));
 
     /// <summary>The batch succeeds; returns what it reports as changed.</summary>
-    protected Task<string[]> Ok(string file, params string[] ops) => OkList(file, "changed", ops);
-
-    /// <summary>The batch succeeds; returns its warnings.</summary>
-    protected Task<string[]> OkWarnings(string file, params string[] ops) => OkList(file, "warnings", ops);
-
-    private async Task<string[]> OkList(string file, string list, string[] ops)
+    protected async Task<string[]> Ok(string file, params string[] ops)
     {
         var r = await Edit(file, ops);
         r.Code.ShouldBe(0, r.Out + r.Err);
         using var doc = JsonDocument.Parse(r.Out);
-        return doc.RootElement.GetProperty(list).EnumerateArray().Select(c => c.GetString()!).ToArray();
+        return doc.RootElement.GetProperty("changed").EnumerateArray().Select(c => c.GetString()!).ToArray();
     }
 
     /// <summary>The batch fails with <paramref name="code"/> and the file is untouched; returns the error message.</summary>

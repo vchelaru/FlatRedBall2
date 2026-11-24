@@ -198,32 +198,25 @@ public class ImportChainTests : InlineBatchTests
 
     // ---- sources with problems of their own ----
 
-    [Fact]
-    public async Task Import_CheckErrorsOfTheSource_ComeAlongWithAWarning()
+    [Theory]
+    [InlineData("gone.png", "", "[missing-texture]")]
+    [InlineData("../sheet.png", "<ShapeCollectionSave><AxisAlignedRectangleSaves><AxisAlignedRectangleSave><Name>H</Name></AxisAlignedRectangleSave>"
+        + "<AxisAlignedRectangleSave><Name>H</Name></AxisAlignedRectangleSave></AxisAlignedRectangleSaves></ShapeCollectionSave>", "[duplicate-shape-name]")]
+    public async Task Import_CheckErrorOfTheSource_FailsTheBatch(string texture, string shapes, string says)
     {
-        const string twins = "<ShapeCollectionSave><AxisAlignedRectangleSaves><AxisAlignedRectangleSave><Name>H</Name></AxisAlignedRectangleSave>"
-            + "<AxisAlignedRectangleSave><Name>H</Name></AxisAlignedRectangleSave></AxisAlignedRectangleSaves></ShapeCollectionSave>";
-        Write(Source, Doc("Second", "Pixel", Chain("Run", Frame("gone.png", shapes: twins))));
+        Write(Source, Doc("Second", "Pixel", Chain("Run", Frame(texture, shapes: shapes))));
 
-        var warnings = await OkWarnings(Into, "import-chain Run from=../art/a.achx");
-
-        Frames(Into, "Run").Single().TextureName.ShouldBe("../art/gone.png");
-        warnings.Length.ShouldBe(2);
-        warnings.ShouldContain(w => w.Contains("[missing-texture]") && w.Contains("../art/gone.png"));
-        warnings.ShouldContain(w => w.Contains("[duplicate-shape-name]") && w.Contains("Run/0"));
-
-        // Only what the import brings is let through: another op raising the count still fails the batch.
-        await Refused("WouldBreakFile", "import-chain Run from=../art/a.achx name=Two", "duplicate-frame Run/0");
+        (await Refused("WouldBreakFile", "import-chain Run from=../art/a.achx")).ShouldContain(says);
     }
 
     [Fact]
-    public async Task Import_CheckErrorFixedLaterInTheBatch_GivesNoWarning()
+    public async Task Import_MissingTextureSetLaterInTheBatch_Succeeds()
     {
         Write(Source, Doc("Second", "Pixel", Chain("Run", Frame("gone.png"))));
 
-        var warnings = await OkWarnings(Into, "import-chain Run from=../art/a.achx", "set-frame-texture Run/0 texture=../sheet.png");
+        await Ok(Into, "import-chain Run from=../art/a.achx", "set-frame-texture Run/0 texture=../sheet.png");
 
-        warnings.ShouldBeEmpty();
+        Frames(Into, "Run").Single().TextureName.ShouldBe("../sheet.png");
     }
 
     /// <summary>Only the imported chains' textures have to be there.</summary>
@@ -254,5 +247,6 @@ public class ImportChainTests : InlineBatchTests
 
         text.ShouldContain("at the end, in the source file's order");
         text.ShouldContain("nothing is written");
+        text.ShouldContain("a missing texture");
     }
 }
