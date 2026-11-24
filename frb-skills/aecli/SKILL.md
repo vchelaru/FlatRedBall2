@@ -46,7 +46,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 
 - Ops apply in order, so after `rename-chain` later ops must use the new name.
 - A file that already has check errors can still be edited, including one with a missing texture: regions are pixels, so `set-frame-texture` to a PNG of any size keeps them.
-- `edit` writes nothing unless every op succeeds and no new `check` error appears. New `check` warnings do not stop it; each code whose count rose comes back in `warnings` (`The edit raised check warnings [cut-short] from 1 to 2`), and an edit that fixes one and causes another of the same code says nothing. A batch that changes nothing leaves the file byte-identical.
+- `edit` writes nothing unless every op succeeds and no `check` error code has more errors than before (so renaming or moving something already broken works). New `check` warnings do not stop it; each code whose count rose comes back in `warnings` (`The edit raised check warnings [cut-short] from 1 to 2`), and an edit that fixes one and causes another of the same code says nothing. A batch that changes nothing leaves the file byte-identical.
 - A file in legacy UV coordinates is refused. Open and save it in the editor once.
 - `set-frame-texture` takes a path relative to the animation file or absolute. Outside the file's folder it references the texture in place unless `copy` is `copy` or `overwrite`. The image check reads the file header only, so a truncated PNG passes.
 - `add-shape` takes `frame`, `type` and an optional `name` (default unique per frame; unique across all three types). Defaults match the editor's Add buttons, centred on the frame offset. Not yet available: moving a shape to another frame, shape color.

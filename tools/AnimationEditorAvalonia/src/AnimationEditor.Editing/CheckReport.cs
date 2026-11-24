@@ -7,13 +7,12 @@ namespace AnimationEditor.Editing;
 public enum CheckSeverity { Error, Warning }
 
 /// <param name="Code">Stable kebab-case identifier: missing-texture, duplicate-chain-name, duplicate-shape-name, unit-undefined, region-outside-texture, empty-chain, zero-length-frame, texture-case.</param>
-/// <param name="Subject">What the issue is about, independent of where it is (a texture or shape name); how an issue is recognised after an edit renames the chain it sits in. Defaults to the message.</param>
-public sealed record CheckIssue(CheckSeverity Severity, string Code, string Message, string? Subject = null);
+public sealed record CheckIssue(CheckSeverity Severity, string Code, string Message);
 
 /// <summary>
 /// Validation of a loaded animation file (#1811). Errors are things a game would trip on (a texture that
 /// is not there, a name that is not unique); warnings are legal but suspect. Edits are judged by
-/// <see cref="NewErrors"/>: a file that already had errors can still be edited, but an edit may not add one. Warnings
+/// <see cref="NewErrors"/>: a file that already had errors can still be edited, but not if the edit makes more errors of any code. Warnings
 /// never block an edit; <see cref="RaisedWarnings"/> says which an edit made more of.
 /// </summary>
 public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
@@ -34,7 +33,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
 
         foreach (var group in doc.AnimationChains.GroupBy(c => c.Name).Where(g => g.Count() > 1))
             issues.Add(new(CheckSeverity.Error, "duplicate-chain-name",
-                $"{group.Count()} chains are named '{group.Key}'.", group.Key));
+                $"{group.Count()} chains are named '{group.Key}'."));
 
         var textures = new Dictionary<string, Texture>();
         for (int c = 0; c < doc.AnimationChains.Count; c++)
@@ -61,7 +60,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
                 var shapes = frame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [];
                 foreach (var dup in shapes.GroupBy(s => s.Name).Where(g => g.Count() > 1))
                     issues.Add(new(CheckSeverity.Error, "duplicate-shape-name",
-                        $"{dup.Count()} shapes are named '{dup.Key}' in frame {chain.Name}/{f}.", dup.Key));
+                        $"{dup.Count()} shapes are named '{dup.Key}' in frame {chain.Name}/{f}."));
             }
         }
 
@@ -71,7 +70,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
             if (texture.Exists && onDisk is null) continue;
             var shown = string.Join(", ", texture.Frames.Take(3)) + (texture.Frames.Count > 3 ? $" and {texture.Frames.Count - 3} more" : "");
             issues.Add(onDisk is null
-                ? new(CheckSeverity.Error, "missing-texture", $"Texture '{name}' not found (frames: {shown}).", name)
+                ? new(CheckSeverity.Error, "missing-texture", $"Texture '{name}' not found (frames: {shown}).")
                 : new(CheckSeverity.Warning, "texture-case",
                     $"Texture '{name}' is '{onDisk}' on disk, so it is not found where file names are case-sensitive (frames: {shown})."));
         }
@@ -107,12 +106,23 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
         }
     }
 
-    /// <summary>The errors of <paramref name="after"/> that <paramref name="before"/> did not already have.</summary>
+    /// <summary>
+    /// The errors of each code that <paramref name="after"/> has more of than <paramref name="before"/>: those whose message
+    /// is not in <paramref name="before"/>, or all of the code's when every message is. Only counts decide, so an edit that
+    /// moves an error to another address or fixes one and causes another of the same code gives none.
+    /// </summary>
     public static IReadOnlyList<CheckIssue> NewErrors(CheckReport before, CheckReport after)
     {
-        if (after.Ok) return []; // the usual case; the set below is slow to start up
-        var known = before.Errors.Select(i => (i.Code, i.Subject ?? i.Message)).ToHashSet();
-        return after.Errors.Where(i => !known.Contains((i.Code, i.Subject ?? i.Message))).ToList();
+        var added = new List<CheckIssue>();
+        if (after.Ok) return added; // the usual case; the grouping below is slow to start up
+        foreach (var errors in after.Errors.GroupBy(i => i.Code))
+        {
+            var was = before.Errors.Where(i => i.Code == errors.Key).ToList();
+            if (errors.Count() <= was.Count) continue;
+            var fresh = errors.Except(was).ToList();
+            added.AddRange(fresh.Count > 0 ? fresh : errors);
+        }
+        return added;
     }
 
     /// <summary>

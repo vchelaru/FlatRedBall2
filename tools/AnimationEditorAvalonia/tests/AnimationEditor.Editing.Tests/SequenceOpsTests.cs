@@ -229,6 +229,95 @@ public class SequenceOpsTests : IDisposable
         Reload().Sequences[0].Loop.ShouldBeFalse();
     }
 
+    private const string DeleteRest = """{"op":"delete-sequence","sequence":"Rest"}""";
+
+    // Run/Body/1 names a chain its source lacks, Run/Lost plays a sequence that is not there, Cy/a/0 plays Cy itself.
+    private void SaveWithErrors()
+    {
+        var save = SeqWorkspace.Build();
+        save.Sequences[0].Tracks[0].Chains[1].Chain = "Gone";
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Lost", References = [new() { Sequence = "Nowhere" }] });
+        save.Sequences.Add(new SequenceSave
+        {
+            Name = "Cy",
+            Tracks =
+            {
+                new SequenceTrackSave { Name = "a", References = [new() { Sequence = "Cy" }] },
+                new SequenceTrackSave { Name = "b", References = [new() { Sequence = "Rest" }] },
+            },
+        });
+        save.Save(_w.SeqPath);
+    }
+
+    private CheckReport CheckFile() => SequenceCheck.Run(Reload(), _w.SeqPath);
+
+    [Theory]
+    [InlineData("""{"op":"rename-sequence","sequence":"Run","to":"Sprint"}""")]
+    [InlineData("""{"op":"rename-sequence","sequence":"Cy","to":"Loop"}""")]
+    [InlineData("""{"op":"rename-track","track":"Run/Body","to":"Torso"}""")]
+    [InlineData("""{"op":"rename-track","track":"Run/Lost","to":"Found"}""")]
+    [InlineData("""{"op":"rename-track","track":"Cy/a","to":"c"}""")]
+    [InlineData("""{"op":"delete-block","block":"Run/Body/0"}""")]
+    [InlineData("""{"op":"move-block","block":"Run/Body/0","to":"Run/Shadow"}""")]
+    [InlineData("""{"op":"move-block","block":"Cy/a/0","to":"Cy/b"}""")]
+    public void Apply_ExistingErrorUnderANewAddress_IsNotRefused(string op)
+    {
+        SaveWithErrors();
+
+        var run = Apply($$"""{"ops":[{{op}}]}""");
+
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+        CheckFile().Errors.Select(i => i.Code).ShouldBe(["missing-chain", "missing-reference-target", "reference-cycle"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Apply_DuplicateTrackNames_SequenceCanBeRenamed()
+    {
+        var save = SeqWorkspace.Build();
+        save.Sequences[0].Tracks[1].Name = "Body";
+        save.Save(_w.SeqPath);
+
+        var run = Apply("""{"ops":[{"op":"rename-sequence","sequence":"Run","to":"Sprint"}]}""");
+
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+    }
+
+    [Fact]
+    public void Apply_MoreErrorsOfACode_IsRefused_NamingTheCodeAndOnlyTheAddedError()
+    {
+        SaveWithErrors();
+        var before = _w.Bytes;
+
+        var run = Apply($$"""{"ops":[{{DeleteRest}}]}""");
+
+        run.Result.HasError(EditErrorCode.WouldBreakFile).ShouldBeTrue();
+        var error = run.Result.Errors.ShouldHaveSingleItem();
+        error.ShouldContain("[missing-reference-target]");
+        error.ShouldContain("'Cy/b' plays 'Rest'");
+        _w.Bytes.ShouldBe(before);
+    }
+
+    [Fact]
+    public void Apply_CopyOfABrokenBlock_IsRefused()
+    {
+        SaveWithErrors();
+
+        var run = Apply("""{"ops":[{"op":"duplicate-block","block":"Run/Body/1"}]}""");
+
+        run.Result.Errors.ShouldHaveSingleItem().ShouldContain("[missing-chain]: Run/Body/2");
+    }
+
+    [Fact]
+    public void Apply_OneErrorFixedAndAnotherOfTheSameCodeCaused_IsNotRefused()
+    {
+        SaveWithErrors();
+
+        var run = Apply($$"""{"ops":[{"op":"delete-track","track":"Run/Lost"},{{DeleteRest}}]}""");
+
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+        CheckFile().Errors.Single(i => i.Code == "missing-reference-target").Message.ShouldContain("Cy/b");
+    }
+
     [Fact]
     public void Apply_AddReferenceTrack_ThenSetClip()
     {

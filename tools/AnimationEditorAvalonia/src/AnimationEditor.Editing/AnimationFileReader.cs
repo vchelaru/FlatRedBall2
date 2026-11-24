@@ -57,7 +57,7 @@ public static class AnimationFileReader
                 if (project.GetTsxOwnerTileId(chain) is { } tile) owners[chain] = tile;
 
             var issues = TsxAnimationValidator.Validate(tileset)
-                .Select(i => new CheckIssue(CheckSeverity.Warning, "tsx-group", i.Message, $"tile {i.TileId}"))
+                .Select(i => new CheckIssue(CheckSeverity.Warning, "tsx-group", i.Message))
                 .ToList();
             return new(doc, null, owners, issues);
         }

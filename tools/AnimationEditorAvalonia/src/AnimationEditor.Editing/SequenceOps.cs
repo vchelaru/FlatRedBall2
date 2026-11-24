@@ -164,7 +164,7 @@ public static class SequenceOps
 
     /// <summary>
     /// Applies <paramref name="ops"/> to <paramref name="session"/>'s document in order and, only if every op succeeded and no
-    /// new check error appeared, saves once. Otherwise nothing is written. A batch that changes nothing writes nothing either,
+    /// check error code has more errors than before, saves once. Otherwise nothing is written. A batch that changes nothing writes nothing either,
     /// so the file stays byte-identical.
     /// </summary>
     public static EditRunResult Apply(SequenceSession session, IReadOnlyList<EditOp> ops)
@@ -200,7 +200,7 @@ public static class SequenceOps
         var added = CheckReport.NewErrors(before, after);
         if (added.Count > 0)
             return new EditRunResult(
-                new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings,
+                new EditResult([], added.Select(i => $"The edit would raise the count of check errors [{i.Code}]: {i.Message}").ToList(), warnings,
                 added.Select(_ => EditErrorCode.WouldBreakFile).ToList()),
                 added.Select(_ => (int?)null).ToList());
 
