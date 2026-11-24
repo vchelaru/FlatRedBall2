@@ -8394,8 +8394,24 @@ public partial class MainWindow : Window
         if (sender is not Control src) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
+        // The label TextBlock stretches across the row, so a shape's blank space right of the text lands
+        // here too; only the text itself renames, the rest of the row centers (#1925).
+        if (vm.Data is ShapeSave && !IsOverLabelText(tvi, e.GetPosition)) return;
         e.Handled = true;
         HandleHeaderTextDoubleTap(vm);
+    }
+
+    /// <summary>
+    /// True when the pointer is over the row's name text itself. The name TextBlock is stretched across
+    /// the row, so its bounds cover the blank space after the text; its desired width is the text's extent.
+    /// </summary>
+    private static bool IsOverLabelText(TreeViewItem tvi, Func<Avalonia.Visual?, Avalonia.Point> getPosition)
+    {
+        var label = tvi.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(
+            b => b.Name == "RowHeaderLabel" && ReferenceEquals(b.DataContext, tvi.DataContext) && b.IsVisible);
+        if (label is null) return false;
+        var pos = getPosition(label);
+        return pos.X >= 0 && pos.X <= label.DesiredSize.Width && pos.Y >= 0 && pos.Y <= label.Bounds.Height;
     }
 
     /// <summary>
@@ -8423,7 +8439,19 @@ public partial class MainWindow : Window
         // Only the header/rename label is excluded (its own DoubleTapped handler already routes
         // it to rename) — other TextBlocks in the row, like the frame-count "Meta" label, are
         // genuine blank-row space and must still reach the focus gesture below (#716).
-        if (src is TextBlock { Name: "RowHeaderLabel" }) return;
+        var rowItem = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+        bool overLabel = rowItem?.DataContext is TreeNodeVm { Data: ShapeSave }
+            ? IsOverLabelText(rowItem, e.GetPosition)
+            : src is TextBlock { Name: "RowHeaderLabel" };
+        if (overLabel)
+        {
+            // The label's own handler normally took this (e.Handled above); route here when the press
+            // source was not the label but the pointer is over the name text.
+            if (rowItem?.DataContext is TreeNodeVm { Data: ShapeSave } labelVm
+                && HandleAnimTreeNodeDoubleTap(labelVm, isLabelDoubleTap: true))
+                e.Handled = true;
+            return;
+        }
         // Belt-and-suspenders: exclude clicks that originated from inside a Button even if
         // the Button's DoubleTapped handler didn't fire (e.g. focus or routing edge cases).
         // The event source is often a visual child (ContentPresenter, SVG icon, etc.),
@@ -8464,9 +8492,6 @@ public partial class MainWindow : Window
                 PreviewCtrl.CenterOnRow(frame);
                 return true;
             case ShapeSave shape when isLabelDoubleTap:
-                // Rename still starts (#234), but the preview also goes to the shape (#1925): the
-                // label is where most double-clicks on a shape row land.
-                PreviewCtrl.CenterOnRow(shape);
                 BeginInlineRename(vm, shape.Name);
                 return true;
             case ShapeSave shape:

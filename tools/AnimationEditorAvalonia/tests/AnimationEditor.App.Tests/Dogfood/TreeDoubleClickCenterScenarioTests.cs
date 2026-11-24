@@ -1,4 +1,7 @@
+using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 
@@ -25,6 +28,26 @@ public class TreeDoubleClickCenterScenarioTests
         return (editor, frame, rect);
     }
 
+    /// <summary>A point on the row's empty space left of the name (the icon), where a double-click is not on the label.</summary>
+    private static Avalonia.Point RowBlankPoint(AnimationEditorHarness editor, object data)
+    {
+        var row = editor.RowFor(data);
+        var label = row.GetVisualDescendants().OfType<TextBlock>().First(b => b.Name == "RowHeaderLabel" && ReferenceEquals(b.DataContext, row.DataContext));
+        var y = editor.RowHeaderPoint(data).Y;
+        var x = label.TranslatePoint(new Avalonia.Point(-8, 0), editor.Window)!.Value.X; // the icon, left of the name text
+        return new Avalonia.Point(x, y);
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickShapeLabel_StartsRename_AndDoesNotCenter()
+    {
+        var (editor, _, rect) = await OpenAsync();
+        using var _e = editor;
+        editor.DoubleClickRow(rect);
+        editor.Nodes.Single(n => ReferenceEquals(n.Data, rect)).IsEditing.ShouldBeTrue();
+        editor.Preview.PanOffset.ShouldBe((0f, 0f));
+    }
+
     [AvaloniaFact]
     public async Task DoubleClickFrameRow_CentersPreviewOnFrameOffset()
     {
@@ -36,17 +59,17 @@ public class TreeDoubleClickCenterScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task DoubleClickShapeRow_CentersPreviewOnShape()
+    public async Task DoubleClickShapeRowBlankSpace_CentersPreviewOnShape()
     {
         var (editor, _, rect) = await OpenAsync();
         using var _e = editor;
-        editor.DoubleClickRow(rect);
+        editor.DoubleClickAt(RowBlankPoint(editor, rect));
         editor.Preview.PanOffset.X.ShouldBe(-30f * editor.Preview.Zoom, 0.01f);
         editor.Preview.PanOffset.Y.ShouldBe(-10f * editor.Preview.Zoom, 0.01f);
     }
 
     [AvaloniaFact]
-    public async Task DoubleClickPolygonRow_CentersPreviewOnItsPoints_NotItsOrigin()
+    public async Task DoubleClickPolygonRowBlankSpace_CentersPreviewOnItsPoints_NotItsOrigin()
     {
         var (editor, frame, _) = await OpenAsync();
         using var _e = editor;
@@ -59,7 +82,7 @@ public class TreeDoubleClickCenterScenarioTests
         poly.Points.Add(new Vector2Save { X = 60, Y = 20 });
         poly.Points.Add(new Vector2Save { X = 60, Y = 40 });
         editor.Expand(frame);
-        editor.DoubleClickRow(poly);
+        editor.DoubleClickAt(RowBlankPoint(editor, poly));
         editor.Preview.PanOffset.X.ShouldBe(-50f * editor.Preview.Zoom, 0.01f);
         editor.Preview.PanOffset.Y.ShouldBe(30f * editor.Preview.Zoom, 0.01f);
     }

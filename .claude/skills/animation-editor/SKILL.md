@@ -110,6 +110,10 @@ Tests that exercise path logic **must** use Windows-style backslash literals (e.
 
 Drag-and-drop tree reorder covers chains, frames, and shapes (pure resolvers `ChainDropResolver` / `FrameDropResolver` / `ShapeDropResolver`, wired in `MainWindow`). **Shapes only reorder among shapes of their own type in the same frame (#1285):** `.achx` and `.achj` save shapes grouped by type (rects, polygons, circles), so a cross-type order is lost on save and reload. `ShapesSave.Move`/`SetOrder` enforce the grouping; dropping on another type shows the `ShapeReorderNotice` problem banner. The drop commits through `AppCommands.MoveShapeToIndex`.
 
+## Tree row double-click
+
+On a shape row, double-clicking the name text renames; double-clicking anywhere else on the row (icon, blank space) centers the preview via `PreviewCenterTarget` (sampled offset; polygon = center of its points). The name TextBlock is stretched across the row, so the zone is decided by pointer position against its `DesiredSize` (`IsOverLabelText`), not by event source. Frame rows have no rename, so the whole row centers; chain rows rename on the label and fit the wireframe elsewhere.
+
 ## Grid mode: double-click resizes; click/drag only repositions
 
 Grid-mode click-to-place and handle-drag preserve the frame's existing size — only
