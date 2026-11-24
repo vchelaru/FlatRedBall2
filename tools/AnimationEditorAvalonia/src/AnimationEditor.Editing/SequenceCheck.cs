@@ -118,7 +118,7 @@ public static class SequenceCheck
         double TargetLengthOf(SequenceReferenceSave other) =>
             SequenceReferences.Find(save.Sequences, other.Sequence) is { } found && !SequenceReferences.WouldCycle(save.Sequences, holder.Name, other.Sequence)
                 ? SequenceTimeline.Length(save.Sequences, found, sources.CycleLength) : 0;
-        double endTime = holderLength - Math.Min(SequenceTimeline.HoldEpsilon, holderLength);
+        double endTime = SequenceTimeline.LastInstant(holderLength);
         var atWrap = SequenceTimeline.ActiveClipAt(track, endTime, TargetLengthOf);
         if (atWrap is not null && atWrap.Sequence == clip.Sequence) return null;
         if (atWrap is not null)
