@@ -18,13 +18,14 @@ public class SequenceTrackClickScenarioTests
 {
     // Body (track 0, the top lane) uses Left, whose frame offset is (-20, 0); Arm (track 1) uses Right, at (+20, 0). At 200% they sit 80 px apart.
     private static async Task<(string Path, PreviewControl Preview)> OpenAsync(AnimationEditorHarness editor,
-        Action<SequenceTrackSave, SequenceTrackSave>? shape = null, string armChain = "Right")
+        Action<SequenceTrackSave, SequenceTrackSave>? shape = null, string armChain = "Right", Action<AnimationFrameSave>? rightFrame = null)
     {
         editor.WritePng("sheet.png", 64, 64);
         var left = AnimationEditorHarness.Chain("Left", "sheet.png", (0, 0, 16, 16));
         left.Frames[0].RelativeX = -20;
         var right = AnimationEditorHarness.Chain("Right", "sheet.png", (0, 0, 16, 16));
         right.Frames[0].RelativeX = 20;
+        rightFrame?.Invoke(right.Frames[0]);
         editor.WriteAchx("hero.achx", left, right);
         string path = Path.Combine(editor.ProjectFolder, "boss.seqj");
         var body = Track("Body", "Left");
@@ -84,6 +85,38 @@ public class SequenceTrackClickScenarioTests
         Inspector(editor).TrackNameBox.Text.ShouldBe("Arm");
         editor.UndoLabels.ShouldBeEmpty();
     }
+
+    // #1979: a 64x16 region with a diagonal flip is drawn 16x64, so it is clicked and scrolled to there.
+    [AvaloniaFact]
+    public async Task ADiagonallyFlippedSprite_IsClickedWhereItIsDrawn()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        var (_, preview) = await OpenAsync(editor, rightFrame: FlippedTall);
+        editor.ClickAt(OnHeader(editor, 0));
+
+        // 200%: 32 px wide by 128 px tall on screen.
+        editor.ClickAt(Sprite(editor, preview, 1) + new Point(0, 50));
+
+        Timeline(editor).SelectedTrack.ShouldBe(1);
+    }
+
+    [AvaloniaFact]
+    public async Task ADiagonallyFlippedSprite_ScrollsLikeTheSizeItIsDrawn()
+    {
+        static async Task<object> RangesZoomedIn(Action<AnimationFrameSave> rightFrame)
+        {
+            using AnimationEditorHarness editor = new AnimationEditorHarness();
+            var (_, preview) = await OpenAsync(editor, rightFrame: rightFrame);
+            preview.SetZoomPercent(3200);
+            return preview.GetScrollBarRanges();
+        }
+        var tall = await RangesZoomedIn(frame => (frame.RightCoordinate, frame.BottomCoordinate) = (16f, 64f));
+
+        (await RangesZoomedIn(FlippedTall)).ShouldBe(tall);
+    }
+
+    private static void FlippedTall(AnimationFrameSave frame) =>
+        (frame.RightCoordinate, frame.BottomCoordinate, frame.FlipDiagonal) = (64f, 16f, true);
 
     [AvaloniaFact]
     public async Task APressOnEmptySpace_LeavesTheSelectionAlone()

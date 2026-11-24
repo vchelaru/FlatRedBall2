@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -67,9 +68,9 @@ public static class FilmstripLayout
                 frames[i] = new FilmstripFrame(duration, 0, 0);
                 continue;
             }
-            double width = Math.Abs(frame.RightCoordinate - frame.LeftCoordinate);
-            double height = Math.Abs(frame.BottomCoordinate - frame.TopCoordinate);
-            frames[i] = frame.FlipDiagonal ? new FilmstripFrame(duration, height, width) : new FilmstripFrame(duration, width, height);
+            var (width, height) = FrameDisplayValues.DisplayedSize(
+                frame, Math.Abs(frame.RightCoordinate - frame.LeftCoordinate), Math.Abs(frame.BottomCoordinate - frame.TopCoordinate));
+            frames[i] = new FilmstripFrame(duration, width, height);
         }
         return frames;
     }

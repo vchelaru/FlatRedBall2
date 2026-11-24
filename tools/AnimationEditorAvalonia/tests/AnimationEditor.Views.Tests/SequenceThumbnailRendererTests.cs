@@ -45,6 +45,21 @@ public class SequenceThumbnailRendererTests
         Assert.Equal(SKColors.Blue, thumb.GetPixel(22, 7).WithAlpha(255));
     }
 
+    // #1979
+    [Fact]
+    public async Task DiagonallyFlippedSprites_AreLaidOutAtTheSizeTheyAreDrawn()
+    {
+        // Each 16x8 region is drawn 8x16, so the two side by side are a 16x16 square.
+        static SequenceThumbnailLayer Flipped(string texture, float offsetX) =>
+            new(new AnimationFrameSave { TextureName = texture, RightCoordinate = 16, BottomCoordinate = 8, FlipDiagonal = true }, texture, offsetX, 0, default);
+
+        using var thumb = await SequenceThumbnailRenderer.RenderAsync([Flipped("red", 0), Flipped("blue", 8)], null, Decode, 28, 28);
+
+        Assert.Equal((28, 28), (thumb!.Width, thumb.Height));
+        Assert.Equal(SKColors.Red, thumb.GetPixel(7, 26).WithAlpha(255));
+        Assert.Equal(SKColors.Blue, thumb.GetPixel(21, 1).WithAlpha(255));
+    }
+
     [Fact]
     public async Task ASpriteWhoseTextureCannotBeRead_IsLeftOut_AndNoneLeftIsNull()
     {

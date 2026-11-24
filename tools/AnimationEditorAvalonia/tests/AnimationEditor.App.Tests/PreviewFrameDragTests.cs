@@ -179,6 +179,52 @@ public class PreviewFrameDragTests
         finally { Directory.Delete(dir, true); }
     }
 
+    // #1979: a 64x16 region with a diagonal flip is drawn 16x64, so it is grabbed there.
+    [AvaloniaTheory]
+    [InlineData(0, -25, true)]
+    [InlineData(25, 0, false)]
+    public void RealDrag_OnADiagonallyFlippedSprite_GrabsItWhereItIsDrawn(int offsetX, int offsetY, bool grabbed)
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var texPath = WriteSolidPng(dir);
+            var frame   = MakeFrame();
+            frame.TextureName = texPath;
+            frame.RightCoordinate = 64f; frame.BottomCoordinate = 16f;
+            frame.FlipDiagonal = true;
+
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
+            ctx.ThumbnailService.GetBitmap(texPath);
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            preview.SetZoomPercent(100);
+            float centerX = (float)((preview.Bounds.Width - 20) / 2 + 20);
+            float centerY = (float)((preview.Bounds.Height - 20) / 2 + 20);
+            var windowPoint = preview.TranslatePoint(new Point(centerX + offsetX, centerY + offsetY), window)!.Value;
+
+            window.MouseDown(windowPoint, MouseButton.Left);
+            var movedPoint = windowPoint + new Point(5, 5);
+            window.MouseMove(movedPoint);
+            window.MouseUp(movedPoint, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(grabbed, frame.RelativeX != 0f);
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
     // ── Live update while dragging (not just on release) ───────────────────────
 
     [AvaloniaFact]
