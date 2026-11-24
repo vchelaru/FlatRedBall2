@@ -26,6 +26,13 @@ public sealed record SkipCounts
     public int RowOutOfRange { get; init; }
 }
 
+/// <summary>Full paths of a frame's texture and of the tileset image it differs from.</summary>
+public sealed record SkippedTexture(string Texture, string Image)
+{
+    public bool IsSameFileName =>
+        string.Equals(new FilePath(Texture).NoPath, new FilePath(Image).NoPath, StringComparison.OrdinalIgnoreCase);
+}
+
 /// <summary>Result of mapping one <see cref="AnimationChainSave"/> onto a tileset's tile grid.</summary>
 public sealed record ChainMappingResult
 {
@@ -36,6 +43,9 @@ public sealed record ChainMappingResult
     public uint? EntryTileId { get; init; }
     public required IReadOnlyList<string> Warnings { get; init; }
     public required SkipCounts SkipCounts { get; init; }
+    /// <summary>A texture the chain uses that is not the tileset's image, one with the image's file name first;
+    /// null when there is none.</summary>
+    public SkippedTexture? SkippedTexture { get; init; }
 }
 
 /// <summary>The subset of a Tiled tileset's geometry needed to map achx/achj frame rects onto
@@ -61,6 +71,11 @@ public sealed record TilesetAnimationInfo
     /// <summary>Whether <paramref name="textureName"/> is this tileset's image, compared by resolved path.</summary>
     public bool IsImage(string textureName) =>
         textureName == ImageFileName || Resolve(textureName) == Resolve(ImageFileName);
+    internal SkippedTexture? FindSkippedTexture(AnimationChainSave chain) => chain.Frames
+        .Where(frame => !IsImage(frame.TextureName))
+        .Select(frame => new SkippedTexture(Resolve(frame.TextureName).FullPath, Resolve(ImageFileName).FullPath))
+        .OrderByDescending(skipped => skipped.IsSameFileName)
+        .FirstOrDefault();
     private FilePath Resolve(string name) => new(TexturePathHelper.ResolveDisplayPath(name, Folder));
     /// <summary>Required only when the source uses <see cref="TextureCoordinateType.UV"/> frames,
     /// to convert normalized (0-1) coordinates to pixels.</summary>
@@ -137,6 +152,7 @@ public static class AchjToTiledAnimationMapper
                 EntryTileId = frames.Count > 0 ? frames[0].TileId : null,
                 Warnings = warnings,
                 SkipCounts = skipCounts.Build(),
+                SkippedTexture = tilesetInfo.FindSkippedTexture(chain),
             });
         }
 

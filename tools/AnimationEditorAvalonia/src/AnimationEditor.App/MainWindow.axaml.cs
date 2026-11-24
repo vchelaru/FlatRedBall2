@@ -1222,6 +1222,11 @@ public partial class MainWindow : Window
         _appCommands.TiledSyncSucceeded += (tsxPath, appliedCount) =>
             Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
                 "Tiled sync OK", _autoSaveBrush, $"{Path.GetFileName(tsxPath)}: {Plural.Format(appliedCount, "chain")} applied"));
+        _appCommands.TiledSyncWarned += warnings =>
+            Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
+                warnings.Count > 0 ? "Tiled sync warning" : "Tiled sync OK",
+                warnings.Count > 0 ? _unsavedBrush : _autoSaveBrush,
+                warnings.Count > 0 ? string.Join("\n", warnings) : "Nothing is left out any more"));
 
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>

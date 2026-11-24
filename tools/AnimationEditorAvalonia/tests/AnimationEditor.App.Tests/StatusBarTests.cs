@@ -384,4 +384,37 @@ public class StatusBarTests
         }
     }
 
+    [AvaloniaFact]
+    public void TiledSyncStatus_ShowsWarning_WhileAChainIsLeftOutOfTheTileset()
+    {
+        var dir = Directory.CreateTempSubdirectory().FullName;
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var achxPath = Path.Combine(dir, "Hero.achx");
+            ctx.ProjectManager.FileName = achxPath;
+            ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir));
+            var frame = new AnimationFrameSave { TextureName = "sub/Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { frame } });
+            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
+
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Tiled sync warning", label.Text);
+            Assert.Contains("Heroes.tsx: chain \"Walk\"", ToolTip.GetTip(label) as string);
+
+            frame.TextureName = "Heroes.png";
+            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("Tiled sync OK", label.Text);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
 }

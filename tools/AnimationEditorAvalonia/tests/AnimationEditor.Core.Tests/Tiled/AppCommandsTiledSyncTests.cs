@@ -3,7 +3,9 @@ using AnimationEditor.Core.Tests;
 using DotTiled;
 using DotTiled.Serialization;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -267,6 +269,79 @@ public class AppCommandsTiledSyncTests
         ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
 
         Assert.False(succeeded);
+    }
+
+    [Fact]
+    public void SaveCurrentAnimationChainList_ChainLeftOutOfTheTileset_WarnsOnEverySaveUntilItIsFixed()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir.Path));
+        var frame = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f };
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(frame);
+        var raised = new List<IReadOnlyList<string>>();
+        ctx.AppCommands.TiledSyncWarned += raised.Add;
+
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        raised.ShouldBeEmpty();
+
+        frame.TextureName = "sub/Heroes.png";
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        raised.Count.ShouldBe(2);
+        raised[1].Single().ShouldStartWith("Heroes.tsx: chain \"Walk\": ");
+
+        frame.TextureName = "Heroes.png";
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        raised.Count.ShouldBe(3);
+        raised[2].ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SaveCurrentAnimationChainList_SeveralTilesets_RaisesSuccessThenWarningThenFailure()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(Path.Combine(dir.Path, "Missing.tsx"));
+        ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir.Path));
+        var walk = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        walk.Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f });
+        walk.Frames.Add(new AnimationFrameSave { TextureName = "sub/Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f });
+        var order = new List<string>();
+        ctx.AppCommands.TiledSyncSucceeded += (_, _) => order.Add("success");
+        ctx.AppCommands.TiledSyncWarned += _ => order.Add("warning");
+        ctx.AppCommands.TiledSyncFailed += (_, _) => order.Add("failure");
+
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+
+        order.ShouldBe(["success", "warning", "failure"]);
+    }
+
+    // The push already reported a tile it could not take over, but nothing showed it.
+    [Fact]
+    public void SaveCurrentAnimationChainList_TileOwnedByAnotherSource_RaisesTiledSyncWarned()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        foreach (var name in new[] { "Other.achx", "Hero.achx" })
+        {
+            ctx.ProjectManager.FileName = Path.Combine(dir.Path, name);
+            ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+        }
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f });
+        ctx.AppCommands.SaveCurrentAnimationChainList(Path.Combine(dir.Path, "Other.achx"));
+        IReadOnlyList<string> raised = [];
+        ctx.AppCommands.TiledSyncWarned += w => raised = w;
+
+        ctx.AppCommands.SaveCurrentAnimationChainList(Path.Combine(dir.Path, "Hero.achx"));
+
+        raised.Single().ShouldContain("already owned by \"Other.achx\"");
     }
 
     [Fact]

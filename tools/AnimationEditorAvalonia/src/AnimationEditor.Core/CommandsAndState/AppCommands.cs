@@ -730,6 +730,10 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action<string, int>? TiledSyncSucceeded;
 
         /// <inheritdoc/>
+        public event Action<IReadOnlyList<string>>? TiledSyncWarned;
+        private bool _tiledSyncWarned;
+
+        /// <inheritdoc/>
         public Func<string, bool>? IsTsxPathOpenAsNativeProject { get; set; }
 
         public void AddAssociatedTiledTileset(string tsxAbsolutePath)
@@ -810,16 +814,17 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
-            foreach (var outcome in outcomes)
-            {
-                if (outcome.Success)
-                {
-                    if (outcome.Changed)
-                        TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
-                }
-                else
-                    TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);
-            }
+            foreach (var outcome in outcomes.Where(o => o.Success && o.Changed))
+                TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
+
+            var warnings = outcomes
+                .SelectMany(o => o.Warnings.Select(w => $"{new FilePath(o.TsxPath).NoPath}: {w}"))
+                .ToList();
+            if (warnings.Count > 0 || _tiledSyncWarned) TiledSyncWarned?.Invoke(warnings);
+            _tiledSyncWarned = warnings.Count > 0;
+
+            foreach (var outcome in outcomes.Where(o => !o.Success))
+                TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);
         }
 
         /// <summary>
