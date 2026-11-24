@@ -1,0 +1,283 @@
+using System.Text.Json;
+using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
+using Xunit;
+
+namespace AnimationEditor.Cli.Tests;
+
+/// <summary>Warnings for bad regions, empty chains, zero-length frames and texture case, and the ones an edit introduces.</summary>
+public class CheckWarningTests : IDisposable
+{
+    private const string EmptyChain = "  <AnimationChain><Name>Nothing</Name></AnimationChain>\n</AnimationChainArraySave>";
+
+    private readonly CliWorkspace _w = new("hero.achx", "hero.achj", "sheet.png");
+
+    public void Dispose() => _w.Dispose();
+
+    private string Hero(string from, string to)
+    {
+        var path = _w.PathOf("hero.achx");
+        var text = File.ReadAllText(path);
+        text.ShouldContain(from);
+        File.WriteAllText(path, text.Replace(from, to));
+        return path;
+    }
+
+    private async Task<List<(string Code, string Message)>> Warnings(string path)
+    {
+        var r = await _w.RunAsync("check", path, "--json");
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        using var doc = JsonDocument.Parse(r.Out);
+        return doc.RootElement.GetProperty("issues").EnumerateArray()
+            .Select(i => (i.GetProperty("code").GetString()!, i.GetProperty("message").GetString()!)).ToList();
+    }
+
+    private async Task<List<string>> EditWarnings(string path, params string[] ops)
+    {
+        var r = await _w.RunAsync(["edit", path, "--json", .. ops.SelectMany(o => new[] { "--op", o })]);
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        using var doc = JsonDocument.Parse(r.Out);
+        doc.RootElement.GetProperty("changed").GetArrayLength().ShouldBeGreaterThan(0);
+        return doc.RootElement.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()!).ToList();
+    }
+
+    [Fact]
+    public async Task Check_CleanFile_HasNoWarnings() => (await Warnings(_w.PathOf("hero.achx"))).ShouldBeEmpty();
+
+    [Theory]
+    [InlineData("<RightCoordinate>48", "<RightCoordinate>99999", "32,0,99967,32")]
+    [InlineData("<LeftCoordinate>32", "<LeftCoordinate>-4", "-4,0,52,32")]
+    [InlineData("<RightCoordinate>48", "<RightCoordinate>32", "32,0,0,32")]
+    public async Task Check_PixelRegionNotInsideItsTexture_Warns(string from, string to, string region)
+    {
+        var (code, message) = (await Warnings(Hero(from, to))).ShouldHaveSingleItem();
+
+        code.ShouldBe("region-outside-texture");
+        message.ShouldContain("Walk/2");
+        message.ShouldContain(region);
+        message.ShouldContain("48x32");
+    }
+
+    [Theory]
+    [InlineData("1", 0)]
+    [InlineData("1.5", 1)]
+    public async Task Check_UvRegion_IsComparedInUv(string right, int expected)
+    {
+        var path = Hero("<RightCoordinate>48", $"<RightCoordinate>{right}");
+        // Every other edge of the fixture becomes a fraction of the 48x32 sheet.
+        var text = File.ReadAllText(path).Replace("<CoordinateType>Pixel", "<CoordinateType>UV")
+            .Replace("Coordinate>16<", "Coordinate>0.3333333<").Replace("Coordinate>32<", "Coordinate>0.6666667<");
+        File.WriteAllText(path, text);
+
+        var regions = (await Warnings(path)).Where(w => w.Code == "region-outside-texture").ToList();
+
+        regions.Count.ShouldBe(expected);
+        if (expected > 0) regions[0].Message.ShouldContain("32,0,40,21");
+    }
+
+    [Fact]
+    public async Task Check_UnreadableTexture_SkipsItsRegions()
+    {
+        File.WriteAllText(_w.PathOf("sheet.png"), "not a png");
+
+        (await Warnings(Hero("<RightCoordinate>48", "<RightCoordinate>99999"))).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Check_ChainWithNoFrames_Warns()
+    {
+        var (code, message) = (await Warnings(Hero("</AnimationChainArraySave>", EmptyChain))).ShouldHaveSingleItem();
+
+        code.ShouldBe("empty-chain");
+        message.ShouldContain("'Nothing'");
+    }
+
+    [Fact]
+    public async Task Check_ZeroLengthFrame_WarnsOnlyInAChainWithSeveralFrames()
+    {
+        Hero("<FrameLength>0.2", "<FrameLength>0"); // Walk/2, of three
+        var (code, message) = (await Warnings(Hero("<FrameLength>0.5", "<FrameLength>0"))).ShouldHaveSingleItem(); // Idle/0, alone
+
+        code.ShouldBe("zero-length-frame");
+        message.ShouldContain("Walk/2");
+    }
+
+    [Theory]
+    [InlineData("Sheet.png", "'sheet.png'")]
+    [InlineData("art/sheet.png", "'Art/sheet.png'")]
+    public async Task Check_TextureNameInAnotherCase_Warns(string name, string onDisk)
+    {
+        Directory.CreateDirectory(_w.PathOf("Art"));
+        File.Copy(_w.PathOf("sheet.png"), Path.Combine(_w.PathOf("Art"), "sheet.png"));
+        var path = Hero("<TextureName>sheet.png", $"<TextureName>{name}");
+
+        // Where file names are case-sensitive the texture is simply missing, which is the error it already was.
+        if (!File.Exists(_w.PathOf(name)))
+        {
+            (await _w.RunAsync("check", path)).Out.ShouldContain("missing-texture");
+            return;
+        }
+        var (code, message) = (await Warnings(path)).ShouldHaveSingleItem();
+
+        code.ShouldBe("texture-case");
+        message.ShouldContain($"'{name}'", Case.Sensitive);
+        message.ShouldContain(onDisk, Case.Sensitive);
+    }
+
+    [Fact]
+    public async Task Check_TextureNameThroughParentFolder_InTheRightCase_HasNoWarning()
+    {
+        var folder = Path.GetFileName(_w.Dir);
+
+        (await Warnings(Hero("<TextureName>sheet.png", $"<TextureName>../{folder}/./sheet.png"))).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Edit_RaisedWarningCount_IsPrintedInTextAndJson()
+    {
+        var text = await _w.RunAsync("edit", _w.PathOf("hero.achx"), "--op", "add-chain Run");
+        var json = await EditWarnings(_w.PathOf("hero.achj"), "add-chain Run", "add-chain Jump");
+
+        text.Code.ShouldBe(0);
+        text.Out.ShouldContain("warning: The edit raised check warnings [empty-chain] from 0 to 1; run `aecli check`.");
+        json.ShouldBe(["The edit raised check warnings [empty-chain] from 0 to 2; run `aecli check`."]);
+    }
+
+    [Theory]
+    [InlineData("hero.achj", "add-chain Run")]
+    [InlineData("hero.seqj", "set-block-start Run/Body/1 start=0.5")]
+    public async Task Edit_SaveThatFails_PrintsNoRaisedWarnings(string file, string op)
+    {
+        WriteSeq();
+        var path = _w.PathOf(file);
+        var before = File.ReadAllBytes(path);
+        SetWritable(path, false);
+        try
+        {
+            var r = await _w.RunAsync("edit", path, "--op", op);
+
+            r.Code.ShouldBe(1);
+            r.Out.ShouldContain("error: Could not save");
+            r.Out.ShouldNotContain("raised check warnings");
+            File.ReadAllBytes(path).ShouldBe(before);
+        }
+        finally
+        {
+            SetWritable(path, true);
+        }
+    }
+
+    // A save moves a temp file over the old one, which a read-only file stops on Windows and a read-only folder stops elsewhere.
+    private static void SetWritable(string path, bool writable)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(path, writable ? FileAttributes.Normal : FileAttributes.ReadOnly);
+            return;
+        }
+        var mode = UnixFileMode.UserRead | UnixFileMode.UserExecute;
+        File.SetUnixFileMode(Path.GetDirectoryName(path)!, writable ? mode | UnixFileMode.UserWrite : mode);
+    }
+
+    [Fact]
+    public async Task Edit_Tsx_PrintsNoRaisedWarnings()
+    {
+        // A tileset cannot hold a chain with no frames, so the saved file has no such warning.
+        (await EditWarnings(_w.Copy("tiles.tsx"), "add-chain Run")).ShouldAllBe(w => !w.Contains("raised check warnings"));
+    }
+
+    [Fact]
+    public async Task Edit_FileWithWarnings_PrintsOnlyCodesWhoseCountRose()
+    {
+        Hero("</AnimationChainArraySave>", EmptyChain);
+        var path = Hero("<RightCoordinate>48", "<RightCoordinate>99999"); // Walk/2
+
+        (await EditWarnings(path, "rename-chain Walk to=Stride", "rename-chain Nothing to=Void", "delete-frame Stride/0")).ShouldBeEmpty();
+        // Regions are held in UV during the edit; the copy of the bad frame is a second bad frame.
+        (await EditWarnings(path, "duplicate-frame Stride/1"))
+            .ShouldBe(["The edit raised check warnings [region-outside-texture] from 1 to 2; run `aecli check`."]);
+    }
+
+    [Fact]
+    public async Task EditSequence_RaisedWarningCount_IsPrintedInTextAndJson()
+    {
+        var path = WriteSeq();
+
+        var json = await EditWarnings(path, "set-block-start Run/Body/1 start=0.5");
+        (await EditWarnings(path, "rename-sequence Run to=Sprint", "rename-track Sprint/Body to=Torso")).ShouldBeEmpty();
+        var text = await _w.RunAsync("edit", path, "--op", "duplicate-track Sprint/Torso to=Sprint");
+
+        json.ShouldBe(["The edit raised check warnings [cut-short] from 0 to 1; run `aecli check`."]);
+        text.Code.ShouldBe(0, text.Out);
+        text.Out.ShouldContain("warning: The edit raised check warnings [cut-short] from 1 to 2; run `aecli check`.");
+    }
+
+    [Fact]
+    public async Task EditSequence_SeveralClipsOnAReferenceTrack_AreCountedOneByOne()
+    {
+        var path = WriteSeq();
+        await EditWarnings(path, "add-sequence name=Long", "add-reference-track Long target=Run");
+
+        // Run lasts 1.5 s, so each later clip cuts the one before it.
+        (await EditWarnings(path, "add-block Long/Run sequence=Run start=0.5", "add-block Long/Run sequence=Run start=1"))
+            .ShouldBe(["The edit raised check warnings [cut-short] from 0 to 2; run `aecli check`."]);
+    }
+
+    [Fact]
+    public async Task EditSequence_OneWarningFixedAndAnotherCaused_PrintsNothing()
+    {
+        var path = WriteSeq();
+        await EditWarnings(path, "duplicate-track Run/Body to=Run", "set-block-start Run/Body/1 start=0.5");
+
+        (await EditWarnings(path, "set-block-start Run/Body/1 start=1", "set-block-start \"Run/Body 2/1\" start=0.5")).ShouldBeEmpty();
+        (await Warnings(path)).ShouldHaveSingleItem().Message.ShouldContain("Run/Body 2/0");
+    }
+
+    [Fact]
+    public async Task Edit_TextureChangeThatLeavesARegionOutside_IsReported()
+    {
+        _w.Copy("other.png"); // 48x32
+        var bytes = File.ReadAllBytes(_w.PathOf("other.png"));
+        bytes[19] = 16; // 16 pixels wide
+        File.WriteAllBytes(_w.PathOf("other.png"), bytes);
+
+        // Walk/2 has no texture yet, so its 32,0,16,32 region could not be compared with anything.
+        var path = _w.PathOf("hero.achx");
+        var text = File.ReadAllText(path);
+        var at = text.IndexOf("<FrameLength>0.2", StringComparison.Ordinal);
+        var name = text.LastIndexOf("sheet.png", at, StringComparison.Ordinal);
+        File.WriteAllText(path, text.Remove(name, "sheet.png".Length));
+        (await Warnings(path)).ShouldBeEmpty();
+
+        (await EditWarnings(path, "set-frame-texture Walk/2 texture=other.png"))
+            .ShouldBe(["The edit raised check warnings [region-outside-texture] from 0 to 1; run `aecli check`."]);
+    }
+
+    [Fact]
+    public async Task CheckSequence_SourceWithMissingTexture_Warns()
+    {
+        var path = WriteSeq();
+        File.Delete(_w.PathOf("sheet.png"));
+
+        var (code, message) = (await Warnings(path)).ShouldHaveSingleItem();
+
+        code.ShouldBe("missing-texture");
+        message.ShouldContain("hero.achj");
+        message.ShouldContain("sheet.png");
+    }
+
+    private string WriteSeq()
+    {
+        var save = new SequenceListSave();
+        save.Sources.Add("hero.achj");
+        var body = new SequenceTrackSave { Name = "Body" };
+        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Length = 0.8 });
+        body.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 1 });
+        var run = new SequenceSave { Name = "Run" };
+        run.Tracks.Add(body);
+        save.Sequences.Add(run);
+        var path = _w.PathOf("hero.seqj");
+        save.Save(path);
+        return path;
+    }
+}

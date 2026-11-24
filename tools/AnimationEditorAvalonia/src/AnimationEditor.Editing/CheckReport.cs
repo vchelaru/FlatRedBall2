@@ -1,17 +1,20 @@
+using AnimationEditor.Core.Export;
+using AnimationEditor.Core.IO;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
 
 public enum CheckSeverity { Error, Warning }
 
-/// <param name="Code">Stable kebab-case identifier: missing-texture, duplicate-chain-name, duplicate-shape-name, unit-undefined.</param>
+/// <param name="Code">Stable kebab-case identifier: missing-texture, duplicate-chain-name, duplicate-shape-name, unit-undefined, region-outside-texture, empty-chain, zero-length-frame, texture-case.</param>
 /// <param name="Subject">What the issue is about, independent of where it is (a texture or shape name); how an issue is recognised after an edit renames the chain it sits in. Defaults to the message.</param>
 public sealed record CheckIssue(CheckSeverity Severity, string Code, string Message, string? Subject = null);
 
 /// <summary>
 /// Validation of a loaded animation file (#1811). Errors are things a game would trip on (a texture that
 /// is not there, a name that is not unique); warnings are legal but suspect. Edits are judged by
-/// <see cref="NewErrors"/>: a file that already had errors can still be edited, but an edit may not add one.
+/// <see cref="NewErrors"/>: a file that already had errors can still be edited, but an edit may not add one. Warnings
+/// never block an edit; <see cref="RaisedWarnings"/> says which an edit made more of.
 /// </summary>
 public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
 {
@@ -33,22 +36,27 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
             issues.Add(new(CheckSeverity.Error, "duplicate-chain-name",
                 $"{group.Count()} chains are named '{group.Key}'.", group.Key));
 
-        var missing = new Dictionary<string, List<string>>();
+        var textures = new Dictionary<string, Texture>();
         for (int c = 0; c < doc.AnimationChains.Count; c++)
         {
             var chain = doc.AnimationChains[c];
+            if (chain.Frames.Count == 0)
+                issues.Add(new(CheckSeverity.Warning, "empty-chain", $"Chain '{chain.Name}' has no frames."));
             for (int f = 0; f < chain.Frames.Count; f++)
             {
                 var frame = chain.Frames[f];
                 if (!string.IsNullOrEmpty(frame.TextureName))
                 {
-                    var path = Path.IsPathRooted(frame.TextureName) ? frame.TextureName : Path.Combine(folder, frame.TextureName);
-                    if (!File.Exists(path))
-                    {
-                        if (!missing.TryGetValue(frame.TextureName, out var where)) missing[frame.TextureName] = where = [];
-                        where.Add($"{chain.Name}/{f}");
-                    }
+                    if (!textures.TryGetValue(frame.TextureName, out var texture))
+                        textures[frame.TextureName] = texture = Texture.Read(frame.TextureName, folder);
+                    texture.Frames.Add($"{chain.Name}/{f}");
+                    if (RegionProblem(frame, doc.CoordinateType, texture.Size) is { } problem)
+                        issues.Add(new(CheckSeverity.Warning, "region-outside-texture", $"Frame {chain.Name}/{f}: {problem}"));
                 }
+
+                if (chain.Frames.Count > 1 && !(frame.FrameLength > 0))
+                    issues.Add(new(CheckSeverity.Warning, "zero-length-frame",
+                        $"Frame {chain.Name}/{f} has a length of 0 or less in a chain of {chain.Frames.Count} frames."));
 
                 var shapes = frame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [];
                 foreach (var dup in shapes.GroupBy(s => s.Name).Where(g => g.Count() > 1))
@@ -57,19 +65,63 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
             }
         }
 
-        foreach (var (texture, where) in missing)
+        foreach (var (name, texture) in textures)
         {
-            var shown = string.Join(", ", where.Take(3)) + (where.Count > 3 ? $" and {where.Count - 3} more" : "");
-            issues.Add(new(CheckSeverity.Error, "missing-texture", $"Texture '{texture}' not found (frames: {shown}).", texture));
+            var onDisk = texture.Exists ? TextureCase.NameOnDisk(name, folder) : null;
+            if (texture.Exists && onDisk is null) continue;
+            var shown = string.Join(", ", texture.Frames.Take(3)) + (texture.Frames.Count > 3 ? $" and {texture.Frames.Count - 3} more" : "");
+            issues.Add(onDisk is null
+                ? new(CheckSeverity.Error, "missing-texture", $"Texture '{name}' not found (frames: {shown}).", name)
+                : new(CheckSeverity.Warning, "texture-case",
+                    $"Texture '{name}' is '{onDisk}' on disk, so it is not found where file names are case-sensitive (frames: {shown})."));
         }
 
         return new CheckReport(issues);
     }
 
+    /// <summary>The textures of <paramref name="doc"/> that are not on disk, each once; <paramref name="filePath"/> is the file it came from.</summary>
+    internal static IEnumerable<string> MissingTextures(AnimationChainListSave doc, string filePath)
+    {
+        var folder = Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? string.Empty;
+        return doc.AnimationChains.SelectMany(c => c.Frames).Select(f => f.TextureName).Where(t => !string.IsNullOrEmpty(t)).Distinct()
+            .Where(t => !File.Exists(Path.Combine(folder, t)));
+    }
+
+    // Why the frame's region cannot be drawn, or null when it can or the texture's size is unknown (not a PNG).
+    private static string? RegionProblem(AnimationFrameSave frame, TextureCoordinateType type, (int W, int H)? size)
+    {
+        if (size is not { W: > 0, H: > 0 } s || !FrameSourceRect.TryResolve(frame, type, _ => s, out var r)) return null;
+        if (r is { X: >= 0, Y: >= 0, Width: > 0, Height: > 0 } && r.X + r.Width <= s.W && r.Y + r.Height <= s.H) return null;
+        return $"the region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {s.W}x{s.H} texture '{frame.TextureName}'.";
+    }
+
+    /// <summary>One texture the document names: whether it is there, its size when it is a PNG, and the frames using it.</summary>
+    private sealed record Texture(bool Exists, (int W, int H)? Size)
+    {
+        public List<string> Frames { get; } = [];
+
+        public static Texture Read(string name, string folder)
+        {
+            var path = Path.Combine(folder, name); // an absolute name stays absolute
+            return File.Exists(path) ? new(true, TextureCoordinateConverter.TryReadPngSize(path)) : new(false, null);
+        }
+    }
+
     /// <summary>The errors of <paramref name="after"/> that <paramref name="before"/> did not already have.</summary>
     public static IReadOnlyList<CheckIssue> NewErrors(CheckReport before, CheckReport after)
     {
+        if (after.Ok) return []; // the usual case; the set below is slow to start up
         var known = before.Errors.Select(i => (i.Code, i.Subject ?? i.Message)).ToHashSet();
         return after.Errors.Where(i => !known.Contains((i.Code, i.Subject ?? i.Message))).ToList();
     }
+
+    /// <summary>
+    /// One line per warning code that <paramref name="after"/> has more of than <paramref name="before"/>. Only counts are
+    /// compared, so an edit that fixes one warning and causes another of the same code gives no line.
+    /// </summary>
+    internal static IEnumerable<string> RaisedWarnings(CheckReport before, CheckReport after) =>
+        from warnings in after.Warnings.GroupBy(i => i.Code)
+        let was = before.Warnings.Count(i => i.Code == warnings.Key)
+        where warnings.Count() > was
+        select $"The edit raised check warnings [{warnings.Key}] from {was} to {warnings.Count()}; run `aecli check`.";
 }

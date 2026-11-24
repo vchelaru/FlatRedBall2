@@ -33,6 +33,18 @@ public class CheckCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task ShapesOfOneFrameSharingAName_AreAnError()
+    {
+        var path = _w.PathOf("hero.achx");
+        File.WriteAllText(path, File.ReadAllText(path).Replace("<Name>Foot", "<Name>Hitbox"));
+
+        var r = await _w.RunAsync("check", path);
+
+        r.Code.ShouldBe(1);
+        r.Out.ShouldContain("error[duplicate-shape-name]: 2 shapes are named 'Hitbox' in frame Walk/2.");
+    }
+
+    [Fact]
     public async Task UndefinedUnit_IsAWarningNotAnError()
     {
         var path = _w.PathOf("hero.achx");

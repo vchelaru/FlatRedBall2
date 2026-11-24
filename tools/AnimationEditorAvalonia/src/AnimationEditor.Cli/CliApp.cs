@@ -33,7 +33,7 @@ public static class CliApp
         if (args.Length == 0) return cli.Usage("no command given.", showUsage: true);
         if (args[0] is "-h" or "--help" or "help")
         {
-            if (args.Skip(1).FirstOrDefault(a => a.StartsWith("--")) is { } extra) return cli.Usage(CliCommands.Help.Refusal(extra));
+            if (args.Skip(1).FirstOrDefault(a => a.StartsWith("--", StringComparison.Ordinal)) is { } extra) return cli.Usage(CliCommands.Help.Refusal(extra));
             stdout.WriteLine(Usage);
             return 0;
         }
@@ -88,7 +88,7 @@ public static class CliApp
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
-                if (!a.StartsWith("--") || (name is null && CliCommands.Find(a) is not null))
+                if (!a.StartsWith("--", StringComparison.Ordinal) || (name is null && CliCommands.Find(a) is not null))
                 {
                     if (name is null) name = a;
                     else if (file is null && CliCommands.Find(name) is not { TakesFile: false }) file = a;
