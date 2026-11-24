@@ -290,7 +290,7 @@ public class SequenceCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task CopyTrack_CopiesBlocksAcrossSequences_NamedFreeAndInsertedAtIndex()
+    public async Task DuplicateTrack_CopiesBlocksAcrossSequences_NamedFreeAndInsertedAtIndex()
     {
         var file = WriteSeq();
         var save = SequenceListSave.FromFile(file);
@@ -299,7 +299,7 @@ public class SequenceCommandTests : IDisposable
         save.Sequences[1].Tracks.Add(new SequenceTrackSave { Name = "Shadow" });
         save.Save(file);
 
-        var r = await Edit(file, """{"ops":[{"op":"copy-track","track":"Run/Body","to":"Idle","index":1}]}""");
+        var r = await Edit(file, """{"ops":[{"op":"duplicate-track","track":"Run/Body","to":"Idle","index":1}]}""");
 
         r.Code.ShouldBe(0, r.Out + r.Err);
         var after = SequenceListSave.FromFile(file);
@@ -310,7 +310,7 @@ public class SequenceCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task CopyTrack_ReferenceTrackThatWouldCycle_FailsAndWritesNothing()
+    public async Task DuplicateTrack_ReferenceTrackThatWouldCycle_FailsAndWritesNothing()
     {
         var file = WriteSeq();
         var save = SequenceListSave.FromFile(file);
@@ -319,7 +319,7 @@ public class SequenceCommandTests : IDisposable
         save.Save(file);
         var before = File.ReadAllBytes(file);
 
-        var r = await Edit(file, """{"ops":[{"op":"copy-track","track":"Idle/Run","to":"Run"}]}""", "--json");
+        var r = await Edit(file, """{"ops":[{"op":"duplicate-track","track":"Idle/Run","to":"Run"}]}""", "--json");
 
         r.Code.ShouldBe(1);
         using var doc = JsonDocument.Parse(r.Out);
