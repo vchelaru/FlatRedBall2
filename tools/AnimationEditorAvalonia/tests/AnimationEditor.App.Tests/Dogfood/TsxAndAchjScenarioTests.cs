@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
@@ -183,6 +184,82 @@ public class TsxAndAchjScenarioTests
         editor.Project.AnimationChains.Count.ShouldBe(1);
         File.ReadAllText(tsx).ShouldContain("<animation>");
         editor.ThrowIfErrorShown();
+    }
+
+    private static void CutAndPaste(AnimationEditorHarness editor, object cut, string toTab, Func<object> target)
+    {
+        editor.ClickRow(cut);
+        editor.Press(Key.X, RawInputModifiers.Control);
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        editor.ClickTab(toTab);
+        editor.ClickRow(target());
+        editor.Press(Key.V, RawInputModifiers.Control);
+        editor.Wait(TimeSpan.FromMilliseconds(200));
+    }
+
+    private static AnimationChainSave WalkWithAShape(string shapeName, params (int X, int Y, int Width, int Height)[] frames)
+    {
+        AnimationChainSave chain = AnimationEditorHarness.Chain("Walk", "Heroes.png", frames);
+        chain.Frames[0].ShapesSave = new ShapesSave();
+        chain.Frames[0].ShapesSave!.Add(new AARectSave { Name = shapeName, ScaleX = 4, ScaleY = 4 });
+        return chain;
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Tsx_CutIntoAnAchxTab_KeepsTheTilesetATileset(bool cutFrame)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave chain = await OpenTsxAsync(editor);
+        string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
+        string achx = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "Heroes.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(achx);
+        editor.ClickTab("Heroes.tsx");
+        editor.Expand(chain);
+
+        CutAndPaste(editor, cutFrame ? chain.Frames[1] : chain, "hero.achx", () => editor.ChainNamed("Walk"));
+
+        editor.ThrowIfErrorShown();
+        string saved = File.ReadAllText(tsx);
+        saved.ShouldContain("<tileset");
+        saved.ShouldNotContain("AnimationChainArraySave");
+        saved.Contains("<frame tileid=\"0\"").ShouldBe(cutFrame, "only what was cut leaves the tileset");
+        saved.ShouldNotContain("<frame tileid=\"1\"");
+        AnimationEditorHarness.ReadSaved(achx).AnimationChains.Sum(c => c.Frames.Count).ShouldBe(cutFrame ? 2 : 3);
+    }
+
+    [AvaloniaFact]
+    public async Task Tsx_PastingAShapeCutFromAnAchx_LeavesTheShapeInTheAchx()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave tsxChain = await OpenTsxAsync(editor);
+        editor.Expand(tsxChain);
+        string achx = editor.WriteAchx("hero.achx", WalkWithAShape("Hit", (0, 0, 16, 16)));
+        await editor.OpenAsync(achx);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        editor.Expand(walk.Frames[0]);
+
+        CutAndPaste(editor, walk.Frames[0].ShapesSave!.Shapes[0], "Heroes.tsx", () => tsxChain.Frames[0]);
+
+        AnimationEditorHarness.ReadSaved(achx).AnimationChains.Single().Frames.Single()
+            .ShapesSave!.AARectSaves.Single().Name.ShouldBe("Hit");
+        editor.Services.PendingCutState.IsActive.ShouldBeTrue("the cut can still be pasted where it fits");
+    }
+
+    [AvaloniaFact]
+    public async Task Tsx_PastingAChainWithAShapeCutFromAnAchx_SaysTheShapeWasNotSaved()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        AnimationChainSave tsxChain = await OpenTsxAsync(editor);
+        string achx = editor.WriteAchx("hero.achx", WalkWithAShape("Hit", (32, 32, 16, 16)));
+        await editor.OpenAsync(achx);
+
+        CutAndPaste(editor, editor.ChainNamed("Walk"), "Heroes.tsx", () => tsxChain);
+
+        File.ReadAllText(Path.Combine(editor.ProjectFolder, "Heroes.tsx")).ShouldContain("<tile id=\"10\">");
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("collision shape");
     }
 
     [AvaloniaFact]

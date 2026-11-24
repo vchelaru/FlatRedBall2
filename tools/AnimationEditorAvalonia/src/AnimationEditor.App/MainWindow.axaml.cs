@@ -8152,7 +8152,7 @@ public partial class MainWindow : Window
 
             if (completingCutAcrossDocuments)
             {
-                _appCommands.PasteFrames(targetChain, frames, insertIndex);
+                if (!_appCommands.PasteFrames(targetChain, frames, insertIndex)) return;
                 RemoveCutSourcesAndSaveTheirDocument();
             }
             else if (completingCut)
@@ -8177,7 +8177,7 @@ public partial class MainWindow : Window
 
             if (completingCutAcrossDocuments)
             {
-                _appCommands.PasteShapes(targetFrames, shapes);
+                if (!_appCommands.PasteShapes(frame, shapes)) return;
                 RemoveCutSourcesAndSaveTheirDocument();
             }
             else if (completingCut)
