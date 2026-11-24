@@ -189,7 +189,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>
         /// Asks for a path and saves there (Save As, and the first save of an Untitled document). A path another tab
         /// holds (<see cref="IsPathOpenInAnotherTab"/>) is refused through <see cref="SaveAsRefused"/> and nothing
-        /// is written, since that tab's document would be out of step with its file.
+        /// is written, since that tab's document would be out of step with its file. So is one with another type's
+        /// extension (<see cref="IO.SaveTarget.IsAnotherType"/>).
         /// </summary>
         Task SaveCurrentAnimationChainListAsync();
 

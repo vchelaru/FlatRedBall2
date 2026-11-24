@@ -860,6 +860,12 @@ namespace AnimationEditor.Core.CommandsAndState
 
             if (string.IsNullOrEmpty(path)) return;
 
+            if (SaveTarget.IsAnotherType(path, fileTypeChoices.Select(choice => choice.Extension).ToArray()))
+            {
+                string kind = _pm.IsNativeTsxProject ? "a .tsx" : "an .achj or .achx";
+                SaveAsRefused?.Invoke($"{new FilePath(path).NoPath} is not {kind} file. Give it {kind} extension.");
+                return;
+            }
             if (IsPathOpenInAnotherTab?.Invoke(path) == true)
             {
                 SaveAsRefused?.Invoke($"{new FilePath(path).NoPath} is open in another tab. Close that tab first.");
