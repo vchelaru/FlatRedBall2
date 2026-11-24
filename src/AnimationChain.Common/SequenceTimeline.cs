@@ -32,6 +32,9 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <item>A sequence with <see cref="SequenceSave.Loop"/> off does not end by going blank: it stops at its length and holds
 /// its final pose (<see cref="PoseTime"/>). The hold is the composite of the last instant, so a track whose chains finished
 /// earlier stays hidden. With Loop on the sequence repeats from 0.</item>
+/// <item>A time within the slack (<see cref="BoundaryTolerance"/>) before a loop's end is the start of the next loop, pass
+/// count included, so a time on a multiple of a length that summed to a hair more never lands on the hidden end
+/// (<see cref="WrapTime(double, double, out int)"/>). With Loop off such a time is the end, and holds.</item>
 /// </list>
 /// Cycle lengths come from the caller (a chain's frame lengths summed, doubled for ping-pong), so this class needs no
 /// chain data.
@@ -208,11 +211,25 @@ public static class SequenceTimeline
     /// The sequence time to show for an elapsed <paramref name="time"/>: wrapped when <paramref name="loop"/>, otherwise
     /// held at <paramref name="length"/>. Negative time shows 0.
     /// </summary>
-    public static double WrapTime(double time, double length, bool loop)
+    public static double WrapTime(double time, double length, bool loop) =>
+        loop ? WrapTime(time, length, out _) : Math.Clamp(time, 0, Math.Max(0, length));
+
+    /// <summary>
+    /// The time inside the current loop of a looping sequence of <paramref name="length"/> seconds after
+    /// <paramref name="time"/> seconds of playback, and in <paramref name="passes"/> the number of loops completed by then.
+    /// Within the slack (<see cref="BoundaryTolerance"/>, for <paramref name="length"/>) before a loop's end the next loop
+    /// has begun: the result is 0 and the pass is counted. Negative time, and an empty sequence, is 0 in pass 0.
+    /// </summary>
+    public static double WrapTime(double time, double length, out int passes)
     {
-        if (length <= 0) return 0;
-        if (time < length) return Math.Max(0, time);
-        return loop ? time % length : length;
+        passes = 0;
+        if (length <= 0 || time <= 0) return 0;
+        double inLoop = time % length;
+        // From the remainder, not time / length, which can round up to a whole number the remainder has not reached.
+        passes = (int)Math.Round((time - inLoop) / length);
+        if (inLoop + Slack(length) < length) return inLoop;
+        passes++;
+        return 0;
     }
 
     /// <summary>How far before the end of a non-looping sequence its held final pose is sampled, in seconds.</summary>
@@ -220,12 +237,12 @@ public static class SequenceTimeline
 
     /// <summary>
     /// The time to sample a sequence's pose at for a playhead at <paramref name="time"/>. A sequence with
-    /// <paramref name="loop"/> off stops at its end and holds its final pose: at or past <paramref name="length"/> the pose
-    /// is the one at the last instant before the end (<see cref="HoldEpsilon"/> earlier), so a track whose chains already
+    /// <paramref name="loop"/> off stops at its end and holds its final pose: at or past <paramref name="length"/>, or within
+    /// the slack (<see cref="BoundaryTolerance"/>) before it, the pose is the one at the last instant before the end (<see cref="HoldEpsilon"/> earlier), so a track whose chains already
     /// finished stays hidden and the rest keep their last frame. Otherwise, and for an empty sequence, the time is unchanged.
     /// </summary>
     public static double PoseTime(double time, double length, bool loop) =>
-        !loop && length > 0 && time >= length ? length - Math.Min(HoldEpsilon, length) : time;
+        !loop && length > 0 && time + Slack(length) >= length ? length - Math.Min(HoldEpsilon, length) : time;
 
     /// <summary>The track's reference clips in playback order: by start, ties kept in list order.</summary>
     public static IReadOnlyList<SequenceReferenceSave> OrderedClips(SequenceTrackSave track) =>
@@ -274,7 +291,7 @@ public static class SequenceTimeline
     /// <paramref name="nextStart"/> (the start of the next clip on the track), whichever is first,
     /// or when the target has no length.
     /// The target restarts at the clip's start. A looping target wraps at its
-    /// length; one with Loop off plays once and then holds its final pose (<see cref="PoseTime"/>) until the clip ends. The
+    /// length (<see cref="WrapTime(double, double, out int)"/>); one with Loop off plays once and then holds its final pose (<see cref="PoseTime"/>) until the clip ends. The
     /// holder lasts at least to the clip's end (<see cref="Length"/>), so a looping holder restarts the target only after it.
     /// </summary>
     public static double? ReferenceTime(SequenceReferenceSave reference, SequenceSave target, double targetLength, double parentTime,
@@ -343,9 +360,7 @@ public static class SequenceTimeline
 
         double carry = ReferenceCarryOver(track, sequenceLength, pass, targetLengthOf, _ => target.Loop);
         if (carry <= 0) return plain;
-        double elapsed = carry + parentTime;
-        targetPass = (int)(elapsed / targetLength);
-        return elapsed % targetLength;
+        return WrapTime(carry + parentTime, targetLength, out targetPass);
     }
 
     /// <summary>The earliest a block's right edge can sit: <see cref="MinimumLength"/> after <paramref name="start"/>.</summary>
