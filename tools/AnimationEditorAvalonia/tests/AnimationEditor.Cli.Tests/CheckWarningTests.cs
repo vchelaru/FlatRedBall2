@@ -133,110 +133,50 @@ public class CheckWarningTests : IDisposable
     }
 
     [Fact]
-    public async Task Edit_IntroducedWarning_IsPrintedInTextAndJson()
+    public async Task Edit_RaisedWarningCount_IsPrintedInTextAndJson()
     {
         var text = await _w.RunAsync("edit", _w.PathOf("hero.achx"), "--op", "add-chain Run");
-        var json = await EditWarnings(_w.PathOf("hero.achj"), "add-chain Run");
+        var json = await EditWarnings(_w.PathOf("hero.achj"), "add-chain Run", "add-chain Jump");
 
         text.Code.ShouldBe(0);
-        text.Out.ShouldContain("warning: The edit introduced a check warning [empty-chain]: Chain 'Run'");
-        json.ShouldHaveSingleItem().ShouldContain("[empty-chain]: Chain 'Run'");
+        text.Out.ShouldContain("warning: The edit raised check warnings [empty-chain] from 0 to 1; run `aecli check`.");
+        json.ShouldBe(["The edit raised check warnings [empty-chain] from 0 to 2; run `aecli check`."]);
     }
 
     [Fact]
-    public async Task Edit_FileWithWarnings_SavesAndReportsOnlyNewOnes()
+    public async Task Edit_FileWithWarnings_PrintsOnlyCodesWhoseCountRose()
     {
         Hero("</AnimationChainArraySave>", EmptyChain);
         var path = Hero("<RightCoordinate>48", "<RightCoordinate>99999"); // Walk/2
 
-        // Renaming the chains and shifting the bad frame moves the old warnings, it does not add any.
         (await EditWarnings(path, "rename-chain Walk to=Stride", "rename-chain Nothing to=Void", "delete-frame Stride/0")).ShouldBeEmpty();
-        // A copy of the bad frame (held in UV during the edit) is a second bad frame.
-        var added = await EditWarnings(path, "duplicate-frame Stride/1");
-
-        added.ShouldHaveSingleItem().ShouldContain("[region-outside-texture]");
-        added[0].ShouldContain("32,0,99967,32");
+        // Regions are held in UV during the edit; the copy of the bad frame is a second bad frame.
+        (await EditWarnings(path, "duplicate-frame Stride/1"))
+            .ShouldBe(["The edit raised check warnings [region-outside-texture] from 1 to 2; run `aecli check`."]);
     }
 
     [Fact]
-    public async Task EditSequence_IntroducedWarning_IsPrintedInTextAndJson()
+    public async Task EditSequence_RaisedWarningCount_IsPrintedInTextAndJson()
     {
         var path = WriteSeq();
 
         var json = await EditWarnings(path, "set-block-start Run/Body/1 start=0.5");
-        var text = await _w.RunAsync("edit", path, "--op", "add-block Run/Body source=hero.achj chain=Idle start=0.6");
+        (await EditWarnings(path, "rename-sequence Run to=Sprint", "rename-track Sprint/Body to=Torso")).ShouldBeEmpty();
+        var text = await _w.RunAsync("edit", path, "--op", "duplicate-track Sprint/Torso to=Sprint");
 
-        json.ShouldHaveSingleItem().ShouldContain("[cut-short]: Run/Body/0");
+        json.ShouldBe(["The edit raised check warnings [cut-short] from 0 to 1; run `aecli check`."]);
         text.Code.ShouldBe(0, text.Out);
-        text.Out.ShouldContain("warning: The edit introduced a check warning [cut-short]: Run/Body/1");
-        text.Out.ShouldNotContain("Run/Body/0"); // already cut short by the first edit
+        text.Out.ShouldContain("warning: The edit raised check warnings [cut-short] from 1 to 2; run `aecli check`.");
     }
 
     [Fact]
-    public async Task EditSequence_Renames_DoNotRepeatOldWarnings()
+    public async Task EditSequence_OneWarningFixedAndAnotherCaused_PrintsNothing()
     {
         var path = WriteSeq();
-        await EditWarnings(path, "set-block-start Run/Body/1 start=0.5");
+        await EditWarnings(path, "duplicate-track Run/Body to=Run", "set-block-start Run/Body/1 start=0.5");
 
-        (await EditWarnings(path, "rename-sequence Run to=Sprint", "rename-track Sprint/Body to=Torso")).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task EditSequence_EveryWarningKind_SurvivesRenamesAndReorders()
-    {
-        File.Delete(_w.PathOf("sheet.png"));
-        var path = WriteSeq(s =>
-        {
-            var blocks = s.Sequences[0].Tracks[0].Chains;
-            blocks[1].Start = 0.5; // cuts the first short
-            blocks.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0.5 }); // the second never plays
-            var once = new SequenceSave { Name = "Long", Loop = false };
-            once.Tracks.Add(new SequenceTrackSave { Name = "Clip", Continuous = true, Reference = new SequenceReferenceSave { Sequence = "Run" } });
-            once.Tracks.Add(new SequenceTrackSave { Name = "Other" });
-            s.Sequences.Add(once);
-        });
-        (await Warnings(path)).Select(w => w.Code).ShouldBe(["missing-texture", "cut-short", "unreachable-block", "continuous-ignored"]);
-
-        (await EditWarnings(path,
-            "rename-track Long/Clip to=Legs", "rename-track Run/Body to=Torso", "rename-sequence Run to=Sprint", "rename-sequence Long to=Wide",
-            "reorder-track Wide/Legs index=1", "reorder-sequence Wide index=0", "add-track Sprint name=Front")).ShouldBeEmpty();
-        (await Warnings(path)).Count.ShouldBe(4);
-    }
-
-    [Fact]
-    public async Task EditSequence_OneWarningFixedAndAnotherCaused_ReportsTheNewOne()
-    {
-        var path = WriteSeq(s =>
-        {
-            s.Sequences[0].Tracks[0].Chains[1].Start = 0.5;
-            var other = new SequenceTrackSave { Name = "Other" };
-            other.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Length = 0.8 });
-            other.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 1 });
-            s.Sequences[0].Tracks.Add(other);
-        });
-
-        var added = await EditWarnings(path, "set-block-start Run/Body/1 start=1", "set-block-start Run/Other/1 start=0.5");
-
-        added.ShouldHaveSingleItem().ShouldContain("[cut-short]: Run/Other/0");
-    }
-
-    [Fact]
-    public async Task EditSequence_CopyOfAWarnedTrack_IsReportedAndTheFileGainsNothingElse()
-    {
-        var path = WriteSeq(s => s.Sequences[0].Tracks[0].Chains[1].Start = 0.5);
-
-        var added = await EditWarnings(path, "duplicate-track Run/Body to=Run");
-
-        added.ShouldHaveSingleItem().ShouldContain("[cut-short]: Run/Body 2/0");
-        // Built without any edit, so whatever the edit adds to the objects it tracks would show.
-        var saved = SequenceListSave.FromFile(path);
-        saved.Sequences[0].UnknownProperties.ShouldBeEmpty();
-        saved.Sequences[0].Tracks.Count.ShouldBe(2);
-        foreach (var track in saved.Sequences[0].Tracks)
-        {
-            track.UnknownProperties.ShouldBeEmpty();
-            foreach (var block in track.Chains) block.UnknownProperties.ShouldBeEmpty();
-        }
+        (await EditWarnings(path, "set-block-start Run/Body/1 start=1", "set-block-start \"Run/Body 2/1\" start=0.5")).ShouldBeEmpty();
+        (await Warnings(path)).ShouldHaveSingleItem().Message.ShouldContain("Run/Body 2/0");
     }
 
     [Fact]
@@ -255,10 +195,8 @@ public class CheckWarningTests : IDisposable
         File.WriteAllText(path, text.Remove(name, "sheet.png".Length));
         (await Warnings(path)).ShouldBeEmpty();
 
-        var added = await EditWarnings(path, "set-frame-texture Walk/2 texture=other.png");
-
-        added.ShouldHaveSingleItem().ShouldContain("[region-outside-texture]: Frame Walk/2");
-        added[0].ShouldContain("16x32 texture 'other.png'");
+        (await EditWarnings(path, "set-frame-texture Walk/2 texture=other.png"))
+            .ShouldBe(["The edit raised check warnings [region-outside-texture] from 0 to 1; run `aecli check`."]);
     }
 
     [Fact]
@@ -274,7 +212,7 @@ public class CheckWarningTests : IDisposable
         message.ShouldContain("sheet.png");
     }
 
-    private string WriteSeq(Action<SequenceListSave>? change = null)
+    private string WriteSeq()
     {
         var save = new SequenceListSave();
         save.Sources.Add("hero.achj");
@@ -284,7 +222,6 @@ public class CheckWarningTests : IDisposable
         var run = new SequenceSave { Name = "Run" };
         run.Tracks.Add(body);
         save.Sequences.Add(run);
-        change?.Invoke(save);
         var path = _w.PathOf("hero.seqj");
         save.Save(path);
         return path;

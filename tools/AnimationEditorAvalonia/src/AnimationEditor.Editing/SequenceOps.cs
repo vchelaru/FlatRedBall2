@@ -152,7 +152,6 @@ public static class SequenceOps
     public static EditRunResult Apply(SequenceSession session, IReadOnlyList<EditOp> ops)
     {
         var doc = session.Document;
-        SequenceEditIds.Add(doc.Save);
         var before = SequenceCheck.Run(doc.Save, session.Path);
         var original = doc.Save.ToJsonString();
         var changed = new List<string>();
@@ -189,7 +188,7 @@ public static class SequenceOps
 
         if (changed.Count == 0 || doc.Save.ToJsonString() == original)
             return new EditRunResult(new EditResult([], [], warnings), []);
-        warnings.AddRange(CheckReport.NewWarningLines(before, after));
+        warnings.AddRange(CheckReport.RaisedWarnings(before, after));
 
         var save = session.Save();
         return save.Success

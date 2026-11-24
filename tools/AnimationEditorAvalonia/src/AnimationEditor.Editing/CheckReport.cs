@@ -7,14 +7,14 @@ namespace AnimationEditor.Editing;
 public enum CheckSeverity { Error, Warning }
 
 /// <param name="Code">Stable kebab-case identifier: missing-texture, duplicate-chain-name, duplicate-shape-name, unit-undefined, region-outside-texture, empty-chain, zero-length-frame, texture-case.</param>
-/// <param name="Subject">What the issue is about, independent of where it is (a texture or shape name, or the chain or frame object itself, which edits keep, or a <see cref="SequenceEditIds"/> id); how an issue is recognised after an edit renames the chain it sits in. Defaults to the message.</param>
-public sealed record CheckIssue(CheckSeverity Severity, string Code, string Message, object? Subject = null);
+/// <param name="Subject">What the issue is about, independent of where it is (a texture or shape name); how an issue is recognised after an edit renames the chain it sits in. Defaults to the message.</param>
+public sealed record CheckIssue(CheckSeverity Severity, string Code, string Message, string? Subject = null);
 
 /// <summary>
 /// Validation of a loaded animation file (#1811). Errors are things a game would trip on (a texture that
 /// is not there, a name that is not unique); warnings are legal but suspect. Edits are judged by
-/// <see cref="NewErrors"/>: a file that already had errors can still be edited, but an edit may not add one. The
-/// <see cref="NewWarnings"/> of an edit are only reported.
+/// <see cref="NewErrors"/>: a file that already had errors can still be edited, but an edit may not add one. Warnings
+/// never block an edit; <see cref="RaisedWarnings"/> says which an edit made more of.
 /// </summary>
 public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
 {
@@ -32,17 +32,16 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
             issues.Add(new(CheckSeverity.Warning, "unit-undefined",
                 "TimeMeasurementUnit is Undefined; frame lengths are read as seconds."));
 
-        var names = new List<string>();
-        foreach (var chain in doc.AnimationChains) names.Add(chain.Name);
-        foreach (var (name, count) in Repeats(names))
-            issues.Add(new(CheckSeverity.Error, "duplicate-chain-name", $"{count} chains are named '{name}'.", name));
+        foreach (var group in doc.AnimationChains.GroupBy(c => c.Name).Where(g => g.Count() > 1))
+            issues.Add(new(CheckSeverity.Error, "duplicate-chain-name",
+                $"{group.Count()} chains are named '{group.Key}'.", group.Key));
 
         var textures = new Dictionary<string, Texture>();
         for (int c = 0; c < doc.AnimationChains.Count; c++)
         {
             var chain = doc.AnimationChains[c];
             if (chain.Frames.Count == 0)
-                issues.Add(new(CheckSeverity.Warning, "empty-chain", $"Chain '{chain.Name}' has no frames.", chain));
+                issues.Add(new(CheckSeverity.Warning, "empty-chain", $"Chain '{chain.Name}' has no frames."));
             for (int f = 0; f < chain.Frames.Count; f++)
             {
                 var frame = chain.Frames[f];
@@ -52,20 +51,17 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
                         textures[frame.TextureName] = texture = Texture.Read(frame.TextureName, folder);
                     texture.Frames.Add($"{chain.Name}/{f}");
                     if (RegionProblem(frame, doc.CoordinateType, texture.Size) is { } problem)
-                        issues.Add(new(CheckSeverity.Warning, "region-outside-texture", $"Frame {chain.Name}/{f}: {problem}", frame));
+                        issues.Add(new(CheckSeverity.Warning, "region-outside-texture", $"Frame {chain.Name}/{f}: {problem}"));
                 }
 
                 if (chain.Frames.Count > 1 && !(frame.FrameLength > 0))
                     issues.Add(new(CheckSeverity.Warning, "zero-length-frame",
-                        $"Frame {chain.Name}/{f} has a length of 0 or less in a chain of {chain.Frames.Count} frames.", frame));
+                        $"Frame {chain.Name}/{f} has a length of 0 or less in a chain of {chain.Frames.Count} frames."));
 
-                if (frame.ShapesSave is not { Shapes.Count: > 1 } saved) continue;
-                names.Clear();
-                foreach (var shape in saved.Shapes)
-                    if (shape is ShapeSave named) names.Add(named.Name);
-                foreach (var (name, count) in Repeats(names))
+                var shapes = frame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [];
+                foreach (var dup in shapes.GroupBy(s => s.Name).Where(g => g.Count() > 1))
                     issues.Add(new(CheckSeverity.Error, "duplicate-shape-name",
-                        $"{count} shapes are named '{name}' in frame {chain.Name}/{f}.", name));
+                        $"{dup.Count()} shapes are named '{dup.Key}' in frame {chain.Name}/{f}.", dup.Key));
             }
         }
 
@@ -77,7 +73,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
             issues.Add(onDisk is null
                 ? new(CheckSeverity.Error, "missing-texture", $"Texture '{name}' not found (frames: {shown}).", name)
                 : new(CheckSeverity.Warning, "texture-case",
-                    $"Texture '{name}' is '{onDisk}' on disk, so it is not found where file names are case-sensitive (frames: {shown}).", name));
+                    $"Texture '{name}' is '{onDisk}' on disk, so it is not found where file names are case-sensitive (frames: {shown})."));
         }
 
         return new CheckReport(issues);
@@ -90,12 +86,6 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
         return doc.AnimationChains.SelectMany(c => c.Frames).Select(f => f.TextureName).Where(t => !string.IsNullOrEmpty(t)).Distinct()
             .Where(t => !File.Exists(Path.Combine(folder, t)));
     }
-
-    // Each name that appears more than once, with its count. Grouping runs only when there is one: it is slow to start up.
-    private static IReadOnlyList<(string Name, int Count)> Repeats(List<string> names) =>
-        new HashSet<string>(names).Count == names.Count
-            ? []
-            : names.GroupBy(n => n).Where(g => g.Count() > 1).Select(g => (g.Key, g.Count())).ToList();
 
     // Why the frame's region cannot be drawn, or null when it can or the texture's size is unknown (not a PNG).
     private static string? RegionProblem(AnimationFrameSave frame, TextureCoordinateType type, (int W, int H)? size)
@@ -120,27 +110,17 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
     /// <summary>The errors of <paramref name="after"/> that <paramref name="before"/> did not already have.</summary>
     public static IReadOnlyList<CheckIssue> NewErrors(CheckReport before, CheckReport after)
     {
-        if (after.Ok) return []; // the usual case, and cheaper than building the set
         var known = before.Errors.Select(i => (i.Code, i.Subject ?? i.Message)).ToHashSet();
         return after.Errors.Where(i => !known.Contains((i.Code, i.Subject ?? i.Message))).ToList();
     }
 
     /// <summary>
-    /// The warnings of <paramref name="after"/> beyond those <paramref name="before"/> had. A copied sequence block
-    /// keeps its subject, so the same code and subject can occur more than once; they are counted, and the ones whose message is new come first.
+    /// One line per warning code that <paramref name="after"/> has more of than <paramref name="before"/>. Only counts are
+    /// compared, so an edit that fixes one warning and causes another of the same code gives no line.
     /// </summary>
-    public static IReadOnlyList<CheckIssue> NewWarnings(CheckReport before, CheckReport after)
-    {
-        if (!after.Warnings.Any()) return [];
-        var known = before.Warnings.ToLookup(i => (i.Code, i.Subject ?? i.Message), i => i.Message);
-        return after.Warnings.GroupBy(i => (i.Code, i.Subject ?? i.Message)).SelectMany(group =>
-        {
-            var old = known[group.Key].ToList();
-            return group.OrderBy(i => old.Contains(i.Message)).Take(group.Count() - old.Count);
-        }).ToList();
-    }
-
-    /// <summary><see cref="NewWarnings"/> as the lines an edit reports.</summary>
-    internal static IEnumerable<string> NewWarningLines(CheckReport before, CheckReport after) =>
-        NewWarnings(before, after).Select(i => $"The edit introduced a check warning [{i.Code}]: {i.Message}");
+    internal static IEnumerable<string> RaisedWarnings(CheckReport before, CheckReport after) =>
+        from warnings in after.Warnings.GroupBy(i => i.Code)
+        let was = before.Warnings.Count(i => i.Code == warnings.Key)
+        where warnings.Count() > was
+        select $"The edit raised check warnings [{warnings.Key}] from {was} to {warnings.Count()}; run `aecli check`.";
 }

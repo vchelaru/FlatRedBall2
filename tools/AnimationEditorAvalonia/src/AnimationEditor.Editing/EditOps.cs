@@ -499,7 +499,7 @@ public static class EditOps
 
         if (changed.Count == 0)
             return new EditRunResult(new EditResult([], [], warnings), []);
-        warnings.AddRange(CheckReport.NewWarningLines(before, after));
+        warnings.AddRange(CheckReport.RaisedWarnings(before, after));
 
         foreach (var tsxPath in associations)
         {

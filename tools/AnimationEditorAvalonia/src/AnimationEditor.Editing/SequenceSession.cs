@@ -53,7 +53,6 @@ public sealed class SequenceSession
     {
         try
         {
-            SequenceEditIds.Remove(Document.Save);
             Document.Save.Save(Path);
             return new EditResult([Path], [], []);
         }
