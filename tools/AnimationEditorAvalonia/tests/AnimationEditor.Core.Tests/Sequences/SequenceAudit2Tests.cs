@@ -565,9 +565,9 @@ public class SequenceAudit2Tests
     }
 
     [Fact]
-    public void FramesOf_UvsStoredRightToLeft_StillMeasureAPositiveWidth()
+    public void FramesOf_EdgesStoredRightToLeft_StillMeasureAPositiveWidth()
     {
-        var chain = new AnimationChainSave { Frames = { new AnimationFrameSave { LeftCoordinate = 0.5f, RightCoordinate = 0f, TopCoordinate = 0f, BottomCoordinate = 1f, FrameLength = 0.1f } } };
+        var chain = new AnimationChainSave { Frames = { new AnimationFrameSave { LeftCoordinate = 50f, RightCoordinate = 0f, TopCoordinate = 0f, BottomCoordinate = 100f, FrameLength = 0.1f } } };
 
         FilmstripLayout.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, _ => true)[0].SpriteWidth.ShouldBe(50);
     }

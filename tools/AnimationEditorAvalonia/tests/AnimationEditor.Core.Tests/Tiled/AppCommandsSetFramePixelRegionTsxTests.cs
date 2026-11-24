@@ -55,12 +55,12 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
 
         _ctx.AppCommands.SetFramePixelRegion([frame0], pixelX: null, pixelY: null, pixelW: 32, pixelH: 32);
 
-        Assert.Equal(0.5f, frame0.RightCoordinate, precision: 4);
+        Assert.Equal(32f, frame0.RightCoordinate, precision: 4);
         // Frame 1 keeps its own origin (tile 4: col 0, row 1) and takes the same 2x2-tile size.
         Assert.Equal(0f, frame1.LeftCoordinate, precision: 4);
-        Assert.Equal(0.25f, frame1.TopCoordinate, precision: 4);
-        Assert.Equal(0.5f, frame1.RightCoordinate, precision: 4);
-        Assert.Equal(0.75f, frame1.BottomCoordinate, precision: 4);
+        Assert.Equal(16f, frame1.TopCoordinate, precision: 4);
+        Assert.Equal(32f, frame1.RightCoordinate, precision: 4);
+        Assert.Equal(48f, frame1.BottomCoordinate, precision: 4);
 
         // The autosave that just ran must have written a consistent 2x2 group, not skipped it.
         var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
@@ -75,11 +75,11 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
         var frame1 = chain.Frames[1];
 
         _ctx.AppCommands.SetFramePixelRegion([chain.Frames[0]], pixelX: null, pixelY: null, pixelW: 32, pixelH: null);
-        Assert.Equal(0.5f, frame1.RightCoordinate, precision: 4);
+        Assert.Equal(32f, frame1.RightCoordinate, precision: 4);
 
         _ctx.UndoManager.Undo();
 
-        Assert.Equal(0.25f, frame1.RightCoordinate, precision: 4);
+        Assert.Equal(16f, frame1.RightCoordinate, precision: 4);
     }
 
     // Moving a frame (X/Y only) never changes the footprint, so its siblings stay where they are.
@@ -93,7 +93,7 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
         _ctx.AppCommands.SetFramePixelRegion([chain.Frames[0]], pixelX: 32, pixelY: null, pixelW: null, pixelH: null);
 
         Assert.Equal(0f, frame1.LeftCoordinate, precision: 4);
-        Assert.Equal(0.25f, frame1.RightCoordinate, precision: 4);
+        Assert.Equal(16f, frame1.RightCoordinate, precision: 4);
     }
 
     [Fact]
@@ -102,15 +102,15 @@ public class AppCommandsSetFramePixelRegionTsxTests : IDisposable
         var chain = new FlatRedBall2.AnimationEditorCommon.AnimationChainSave { Name = "Walk" };
         var frame0 = TestHelpers.MakeFrame();
         var frame1 = TestHelpers.MakeFrame();
-        frame0.RightCoordinate = 0.25f;
-        frame1.RightCoordinate = 0.25f;
+        frame0.RightCoordinate = 16f;
+        frame1.RightCoordinate = 16f;
         chain.Frames.Add(frame0);
         chain.Frames.Add(frame1);
         _ctx.Acls.AnimationChains.Add(chain);
 
         _ctx.AppCommands.SetFramePixelRegion([frame0], pixelX: null, pixelY: null, pixelW: 32, pixelH: null);
 
-        Assert.Equal(0.5f, frame0.RightCoordinate, precision: 4);
-        Assert.Equal(0.25f, frame1.RightCoordinate, precision: 4);
+        Assert.Equal(32f, frame0.RightCoordinate, precision: 4);
+        Assert.Equal(16f, frame1.RightCoordinate, precision: 4);
     }
 }

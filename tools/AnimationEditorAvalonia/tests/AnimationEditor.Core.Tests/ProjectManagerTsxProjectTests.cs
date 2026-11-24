@@ -362,15 +362,15 @@ public class ProjectManagerTsxProjectTests : IDisposable
         newChain.Frames.Add(new AnimationFrameSave
         {
             TextureName = "Heroes.png",
-            LeftCoordinate = 0f, RightCoordinate = 0.25f,
-            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            LeftCoordinate = 0f, RightCoordinate = 16f,
+            TopCoordinate = 16f, BottomCoordinate = 32f,
             FrameLength = 0.1f,
         });
         newChain.Frames.Add(new AnimationFrameSave
         {
             TextureName = "Heroes.png",
-            LeftCoordinate = 0.25f, RightCoordinate = 0.5f,
-            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            LeftCoordinate = 16f, RightCoordinate = 32f,
+            TopCoordinate = 16f, BottomCoordinate = 32f,
             FrameLength = 0.1f,
         });
         pm.AnimationChainListSave!.AnimationChains.Add(newChain);
@@ -418,8 +418,8 @@ public class ProjectManagerTsxProjectTests : IDisposable
         chain.Frames.Add(new AnimationFrameSave
         {
             TextureName = "Heroes.png",
-            LeftCoordinate = 0f, RightCoordinate = 0.25f,
-            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            LeftCoordinate = 0f, RightCoordinate = 16f,
+            TopCoordinate = 16f, BottomCoordinate = 32f,
             FrameLength = 0.1f,
         });
 
@@ -578,8 +578,8 @@ public class ProjectManagerTsxProjectTests : IDisposable
         chain.Frames.Add(new AnimationFrameSave
         {
             TextureName = "Heroes.png",
-            LeftCoordinate = 0f, RightCoordinate = 0.25f,
-            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            LeftCoordinate = 0f, RightCoordinate = 16f,
+            TopCoordinate = 16f, BottomCoordinate = 32f,
             FrameLength = 0.1f,
         });
 
@@ -721,9 +721,9 @@ public class ProjectManagerTsxProjectTests : IDisposable
         pm.LoadTsxProject(new FilePath(path));
 
         var chain = pm.AnimationChainListSave!.AnimationChains.Single();
-        // Grow frame 0 from one 16px tile (UV 0.25) to two tiles (UV 0.5) wide; frame 1 stays a
+        // Grow frame 0 from one 16px tile to two tiles wide; frame 1 stays a
         // single 16px cell -- the two frames now disagree on footprint size.
-        chain.Frames[0].RightCoordinate = 0.5f;
+        chain.Frames[0].RightCoordinate = 32f;
 
         pm.SaveTsxProject();
 
@@ -761,8 +761,8 @@ public class ProjectManagerTsxProjectTests : IDisposable
         chain.Frames.Add(new AnimationFrameSave
         {
             TextureName = "Wrong.png",
-            LeftCoordinate = 0f, RightCoordinate = 0.25f,
-            TopCoordinate = 0.25f, BottomCoordinate = 0.5f,
+            LeftCoordinate = 0f, RightCoordinate = 16f,
+            TopCoordinate = 16f, BottomCoordinate = 32f,
             FrameLength = 0.1f,
         });
         pm.SaveTsxProject();
