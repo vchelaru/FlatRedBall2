@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using DotTiled;
 using System.Collections.Generic;
 using System.Linq;
@@ -69,15 +70,13 @@ public static class TilesetAnimationSync
 
         var changed = false;
 
-        var clearedTileIds = new HashSet<uint>();
+        var clearedTileChains = new SortedDictionary<uint, string?>();
         foreach (var staleTileId in previouslyTrackedTileIds.Except(newTileIds))
         {
             var staleTile = tilesById[staleTileId];
+            clearedTileChains[staleTileId] = GetStringProperty(staleTile, AnimationNamePropertyName);
             if (ClearTile(staleTile))
-            {
                 changed = true;
-                clearedTileIds.Add(staleTileId);
-            }
             if (IsTileEmpty(staleTile))
             {
                 tileset.Tiles.Remove(staleTile);
@@ -92,8 +91,16 @@ public static class TilesetAnimationSync
             warnings.AddRange(result.Warnings);
             // A differently named texture is silent, because most chains of a big project belong to another tileset.
             if (result.SameNamedTexture is { } sameNamed)
-                warnings.Add($"chain \"{result.ChainName}\": frames on \"{sameNamed.Texture}\" were not pushed, because the tileset's image is \"{sameNamed.Image}\"." +
-                    (sameNamed.EntryTileId is { } lostTileId && clearedTileIds.Contains(lostTileId) ? $" Tile {lostTileId} was cleared." : ""));
+            {
+                // By tile id as well, for a chain renamed in the same save.
+                var lost = clearedTileChains
+                    .Where(cleared => cleared.Value == result.ChainName || cleared.Key == sameNamed.EntryTileId)
+                    .Select(cleared => cleared.Key)
+                    .ToList();
+                var lostNote = lost.Count == 0 ? ""
+                    : $" {Plural.Noun(lost.Count, "Tile")} {string.Join(", ", lost)} {(lost.Count == 1 ? "was" : "were")} cleared.";
+                warnings.Add($"chain \"{result.ChainName}\": frames on \"{sameNamed.Texture}\" were not pushed, because the tileset's image is \"{sameNamed.Image}\".{lostNote}");
+            }
             if (result.EntryTileId is not { } tileId)
                 continue;
 

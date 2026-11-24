@@ -137,6 +137,40 @@ public class TiledTilesetSyncRunnerTests
     }
 
     [Fact]
+    public void SyncAll_FramesMovedOneAtATimeToASameNamedImage_NamesEachTileAsItIsCleared()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        var frames = achj.AnimationChains[0].Frames;
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        frames[0].TextureName = "sub/Heroes.png";
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single().ShouldEndWith("Tile 0 was cleared.");
+
+        frames[1].TextureName = "sub/Heroes.png";
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single().ShouldEndWith("Tile 1 was cleared.");
+    }
+
+    [Fact]
+    public void SyncAll_FramesMovedToAnotherCellOfASameNamedImage_NamesTheClearedTile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        achj.AnimationChains[0].Frames.RemoveAt(1);
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        var frame = achj.AnimationChains[0].Frames[0];
+        frame.TextureName = "sub/Heroes.png";
+        frame.LeftCoordinate = 48;
+        frame.RightCoordinate = 64;
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single().Warnings.Single().ShouldEndWith("Tile 0 was cleared.");
+    }
+
+    [Fact]
     public void SyncAll_FramesPointedBackAtTheImage_ArePushedAgain()
     {
         var tempDir = Directory.CreateTempSubdirectory().FullName;
@@ -192,7 +226,7 @@ public class TiledTilesetSyncRunnerTests
         var outcome = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]).Single();
 
         Loader.Default().LoadTileset(tsxPath).Tiles.Select(t => t.ID).ShouldBe([3u]);
-        outcome.Warnings.Single().ShouldEndWith("Tile 1 was cleared.");
+        outcome.Warnings.Single().ShouldEndWith("Tiles 0, 1 were cleared.");
     }
 
     [Theory]
