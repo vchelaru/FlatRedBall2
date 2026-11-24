@@ -249,6 +249,62 @@ public class IoManagerTests
         Assert.Contains(new FilePath(secondTsxPath), associated.Select(p => new FilePath(p)));
     }
 
+    // #1992: what cannot be read may still hold associations, so adding one must not replace it.
+    [Theory]
+    [InlineData("{ \"TiledTilesetPaths\": [ \"Enemies.tsx\" ")]
+    [InlineData("<<<<<<< HEAD\n{ \"TiledTilesetPaths\": [ \"Enemies.tsx\" ] }\n=======")]
+    [InlineData("<AETiledSyncSave><TiledTilesetPath>Enemies.tsx</TiledTilesetPath></AETiledSyncSave>")]
+    [InlineData("[ \"Enemies.tsx\" ]")]
+    [InlineData("{ \"TiledTilesetPaths\": \"Enemies.tsx\" }")]
+    [InlineData("{ \"TiledTilesetPaths\": null }")]
+    [InlineData("null")]
+    [InlineData("")]
+    public void AddAssociatedTiledTilesetPath_UnreadableTiledSyncFile_IsLeftAloneAndReported(string contents)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var syncPath = dir.Path + "/hero.tiledsync";
+        File.WriteAllText(syncPath, contents);
+        Exception? reported = null;
+        ctx.IoManager.TiledSyncParseFailed += (_, ex) => reported = ex;
+
+        ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/hero.achx", dir.Path + "/Heroes.tsx");
+
+        Assert.Equal(contents, File.ReadAllText(syncPath));
+        Assert.Contains("hero.tiledsync", reported?.Message);
+    }
+
+    // Outside Windows a lock does not stop the file from being replaced.
+    [Fact]
+    public void AddAssociatedTiledTilesetPath_TiledSyncFileInUse_IsLeftAloneAndReported()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var syncPath = dir.Path + "/hero.tiledsync";
+        File.WriteAllText(syncPath, "{ \"TiledTilesetPaths\": [ \"Enemies.tsx\" ] }");
+        var reported = false;
+        ctx.IoManager.TiledSyncParseFailed += (_, _) => reported = true;
+
+        using (new FileStream(syncPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            ctx.IoManager.AddAssociatedTiledTilesetPath(dir.Path + "/hero.achx", dir.Path + "/Heroes.tsx");
+
+        Assert.Contains("Enemies.tsx", File.ReadAllText(syncPath));
+        Assert.True(reported);
+    }
+
+    [Fact]
+    public void GetAssociatedTiledTilesetPaths_PathsAreNull_ReportsAndReturnsEmpty()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        File.WriteAllText(dir.Path + "/hero.tiledsync", "{ \"TiledTilesetPaths\": null }");
+        var reported = false;
+        ctx.IoManager.TiledSyncParseFailed += (_, _) => reported = true;
+
+        Assert.Empty(ctx.IoManager.GetAssociatedTiledTilesetPaths(dir.Path + "/hero.achx"));
+        Assert.True(reported);
+    }
+
     [Fact]
     public void GetAssociatedTiledTilesetPaths_CorruptTiledSyncFile_RaisesTiledSyncParseFailed()
     {

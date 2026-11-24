@@ -522,6 +522,10 @@ public static class EditOps
 
         foreach (var op in ops)
         {
+            // No file or animation name can hold one, and the path functions throw on it.
+            if (op.Values.FirstOrDefault(v => v.Value.Contains('\0')).Key is { } field)
+                return FailedOp(warnings, op, "", Fail($"{field} cannot contain a null character.", EditErrorCode.InvalidValue));
+
             var refused = TsxOpPolicy.Check(session, op);
             if (refused is not null)
                 return new EditRunResult(

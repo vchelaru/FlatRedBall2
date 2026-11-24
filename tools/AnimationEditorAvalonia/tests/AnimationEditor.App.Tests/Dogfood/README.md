@@ -69,7 +69,7 @@ Rules that keep scenarios honest:
 - Assert on more than one surface where they apply: the model (`Project`, `Services.SelectedState`),
   the controls (`AnimTree`, `Nodes`, `VisibleChainHeaders`, `Wireframe`, `Preview`, `TabLabels`,
   `HistoryRows`, any control by name through `Control<T>`), the undo stack (`UndoLabels`,
-  `UndoManager`), the notifications (`ErrorBannerText`, `ToastText`, `DeletedToastText`) and the
+  `UndoManager`), the notifications (`ProblemText`, `InfoText`, `DeletedToastText`) and the
   saved file (`ReadSaved`). A bug often shows in only one of them.
 - Anything that needs a timer to tick (preview playback, the smooth wheel zoom, toast auto-hide)
   goes through `WaitAsync` / `WaitUntilAsync`. The synchronous `Wait` / `WaitUntil` only pump

@@ -45,7 +45,8 @@ namespace AnimationEditor.Core.IO
         /// <summary>
         /// Records <paramref name="tsxFile"/> (stored relative to <paramref name="achxFile"/>'s
         /// folder) as a tileset that should be kept in sync with this .achx/.achj's animation
-        /// chains. A no-op if already associated.
+        /// chains. A no-op if already associated. An existing <c>.tiledsync</c> that cannot be read is
+        /// left as it is, and <see cref="TiledSyncParseFailed"/> is raised.
         /// </summary>
         void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile);
 
