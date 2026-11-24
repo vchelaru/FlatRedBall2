@@ -60,10 +60,10 @@ namespace AnimationEditor.Core
         bool MoveTsxProject(FilePath path);
 
         /// <summary>
-        /// Whether the last <see cref="SaveTsxProject"/> went into a change another program made to the file, which the
-        /// open document does not have yet.
+        /// Whether a <see cref="SaveTsxProject"/> went into a change another program made to the file, which the open
+        /// document does not have until it is reloaded.
         /// </summary>
-        bool TsxSaveMergedOutsideChange { get; }
+        bool TsxLacksOutsideChange { get; }
 
         /// <summary>The chains the last <see cref="SaveTsxProject"/> did not store in full.
         /// See <see cref="ProjectManager.TsxChainsNotFullySaved"/>.</summary>

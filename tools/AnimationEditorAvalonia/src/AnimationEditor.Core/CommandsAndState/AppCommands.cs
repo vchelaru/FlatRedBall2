@@ -642,9 +642,10 @@ namespace AnimationEditor.Core.CommandsAndState
                         else
                             _pm.SaveAnimationChainList(target);
                     });
-                    _diskState = ReadDiskState(target);
-                    if (tsxWarnings != null && _pm.TsxSaveMergedOutsideChange)
+                    if (_pm.TsxLacksOutsideChange)
                         HotReloadWatcher.ReportChange(target);
+                    else
+                        _diskState = ReadDiskState(target);
                     if (tsxWarnings is { Count: > 0 })
                         TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
                     _undoManager.MarkSaved();

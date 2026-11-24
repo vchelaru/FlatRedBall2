@@ -64,8 +64,10 @@ namespace AnimationEditor.Core
             /// <summary>What the last <see cref="Save"/> wrote, to either file.</summary>
             private string _writtenText = source.Text;
 
-            /// <returns>Whether the save went into a change another program made to the file.</returns>
-            public bool Save(DotTiled.Tileset tileset, FilePath target)
+            /// <summary>A save went into a change another program made. The document has it only after a reload.</summary>
+            public bool LacksOutsideChange { get; private set; }
+
+            public void Save(DotTiled.Tileset tileset, FilePath target)
             {
                 if (target == Path && target.Exists() && File.ReadAllText(target.FullPath) != _diskText)
                 {
@@ -86,14 +88,14 @@ namespace AnimationEditor.Core
                     Tiled.TsxWriter.Write(merged, merged.Text, target);
                     (_opened, _openedTileset, _diskText, _diskTileset) = (merged, tileset, merged.Text, tileset);
                     _writtenText = merged.Text;
-                    return true;
+                    LacksOutsideChange = true;
+                    return;
                 }
 
                 var text = Tiled.TsxWriter.Render(_opened, _openedTileset, tileset);
                 _writtenText = Tiled.TsxWriter.Write(_opened, text, target);
                 if (target == Path)
                     (_diskText, _diskTileset) = (_writtenText, tileset);
-                return false;
             }
 
             /// <summary>What decides which tile an animation's rects are on.</summary>
@@ -575,7 +577,7 @@ namespace AnimationEditor.Core
         }
 
         /// <inheritdoc/>
-        public bool TsxSaveMergedOutsideChange { get; private set; }
+        public bool TsxLacksOutsideChange => _tsxFile?.LacksOutsideChange == true;
 
         /// <summary>
         /// The chains the last <see cref="SaveTsxProject"/> did not store in full: not written at all (a mapping
@@ -645,7 +647,7 @@ namespace AnimationEditor.Core
 
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
             Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped, _tsxUserProperties);
-            TsxSaveMergedOutsideChange = _tsxFile.Save(workingTileset, new FilePath(targetPath ?? FileName!));
+            _tsxFile.Save(workingTileset, new FilePath(targetPath ?? FileName!));
             _tsxTileset = workingTileset;
 
             // Commits this save's tile assignments (including a brand-new chain's freshly-chosen

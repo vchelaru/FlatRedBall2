@@ -268,6 +268,26 @@ public sealed class TsxInPlaceSaveTests : IDisposable
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[0].TextureName.ShouldBe("Heroes.png");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Save_ThenAnotherTab_ComingBackReloadsOnlyWhenAnotherProgramChangedTheFile(bool changedOutside)
+    {
+        var path = Write(Xml);
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.AutosaveOnChange = true;
+        await ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        if (changedOutside)
+            File.WriteAllText(path, Xml.Replace("duration=\"150\"", "duration=\"151\""));
+        SetFirstDuration((ProjectManager)ctx.ProjectManager, 300);
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        var tab = new AnimationEditor.Core.Models.TabEntry(new FilePath(path));
+
+        ctx.AppCommands.CaptureTabEditorState(tab);
+
+        ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBe(!changedOutside);
+    }
+
     /// <summary>The reload that takes another program's change runs even when a save went into that change first.</summary>
     [Theory]
     [InlineData(true)]
@@ -291,6 +311,8 @@ public sealed class TsxInPlaceSaveTests : IDisposable
         if (changedOutside)
             File.WriteAllText(path, File.ReadAllText(path).Replace("duration=\"150\"", "duration=\"151\""));
         SetFirstDuration((ProjectManager)ctx.ProjectManager, 400);
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        // Another save before the report comes.
         ctx.AppCommands.SaveCurrentAnimationChainList();
         for (var i = 0; i < 40 && reports == 0 && changedOutside; i++)
             await Task.Delay(100);
