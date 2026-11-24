@@ -32,6 +32,8 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 
 **Bulk selectors.** Frame ops take `Walk/*`, `Walk/2-5`, `Walk/0,3,7`; `delete-chain`, chain flag setters, `set-chain-length`, `invert-frame-order`, `justify-offsets-bottom` and the chain part of frame addresses take globs (`Walk*`); shape and event addresses take the same (`Walk/*/rect/Hitbox`, `*/*/event/*`) and skip frames without the shape or event. A selector matching nothing, or any index past a chain end, is an error, and one failing target fails the whole batch. `--schema` has the full rules.
 
+**Relative values.** Setter number fields marked relative in `--schema` (offset, length, color, shape position and size, block start, length and end) take Inspector edits, each target from its own value: `y=+2`, `y="- 2"`, `y=*2`, `y=/2`; in JSON, a string (`"+2"`). `y=-2` is absolute, so write `"- 2"` to subtract. Other number fields refuse relative text (exit 2). `set-frame-color` on an unset channel starts from the inherited value; a block with auto length from its shown length, which becomes set.
+
 **Copy elsewhere.** `duplicate-frame` takes `to` (chain) and `index`; `duplicate-shape` and `duplicate-frame-event` take `to` (a frame selector: `duplicate-shape Walk/0/rect/Hitbox to=Walk/1-7`). A shape name already in a target frame, the source frame included, fails the batch. To move, duplicate then delete in one batch. `import-chain <chain or glob> from=<file>` appends chains of another `.achx`/`.achj`, textures referenced in place and lengths converted; taken names fail the batch, and `name` renames a single copy. Check errors the chains have in their source (a missing texture) fail the batch; fix the source, or set the texture in the same batch.
 
 ## Landmines

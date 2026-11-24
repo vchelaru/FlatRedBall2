@@ -151,7 +151,7 @@ public static class PropertyEdit
             return Fail(EditErrorCode.UnsupportedFile, "A region needs the texture's size, which is only read from PNG files.");
 
         var (w, h) = size.Value;
-        if (region.X < 0 || region.Y < 0 || region.Width <= 0 || region.Height <= 0 || region.X + region.Width > w || region.Y + region.Height > h)
+        if (region.X < 0 || region.Y < 0 || region.Width <= 0 || region.Height <= 0 || region.X > w - region.Width || region.Y > h - region.Height)
             return Fail(EditErrorCode.InvalidValue,
                 $"The region {region.X},{region.Y},{region.Width},{region.Height} is not inside the {w}x{h} texture.");
 
@@ -166,8 +166,8 @@ public static class PropertyEdit
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
         if (x is null && y is null) return Fail(EditErrorCode.InvalidValue, "An offset needs x, y or both.");
-        if ((x is { } nx && !float.IsFinite(nx)) || (y is { } ny && !float.IsFinite(ny)))
-            return Fail(EditErrorCode.InvalidValue, "An offset must be a finite number.");
+        if ((x is { } nx && !NumberFields.InRange(nx)) || (y is { } ny && !NumberFields.InRange(ny)))
+            return Fail(EditErrorCode.InvalidValue, $"An offset is out of range: valid values are {NumberFields.RangeText}.");
 
         var before = (frame.RelativeX, frame.RelativeY);
         commands.SetFrameRelative([frame], Edit(x), Edit(y));

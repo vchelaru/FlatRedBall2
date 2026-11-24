@@ -20,7 +20,7 @@ public static class InlineOps
     public const string Syntax =
         "Inline form (edit <file> --op \"<op-name> <primary> key=value ...\", repeatable, applied in order; edit <file> --ops - reads the ops file JSON from stdin): "
         + "the primary address is the op's first required field (its first field when none is required), written without its name (key=value also works). "
-        + "Values: numbers (-3, 0.5), true/false, text (quote it when it has spaces: name=\"Walk Cycle\" or 'Walk Cycle'), "
+        + "Values: numbers (-3, 0.5; relative ones such as +2 where the field is marked relative), true/false, text (quote it when it has spaces: name=\"Walk Cycle\" or 'Walk Cycle'), "
         + "and for points a JSON array (points=[[0,0],[8,0],[8,8]]). A text value is always taken literally. Each op shows its form below as 'inline:'.";
 
     /// <summary>The expected inline form of an op, e.g. <c>set-frame-offset &lt;frame&gt; [x=&lt;number&gt;] [y=&lt;number&gt;]</c>.</summary>
@@ -120,13 +120,14 @@ public static class InlineOps
         switch (field.Type)
         {
             case "integer" or "number":
-                return (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && double.IsFinite(d)
+                // A leading + makes the text relative (#1942), so it stays text for the shared parser.
+                return (!text.TrimStart().StartsWith('+') && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && double.IsFinite(d)
                     ? JsonValue.Create(d) : JsonValue.Create(text), null);
             case "boolean":
                 return (text is "true" or "false" ? JsonValue.Create(text == "true") : JsonValue.Create(text), null);
             case "points":
                 try { return (JsonNode.Parse(text), null); }
-                catch (JsonException ex) { return (null, $"field '{field.Name}' is not valid JSON ({ex.Message.Split('.')[0]})."); }
+                catch (JsonException ex) { return (null, $"field '{field.Name}' is not valid JSON ({ex.Message.Split('.')[0]}); its numbers are absolute."); }
             default:
                 return (JsonValue.Create(text), null);
         }
