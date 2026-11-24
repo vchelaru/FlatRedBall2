@@ -44,7 +44,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 
 - Ops apply in order, so after `rename-chain` later ops must use the new name.
 - `edit` writes nothing unless every op succeeds and no new `check` error appears. A batch that changes nothing leaves the file byte-identical.
-- A file that already has check errors can still be edited, with one exception: a `.achx` with a missing texture cannot be saved in pixel coordinates (the editor's save path needs the texture size), so every edit of it fails. Fix the texture path first.
+- A file that already has check errors can still be edited, including one with a missing texture: regions are pixels, so `set-frame-texture` to a PNG of any size keeps them.
 - A file in legacy UV coordinates is refused. Open and save it in the editor once.
 - `set-frame-texture` takes a path relative to the animation file or absolute. Outside the file's folder it references the texture in place unless `copy` is `copy` or `overwrite`. The image check reads the file header only, so a truncated PNG passes.
 - `add-shape` takes `frame`, `type` and an optional `name` (default unique per frame; unique across all three types). Defaults match the editor's Add buttons, centred on the frame offset. Not yet available: moving a shape to another frame, shape color.
