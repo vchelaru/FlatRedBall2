@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Keyframes;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 
@@ -9,7 +10,8 @@ namespace AnimationEditor.Editing;
 
 /// <param name="Type">JSON type of the value: "string", "integer" or "number".</param>
 /// <param name="Values">The allowed values when the field is an enumeration.</param>
-public sealed record OpField(string Name, string Type, bool Required, string Description, IReadOnlyList<string>? Values = null);
+/// <param name="Relative">True when a number field also takes a <see cref="NumericEdit"/> text relative to the target's current value (<c>+2</c>).</param>
+public sealed record OpField(string Name, string Type, bool Required, string Description, IReadOnlyList<string>? Values = null, bool Relative = false);
 
 public sealed record OpSpec(string Name, string Description, IReadOnlyList<OpField> Fields);
 
@@ -60,6 +62,12 @@ public static class EditOps
         + "A selector expands when its op starts, in chain order then in the order written; delete-frame, duplicate-frame and delete-frame-event run from the highest index down so every index means the state before the op. "
         + "A selector that matches nothing is an error (NoMatch), as is any index past a chain's end. Any failing target fails the whole batch and nothing is written. "
         + "Shape and event selectors skip frames that lack the shape or event. A chain whose name really contains * or ? cannot be addressed by glob.";
+
+    /// <summary>How <c>--schema</c> explains relative values; shared by the text and JSON output.</summary>
+    public const string RelativeSyntax =
+        "Relative values: a field marked relative also takes a value starting with an operator, as the Inspector does: +2, \"- 2\" (a space after the minus; -2 is absolute), *2, /2. "
+        + "Each target changes from its own value, read before the op changes any target, and the result must be in the field's range or the batch fails. "
+        + "In JSON a number is absolute and a string is a relative value or arithmetic (\"3+4\"). Every other number is absolute. Numbers past 1000000 either way are refused.";
 
     /// <summary>How <c>--schema</c> explains Tiled .tsx files; shared by the text and JSON output.</summary>
     public static string TsxNote =>
@@ -165,7 +173,7 @@ public static class EditOps
         new("set-chain-length", "Rescales a chain's frame lengths so they add up to length, in the file's own time unit. That is one forward pass: describe shows the played cycle in seconds, twice as long for a ping-pong chain. Every resulting frame length must be in set-frame-length's range, and proportional needs a total above 0. Fails on a locked chain or one with no frames. A .tsx stores whole milliseconds, so its frames are rounded on save.",
         [
             new("chain", "string", true, "Chain name, or a glob (Walk*)."),
-            new("length", "number", true, "Sum of the frame lengths in the file's time unit."),
+            new("length", "number", true, "Sum of the frame lengths in the file's time unit.", Relative: true),
             new("mode", "string", false, "proportional (default) keeps the ratios between frames; even gives every frame length / frame count.", ChainLengthModeValues),
         ]),
         new("invert-frame-order", "Reverses the order of a chain's frames (set-chain-reverse keeps the order and plays it backward). Fails on a locked chain.",
@@ -179,7 +187,7 @@ public static class EditOps
         new("set-frame-length", "Sets one frame's length in the file's own time unit (see describe). Valid range: 0.001 to 60 seconds, or 1 to 60000 milliseconds.",
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
-            new("length", "number", true, "New length in the file's time unit."),
+            new("length", "number", true, "New length in the file's time unit.", Relative: true),
         ]),
         new("set-frame-region", "Sets the pixel rectangle of the texture a frame shows. The frame's texture must be an existing PNG and the rectangle must lie inside it.",
         [
@@ -189,16 +197,16 @@ public static class EditOps
         new("set-frame-offset", "Sets a frame's relative offset. Give x, y or both; an omitted axis is left as it is.",
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
-            new("x", "number", false, "Relative X."),
-            new("y", "number", false, "Relative Y."),
+            new("x", "number", false, "X offset.", Relative: true),
+            new("y", "number", false, "Y offset.", Relative: true),
         ]),
-        new("set-frame-color", "Sets a frame's color channels and operation. Give at least one; omitted ones are left as they are. A channel cannot be cleared back to inherited.",
+        new("set-frame-color", "Sets a frame's color channels and operation. Give at least one; omitted ones are left as they are. A channel cannot be cleared back to inherited. A relative value on an unset channel starts from the value it inherits (255 when no earlier frame sets it, or 0 for red, green and blue in add).",
         [
             new("frame", "string", true, "Frame address: Chain/frameIndex."),
-            new("red", "integer", false, "Red, -255 to 255."),
-            new("green", "integer", false, "Green, -255 to 255."),
-            new("blue", "integer", false, "Blue, -255 to 255."),
-            new("alpha", "integer", false, "Alpha, 0 to 255."),
+            new("red", "integer", false, "Red, -255 to 255.", Relative: true),
+            new("green", "integer", false, "Green, -255 to 255.", Relative: true),
+            new("blue", "integer", false, "Blue, -255 to 255.", Relative: true),
+            new("alpha", "integer", false, "Alpha, 0 to 255.", Relative: true),
             new("operation", "string", false, "How red, green and blue combine with the texture.", ColorOperationValues),
         ]),
         new("set-frame-flip", "Sets a frame's flip flags to the given values (not a toggle). Give at least one; omitted ones are left as they are. A change also mirrors the frame's offset and shapes, as in the editor.",
@@ -226,10 +234,10 @@ public static class EditOps
         new("set-rect", "Sets a rect's center and half-extents. Give at least one; omitted ones are left as they are.",
         [
             new("shape", "string", true, ShapeAddressDescription),
-            new("x", "number", false, "Center X."),
-            new("y", "number", false, "Center Y."),
-            new("scaleX", "number", false, "Half-width, greater than 0."),
-            new("scaleY", "number", false, "Half-height, greater than 0."),
+            new("x", "number", false, "Center X.", Relative: true),
+            new("y", "number", false, "Center Y.", Relative: true),
+            new("scaleX", "number", false, "Half-width, greater than 0.", Relative: true),
+            new("scaleY", "number", false, "Half-height, greater than 0.", Relative: true),
         ]),
         new("match-frame-size", "Centers a rect on its frame's offset and sizes it to the frame's region. Fails when the region size is unknown (whole texture, size not readable).",
         [
@@ -238,22 +246,22 @@ public static class EditOps
         new("set-circle", "Sets a circle's center and radius. Give at least one; omitted ones are left as they are.",
         [
             new("shape", "string", true, ShapeAddressDescription),
-            new("x", "number", false, "Center X."),
-            new("y", "number", false, "Center Y."),
-            new("radius", "number", false, "Radius, greater than 0."),
+            new("x", "number", false, "Center X.", Relative: true),
+            new("y", "number", false, "Center Y.", Relative: true),
+            new("radius", "number", false, "Radius, greater than 0.", Relative: true),
         ]),
         new("set-polygon", "Sets a polygon's origin and/or replaces its points. Give at least one; omitted ones are left as they are. The editor's closed outlines repeat the first point at the end; points are stored exactly as given.",
         [
             new("shape", "string", true, ShapeAddressDescription),
-            new("x", "number", false, "Origin X."),
-            new("y", "number", false, "Origin Y."),
+            new("x", "number", false, "Origin X.", Relative: true),
+            new("y", "number", false, "Origin Y.", Relative: true),
             new("points", "points", false, "At least 3 points relative to the origin, Y+ up, as [[x,y],[x,y],...]."),
         ]),
         new("set-shape-common", "Sets the position every shape type has (rect and circle center, polygon origin). Give at least one; omitted ones are left as they are.",
         [
             new("shape", "string", true, ShapeAddressDescription),
-            new("x", "number", false, "X."),
-            new("y", "number", false, "Y."),
+            new("x", "number", false, "X.", Relative: true),
+            new("y", "number", false, "Y.", Relative: true),
         ]),
         new("add-frame-event", "Appends a named event to a frame. Data is an optional free-form string the game interprets.",
         [
@@ -386,7 +394,7 @@ public static class EditOps
             if (field is null) return (null, At($"'{name}' has no field '{property.Name}'." + NameHints.For(property.Name, spec.Fields.Select(f => f.Name), "fields")));
             var typed = ReadValue(field, property.Value);
             if (typed is null)
-                return (null, At($"field '{field.Name}' of '{name}' must be {FieldTypeText(field.Type)}."));
+                return (null, At($"field '{field.Name}' of '{name}' must be {FieldTypeText(field, property.Value)}."));
             var value = typed;
             if (field.Values is not null && !field.Values.Contains(value))
                 return (null, At($"field '{field.Name}' of '{name}' must be one of {string.Join("|", field.Values)}, not '{value}'."));
@@ -404,6 +412,8 @@ public static class EditOps
     {
         switch (field.Type)
         {
+            case "integer" or "number" when value.ValueKind == JsonValueKind.String:
+                return field.Relative ? ReadNumberText(field, value.GetString()!) : null;
             case "integer":
                 return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var i)
                     ? i.ToString(CultureInfo.InvariantCulture) : null;
@@ -418,6 +428,16 @@ public static class EditOps
             default:
                 return value.ValueKind == JsonValueKind.String ? value.GetString() : null;
         }
+    }
+
+    /// <summary>A relative value as typed, or an absolute one evaluated; null when <paramref name="text"/> is neither.</summary>
+    private static string? ReadNumberText(OpField field, string text)
+    {
+        if (!NumericEdit.TryParse(text, out var edit)) return null;
+        if (edit.IsRelative) return text;
+        var value = edit.Apply(0m);
+        if (field.Type == "integer" && (value != decimal.Truncate(value) || value is < int.MinValue or > int.MaxValue)) return null;
+        return value.ToString(field.Type == "integer" ? "0" : null, CultureInfo.InvariantCulture);
     }
 
     /// <summary>A JSON array of [x, y] number pairs as "x,y;x,y;..." (invariant culture), or null when it is not one.</summary>
@@ -439,12 +459,18 @@ public static class EditOps
         return string.Join(";", parts);
     }
 
-    private static string FieldTypeText(string type) => type switch
+    private static string FieldTypeText(OpField field, JsonElement value)
     {
-        "integer" => "an integer",
-        "points" => "a list of [x, y] number pairs, as [[x,y],[x,y],...]",
-        _ => $"a {type}",
-    };
+        var relative = value.ValueKind == JsonValueKind.String && NumericEdit.TryParse(value.GetString(), out var edit) && edit.IsRelative;
+        var a = field.Type == "integer" ? "an" : "a";
+        return field.Type switch
+        {
+            "integer" or "number" when field.Relative => $"{a} {field.Type}, or a relative value such as +2",
+            "integer" or "number" when relative => $"an absolute {field.Type}; '{value.GetString()}' is relative",
+            "points" => "a list of absolute [x, y] number pairs, as [[x,y],[x,y],...]",
+            _ => $"{a} {field.Type}",
+        };
+    }
 
     /// <summary>The nearest op name, or the whole list when nothing is close.</summary>
     private static string OpHint(string name, IReadOnlyList<OpSpec> specs)
@@ -500,17 +526,22 @@ public static class EditOps
                     new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {expansion.Error}"], warnings, [expansion.Code]),
                     [op.Index]);
 
+            EditRunResult TargetFailed(EditResult result, string? target) =>
+                FailedOp(warnings, op, target is null ? "" : $"target {target}: ", result);
+
+            // Every target first: changing one can change what a later one inherits.
+            var targets = new List<ExpandedOp>();
             foreach (var target in expansion.Ops)
             {
+                var resolved = NumberFields.ResolveRelative(target.Op, field => CurrentValue(session.Document, target.Op, field));
+                if (resolved.Error is not null) return TargetFailed(resolved.Error, target.Target);
+                targets.Add(target with { Op = resolved.Op });
+            }
+
+            foreach (var target in targets)
+            {
                 var result = await ApplyOneAsync(session, target.Op);
-                if (!result.Success)
-                {
-                    var where = target.Target is null ? "" : $"target {target.Target}: ";
-                    var errors = result.Errors.Select(e => $"op {op.Index} ({op.Spec.Name}): {where}{e}").ToList();
-                    return new EditRunResult(
-                        new EditResult([], errors, warnings, result.ErrorCodes),
-                        errors.Select(_ => (int?)op.Index).ToList());
-                }
+                if (!result.Success) return TargetFailed(result, target.Target);
                 changed.AddRange(result.ChangedItems);
             }
         }
@@ -550,6 +581,55 @@ public static class EditOps
             warnings.AddRange(BrokenSequenceBlocks.Warnings(session.Document, session.Path, chainsBefore));
         var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path)).Distinct().ToList();
         return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
+    }
+
+    /// <summary>The run's result when an op failed: each error prefixed with the op and <paramref name="where"/>.</summary>
+    internal static EditRunResult FailedOp(List<string> warnings, EditOp op, string where, EditResult result)
+    {
+        var errors = result.Errors.Select(e => $"op {op.Index} ({op.Spec.Name}): {where}{e}").ToList();
+        return new EditRunResult(new EditResult([], errors, warnings, result.ErrorCodes), errors.Select(_ => (int?)op.Index).ToList());
+    }
+
+    /// <summary>What a relative value of <paramref name="field"/> starts from, or why the op's target cannot be resolved.</summary>
+    private static (decimal Value, EditResult? Error) CurrentValue(AnimationChainListSave doc, EditOp op, OpField field)
+    {
+        decimal value = 0;
+        EditResult Take(float current)
+        {
+            value = (decimal)current;
+            return new EditResult([], [], []);
+        }
+
+        EditResult Color(AnimationChainSave chain, AnimationFrameSave frame)
+        {
+            var inherited = EffectiveFrameColor.Resolve(chain.Frames, chain.Frames.IndexOf(frame));
+            int unset = EffectiveFrameColor.ChannelDefault(inherited.Operation);
+            return field.Name switch
+            {
+                "red" => Take(frame.Red ?? inherited.Red ?? unset),
+                "green" => Take(frame.Green ?? inherited.Green ?? unset),
+                "blue" => Take(frame.Blue ?? inherited.Blue ?? unset),
+                _ => Take(frame.Alpha ?? inherited.Alpha ?? 255),
+            };
+        }
+
+        var found = op.Spec.Name switch
+        {
+            "set-chain-length" => WithChain(doc, op, chain => Take(chain.Frames.Sum(f => f.FrameLength))),
+            "set-frame-length" => WithFrame(doc, op, (_, frame) => Take(frame.FrameLength)),
+            "set-frame-offset" => WithFrame(doc, op, (_, frame) => Take(field.Name == "x" ? frame.RelativeX : frame.RelativeY)),
+            "set-frame-color" => WithFrame(doc, op, Color),
+            _ => field.Name switch
+            {
+                "x" => WithShape<ShapeSave>(doc, op, "shape", shape => Take(shape.X)),
+                "y" => WithShape<ShapeSave>(doc, op, "shape", shape => Take(shape.Y)),
+                "scaleX" => WithShape<AARectSave>(doc, op, "rect", rect => Take(rect.ScaleX)),
+                "scaleY" => WithShape<AARectSave>(doc, op, "rect", rect => Take(rect.ScaleY)),
+                "radius" => WithShape<CircleSave>(doc, op, "circle", circle => Take(circle.Radius)),
+                _ => throw new InvalidOperationException($"No current value for '{field.Name}' of '{op.Spec.Name}'."),
+            },
+        };
+        return (value, found.Success ? null : found);
     }
 
     private static Task<EditResult> ApplyOneAsync(EditSession session, EditOp op)
@@ -806,8 +886,8 @@ public static class EditOps
     private static (FramePixelRegion? Region, string? Error) ParseRegion(string text)
     {
         var parts = text.Split(',');
-        if (parts.Length != 4 || !parts.All(p => int.TryParse(p.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
-            return (null, $"The region '{text}' must be four whole pixel numbers: x,y,width,height.");
+        if (parts.Length != 4 || !parts.All(p => int.TryParse(p.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _) && !p.Trim().StartsWith('+')))
+            return (null, $"The region '{text}' must be four whole pixel numbers: x,y,width,height, all absolute.");
         var n = parts.Select(p => int.Parse(p.Trim(), CultureInfo.InvariantCulture)).ToArray();
         return (new FramePixelRegion(n[0], n[1], n[2], n[3]), null);
     }
