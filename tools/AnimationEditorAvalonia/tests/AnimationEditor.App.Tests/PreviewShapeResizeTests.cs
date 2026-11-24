@@ -34,6 +34,67 @@ public class PreviewShapeResizeTests
         return frame;
     }
 
+    // ── Pixel snapping ────────────────────────────────────────────────────────
+
+    [AvaloniaFact]
+    public void ResizeCircle_SubPixelDelta_SnapsRadiusToPixelAndKeepsCenter()
+    {
+        var ctx    = TestHelpers.BuildServices();
+        var circle = new CircleSave { X = 3f, Y = 4f, Radius = 10f };
+        ctx.SelectedState.SelectedFrame  = MakeFrame(circle: circle);
+        ctx.SelectedState.SelectedCircle = circle;
+
+        ctx.CreatePreviewControl().SimulateShapeResizeDrag(HandleKind.MidRight, 5.6f, 0f);
+
+        Assert.Equal(16f, circle.Radius, precision: 3);
+        Assert.Equal(3f,  circle.X, precision: 3);
+        Assert.Equal(4f,  circle.Y, precision: 3);
+    }
+
+    [AvaloniaFact]
+    public void ResizeCircle_ShrinkPastZero_ClampsToOnePixel()
+    {
+        var ctx    = TestHelpers.BuildServices();
+        var circle = new CircleSave { X = 0f, Y = 0f, Radius = 10f };
+        ctx.SelectedState.SelectedFrame  = MakeFrame(circle: circle);
+        ctx.SelectedState.SelectedCircle = circle;
+
+        ctx.CreatePreviewControl().SimulateShapeResizeDrag(HandleKind.MidRight, -50f, 0f);
+
+        Assert.Equal(1f, circle.Radius, precision: 3);
+    }
+
+    [AvaloniaFact]
+    public void ResizeRect_MidRight_SnapsMovedEdgeAndKeepsOppositeEdge()
+    {
+        var ctx   = TestHelpers.BuildServices();
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f }; // left -10, right 10
+        ctx.SelectedState.SelectedFrame     = MakeFrame(rect: rect);
+        ctx.SelectedState.SelectedRectangle = rect;
+
+        ctx.CreatePreviewControl().SimulateShapeResizeDrag(HandleKind.MidRight, 5.6f, 0f); // right 15.6 -> 16
+
+        Assert.Equal(-10f, rect.X - rect.ScaleX, precision: 3);
+        Assert.Equal(16f,  rect.X + rect.ScaleX, precision: 3);
+        Assert.Equal(10f,  rect.ScaleY, precision: 3);
+    }
+
+    [AvaloniaFact]
+    public void ResizeRect_TopLeft_SnapsBothMovedEdges()
+    {
+        var ctx   = TestHelpers.BuildServices();
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
+        ctx.SelectedState.SelectedFrame     = MakeFrame(rect: rect);
+        ctx.SelectedState.SelectedRectangle = rect;
+
+        ctx.CreatePreviewControl().SimulateShapeResizeDrag(HandleKind.TopLeft, -2.4f, 3.6f); // left -12.4 -> -12, top 13.6 -> 14
+
+        Assert.Equal(-12f, rect.X - rect.ScaleX, precision: 3);
+        Assert.Equal(10f,  rect.X + rect.ScaleX, precision: 3);
+        Assert.Equal(14f,  rect.Y + rect.ScaleY, precision: 3);
+        Assert.Equal(-10f, rect.Y - rect.ScaleY, precision: 3);
+    }
+
     // ── Rect resize ───────────────────────────────────────────────────────────
 
     /// <summary>

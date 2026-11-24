@@ -1384,6 +1384,31 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     }
 
     /// <summary>
+    /// Test-only: drags <paramref name="handle"/> of the selected shape by a world-space delta through
+    /// the same resize path as a live drag (snapping included), then commits.
+    /// </summary>
+    internal void SimulateShapeResizeDrag(HandleKind handle, float worldDx, float worldDy)
+    {
+        var shape = _selectedState!.SelectedShape;
+        if (shape is null || IsShapeLocked(shape)) return;
+        _draggingShape = shape;
+        _shapeResizeHandle = handle;
+
+        if (shape is AARectSave r)
+        {
+            _shapeDragStartX = r.X; _shapeDragStartY = r.Y;
+            _shapeDragStartScaleX = r.ScaleX; _shapeDragStartScaleY = r.ScaleY;
+        }
+        else if (shape is CircleSave c)
+        {
+            _shapeDragStartX = c.X; _shapeDragStartY = c.Y;
+            _shapeDragStartScaleX = c.Radius; _shapeDragStartScaleY = 0f;
+        }
+        ApplyShapeResizeWorld(worldDx, worldDy);
+        CommitShapeResize();
+    }
+
+    /// <summary>
     /// Test-only: applies a world-space drag delta to the currently selected frame's
     /// <see cref="AnimationFrameSave.RelativeX"/>/<see cref="AnimationFrameSave.RelativeY"/> and
     /// commits. Bypasses coordinate conversion, so results are independent of zoom/pan/
@@ -2575,7 +2600,16 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         float om = _appState!.OffsetMultiplier * _zoom;
         float worldDX = ((float)(pos.X - _shapeDragAnchor.X)) / om;
         float worldDY = -((float)(pos.Y - _shapeDragAnchor.Y)) / om; // Y flip: screen↓ = world↓
+        ApplyShapeResizeWorld(worldDX, worldDY);
+    }
 
+    /// <summary>
+    /// Resizes <see cref="_draggingShape"/> by a world-space delta from the drag start. Circles keep
+    /// their center; rectangles keep the edge opposite the grabbed handle. Moved edges and radii
+    /// snap to whole pixels, matching position drags.
+    /// </summary>
+    private void ApplyShapeResizeWorld(float worldDX, float worldDY)
+    {
         if (_draggingShape is CircleSave circle)
         {
             // Use signed delta projected onto the handle's outward direction.
@@ -2591,7 +2625,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 HandleKind.BotLeft    => (-worldDX - worldDY) / 2f,
                 _ => 0f,
             };
-            circle.Radius = MathF.Max(0.5f, _shapeDragStartScaleX + delta);
+            circle.Radius = MathF.Max(1f, SnapToPixel(_shapeDragStartScaleX + delta));
         }
         else if (_draggingShape is AARectSave r)
         {
@@ -2614,6 +2648,16 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 case HandleKind.BotRight:   newRight  = startRight  + worldDX; newBottom = startBottom + worldDY; break;
                 case HandleKind.BotLeft:    newLeft   = startLeft   + worldDX; newBottom = startBottom + worldDY; break;
             }
+
+            // Snap only the edges this handle moves; the opposite edge stays where it was.
+            bool movesLeft   = _shapeResizeHandle is HandleKind.MidLeft  or HandleKind.TopLeft  or HandleKind.BotLeft;
+            bool movesRight  = _shapeResizeHandle is HandleKind.MidRight or HandleKind.TopRight or HandleKind.BotRight;
+            bool movesTop    = _shapeResizeHandle is HandleKind.TopCenter or HandleKind.TopRight or HandleKind.TopLeft;
+            bool movesBottom = _shapeResizeHandle is HandleKind.BotCenter or HandleKind.BotRight or HandleKind.BotLeft;
+            if (movesLeft)   newLeft   = SnapToPixel(newLeft);
+            if (movesRight)  newRight  = SnapToPixel(newRight);
+            if (movesTop)    newTop    = SnapToPixel(newTop);
+            if (movesBottom) newBottom = SnapToPixel(newBottom);
 
             const float minSize = 1f; // minimum 1 world unit on each axis
             if (newRight - newLeft < minSize)
