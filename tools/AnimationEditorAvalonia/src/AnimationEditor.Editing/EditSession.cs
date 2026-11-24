@@ -98,7 +98,7 @@ public sealed class EditSession
         var warnings = new List<string>();
         var changed = new List<string> { Path };
         void OnFailed(string message) => errors.Add(message);
-        void OnTsxWarnings(IReadOnlyList<string> notes) => warnings.AddRange(notes);
+        void OnTsxWarnings(string tsx, IReadOnlyList<string> notes) => warnings.AddRange(notes);
         void OnSynced(string tsx, int count) => changed.Add(tsx);
         void OnSyncFailed(string target, Exception ex) =>
             // The target is this file when its .tiledsync cannot be read, so no tileset is known.

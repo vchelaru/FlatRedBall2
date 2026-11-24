@@ -2,6 +2,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -234,6 +235,29 @@ public class CutPasteTests
 
         Assert.True(removed);
         Assert.DoesNotContain(frame, chain.Frames);
+    }
+
+    // As in a same-document cut: a locked chain keeps its contents, but the chain itself can go.
+    [Theory]
+    [InlineData(CopySelectionKind.Chain, true)]
+    [InlineData(CopySelectionKind.Frame, false)]
+    [InlineData(CopySelectionKind.Shape, false)]
+    public void RemoveSourcesFrom_LockedChain_KeepsItsFramesAndShapes(CopySelectionKind kind, bool expectedRemoved)
+    {
+        var cut = new PendingCutState();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var shape = new CircleSave { Name = "Hit" };
+        frame.ShapesSave = new ShapesSave();
+        frame.ShapesSave.Add(shape);
+        chain.IsLocked = true;
+        cut.Set(new CopySelectionPayload { Kind = kind, Chains = [chain], Frames = [frame], Shapes = [shape] }, ctx.Acls);
+
+        cut.RemoveSourcesFrom(ctx.Acls).ShouldBe(expectedRemoved);
+
+        chain.Frames.ShouldBe([frame]);
+        frame.ShapesSave.Shapes.ShouldBe([shape]);
     }
 
     [Fact]

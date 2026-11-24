@@ -65,7 +65,7 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
         _path = Path.Combine(_dir.Path, "Heroes.tsx");
         File.WriteAllText(_path, TsxFixtureXml);
         _ctx.ProjectManager.LoadTsxProject(new FilePath(_path));
-        _ctx.AppCommands.TsxSaveCompletedWithWarnings += w => _warnings.Add(w);
+        _ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, w) => _warnings.Add(w);
         return _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single(c => c.Name == chainName);
     }
 

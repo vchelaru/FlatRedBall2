@@ -225,6 +225,7 @@ public class TsxCommandTests : IDisposable
     [InlineData("""{"op":"set-frame-offset","frame":"Walk/0","x":1}""")]
     [InlineData("""{"op":"set-frame-color","frame":"Walk/0","red":10}""")]
     [InlineData("""{"op":"add-shape","frame":"Walk/0","type":"rect"}""")]
+    [InlineData("""{"op":"duplicate-shape","shape":"Walk/0/rect/Hitbox","to":"Walk/*"}""")]
     [InlineData("""{"op":"add-frame-event","frame":"Walk/0","name":"Hit"}""")]
     [InlineData("""{"op":"set-frame-keyframe","frame":"Walk/1","group":"offset","value":false}""")]
     [InlineData("""{"op":"set-frame-texture","frame":"Walk/0","texture":"other.png"}""")]

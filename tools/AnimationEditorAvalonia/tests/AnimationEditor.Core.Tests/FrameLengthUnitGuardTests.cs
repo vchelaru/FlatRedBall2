@@ -27,6 +27,7 @@ public class FrameLengthUnitGuardTests
         "Core/Tiled/AchjToTiledAnimationMapper.cs",
         "Core/Tiled/MultiTileToTiledAnimationMapper.cs",
         "Core/Tiled/TiledAnimationToAchjMapper.cs",
+        "Core/Tiled/TsxLossyDataCheck.cs", // rounds via FrameLengthUnit with the list's unit
         "Core/ViewModels/TimelineStripSignature.cs",
         "Core/CommandsAndState/PlaybackController.cs",
         "App/MainWindow.axaml.cs",

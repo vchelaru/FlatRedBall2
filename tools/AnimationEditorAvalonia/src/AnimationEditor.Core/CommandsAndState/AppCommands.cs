@@ -265,7 +265,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
         /// <inheritdoc cref="IAppCommands.TsxSaveCompletedWithWarnings"/>
-        public event Action<IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
+        public event Action<string, IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
 
         /// <inheritdoc cref="IAppCommands.SaveFailed"/>
         public event Action<string>? SaveFailed;
@@ -646,7 +646,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     });
                     _diskState = ReadDiskState(target);
                     if (tsxWarnings is { Count: > 0 })
-                        TsxSaveCompletedWithWarnings?.Invoke(tsxWarnings);
+                        TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
                     _undoManager.MarkSaved();
                     EditorProjectModelChanged?.Invoke(target);
                 }
@@ -688,15 +688,20 @@ namespace AnimationEditor.Core.CommandsAndState
             }
             catch (Exception ex)
             {
-                SaveFailed?.Invoke(ex.Message);
+                SaveFailed?.Invoke($"\"{tab.Path.NoPath}\": {ex.Message}");
                 return false;
             }
             tab.CachedDiskState = ReadDiskState(path);
             tab.SaveFailed = false;
             if (tsxWarnings.Count > 0)
-                TsxSaveCompletedWithWarnings?.Invoke(tsxWarnings);
+                TsxSaveCompletedWithWarnings?.Invoke(path, tsxWarnings);
             return true;
         }
+
+        /// <inheritdoc cref="IAppCommands.LastSaveStored"/>
+        public bool LastSaveStored(IEnumerable<AnimationChainSave> chains) =>
+            _undoManager.SaveState != SaveState.Failed
+            && !(_pm.IsNativeTsxProject && chains.Any(_pm.TsxChainsNotFullySaved.Contains));
 
         /// <summary>SaveTsxProject writes the current document, so the tab's document stands in for it meanwhile.</summary>
         private IReadOnlyList<string> SaveTsxDocument(TabEntry tab, string path)
@@ -2828,7 +2833,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.PasteShapes(IReadOnlyList{AnimationFrameSave}, IReadOnlyList{object})"/>
         public void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<object> shapes)
         {
-            if (frames.Count == 0) return;
+            if (frames.Count == 0 || IsAchxOnlyEditBlocked()) return;
             if (frames.Count == 1)
             {
                 PasteShapes(frames[0], shapes);
