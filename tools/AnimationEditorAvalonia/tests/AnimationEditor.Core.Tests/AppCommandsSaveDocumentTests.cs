@@ -1,4 +1,6 @@
 using AnimationEditor.Core;
+using AnimationEditor.Core.Models;
+using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -22,7 +24,11 @@ public class AppCommandsSaveDocumentTests
         Directory.CreateDirectory(dir);
         string path = Path.Combine(dir, "other.achx");
 
-        ctx.AppCommands.SaveDocument(other, path, TextureCoordinateType.UV);
+        ctx.AppCommands.SaveDocument(new TabEntry(new FilePath(path))
+        {
+            CachedEditorModel = other,
+            CachedOnDiskCoordinateType = TextureCoordinateType.UV,
+        });
 
         AnimationChainListSave.FromFile(path).AnimationChains.Single().Name.ShouldBe("Other");
         ctx.Acls.AnimationChains.Single().Name.ShouldBe("Current");

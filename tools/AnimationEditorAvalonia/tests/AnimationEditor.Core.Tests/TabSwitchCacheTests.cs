@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Models;
@@ -179,6 +180,175 @@ public class TabSwitchCacheTests : IDisposable
         _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
         _pm.AnimationChainListSave!.AnimationChains[0].Name.ShouldBe("Renamed");
         tab.SaveFailed.ShouldBeTrue();
+    }
+
+    // The watcher reports an edit 200 ms late, so the tab can be left before the editor has seen it.
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenEditedBeforeLeavingAndNotYetReloaded_ReturnsFalse()
+    {
+        string path = WriteAchx("edited.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+
+        WriteAchx("edited.achx", "Behind");
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task TryActivateTabFromCache_AfterAnOwnSave_IsFreshUnlessEditedSince(bool editedSince, bool expected)
+    {
+        var ctx = new TestServices(); // CountingProjectManager never writes.
+        string path = WriteAchx("saved.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+
+        if (editedSince) WriteAchx("saved.achx", "Outside");
+        ctx.AppCommands.CaptureTabEditorState(tab);
+
+        ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TryActivateTabFromCache_AfterAHotReload_IsFresh(bool reloads)
+    {
+        string path = WriteAchx("reloaded.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        if (reloads) WriteAchx("reloaded.achx", "After");
+        else File.WriteAllText(path, "<AnimationChainArrayS");
+        _ctx.AppCommands.ReloadAchxFromDisk(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+        _pm.AnimationChainListSave!.AnimationChains[0].Name.ShouldBe(reloads ? "After" : "Before");
+    }
+
+    // A cross-document cut writes a background tab's own document.
+    [Fact]
+    public async Task TryActivateTabFromCache_AfterSaveDocumentWroteTheTabsFile_IsFresh()
+    {
+        var ctx = new TestServices(); // CountingProjectManager never writes.
+        string path = WriteAchx("cut.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        ctx.AppCommands.CaptureTabEditorState(tab);
+        tab.CachedEditorModel!.AnimationChains.Clear();
+
+        ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        AnimationChainListSave.FromFile(path).AnimationChains.ShouldBeEmpty();
+        ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+        ctx.ProjectManager.AnimationChainListSave.ShouldBeSameAs(tab.CachedEditorModel);
+    }
+
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenSaveFailedAndTheFileChanged_KeepsTheEditsAndPausesSaving()
+    {
+        var ctx = new TestServices(); // CountingProjectManager never writes.
+        string path = WriteAchx("failed.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        ctx.UndoManager.MarkSaveFailed();
+        ctx.AppCommands.CaptureTabEditorState(tab);
+        WriteAchx("failed.achx", "Outside");
+        var problems = new List<string>();
+        ctx.AppCommands.SaveFailed += problems.Add;
+
+        ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name.ShouldBe("Renamed");
+        problems.ShouldHaveSingleItem().ShouldContain("changed on disk");
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        problems.Count.ShouldBe(2);
+        ctx.UndoManager.SaveState.ShouldBe(SaveState.Failed);
+        // A cut out of this tab's document writes it too.
+        ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
+        AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Outside");
+
+        ctx.AppCommands.ReloadAchxFromDisk(path);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name.ShouldBe("Outside");
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        ctx.UndoManager.SaveState.ShouldBe(SaveState.AutoSaveOn);
+    }
+
+    [Fact]
+    public async Task TryActivateTabFromCache_WhenSaveFailedAndTheFileIsUnchanged_RaisesNothingAndSavesAgain()
+    {
+        var ctx = new TestServices(); // CountingProjectManager never writes.
+        string path = WriteAchx("failed.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        ctx.UndoManager.MarkSaveFailed();
+        ctx.AppCommands.CaptureTabEditorState(tab);
+        var problems = new List<string>();
+        ctx.AppCommands.SaveFailed += problems.Add;
+
+        ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+
+        problems.ShouldBeEmpty();
+        AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Renamed");
+    }
+
+    [Fact]
+    public async Task SaveDocument_WhenTheFileChanged_RefusesAndMarksTheTab()
+    {
+        var ctx = new TestServices();
+        string path = WriteAchx("cut.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        ctx.AppCommands.CaptureTabEditorState(tab);
+        WriteAchx("cut.achx", "Outside");
+
+        ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
+
+        AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Outside");
+        tab.SaveFailed.ShouldBeTrue();
+    }
+
+    // A failed Save As already moved the document to the new path; its retry is not an overwrite of an unseen edit.
+    [Fact]
+    public async Task SaveCurrentAnimationChainList_AfterASaveAsOverAnotherFileFailed_Retries()
+    {
+        var ctx = new TestServices();
+        string target = WriteAchx("target.achx", "Target");
+        await ctx.AppCommands.OpenAchxWorkflowAsync(WriteAchx("hero.achx", "Hero"));
+        ctx.UndoManager.MarkSaveFailed();
+        ctx.ProjectManager.FileName = target;
+
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+
+        AnimationChainListSave.FromFile(target).AnimationChains[0].Name.ShouldBe("Hero");
+    }
+
+    [Fact]
+    public async Task SaveCurrentAnimationChainList_WhenAKeptTabsFileIsPutBack_SavesAgain()
+    {
+        var ctx = new TestServices();
+        string path = WriteAchx("failed.achx", "Before");
+        byte[] before = File.ReadAllBytes(path);
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        ctx.UndoManager.MarkSaveFailed();
+        ctx.AppCommands.CaptureTabEditorState(tab);
+        WriteAchx("failed.achx", "Outside");
+        ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+        File.WriteAllBytes(path, before);
+
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+
+        AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Renamed");
     }
 
     private static FileStream Lock(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.None);

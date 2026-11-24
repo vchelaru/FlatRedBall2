@@ -145,7 +145,10 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Swaps the editor to <paramref name="tab"/>'s cached in-memory model when the cache
-        /// is fresh. Does not clear or restore undo — the app layer handles that.
+        /// is fresh: the file holds what the editor last read from or wrote to it. A tab whose last save
+        /// failed is kept even when the file changed; saving to that file is then refused (raising <see
+        /// cref="SaveFailed"/>, once here too) while the file differs, until it is reloaded. Does not clear or
+        /// restore undo; the app layer handles that.
         /// </summary>
         /// <returns><c>true</c> when the cache was applied; <c>false</c> when a disk load is needed.</returns>
         bool TryActivateTabFromCache(TabEntry tab);
@@ -182,14 +185,27 @@ namespace AnimationEditor.Core.CommandsAndState
         void RefreshWireframe();
         void RefreshTreeView();
         void SaveCurrentAnimationChainList(string? fileName = null);
-        Task SaveCurrentAnimationChainListAsync();
+
         /// <summary>
-        /// Writes a document other than the current one to its own file, in that file's disk
-        /// format: a cross-document cut removes chains from a background tab's model, and unless
-        /// that model reaches disk the chain comes back from the file on the next load or reload.
-        /// A failure is reported through <see cref="SaveFailed"/> and returns false.
+        /// Asks for a path and saves there (Save As, and the first save of an Untitled document). A path another tab
+        /// holds (<see cref="IsPathOpenInAnotherTab"/>) is refused through <see cref="SaveAsRefused"/> and nothing
+        /// is written, since that tab's document would be out of step with its file.
         /// </summary>
-        bool SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
+        Task SaveCurrentAnimationChainListAsync();
+
+        /// <summary>Whether a tab other than the active one holds this path. Null (no tabs) means none does.</summary>
+        Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
+
+        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> refuses the picked path.</summary>
+        event Action<string>? SaveAsRefused;
+
+        /// <summary>
+        /// Writes a background tab's cached document to its own file, in that file's disk format: a cross-document cut removes chains from a background tab's model, and unless
+        /// that model reaches disk the chain comes back from the file on the next load or reload.
+        /// A failure, or a file that changed since the document was read or saved, is reported through <see
+        /// cref="SaveFailed"/> and returns false. Sets <see cref="TabEntry.SaveFailed"/> either way.
+        /// </summary>
+        bool SaveDocument(TabEntry tab);
         Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
