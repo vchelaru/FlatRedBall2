@@ -289,7 +289,7 @@ public static class CliApp
             var report = isSequence
                 ? AtReport.BuildSequence(file, sequence, times, pass, track, shapesOnly, out error, out usage)
                 : AtReport.BuildChain(file, chain, times, shapesOnly, out error, out usage);
-            if (report is null) return usage ? Usage(error!) : Failed(error!);
+            if (report is null) return usage ? Usage(error!) : Failed(error!, RenderPlanner.CodeOf(error!));
             stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, report)) + Environment.NewLine : AtReport.ToText(report));
             return 0;
         }
@@ -359,10 +359,10 @@ public static class CliApp
             return result.Success ? 0 : 1;
         }
 
-        private int Failed(string message)
+        private int Failed(string message, EditErrorCode code = EditErrorCode.Unspecified)
         {
             if (Json)
-                stdout.WriteLine(EditJson.Render(w => EditJson.WriteResult(w, new EditResult([], [message], []))));
+                stdout.WriteLine(EditJson.Render(w => EditJson.WriteResult(w, new EditResult([], [message], [], [code]))));
             else
                 stderr.WriteLine($"aecli: {message}");
             return 1;

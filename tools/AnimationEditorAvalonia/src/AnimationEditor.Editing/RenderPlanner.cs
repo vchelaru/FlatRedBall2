@@ -65,19 +65,7 @@ public static class RenderPlanner
     {
         error = null; usage = false;
         if (request.Frames is not null) { usage = true; error = FrameIsForChains; return null; }
-        var read = SequenceFileReader.Read(request.File);
-        if (read.Document is null) { error = read.Error; return null; }
-
-        SequenceDocument document;
-        try { document = SequenceDocument.Load(request.File); }
-        catch (Exception ex) { error = $"Could not read {Path.GetFileName(request.File)}: {ex.Message}"; return null; }
-
-        var sequences = document.Save.Sequences;
-        int index = Pick(request.Name, sequences.Select(s => s.Name).ToList(), "sequence", "--sequence", "sequences", out error, out usage);
-        if (index < 0) return null;
-
-        var missing = document.Save.Sources.Where(document.IsSourceMissing).ToList();
-        if (missing.Count > 0) { error = $"Missing or unreadable source(s): {string.Join(", ", missing)}."; return null; }
+        if (OpenSequence(request.File, request.Name, out error, out usage) is not var (document, index)) return null;
 
         var times = request.Times ?? [0d];
         var frames = new List<ExportTimelineFrame>();
@@ -91,10 +79,62 @@ public static class RenderPlanner
             }).ToList();
             frames.Add(new ExportTimelineFrame(layers, 0));
         }
-        string name = sequences[index].Name;
+        string name = document.Save.Sequences[index].Name;
+        var labels = times.Select(t => Time(t) + "s" + (request.Pass > 0 ? $" pass {request.Pass}" : "")).ToList();
+        if (frames.All(f => f.Layers.Count == 0))
+        {
+            error = string.Join(". ", times.Select((t, i) => PastEnd(document, index, t) ?? $"{name} at {labels[i]}: nothing visible"));
+            return null;
+        }
         var textureOf = SpriteTextures(document, index, times, request.Pass);
-        return new RenderPlan(name, times.Select(t => Stem(name, Time(t) + PassSuffix(request.Pass))).ToList(), times.Select(t => Time(t) + "s" + (request.Pass > 0 ? $" pass {request.Pass}" : "")).ToList(), frames, frame => textureOf.GetValueOrDefault(frame));
+        return new RenderPlan(name, times.Select(t => Stem(name, Time(t) + PassSuffix(request.Pass))).ToList(), labels, frames, frame => textureOf.GetValueOrDefault(frame));
     }
+
+    /// <summary>
+    /// The document and the index of the named sequence (or the file's only one), or null with <paramref name="error"/>: also when a
+    /// source is missing, or the sequence or one it plays uses a chain, source or sequence that is not there (as <c>check</c> says it).
+    /// </summary>
+    internal static (SequenceDocument Document, int Index)? OpenSequence(string file, string? name, out string? error, out bool usage)
+    {
+        usage = false;
+        var read = SequenceFileReader.Read(file);
+        if (read.Document is null) { error = read.Error; return null; }
+
+        SequenceDocument document;
+        try { document = SequenceDocument.Load(file); }
+        catch (Exception ex) { error = $"Could not read {Path.GetFileName(file)}: {ex.Message}"; return null; }
+
+        var sequences = document.Save.Sequences;
+        int index = Pick(name, sequences.Select(s => s.Name).ToList(), "sequence", "--sequence", "sequences", out error, out usage);
+        if (index < 0) return null;
+
+        var missing = document.Save.Sources.Where(document.IsSourceMissing).ToList();
+        if (missing.Count > 0) { error = $"Missing or unreadable source(s): {string.Join(", ", missing)}."; return null; }
+
+        // WouldCycle(s, picked) is true for the picked sequence and every sequence it plays.
+        string picked = sequences[index].Name;
+        var asked = new SequenceListSave { Sources = document.Save.Sources, Sequences = sequences.Where(s => SequenceReferences.WouldCycle(sequences, s.Name, picked)).ToList() };
+        var absent = SequenceCheck.Run(asked, file).Errors.Where(e => e.Code.StartsWith("missing-")).Select(e => e.Message).ToList();
+        if (absent.Count > 0) { error = string.Join(" ", absent); return null; }
+        return (document, index);
+    }
+
+    /// <summary>The message for a <paramref name="time"/> at or past the end of a looping sequence, which shows nothing there; null otherwise.</summary>
+    internal static string? PastEnd(SequenceDocument document, int index, double time)
+    {
+        var sequence = document.Save.Sequences[index];
+        double length = document.SequenceLength(index);
+        return sequence.Loop && length > 0 && time >= Math.Round(length, 6)
+            ? $"{Time(time)}s is past the end of {sequence.Name} ({Time(length)}s); use --pass for later loops"
+            : null;
+    }
+
+    /// <summary>The code of an error <see cref="Plan"/> or <see cref="AtReport"/> gave.</summary>
+    public static EditErrorCode CodeOf(string error) =>
+        error.StartsWith("No ") || error.StartsWith("File not found") || error.StartsWith("Missing")
+            || error.Contains(" has no chain '") || error.Contains("which does not exist") || error.Contains("not in the sources list") ? EditErrorCode.NotFound
+        : error.Contains("out of range") ? EditErrorCode.IndexOutOfRange
+        : EditErrorCode.Unspecified;
 
     // The texture of every frame the requested times can show, resolved through the sprite's own source.
     private static Dictionary<AnimationFrameSave, string?> SpriteTextures(SequenceDocument document, int index, IReadOnlyList<double> times, int pass)
