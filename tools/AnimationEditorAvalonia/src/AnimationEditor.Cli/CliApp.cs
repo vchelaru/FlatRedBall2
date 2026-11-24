@@ -260,12 +260,16 @@ public static class CliApp
                         w.WriteEndObject();
                     }
                     w.WriteEndArray();
+                    w.WriteStartArray("warnings");
+                    foreach (var warning in outcome.Warnings) w.WriteStringValue(warning);
+                    w.WriteEndArray();
                     w.WriteEndObject();
                 }));
             }
             else
             {
-                foreach (var f in outcome.Files) stdout.WriteLine(f);
+                foreach (var f in outcome.Files) stdout.WriteLine(f); // stdout holds only paths, so a script can read it
+                foreach (var warning in outcome.Warnings) stderr.WriteLine($"aecli: {warning}");
                 foreach (var (_, message) in outcome.Errors) stderr.WriteLine($"aecli: {message}");
             }
             return outcome.Success ? 0 : 1;
@@ -294,7 +298,7 @@ public static class CliApp
             var report = isSequence
                 ? AtReport.BuildSequence(file, sequence, times, pass, track, shapesOnly, out error, out usage)
                 : AtReport.BuildChain(file, chain, times, shapesOnly, out error, out usage);
-            if (report is null) return usage ? Usage(error!) : Failed(error!);
+            if (report is null) return usage ? Usage(error!) : Failed(error!, RenderPlanner.CodeOf(error!));
             stdout.Write(Json ? EditJson.Render(w => AtReport.WriteJson(w, report)) + Environment.NewLine : AtReport.ToText(report));
             return 0;
         }
@@ -364,10 +368,10 @@ public static class CliApp
             return result.Success ? 0 : 1;
         }
 
-        private int Failed(string message)
+        private int Failed(string message, EditErrorCode code = EditErrorCode.Unspecified)
         {
             if (Json)
-                stdout.WriteLine(EditJson.Render(w => EditJson.WriteResult(w, new EditResult([], [message], []))));
+                stdout.WriteLine(EditJson.Render(w => EditJson.WriteResult(w, new EditResult([], [message], [], [code]))));
             else
                 stderr.WriteLine($"aecli: {message}");
             return 1;

@@ -1,12 +1,16 @@
 using System.Globalization;
+using AnimationEditor.Core.IO;
 using AnimationEditor.Editing;
 using AnimationEditor.Views.Export;
+using AnimationEditor.Views.Services;
 
 namespace AnimationEditor.Cli;
 
 /// <summary>What <c>aecli render</c> produced: the files written, or why not. <see cref="UsageError"/> means the command line was malformed.</summary>
 internal sealed record RenderOutcome(IReadOnlyList<string> Files, IReadOnlyList<(string Code, string Message)> Errors, string? UsageError = null)
 {
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
     public bool Success => Errors.Count == 0 && UsageError is null;
 }
 
@@ -54,7 +58,8 @@ internal static class RenderCommand
         if (!CliCommands.TryPass(values, out int pass, out var passError)) return Usage(passError!);
 
         var plan = RenderPlanner.Plan(new RenderRequest(file, name, times, frames, pass), out var error, out var usage);
-        if (plan is null) return usage ? Usage(error!) : Failed(CodeOf(error!), error!);
+        if (plan is null) return usage ? Usage(error!) : Failed(RenderPlanner.CodeOf(error!), error!);
+        if (TextureErrors(plan) is { Count: > 0 } textureErrors) return new RenderOutcome([], textureErrors);
 
         StillImages images;
         try
@@ -66,7 +71,7 @@ internal static class RenderCommand
         }
         catch (InvalidOperationException ex)
         {
-            return Failed(nameof(EditErrorCode.Unspecified), ex.Message);
+            return Failed(EditErrorCode.Unspecified, ex.Message);
         }
 
         try
@@ -79,23 +84,38 @@ internal static class RenderCommand
                 File.WriteAllBytes(path, images.Pngs[i]);
                 files.Add(path);
             }
-            return new RenderOutcome(files, []);
+            return new RenderOutcome(files, []) { Warnings = plan.Warnings };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return Failed("Unspecified", $"Could not write to {outDir}: {ex.Message}");
+            return Failed(EditErrorCode.Unspecified, $"Could not write to {outDir}: {ex.Message}");
         }
     }
 
-    // The planner reports plain messages; its not-found and range errors get the codes the other commands use.
-    private static string CodeOf(string error) =>
-        error.StartsWith("No ") || error.StartsWith("File not found") || error.StartsWith("Missing") ? nameof(EditErrorCode.NotFound)
-        : error.Contains("out of range") ? nameof(EditErrorCode.IndexOutOfRange)
-        : nameof(EditErrorCode.Unspecified);
+    // The renderer leaves out a frame whose texture it cannot load, so what it would leave out is refused here.
+    private static IReadOnlyList<(string Code, string Message)> TextureErrors(RenderPlan plan)
+    {
+        var errors = new List<(string, string)>();
+        var layers = plan.Frames.SelectMany(f => f.Layers).ToList();
+        foreach (var layer in layers.DistinctBy(l => plan.ResolveTexture(l.Frame), StringComparer.OrdinalIgnoreCase))
+        {
+            if (plan.ResolveTexture(layer.Frame) is not { } path) continue;
+            string where = $"(frame {layer.Chain.Name}/{layer.Chain.Frames.IndexOf(layer.Frame)})", name = layer.Frame.TextureName;
+            if (!File.Exists(path))
+                errors.Add((nameof(EditErrorCode.TextureNotFound), $"Texture '{name}' not found {where}."));
+            else if (SkiaFileDecoder.ReadSize(path) is not var (width, height))
+                errors.Add((nameof(EditErrorCode.TextureUndecodable), $"Texture '{name}' could not be read as an image {where}."));
+            else if (ImageSizeLimit.Exceeds(width, height))
+                errors.Add((nameof(EditErrorCode.TextureUndecodable), ImageSizeLimit.Describe(name, width, height)));
+        }
+        if (errors.Count == 0 && layers.All(l => plan.ResolveTexture(l.Frame) is null))
+            errors.Add((nameof(EditErrorCode.Unspecified), "Nothing to draw: the frames shown have no texture."));
+        return errors;
+    }
 
     private static RenderOutcome Usage(string message) => new([], [], message);
 
-    private static RenderOutcome Failed(string code, string message) => new([], [(code, message)]);
+    private static RenderOutcome Failed(EditErrorCode code, string message) => new([], [(code.ToString(), message)]);
 
     private static bool TryParseList<T>(string text, Func<string, T?> parse, out IReadOnlyList<T>? result) where T : struct
     {
