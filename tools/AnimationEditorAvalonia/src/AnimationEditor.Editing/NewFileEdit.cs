@@ -46,7 +46,7 @@ public static class NewFileEdit
     public static EditResult CreateSequenceFile(string path, bool overwrite = false)
     {
         var name = new FilePath(path).NoPath;
-        if (SaveTarget.IsAnotherType(path, "seqj"))
+        if (!AchxFolderScanner.IsSequencePath(path))
             return Failed(name, "it is not a .seqj file. Give it a .seqj extension.", EditErrorCode.UnsupportedFile);
         if (!overwrite && File.Exists(path)) return AlreadyExists(name);
 

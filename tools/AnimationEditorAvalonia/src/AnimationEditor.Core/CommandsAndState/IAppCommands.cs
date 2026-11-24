@@ -203,7 +203,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         Func<bool>? IsDocumentTabInFront { get; set; }
 
-        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> refuses the picked path.</summary>
+        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> or <see cref="ExportAsync"/> refuses the picked path.</summary>
         event Action<string>? SaveAsRefused;
 
         /// <summary>
