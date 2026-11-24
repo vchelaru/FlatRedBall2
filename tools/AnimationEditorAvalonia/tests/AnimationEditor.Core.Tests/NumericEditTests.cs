@@ -51,4 +51,14 @@ public class NumericEditTests
     {
         NumericEdit.TryParse(text, out _).ShouldBeFalse();
     }
+
+    /// <summary>1e30 does not fit the decimal the edit computes in.</summary>
+    [Fact]
+    public void Apply_CurrentPastDecimal_SetsAbsoluteAndLeavesRelativeUnchanged()
+    {
+        NumericEdit.Set(3m).Apply(1e30f).ShouldBe(3f);
+
+        NumericEdit.TryParse("+4", out NumericEdit relative).ShouldBeTrue();
+        relative.Apply(1e30f).ShouldBe(1e30f);
+    }
 }

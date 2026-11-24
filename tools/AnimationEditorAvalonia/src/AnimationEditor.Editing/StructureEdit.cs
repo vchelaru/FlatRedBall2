@@ -161,6 +161,8 @@ public static class StructureEdit
             return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absoluteTexture}");
         if (length is { } l && !(l > 0f))
             return Fail(EditErrorCode.InvalidValue, "A frame length must be greater than zero.");
+        if (length is { } given && !NumberFields.InRange(given))
+            return Fail(EditErrorCode.InvalidValue, $"A frame length must be at most {NumberFields.Max}.");
 
         if (region is { } r)
         {
@@ -168,7 +170,7 @@ public static class StructureEdit
             if (read is null)
                 return Fail(EditErrorCode.UnsupportedFile, "A region needs the texture's size, which is only read from PNG files.");
             var size = read.Value;
-            if (r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 || r.X + r.Width > size.Width || r.Y + r.Height > size.Height)
+            if (r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 || r.X > size.Width - r.Width || r.Y > size.Height - r.Height)
                 return Fail(EditErrorCode.InvalidValue,
                     $"The region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {size.Width}x{size.Height} texture.");
         }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using AnimationEditor.Core.Sequences;
 
 namespace AnimationEditor.Editing;
 
@@ -35,7 +36,7 @@ public static class SequenceOps
             new("sequence", "string", true, SequenceAddressDescription),
             new("to", "string", true, "New sequence name."),
         ]),
-        new("delete-sequence", "Deletes a sequence. Fails if that leaves a track playing it (a missing reference target is a check error).",
+        new("delete-sequence", "Deletes a sequence. A track that still plays it is left with a missing reference target, a check error: the batch is refused when that raises the count of those errors.",
         [
             new("sequence", "string", true, SequenceAddressDescription),
         ]),
@@ -105,7 +106,7 @@ public static class SequenceOps
         [
             new("source", "string", true, "Source as listed in the file."),
         ]),
-        new("replace-source", "Swaps a library source for another file and points its blocks at it. Blocks naming a chain the new file lacks are kept (check reports them).",
+        new("replace-source", "Swaps a library source for another file and points its blocks at it. Its blocks keep their chain names; a chain the new file lacks is a check error: the batch is refused when that raises the count of those errors.",
         [
             new("source", "string", true, "Source as listed in the file."),
             new("path", "string", true, "New file, relative to the .seqj or absolute; must exist."),
@@ -122,18 +123,18 @@ public static class SequenceOps
         new("set-block-start", "Moves a block to a start time in seconds. The next block on the track cuts it short from there.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
-            new("start", "number", true, "Seconds from the sequence start, 0 or more."),
+            new("start", "number", true, "Seconds from the sequence start, 0 or more.", Relative: true),
         ]),
-        new("set-block-length", "Sets a block's length in seconds, so its end stays put when the chain changes. Give length, or clear to unset it (describe's length auto: one cycle of the chain, or one run of a clip's target, following edits to it). A following block still cuts it short.",
+        new("set-block-length", "Sets a block's length in seconds, so its end stays put when the chain changes. Give length, or clear to unset it (describe's length auto: one cycle of the chain, or one run of a clip's target, following edits to it). A relative length on an auto block starts from that cycle or run. A following block still cuts it short.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
-            new("length", "number", false, "Seconds, above 0."),
+            new("length", "number", false, "Seconds, above 0.", Relative: true),
             new("clear", "boolean", false, "true to unset the length."),
         ]),
-        new("set-block-end", "Sets a block's length so it ends at a time in seconds: length = end - start. Uses the block's current start, so set that first. A following block still cuts it short.",
+        new("set-block-end", "Sets a block's length so it ends at a time in seconds: length = end - start. Uses the block's current start, so set that first. A relative end starts from start + length, even when a following block cuts it short. A following block still cuts it short.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
-            new("end", "number", true, "Seconds from the sequence start, after the block's start."),
+            new("end", "number", true, "Seconds from the sequence start, after the block's start.", Relative: true),
         ]),
         new("set-block-chain", "Points a block at another chain, keeping its start and length. Give source to take the chain from another library source; default is the block's own source. A reference track's clips have no chain and are refused.",
         [
@@ -155,7 +156,7 @@ public static class SequenceOps
         [
             new("block", "string", true, BlockAddressDescription),
             new("to", "string", false, "Destination track address, in any sequence. Default: the block's own track."),
-            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default: unchanged."),
+            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default: unchanged.", Relative: true),
         ]),
     ];
 
@@ -183,15 +184,22 @@ public static class SequenceOps
             if (targets.Error is not null)
                 return Failed(warnings, op, targets.Error, targets.Code);
 
+            EditRunResult TargetFailed(EditResult result, string target) =>
+                EditOps.FailedOp(warnings, op, SelectorField(op) is null ? "" : $"target {target}: ", result);
+
+            // Every target first: changing one can change the length of a sequence a later one plays.
+            var resolved = new List<(EditOp Op, string Target)>();
             foreach (var target in targets.List!)
             {
-                var result = ApplyOne(session, op, target);
-                if (!result.Success)
-                {
-                    var where = SelectorField(op) is null ? "" : $"target {target}: ";
-                    var errors = result.Errors.Select(e => $"op {op.Index} ({op.Spec.Name}): {where}{e}").ToList();
-                    return new EditRunResult(new EditResult([], errors, warnings, result.ErrorCodes), errors.Select(_ => (int?)op.Index).ToList());
-                }
+                var one = NumberFields.ResolveRelative(op, field => CurrentValue(doc, op, field, target));
+                if (one.Error is not null) return TargetFailed(one.Error, target);
+                resolved.Add((one.Op, target));
+            }
+
+            foreach (var (absolute, target) in resolved)
+            {
+                var result = ApplyOne(session, absolute, target);
+                if (!result.Success) return TargetFailed(result, target);
                 changed.AddRange(result.ChangedItems);
             }
         }
@@ -244,6 +252,26 @@ public static class SequenceOps
         // Deleting shifts the indexes after a block, so blocks go from the highest down.
         var list = op.Spec.Name == "delete-block" ? expansion.Targets!.Reverse().ToList() : expansion.Targets!;
         return new Targets(list, null, EditErrorCode.Unspecified);
+    }
+
+    /// <summary>What a relative value of <paramref name="field"/> starts from, as the editor shows it, or why the block cannot be resolved.</summary>
+    private static (decimal Value, EditResult? Error) CurrentValue(SequenceDocument doc, EditOp op, OpField field, string target)
+    {
+        var at = SequenceAddress.ResolveBlock(doc.Save, target.Length > 0 ? target : op.Values["block"]);
+        if (!at.Ok) return (0, new EditResult([], [at.Error!], [], [at.Code]));
+
+        var a = at.Value!;
+        var track = doc.Save.Sequences[a.Sequence].Tracks[a.Track];
+        var (start, length) = track.References is { } clips
+            ? (clips[a.Block].Start, doc.ClipLength(clips[a.Block]))
+            : (track.Chains[a.Block].Start, doc.ChainLength(track.Chains[a.Block]));
+        return (field.Name switch
+        {
+            "start" => (decimal)start,
+            "length" => (decimal)length,
+            "end" => (decimal)start + (decimal)length,
+            _ => throw new InvalidOperationException($"No current value for '{field.Name}' of '{op.Spec.Name}'."),
+        }, null);
     }
 
     private static EditResult ApplyOne(SequenceSession session, EditOp op, string target)

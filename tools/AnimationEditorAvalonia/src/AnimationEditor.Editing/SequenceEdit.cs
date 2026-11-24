@@ -15,8 +15,6 @@ namespace AnimationEditor.Editing;
 /// </summary>
 public static class SequenceEdit
 {
-    private const double MaxLength = 1_000_000;
-
     // ---- sequences ----
 
     /// <summary>Appends a sequence. A null name picks a free default ("Sequence", "Sequence 2"); a given name must be unused.</summary>
@@ -236,7 +234,7 @@ public static class SequenceEdit
         if (!at.Ok) return FromAddress(at);
         var to = SequenceAddress.ResolveSequence(doc.Save, target);
         if (!to.Ok) return FromAddress(to);
-        if (!double.IsFinite(start) || start < 0) return Fail(EditErrorCode.InvalidValue, "Start must be 0 or more.");
+        if (CheckStart(start) is { } badStart) return badStart;
         var owner = doc.Save.Sequences[at.Value!.Sequence];
         if (index is { } i && (i < 0 || i > owner.Tracks.Count)) return OutOfRange(i, owner.Tracks.Count + 1, "track slot");
         var targetName = doc.Save.Sequences[to.Value!.Sequence].Name;
@@ -614,10 +612,10 @@ public static class SequenceEdit
     }
 
     private static EditResult? CheckStart(double start) =>
-        double.IsFinite(start) && start >= 0 ? null : Fail(EditErrorCode.InvalidValue, "Start must be 0 or more.");
+        NumberFields.InRange(start) && start >= 0 ? null : Fail(EditErrorCode.InvalidValue, $"Start must be 0 or more, up to {NumberFields.Max}.");
 
     private static EditResult? CheckLength(double length) =>
-        double.IsFinite(length) && length > 0 && length <= MaxLength ? null : Fail(EditErrorCode.InvalidValue, "Length must be above 0.");
+        NumberFields.InRange(length) && length > 0 ? null : Fail(EditErrorCode.InvalidValue, $"Length must be above 0, up to {NumberFields.Max}.");
 
     /// <summary>The library entry <paramref name="source"/> names, as written in the file (case and slash style ignored), or null.</summary>
     private static string? FindSource(SequenceDocument doc, string source)
