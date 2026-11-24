@@ -93,8 +93,8 @@ public class SequenceTimelineSnapScenarioTests
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         var save = SequenceListSave.FromFile(boss);
         var combo = new SequenceSave { Name = "Combo" };
-        combo.Tracks.Add(new SequenceTrackSave { Name = "A", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 0 } });
-        combo.Tracks.Add(new SequenceTrackSave { Name = "B", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 1 } });
+        combo.Tracks.Add(new SequenceTrackSave { Name = "A", References = [new SequenceReferenceSave { Sequence = "Attack", Start = 0 }] });
+        combo.Tracks.Add(new SequenceTrackSave { Name = "B", References = [new SequenceReferenceSave { Sequence = "Attack", Start = 1 }] });
         save.Sequences.Insert(0, combo);
         save.Save(boss);
         await editor.OpenAsync(boss);
@@ -105,7 +105,7 @@ public class SequenceTimelineSnapScenarioTests
 
         timeline.SnapGuideTime!.Value.ShouldBe(0.5, 1e-6);
         editor.DragRelease(At(editor, 1, 0.6, dx: 3));
-        SequenceListSave.FromFile(boss).Sequences[0].Tracks[1].Reference!.Start.ShouldBe(0.5, 1e-6);
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[1].References![0].Start.ShouldBe(0.5, 1e-6);
     }
 
     // Combo: a reference clip of Attack (0.5 s) on track 0 at 3.0, and a Walk block (0.5 s) on track 1 at walkStart.
@@ -114,7 +114,7 @@ public class SequenceTimelineSnapScenarioTests
         string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
         var save = SequenceListSave.FromFile(boss);
         var combo = new SequenceSave { Name = "Combo" };
-        combo.Tracks.Add(new SequenceTrackSave { Name = "Clip", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 3.0 } });
+        combo.Tracks.Add(new SequenceTrackSave { Name = "Clip", References = [new SequenceReferenceSave { Sequence = "Attack", Start = 3.0 }] });
         combo.Tracks.Add(Track("Chain", ("Walk", walkStart, null)));
         save.Sequences.Insert(0, combo);
         save.Save(boss);
@@ -122,7 +122,7 @@ public class SequenceTimelineSnapScenarioTests
         return boss;
     }
 
-    private static SequenceReferenceSave SavedClip(string path) => SequenceListSave.FromFile(path).Sequences[0].Tracks[0].Reference!;
+    private static SequenceReferenceSave SavedClip(string path) => SequenceListSave.FromFile(path).Sequences[0].Tracks[0].References![0];
 
     [AvaloniaFact]
     public async Task DraggingAReferenceClip_NearAChainBlocksStart_LandsItsEndExactlyOnIt()
