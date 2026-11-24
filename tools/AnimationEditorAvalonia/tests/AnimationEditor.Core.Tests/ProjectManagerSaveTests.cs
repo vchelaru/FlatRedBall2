@@ -81,6 +81,22 @@ public class ProjectManagerSaveTests : IDisposable
         Assert.Equal((16f, 24f), (saved[1].RightCoordinate, saved[1].BottomCoordinate));
     }
 
+    // #2036: a save that fails anywhere leaves every name as it was, so one made relative to the target's folder does not stay.
+    [Fact]
+    public void SaveAnimationChainList_ATextureNameThatHasNoPath_LeavesTheOtherNames()
+    {
+        string absolute = Path.Combine(_dir, "sprite.png");
+        var chain = new AnimationChainSave { Name = "Chain1" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = absolute });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "C:a/../../b.png" });
+        var pm = new ProjectManager { AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel } };
+        pm.AnimationChainListSave.AnimationChains.Add(chain);
+
+        Assert.Throws<InvalidOperationException>(() => pm.SaveAnimationChainList(AchxPath("broken.achx")));
+
+        Assert.Equal([absolute, "C:a/../../b.png"], chain.Frames.Select(frame => frame.TextureName));
+    }
+
     // Converting to fractions needs every size, and a frame left in pixels under a UV header would be a lie (#1135). The
     // failed save must not have written the file or changed any frame, including the one whose texture did resolve.
     [Fact]

@@ -131,4 +131,33 @@ public class AppCommandsStaleOnDiskTests : IDisposable
         Assert.True(File.Exists(copyPath));
         Assert.Contains("barrel.png", File.ReadAllText(path));
     }
+
+    // #2036: the stale file is another one, so refusing to write it says nothing about this document's own save.
+    [Fact]
+    public async System.Threading.Tasks.Task SaveAs_OntoAnotherFileThatCouldNotBeReloaded_IsRefusedAsASaveAs()
+    {
+        var stale = OpenTsx();
+        File.WriteAllText(stale, TsxImageCollectionXml);
+        _ctx.AppCommands.ReloadAchxFromDisk(stale);
+        var other = Path.Combine(_dir.Path, "Other.tsx");
+        File.WriteAllText(other, PlainTsxXml);
+        _ctx.ProjectManager.LoadTsxProject(new FilePath(other));
+        var refused = new System.Collections.Generic.List<string>();
+        var failed = new System.Collections.Generic.List<string>();
+        _ctx.AppCommands.SaveAsRefused += refused.Add;
+        _ctx.AppCommands.SaveFailed += failed.Add;
+        _ctx.AppCommands.FileDialogService = new StubFileDialogService(stale);
+        var before = _ctx.UndoManager.SaveState;
+
+        Assert.False(await _ctx.AppCommands.SaveCurrentAnimationChainListAsync());
+
+        Assert.Equal(before, _ctx.UndoManager.SaveState);
+        Assert.NotEqual(SaveState.Failed, before);
+        Assert.Empty(failed);
+        var message = Assert.Single(refused);
+        Assert.StartsWith("Could not save Heroes.tsx: it changed on disk and couldn't be reloaded (", message);
+        Assert.DoesNotContain("Reload from Disk", message);
+        Assert.Contains("barrel.png", File.ReadAllText(stale));
+        Assert.Equal(new FilePath(other), new FilePath(_ctx.ProjectManager.FileName!));
+    }
 }

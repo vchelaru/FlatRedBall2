@@ -87,7 +87,7 @@ public class DocumentWriteGuardTests
     private static readonly Regex Write = new(
         @"\bFile\.(Write\w+|Append\w+|Move|Copy|Replace|Create\w*|Open|OpenWrite)\(|\bnew (StreamWriter|FileStream)\(|\.(MoveTo|OpenWrite|CreateText|AppendText)\("
         + @"|\bnew FileInfo\([^)]*\)\.\w+To\(|\bAtomicFile\.Write\(|\bTsxWriter\.\w+\(|\.Save(Json|As)?\([^)\s]"
-        + @"|(?<!void |Task |bool |bool> |string> )\b(SaveCurrentAnimationChainList(Async)?|SaveDocument|SaveTsxProject|SaveTsxDocument|SaveAnimationChainList|SaveToDisk"
+        + @"|(?<!void |Task |bool |bool> |string> )\b(SaveCurrentAnimationChainList(Async)?|WriteDocument|SaveDocument|SaveTsxProject|SaveTsxDocument|SaveAnimationChainList|SaveToDisk"
         + @"|WriteRecoveryFile|SyncAssociatedTiledTilesets)\(|\bTiledTilesetSyncRunner\.\w+\(|\bAchxToAchj\w+\.Convert\(|\bDeleteToRecycleBin\(",
         RegexOptions.Compiled);
 
