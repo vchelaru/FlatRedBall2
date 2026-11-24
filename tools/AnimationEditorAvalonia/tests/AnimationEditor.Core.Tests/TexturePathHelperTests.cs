@@ -1,5 +1,6 @@
 using System.IO;
 using AnimationEditor.Core.IO;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -248,4 +249,12 @@ public class TexturePathHelperTests
             Path.GetFullPath(Path.Combine(TestPaths.AbsDir("Project", "Animations"), "../Content/Hero.png")),
             resolved);
     }
+
+    // #1983
+    [Theory]
+    [InlineData("//server/share/Anims/", "../Art/a.png")]
+    [InlineData(@"\\server\share\Anims", "../Art/a.png")]
+    [InlineData(@"C:\Anims", "//server/share/Art/a.png")]
+    public void NormalizeStoredTextureName_NetworkTexture_RelativeOnlyWithinTheShare(string folder, string expected) =>
+        TexturePathHelper.NormalizeStoredTextureName("//server/share/Art/a.png", folder).ShouldBe(expected);
 }

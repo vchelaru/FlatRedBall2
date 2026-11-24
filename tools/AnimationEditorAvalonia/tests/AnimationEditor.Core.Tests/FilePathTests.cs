@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Paths;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -129,4 +130,40 @@ public class FilePathTests
 
         Assert.Equal("c:/games/hero.achx", path.Standardized);
     }
+
+    // #1983: a network path (\\server\share\...) keeps its double-slash root however it is spelled.
+    [Theory]
+    [InlineData(@"//server/share/Art/a.png", "//server/share/Art/a.png")]
+    [InlineData(@"\\server\share\Art\a.png", "//server/share/Art/a.png")]
+    [InlineData(@"\\server/share\Art/a.png", "//server/share/Art/a.png")]
+    [InlineData(@"//server/share/Art//a.png", "//server/share/Art/a.png")]
+    [InlineData(@"\\server\share\Art\.\..\a.png", "//server/share/a.png")]
+    [InlineData(@"//server/share/../../../a.png", "//server/share/a.png")]
+    [InlineData(@"//server/share/Art/", "//server/share/Art/")]
+    [InlineData(@"\\?\C:\Art\a.png", "//?/C:/Art/a.png")]
+    [InlineData(@"\\.\C:\Art\a.png", "//./C:/Art/a.png")]
+    public void FullPath_NetworkPath_KeepsDoubleSlashRoot(string path, string expected)
+    {
+        new FilePath(path).FullPath.ShouldBe(expected);
+        new FilePath(path).StandardizedCaseSensitive.ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(@"//server/share/Art/a.png")]
+    [InlineData(@"\\server\share\Art\a.png")]
+    public void GetDirectoryContainingThis_NetworkPath_KeepsDoubleSlashRoot(string path) =>
+        new FilePath(path).GetDirectoryContainingThis().FullPath.ShouldBe("//server/share/Art/");
+
+    // No relative path reaches another share, server or drive: Windows stops ../ at the share.
+    [Theory]
+    [InlineData(@"\\server\share\Art\a.png", @"\\SERVER\share\Anims\", "../Art/a.png")]
+    [InlineData(@"//server/share/Anims/a.png", @"\\server\share\Anims", "a.png")]
+    [InlineData(@"\\server\share\a.png", @"C:\Anims\", "//server/share/a.png")]
+    [InlineData(@"\\server\share\a.png", "/Anims/", "//server/share/a.png")]
+    [InlineData(@"\\server\other\a.png", @"\\server\share\", "//server/other/a.png")]
+    [InlineData(@"\\elsewhere\share\a.png", @"\\server\share\", "//elsewhere/share/a.png")]
+    [InlineData(@"C:\Art\a.png", @"\\server\share\", "C:/Art/a.png")]
+    [InlineData("/Art/a.png", @"\\server\share\", "/Art/a.png")]
+    public void RelativeTo_NetworkPath_IsRelativeOnlyWithinTheShare(string path, string folder, string expected) =>
+        new FilePath(path).RelativeTo(new FilePath(folder)).ShouldBe(expected);
 }
