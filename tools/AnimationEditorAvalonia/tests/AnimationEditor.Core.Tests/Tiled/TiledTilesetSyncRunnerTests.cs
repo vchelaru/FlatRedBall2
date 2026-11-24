@@ -15,17 +15,8 @@ public class TiledTilesetSyncRunnerTests
     // itself supports Pixel too -- see AchjToTiledAnimationMapperTests for the UV path).
     private static string WriteFixtureTileset(string tempDir, string fileName = "Heroes.tsx")
     {
-        var tileset = new Tileset
-        {
-            Name = "Heroes",
-            TileWidth = 16,
-            TileHeight = 16,
-            TileCount = 64,
-            Columns = 4,
-            Image = new Image { Source = "Heroes.png" },
-        };
         var path = Path.Combine(tempDir, fileName);
-        TsxWriter.Write(tileset, path);
+        File.WriteAllText(path, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><tileset name=\"Heroes\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"4\"><image source=\"Heroes.png\"/></tileset>");
         return path;
     }
 

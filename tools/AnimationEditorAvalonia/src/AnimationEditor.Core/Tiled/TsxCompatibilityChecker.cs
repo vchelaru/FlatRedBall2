@@ -9,11 +9,7 @@ using System.Text.Unicode;
 namespace AnimationEditor.Core.Tiled;
 
 /// <summary>
-/// Checks whether a Tiled <see cref="Tileset"/> can be opened as a native AnimationEditor project
-/// (issue #1140) without losing data on the first save. Deliberately reuses <see
-/// cref="TsxWriter"/> itself as the source of truth (a dry-run write to a throwaway stream) rather
-/// than duplicating its own checks -- so this stays
-/// in sync automatically if <see cref="TsxWriter"/>'s supported subset ever changes.
+/// Checks whether a Tiled <see cref="Tileset"/> can be opened as a native AnimationEditor project (issue #1140).
 /// </summary>
 public static partial class TsxCompatibilityChecker
 {
@@ -21,9 +17,9 @@ public static partial class TsxCompatibilityChecker
     /// other encoding would become unreadable on its first save (#2015).</summary>
     /// <returns><see langword="false"/> when the file is not UTF-8 (a byte order mark is optional);
     /// <paramref name="blockingReason"/> then names its encoding.</returns>
-    public static bool CheckEncoding(string path, out string? blockingReason)
+    public static bool CheckEncoding(ReadOnlySpan<byte> bytes, out string? blockingReason)
     {
-        var encoding = FindUnsupportedEncoding(File.ReadAllBytes(path));
+        var encoding = FindUnsupportedEncoding(bytes);
         blockingReason = encoding is null
             ? null
             : $"the file's encoding is {encoding}. AnimationEditor only supports UTF-8, so convert the file to UTF-8 first.";
@@ -52,8 +48,7 @@ public static partial class TsxCompatibilityChecker
     [GeneratedRegex("""^<\?xml\s(.*\s)?encoding\s*=\s*["'](?<name>[^"']*)""", RegexOptions.Singleline)]
     private static partial Regex DeclaredEncoding();
 
-    /// <returns><see langword="false"/> when opening natively would crash on the first save;
-    /// <paramref name="blockingReason"/> is <see cref="TsxWriter"/>'s own explanation in that case.</returns>
+    /// <returns><see langword="false"/> when the editor cannot work with the tileset; <paramref name="blockingReason"/> says why.</returns>
     public static bool CheckOpenCompatibility(Tileset tileset, out string? blockingReason)
     {
         // An image-collection tileset (one image per tile, no shared sheet) has no tile grid for
@@ -64,16 +59,7 @@ public static partial class TsxCompatibilityChecker
             return false;
         }
 
-        try
-        {
-            TsxWriter.Write(tileset, Stream.Null);
-            blockingReason = null;
-            return true;
-        }
-        catch (NotSupportedException ex)
-        {
-            blockingReason = ex.Message;
-            return false;
-        }
+        blockingReason = null;
+        return true;
     }
 }

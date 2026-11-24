@@ -52,6 +52,12 @@ namespace AnimationEditor.Core
         /// non-empty. See <see cref="ProjectManager.SaveTsxProject"/>.</summary>
         IReadOnlyList<string> SaveTsxProject(string? targetPath = null);
 
+        /// <summary>
+        /// After Save As wrote the open tsx to <paramref name="path"/>, makes that its file. From another folder, the
+        /// image and the frames' textures are now relative to the new one. No-op unless a tsx project is loaded.
+        /// </summary>
+        void MoveTsxProject(FilePath path);
+
         /// <summary>The chains the last <see cref="SaveTsxProject"/> did not store in full.
         /// See <see cref="ProjectManager.TsxChainsNotFullySaved"/>.</summary>
         IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved { get; }

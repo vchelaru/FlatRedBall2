@@ -601,9 +601,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (!_staleOnDiskReasons.TryGetValue(new AnimationEditor.Core.Paths.FilePath(path).FullPath, out var staleReason))
                 return false;
-            SaveFailed?.Invoke(
-                $"\"{System.IO.Path.GetFileName(path)}\" changed on disk and couldn't be reloaded ({staleReason}). " +
-                "Saving would overwrite that change. Fix the file and use File > Reload from Disk to drop the edits, or Save As a different file.");
+            SaveFailed?.Invoke(ProjectManager.ChangedOnDiskMessage(new FilePath(path), staleReason));
             return true;
         }
 
@@ -873,6 +871,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             SaveCurrentAnimationChainList(path);
+            _pm.MoveTsxProject(new FilePath(path));
             _pm.FileName = path;
             SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();

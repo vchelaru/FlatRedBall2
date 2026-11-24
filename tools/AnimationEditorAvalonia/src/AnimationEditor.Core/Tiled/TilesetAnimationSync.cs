@@ -132,7 +132,6 @@ public static class TilesetAnimationSync
             appliedCount++;
         }
 
-        tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID));
         return new TilesetAnimationSyncResult(appliedCount, warnings, changed);
     }
 
@@ -152,23 +151,10 @@ public static class TilesetAnimationSync
         return hadAnimation || hadTrackingProperties;
     }
 
-    /// <summary>Whether a tile has nothing left worth keeping a &lt;tile&gt; element for -- no
-    /// animation, no properties, and none of Tiled's other per-tile data (type/probability/x/y/
-    /// width/height/image/object layer). A tile that only ever existed to carry an animation this
-    /// sync owns becomes exactly this once <see cref="ClearTile"/> strips it, and leaving it in
-    /// <see cref="Tileset.Tiles"/> as a bare <c>&lt;tile id="N"/&gt;</c> stub would accumulate one
-    /// such stub per animation ever removed.</summary>
+    /// <summary>Whether the model has nothing left for a tile. <see cref="TsxWriter"/> keeps its element in the file
+    /// when that still holds something the model does not.</summary>
     private static bool IsTileEmpty(Tile tile) =>
-        string.IsNullOrEmpty(tile.Type) &&
-        tile.Probability == 0f &&
-        tile.X == 0 &&
-        tile.Y == 0 &&
-        tile.Width == 0 &&
-        tile.Height == 0 &&
-        !tile.Image.HasValue &&
-        !tile.ObjectLayer.HasValue &&
-        tile.Properties.Count == 0 &&
-        tile.Animation.Count == 0;
+        string.IsNullOrEmpty(tile.Type) && tile.Properties.Count == 0 && tile.Animation.Count == 0;
 
     private static bool AnimationEquals(List<Frame> a, List<Frame> b)
     {

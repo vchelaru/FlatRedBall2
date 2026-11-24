@@ -292,15 +292,10 @@ public class StatusBarTests
 
     private static string WriteFixtureTileset(string dir)
     {
-        var tileset = new DotTiled.Tileset
-        {
-            Name = "Heroes", TileWidth = 16, TileHeight = 16, TileCount = 64, Columns = 4,
-            // Width/height let the mapper convert the achx's UV frame coordinates back to
-            // pixels -- ProjectManager.AnimationChainListSave is always UV in memory.
-            Image = new DotTiled.Image { Source = "Heroes.png", Width = 64, Height = 16 },
-        };
+        // Width/height let the mapper convert the achx's UV frame coordinates back to
+        // pixels -- ProjectManager.AnimationChainListSave is always UV in memory.
         var path = Path.Combine(dir, "Heroes.tsx");
-        AnimationEditor.Core.Tiled.TsxWriter.Write(tileset, path);
+        File.WriteAllText(path, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><tileset name=\"Heroes\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"4\"><image source=\"Heroes.png\" width=\"64\" height=\"16\"/></tileset>");
         return path;
     }
 

@@ -75,6 +75,7 @@ public class AppCommandsSaveFailTests
         public TileGrid? TsxTileGrid => null;
         public void LoadTsxProject(FilePath fileName) { }
         public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => [];
+        public void MoveTsxProject(FilePath path) { }
         public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => new HashSet<AnimationChainSave>();
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
         public uint? GetTsxOwnerTileId(AnimationChainSave chain) => null;
