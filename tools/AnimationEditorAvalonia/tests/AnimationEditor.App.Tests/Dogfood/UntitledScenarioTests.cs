@@ -139,13 +139,27 @@ public class UntitledScenarioTests
     [InlineData("boss.seqj")]
     [InlineData("sheet.png")]
     [InlineData("hero.achx")]
+    [InlineData("Tiles.tsx")]
     public async Task FileNew_FromAnyTab_ShowsTheAnimationEditor(string front)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string png = editor.WritePng("sheet.png", 64, 64);
         if (front == "sheet.png") await editor.OpenPngTabAsync(png);
         else if (front == "hero.achx") await editor.OpenAsync(editor.WriteAchx(front, AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16))));
+        else if (front == "Tiles.tsx")
+        {
+            string path = Path.Combine(editor.ProjectFolder, front);
+            File.WriteAllText(path, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <tileset version="1.10" tiledversion="1.12.2" name="Tiles" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+                 <image source="sheet.png" width="64" height="64"/>
+                 <tile id="0"><animation><frame tileid="0" duration="100"/><frame tileid="1" duration="100"/></animation></tile>
+                </tileset>
+                """);
+            await editor.OpenAsync(path);
+        }
         else await editor.OpenAsync(editor.WriteSeqj(front, "Attack"));
+        if (front is "hero.achx" or "Tiles.tsx") editor.Control<TextBlock>("StatusCounts").Text.ShouldStartWith("1 chain");
         editor.Dialogs.AnswerNextSaveFile(null);
 
         editor.ClickMenu("MenuNew");
@@ -156,7 +170,7 @@ public class UntitledScenarioTests
         editor.Press(Key.Enter);
         editor.Project.AnimationChains.Count.ShouldBe(1);
         editor.ClickTab(front);
-        editor.Control<Control>("AnimationsBlock").IsVisible.ShouldBe(front == "hero.achx", "the tab left for the new one still shows its own pane");
+        editor.Control<Control>("AnimationsBlock").IsVisible.ShouldBe(front is "hero.achx" or "Tiles.tsx", "the tab left for the new one still shows its own pane");
     }
 
     [AvaloniaFact]
