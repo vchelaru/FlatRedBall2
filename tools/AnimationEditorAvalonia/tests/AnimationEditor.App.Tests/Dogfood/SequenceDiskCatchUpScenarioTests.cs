@@ -282,4 +282,23 @@ public class SequenceDiskCatchUpScenarioTests
 
         editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
     }
+
+    [AvaloniaFact]
+    public async Task SeqjFixedWhileAway_WithAnEditMadeWhileItWasInvalid_SaysTheEditIsUnsavedAndNotThatTheFileIsInvalid()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        var (seqj, hero) = await OpenSeqjThenAchxAsync(editor);
+        File.WriteAllText(seqj, "{ nope");
+        editor.ClickTab("boss.seqj");
+        editor.Click(editor.Control<Button>("AddSequenceButton"));
+        editor.Press(Key.Escape);
+        await editor.OpenAsync(hero);
+
+        Rewrite(seqj, "Attack", "Idle", "Die");
+        editor.ClickTab("boss.seqj");
+        editor.Layout();
+
+        editor.ProblemText!.ShouldContain("edits that could not be saved");
+        editor.SequenceNames.ShouldBe(new[] { "Attack", "Idle", "Sequence" });
+    }
 }

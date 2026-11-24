@@ -143,4 +143,35 @@ public class SequenceDocumentSaveFailureTests
 
         document.HasUnsavedEdits.ShouldBeFalse();
     }
+
+    // What the document itself wrote last is not an outside change, in its own file or in the one Save As moved it to.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FailedWrite_AfterOneThatWorked_IsSavedByARetry(bool saveAs)
+    {
+        using var dir = new TestHelpers.TempDir();
+        string path = WriteSeqj(dir.Path, "Idle");
+        var document = SequenceDocument.Load(path);
+        if (saveAs)
+        {
+            document.SaveRunner = (_, _) => throw new IOException("disk full");
+            document.AddSequence(new UndoManager());
+            document.SaveRunner = static (_, write) => write();
+            path = Path.Combine(dir.Path, "copy.seqj");
+            document.SaveAs(path).ShouldBeNull();
+        }
+        else
+        {
+            document.AddSequence(new UndoManager());
+        }
+
+        document.SaveRunner = (_, _) => throw new IOException("disk full");
+        document.AddSequence(new UndoManager());
+        document.SaveRunner = static (_, write) => write();
+        document.SaveToDisk();
+
+        document.SaveError.ShouldBeNull();
+        Names(SequenceListSave.FromFile(path)).ShouldBe(new[] { "Idle", "Sequence", "Sequence 2" });
+    }
 }

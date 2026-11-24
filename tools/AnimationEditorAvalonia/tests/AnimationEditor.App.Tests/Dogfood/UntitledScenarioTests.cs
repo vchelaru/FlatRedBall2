@@ -129,17 +129,22 @@ public class UntitledScenarioTests
         editor.Control<Control>("AchxEditorPane").IsVisible.ShouldBeTrue();
         editor.Control<Control>("SequenceEditorPane").IsVisible.ShouldBeFalse();
         editor.Control<Control>("PngPaneGrid").IsVisible.ShouldBeFalse();
+        editor.TitleFileName.ShouldBe("", "the title describes the Untitled document");
         editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Not saved", "the status bar describes the Untitled document");
+        editor.Control<TextBlock>("StatusFilename").Text.ShouldBeNullOrEmpty();
+        editor.Control<TextBlock>("StatusCounts").Text.ShouldBe(editor.Project.AnimationChains.Count == 0 ? "" : "1 chain · 0 frames · 0.00s");
     }
 
     [AvaloniaTheory]
     [InlineData("boss.seqj")]
     [InlineData("sheet.png")]
-    public async Task FileNew_FromATabOfAnotherKind_ShowsTheAnimationEditor(string front)
+    [InlineData("hero.achx")]
+    public async Task FileNew_FromAnyTab_ShowsTheAnimationEditor(string front)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string png = editor.WritePng("sheet.png", 64, 64);
         if (front == "sheet.png") await editor.OpenPngTabAsync(png);
+        else if (front == "hero.achx") await editor.OpenAsync(editor.WriteAchx(front, AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16))));
         else await editor.OpenAsync(editor.WriteSeqj(front, "Attack"));
         editor.Dialogs.AnswerNextSaveFile(null);
 
@@ -151,7 +156,7 @@ public class UntitledScenarioTests
         editor.Press(Key.Enter);
         editor.Project.AnimationChains.Count.ShouldBe(1);
         editor.ClickTab(front);
-        editor.Control<Control>("AnimationsBlock").IsVisible.ShouldBeFalse("the tab left for the new one still shows its own pane");
+        editor.Control<Control>("AnimationsBlock").IsVisible.ShouldBe(front == "hero.achx", "the tab left for the new one still shows its own pane");
     }
 
     [AvaloniaFact]
