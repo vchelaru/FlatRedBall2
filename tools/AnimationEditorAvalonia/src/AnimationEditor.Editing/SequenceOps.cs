@@ -12,8 +12,8 @@ public static class SequenceOps
     /// <summary>How <c>--schema</c> explains sequence addressing; shared by the text and JSON output.</summary>
     public const string AddressSyntax =
         "Sequence files (.seqj): sequence Run, track Run/Body or Run/0 (name wins over index), block Run/Body/1 (zero-based index in the track). "
-        + "A track that plays another sequence has one block, its clip, at index 0. "
-        + "Selectors: set-sequence-loop takes a glob over sequence names (R*, *); set-track-continuous and delete-track take a track name, glob or index selector "
+        + "A track that plays other sequences has one block per clip, in list order. "
+        + "Selectors: set-sequence-loop takes a glob over sequence names (R*, *); set-track-continuous, set-track-visible and delete-track take a track name, glob or index selector "
         + "(Run/*, Run/Sh*, Run/0-1, Run/0,2, R*/Body); set-block-start, set-block-length, set-block-end, set-block-chain and delete-block take the same track part and a block index selector "
         + "(Run/Body/*, Run/*/0, Run/Body/0-1). Every other op takes one exact address. A selector matching nothing is NoMatch, an index past the end is "
         + "IndexOutOfRange, and any failing target fails the whole batch and nothing is written. delete-block and delete-track run from the highest index down. "
@@ -22,7 +22,7 @@ public static class SequenceOps
 
     private const string SequenceAddressDescription = "Sequence name.";
     private const string TrackAddressDescription = "Track address: Sequence/TrackName or Sequence/index.";
-    private const string BlockAddressDescription = "Block address: Sequence/Track/index (zero-based). On a reference track the clip is block 0.";
+    private const string BlockAddressDescription = "Block address: Sequence/Track/index (zero-based). On a reference track each clip is a block, in list order.";
 
     public static IReadOnlyList<OpSpec> Specs { get; } =
     [
@@ -85,6 +85,11 @@ public static class SequenceOps
             new("track", "string", true, TrackAddressDescription + " Takes selectors."),
             new("value", "boolean", true, "true for continuous."),
         ]),
+        new("set-track-visible", "Shows or hides a track. A hidden track is not drawn and keeps its blocks; describe marks it hidden.",
+        [
+            new("track", "string", true, TrackAddressDescription + " Takes selectors."),
+            new("value", "boolean", true, "false to hide."),
+        ]),
         new("add-reference-track", "Adds a track, named after the target, that plays another sequence of the file from start seconds, once. Its clip is block 0 (set-block-start, set-block-length, set-block-end). Fails if the target would play the sequence back.",
         [
             new("sequence", "string", true, "Sequence that gets the track."),
@@ -139,6 +144,18 @@ public static class SequenceOps
         new("delete-block", "Deletes a block of a chain track; later blocks shift down. To remove a reference track use delete-track.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
+        ]),
+        new("duplicate-block", "Copies a block, or a clip of a reference track, keeping its length. The copy becomes the last block of the destination track. Chain blocks go to chain tracks and clips to reference tracks; a clip that would play its own sequence back fails with WouldCycle.",
+        [
+            new("block", "string", true, BlockAddressDescription),
+            new("to", "string", false, "Destination track address, in any sequence. Default: the block's own track."),
+            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default: the block's start on another track; on its own track, right after the block."),
+        ]),
+        new("move-block", "Moves a block, or a clip of a reference track, to another track, another start, or both, keeping its length. On another track it becomes the last block and later blocks of the old track shift down; on its own track it keeps its index. Chain blocks go to chain tracks and clips to reference tracks; a clip that would play its own sequence back fails with WouldCycle.",
+        [
+            new("block", "string", true, BlockAddressDescription),
+            new("to", "string", false, "Destination track address, in any sequence. Default: the block's own track."),
+            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default: unchanged."),
         ]),
     ];
 
@@ -205,7 +222,7 @@ public static class SequenceOps
     private static string? SelectorField(EditOp op) => op.Spec.Name switch
     {
         "set-sequence-loop" => "sequence",
-        "delete-track" or "set-track-continuous" => "track",
+        "delete-track" or "set-track-continuous" or "set-track-visible" => "track",
         "set-block-start" or "set-block-length" or "set-block-end" or "set-block-chain" or "delete-block" => "block",
         _ => null,
     };
@@ -253,6 +270,7 @@ public static class SequenceOps
             case "delete-track": return SequenceEdit.DeleteTrack(doc, undo, target);
             case "reorder-track": return SequenceEdit.ReorderTrack(doc, undo, v["track"], OptInt("index")!.Value);
             case "set-track-continuous": return SequenceEdit.SetTrackContinuous(doc, undo, target, Flag("value"));
+            case "set-track-visible": return SequenceEdit.SetTrackVisible(doc, undo, target, Flag("value"));
             case "add-reference-track": return SequenceEdit.AddReferenceTrack(doc, undo, v["sequence"], v["target"], Num("start"), OptInt("index"));
             case "add-source": return SequenceEdit.AddSource(doc, undo, v["path"]);
             case "remove-source": return SequenceEdit.RemoveSource(doc, undo, v["source"]);
@@ -267,6 +285,8 @@ public static class SequenceOps
             case "set-block-end": return SequenceEdit.SetBlockEnd(doc, undo, target, Num("end"));
             case "set-block-chain": return SequenceEdit.SetBlockChain(doc, undo, target, Opt("source"), v["chain"]);
             case "delete-block": return SequenceEdit.DeleteBlock(doc, undo, target);
+            case "duplicate-block": return SequenceEdit.DuplicateBlock(doc, undo, v["block"], Opt("to"), v.ContainsKey("start") ? Num("start") : null);
+            case "move-block": return SequenceEdit.MoveBlock(doc, undo, v["block"], Opt("to"), v.ContainsKey("start") ? Num("start") : null);
             default: throw new InvalidOperationException($"No handler for op '{op.Spec.Name}'.");
         }
     }

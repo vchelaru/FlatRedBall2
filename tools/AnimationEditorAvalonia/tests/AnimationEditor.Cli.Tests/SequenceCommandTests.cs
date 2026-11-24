@@ -43,9 +43,9 @@ public class SequenceCommandTests : IDisposable
         var r = await _w.RunAsync("describe", file);
 
         r.Code.ShouldBe(0, r.Err);
-        r.Out.ShouldContain("Run  (loop, 1 track, length 1.5)");
+        r.Out.ShouldContain("Run  (loop, 1 track, length 1.5s)");
         r.Out.ShouldContain("Body  continuous");
-        r.Out.ShouldContain("Run/Body/0  Walk  hero.achj  start 0  length 0.8  end 0.8");
+        r.Out.ShouldContain("Run/Body/0  Walk  hero.achj  start 0  length 0.8s  end 0.8");
         r.Out.ShouldContain("Run/Body/1  Idle  hero.achj  start 1  length auto  end 1.5");
     }
 
@@ -222,7 +222,7 @@ public class SequenceCommandTests : IDisposable
 
         cycle.ShouldBe(1);
         ok.Code.ShouldBe(0, ok.Out + ok.Err);
-        describe.Out.ShouldContain("Run/Sub/0  plays Other  start 1  length 1  end 2");
+        describe.Out.ShouldContain("Run/Sub/0  plays Other  start 1  length 1s  end 2");
         describe.Out.ShouldContain("Run/Sub/1  plays Other  start 3");
         SequenceListSave.FromFile(file).Sequences[0].Tracks[1].References!.Count.ShouldBe(2);
 
