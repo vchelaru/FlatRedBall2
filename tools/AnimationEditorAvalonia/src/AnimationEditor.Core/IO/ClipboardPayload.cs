@@ -81,6 +81,17 @@ public static class ClipboardPayload
         _ => throw new System.ArgumentOutOfRangeException(nameof(payload)),
     };
 
+    /// <summary>
+    /// What a copy and paste does to chains, without the text: textures named by absolute path and lengths in the
+    /// pasting file's unit. Changes <paramref name="chains"/> in place, so pass ones no open document holds.
+    /// </summary>
+    internal static void Retarget(
+        List<AnimationChainSave> chains, string sourceFolder, FrameLengthUnit sourceUnit, FrameLengthUnit destinationUnit)
+    {
+        ResolveChainTextures(chains, sourceFolder);
+        ConvertLengths(chains.SelectMany(c => c.Frames), sourceUnit, destinationUnit);
+    }
+
     private static List<AnimationChainSave> ResolveChainTextures(
         List<AnimationChainSave> chains, string? sourceAchxFolder)
     {

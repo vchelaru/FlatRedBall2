@@ -14,6 +14,8 @@ public abstract class InlineBatchTests : IDisposable
 
     public void Dispose() => _w.Dispose();
 
+    protected string PathOf(string file) => _w.PathOf(file);
+
     protected void Write(string file, string text) => _w.Write(file, text);
 
     protected string Raw(string file) => File.ReadAllText(_w.PathOf(file));

@@ -22,6 +22,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly ISelectedState _selectedState;
         private readonly List<object> _preSelection;
         private readonly List<AnimationChainSave> _anchorChains;
+        private readonly int? _insertIndex;
 
         private int[] _insertedIndices = [];
 
@@ -32,7 +33,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             IReadOnlyList<AnimationChainSave> chains,
             IAppCommands commands,
             IApplicationEvents events,
-            ISelectedState selectedState)
+            ISelectedState selectedState,
+            int? insertIndex = null)
         {
             _acls = acls;
             _chains = chains;
@@ -41,6 +43,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _selectedState = selectedState;
             _preSelection = new List<object>(selectedState.SelectedNodes);
             _anchorChains = selectedState.SelectedChains;
+            _insertIndex = insertIndex;
             Description = chains.Count == 1
                 ? $"Paste Animation '{chains[0].Name}'"
                 : $"Paste {chains.Count} Animations";
@@ -50,7 +53,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             if (_chains.Count == 0) return false;
 
-            ChainPasteLogic.InsertPastedChains(_acls, _chains, _anchorChains);
+            ChainPasteLogic.InsertPastedChains(_acls, _chains, _anchorChains, _insertIndex);
             _insertedIndices = _chains
                 .Select(c => _acls.AnimationChains.IndexOf(c))
                 .ToArray();

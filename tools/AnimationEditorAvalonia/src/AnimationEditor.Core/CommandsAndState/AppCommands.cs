@@ -2672,11 +2672,11 @@ namespace AnimationEditor.Core.CommandsAndState
         // ── Paste (clipboard → project) ───────────────────────────────────────
 
         /// <inheritdoc cref="IAppCommands.PasteChains"/>
-        public void PasteChains(IReadOnlyList<AnimationChainSave> chains)
+        public void PasteChains(IReadOnlyList<AnimationChainSave> chains, int? insertIndex = null)
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null) return;
-            _undoManager.Execute(new PasteChainsCommand(acls, chains, this, _events, _selectedState));
+            _undoManager.Execute(new PasteChainsCommand(acls, chains, this, _events, _selectedState, insertIndex));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteFrames"/>

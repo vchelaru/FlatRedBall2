@@ -32,12 +32,12 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 
 **Bulk selectors.** Frame ops take `Walk/*`, `Walk/2-5`, `Walk/0,3,7`; `delete-chain`, chain flag setters, `set-chain-length`, `invert-frame-order`, `justify-offsets-bottom` and the chain part of frame addresses take globs (`Walk*`); shape and event addresses take the same (`Walk/*/rect/Hitbox`, `*/*/event/*`) and skip frames without the shape or event. A selector matching nothing, or any index past a chain end, is an error, and one failing target fails the whole batch. `--schema` has the full rules.
 
-**Copy elsewhere.** `duplicate-frame` takes `to` (chain) and `index`; `duplicate-shape` and `duplicate-frame-event` take `to` (a frame selector: `duplicate-shape Walk/0/rect/Hitbox to=Walk/1-7`). A shape name already in a target frame, the source frame included, fails the batch. To move, duplicate then delete in one batch.
+**Copy elsewhere.** `duplicate-frame` takes `to` (chain) and `index`; `duplicate-shape` and `duplicate-frame-event` take `to` (a frame selector: `duplicate-shape Walk/0/rect/Hitbox to=Walk/1-7`). A shape name already in a target frame, the source frame included, fails the batch. To move, duplicate then delete in one batch. `import-chain <chain or glob> from=<file>` appends chains of another `.achx`/`.achj`, textures referenced in place and lengths converted; taken names fail the batch, and `name` renames a single copy. Check errors the chains have in their source (a missing texture) fail the batch; fix the source, or set the texture in the same batch.
 
 ## Landmines
 
 - `reorder-*` takes the final zero-based position. Moving to the current position changes nothing.
-- `add-chain` and a named `duplicate-chain` fail on a name already in use (the editor renames silently, aecli does not). An unnamed `duplicate-chain` numbers the copy (`Walk` becomes `Walk2`).
+- `add-chain`, `import-chain` and a named `duplicate-chain` fail on a name already in use (the editor renames silently, aecli does not). An unnamed `duplicate-chain` numbers the copy (`Walk` becomes `Walk2`).
 - `add-frame` shows the whole texture unless `region` (`x,y,width,height` in pixels) is given. `region` needs a PNG, because the size is read from the PNG header. `length` is in the file's own time unit; leave it out for that unit's default.
 - Setting a value a thing already has is a no-op. Editing a locked chain's flags, frames or shapes, or deleting it, fails with code `Locked` (unlock with `set-chain-locked`; `describe` shows which chains are locked). `rename|reorder|duplicate-chain` still work on it, and `set-unit` converts locked chains too.
 - `set-frame-length` is in the file's unit and range-checked (0.001-60 s, 1-60000 ms). `set-unit` converts all lengths so playback time stays the same; later ops in the batch use the new unit.
