@@ -258,12 +258,14 @@ public sealed class TsxInPlaceSaveTests : IDisposable
         var ctx = TestHelpers.SetupFreshAcls();
         await ctx.AppCommands.OpenTsxWorkflowAsync(path);
         string? failure = null;
-        ctx.AppCommands.SaveFailed += message => failure = message;
+        ctx.AppCommands.SaveAsRefused += message => failure = message;
+        ctx.UndoManager.MarkSaved();
         ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
 
-        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+        (await ctx.AppCommands.SaveCurrentAnimationChainListAsync()).ShouldBeFalse();
 
         failure.ShouldNotBeNull();
+        ctx.UndoManager.SaveState.ShouldBe(SaveState.AutoSaveOn);
         new FilePath(ctx.ProjectManager.FileName!).ShouldBe(new FilePath(path));
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[0].TextureName.ShouldBe("Heroes.png");
     }
@@ -406,6 +408,24 @@ public sealed class TsxInPlaceSaveTests : IDisposable
 
         var expected = Tileset(string.Format(content, rebased ?? reference));
         File.ReadAllText(target).ShouldBe(image is null ? expected : expected.Replace($"source=\"{image}\"", $"source=\"{rebasedImage}\""));
+    }
+
+    // The frames are rebased after the copy is written, so a name no path can be made of must not stop it half way.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("a\0.png")]
+    public void MoveTsxProject_FrameWithAnUnusableTextureName_LeavesThatName(string? name)
+    {
+        var pm = Open(Write(Xml));
+        var frames = pm.AnimationChainListSave!.AnimationChains.Select(chain => chain.Frames[0]).ToList();
+        var copy = Path.Combine(Directory.CreateDirectory(Path.Combine(_dir.Path, "Copies")).FullName, "Copy.tsx");
+        pm.SaveTsxProject(copy);
+        frames[0].TextureName = name!;
+
+        pm.MoveTsxProject(new FilePath(copy)).ShouldBeTrue();
+
+        frames.Select(frame => frame.TextureName).ShouldBe([name, "../Heroes.png"]);
     }
 
     [Fact]

@@ -197,10 +197,21 @@ namespace AnimationEditor.Core
         public void SaveAnimationChainList(AnimationChainListSave acls, string targetPath, TextureCoordinateType diskFormat)
         {
             var achxDirectory = System.IO.Path.GetDirectoryName(targetPath) ?? string.Empty;
-            NormalizeFrameTextureNames(acls, achxDirectory);
+            var textureNames = acls.AnimationChains.SelectMany(chain => chain.Frames)
+                .Select(frame => (Frame: frame, frame.TextureName)).ToList();
             void Write() { if (IsJsonPath(targetPath)) acls.SaveJson(targetPath); else acls.Save(targetPath); }
 
-            TextureCoordinateConverter.WriteAs(acls, diskFormat, TextureCoordinateConverter.SizesIn(achxDirectory), Write);
+            try
+            {
+                NormalizeFrameTextureNames(acls, achxDirectory);
+                TextureCoordinateConverter.WriteAs(acls, diskFormat, TextureCoordinateConverter.SizesIn(achxDirectory), Write);
+            }
+            catch
+            {
+                // The document is still where it was, and a name relative to the target's folder is another file there.
+                foreach (var (frame, name) in textureNames) frame.TextureName = name;
+                throw;
+            }
         }
 
         /// <summary>True when <paramref name="path"/> has a .achj (JSON) extension; false for .achx or anything else.</summary>
