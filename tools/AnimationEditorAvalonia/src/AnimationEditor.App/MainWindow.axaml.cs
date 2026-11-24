@@ -7005,7 +7005,8 @@ public partial class MainWindow : Window
             widths[i] = _timelineFrames[i].Width;
 
         var result = TimelineScrubMapper.Resolve(contentX, widths);
-        PreviewCtrl.ScrubToFrame(result.FrameIndex, result.Fraction);
+        // A modifier click keeps today's plain frame selection.
+        PreviewCtrl.ScrubToFrame(result.FrameIndex, result.Fraction, followShape: e.KeyModifiers == KeyModifiers.None);
 
         UpdateTimelineScrubber(result.FrameIndex);
         if (result.FrameIndex >= 0 && result.FrameIndex < _timelineFrames.Count)
