@@ -18,10 +18,14 @@ namespace AnimationEditor.Core.Models
             tab.CachedReferencedPngs = pm.ReferencedPngs;
         }
 
-        /// <summary>Discards the cached model so the next activation reloads from disk.</summary>
+        /// <summary>
+        /// Discards the cached model so the next activation reloads from disk, and the undo history with it: its
+        /// commands hold that model's objects.
+        /// </summary>
         public static void Invalidate(TabEntry tab)
         {
             tab.CachedEditorModel = null;
+            tab.UndoSnapshot = null;
             tab.CachedDiskState = null;
             tab.SaveFailed = false;
         }
