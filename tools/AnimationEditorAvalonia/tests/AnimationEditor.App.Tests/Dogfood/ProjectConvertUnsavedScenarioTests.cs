@@ -56,15 +56,29 @@ public class ProjectConvertUnsavedScenarioTests
     private static int SavedX(string path) =>
         (int)AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Single().LeftCoordinate;
 
-    [AvaloniaTheory]
-    [InlineData("hero.achx")]
-    [InlineData("boss.achx")]
-    public async Task ConvertFile_TabWithAFailedSave_SavesItFirst_AndAsksNothingMore(string inFront)
+    // Right-clicking a file row brings its tab to the front, so only a folder convert finds the tab behind.
+    [AvaloniaFact]
+    public async Task ConvertFolder_TabBehindWithAFailedSave_SavesItFirst()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
         UnusualProjectScenarioTests.MakeWritable(hero);
-        editor.ClickTab(inFront);
+        editor.ClickTab("boss.achx");
+
+        PickFromRow(editor, "Sprites", "Convert Animations to .achj");
+
+        SavedX(Path.ChangeExtension(hero, ".achj")).ShouldBe(8);
+        recycled.ShouldBe(new[] { "boss.achx", "hero.achx" });
+        editor.Tabs.Tabs.ShouldBeEmpty();
+        editor.ProblemText.ShouldBeNull("the failed save it reported is done");
+    }
+
+    [AvaloniaFact]
+    public async Task ConvertFile_TabWithAFailedSave_SavesItFirst_AndAsksNothingMore()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
+        UnusualProjectScenarioTests.MakeWritable(hero);
 
         PickFromRow(editor, "hero.achx", "Convert to .achj");
 
@@ -92,15 +106,12 @@ public class ProjectConvertUnsavedScenarioTests
         editor.ProblemText.ShouldBe(banner);
     }
 
-    [AvaloniaTheory]
-    [InlineData("hero.achx")]
-    [InlineData("boss.achx")]
-    public async Task ConvertFile_TabWhoseFileChangedOnDisk_IsNotConverted(string inFront)
+    [AvaloniaFact]
+    public async Task ConvertFile_TabWhoseFileChangedOnDisk_IsNotConverted()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
         UnusualProjectScenarioTests.MakeWritable(hero);
-        editor.ClickTab(inFront);
         File.AppendAllText(hero, "<!-- edited elsewhere -->");
         string heroText = File.ReadAllText(hero);
 
@@ -114,20 +125,27 @@ public class ProjectConvertUnsavedScenarioTests
 
     // Skipped, so its tab stays open, and must know the edits are saved now.
     [AvaloniaTheory]
-    [InlineData("hero.achx")]
-    [InlineData("boss.achx")]
-    public async Task ConvertFile_TabWithAFailedSave_WhoseAchjExists_IsSaved_AndItsTabKnows(string inFront)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Convert_TabWithAFailedSave_WhoseAchjExists_IsSaved_AndItsTabKnows(bool folderWithTheTabBehind)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
         UnusualProjectScenarioTests.MakeWritable(hero);
-        editor.ClickTab(inFront);
         File.WriteAllText(Path.ChangeExtension(hero, ".achj"), "another file");
 
-        PickFromRow(editor, "hero.achx", "Convert to .achj");
+        if (folderWithTheTabBehind)
+        {
+            editor.ClickTab("boss.achx");
+            PickFromRow(editor, "Sprites", "Convert Animations to .achj");
+        }
+        else
+        {
+            PickFromRow(editor, "hero.achx", "Convert to .achj");
+        }
 
         File.ReadAllText(Path.ChangeExtension(hero, ".achj")).ShouldBe("another file");
-        recycled.ShouldBeEmpty();
+        recycled.ShouldNotContain("hero.achx");
         SavedX(hero).ShouldBe(8);
         editor.ClickTab("hero.achx");
         editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(8);
