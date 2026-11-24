@@ -597,10 +597,16 @@ namespace AnimationEditor.Core.CommandsAndState
         // Null in the CLI: it has no tabs to switch back to, and hashing would slow its startup.
         private DiskState? ReadDiskState(string path) => AutosaveOnChange ? DiskState.Read(new FilePath(path)) : null;
 
-        private bool RefuseIfStale(string path)
+        private bool RefuseIfStale(string path, bool toAnotherFile = false)
         {
             if (!_staleOnDiskReasons.TryGetValue(new AnimationEditor.Core.Paths.FilePath(path).FullPath, out var staleReason))
                 return false;
+            if (toAnotherFile)
+            {
+                SaveAsRefused?.Invoke(
+                    $"Could not save {new FilePath(path).NoPath}: it changed on disk and couldn't be reloaded ({staleReason}). Pick another name.");
+                return true;
+            }
             SaveFailed?.Invoke(SaveTarget.UnreadableOnDiskMessage(path, staleReason));
             return true;
         }
@@ -617,17 +623,20 @@ namespace AnimationEditor.Core.CommandsAndState
             return true;
         }
 
-        public void SaveCurrentAnimationChainList(string? fileName = null)
+        /// <inheritdoc/>
+        public bool SaveCurrentAnimationChainList(string? fileName = null) => WriteDocument(fileName ?? _pm.FileName);
+
+        // toAnotherFile: Save As. A failure there says nothing about the document's own file, which is as saved as it was.
+        private bool WriteDocument(string? target, bool toAnotherFile = false)
         {
-            var target = fileName ?? _pm.FileName;
             if (!string.IsNullOrEmpty(target))
             {
                 // Only after a failed save: otherwise the live reload takes the file's change.
-                if (RefuseIfStale(target)
+                if (RefuseIfStale(target, toAnotherFile)
                     || (_undoManager.SaveState == SaveState.Failed && RefuseIfChangedOnDisk(target, _diskState)))
                 {
-                    _undoManager.MarkSaveFailed();
-                    return;
+                    if (!toAnotherFile) _undoManager.MarkSaveFailed();
+                    return false;
                 }
 
                 try
@@ -648,9 +657,14 @@ namespace AnimationEditor.Core.CommandsAndState
                 }
                 catch (Exception ex)
                 {
+                    if (toAnotherFile)
+                    {
+                        SaveAsRefused?.Invoke($"Could not save {new FilePath(target).NoPath}: {ex.Message}");
+                        return false;
+                    }
                     _undoManager.MarkSaveFailed();
                     SaveFailed?.Invoke(ex.Message);
-                    return;
+                    return false;
                 }
 
                 // A native tsx project has no achx to push from -- the achj-push feature
@@ -662,9 +676,9 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 _ioManager.WriteRecoveryFile(_pm.AnimationChainListSave);
             }
+            return true;
         }
 
-        /// <inheritdoc/>
         /// <inheritdoc cref="IAppCommands.SaveDocument"/>
         public bool SaveDocument(TabEntry tab)
         {
@@ -839,8 +853,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// current animation chain list to the chosen path, update
         /// <see cref="ProjectManager.FileName"/>, and fire <see cref="SaveAsCompleted"/>
         /// and <see cref="IApplicationEvents.CurrentFileChanged"/>.
-        /// Does nothing if the user cancels the dialog.
+        /// Does nothing if the user cancels the dialog, and only reports why when the path is refused or the write fails.
         /// </summary>
+        /// <returns>Whether the document was saved there.</returns>
         /// <remarks>
         /// The dialog's default extension follows the currently-loaded file: <c>achj</c> (JSON)
         /// for a brand-new, never-saved file (#872 -- .achj is the default going forward), or
@@ -848,7 +863,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// on-disk format of an opened legacy file). The user can still pick the other format
         /// from the dialog's file-type dropdown (#973).
         /// </remarks>
-        public async Task SaveCurrentAnimationChainListAsync()
+        public async Task<bool> SaveCurrentAnimationChainListAsync()
         {
             var currentExtension = string.IsNullOrEmpty(_pm.FileName)
                 ? null
@@ -870,26 +885,28 @@ namespace AnimationEditor.Core.CommandsAndState
             var path = await FileDialogService.PickSaveFileAsync(
                 "Save Animation Chain", defaultExtension, fileTypeChoices, SaveDialogStart.For(_pm.FileName));
 
-            if (string.IsNullOrEmpty(path)) return;
+            if (string.IsNullOrEmpty(path)) return false;
 
             if (SaveTarget.IsAnotherType(path, fileTypeChoices.Select(choice => choice.Extension).ToArray()))
             {
                 string kind = _pm.IsNativeTsxProject ? "a .tsx" : "an .achj or .achx";
                 SaveAsRefused?.Invoke(SaveTarget.WrongTypeMessage(path, kind));
-                return;
+                return false;
             }
             if (IsPathOpenInAnotherTab?.Invoke(path) == true)
             {
                 SaveAsRefused?.Invoke(SaveTarget.OpenInAnotherTabMessage(path));
-                return;
+                return false;
             }
 
-            SaveCurrentAnimationChainList(path);
+            bool toAnotherFile = string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path);
+            if (!WriteDocument(path, toAnotherFile)) return false;
             _pm.FileName = path;
             SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();
             SaveAsCompleted?.Invoke(path);
             _events.RaiseCurrentFileChanged(path);
+            return true;
         }
 
         /// <summary>
