@@ -354,7 +354,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// the next free name, and selects the copies (the first is the primary), as one undo entry. A copy plays the copy of a
     /// sequence duplicated with it. Undo selects the originals again. Returns the new names.
     /// </summary>
-    public IReadOnlyList<string> DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices)
+    public IReadOnlyList<string> DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices, IReadOnlyList<string>? givenNames = null)
     {
         var ordered = InDocumentOrder(indices);
         if (ordered.Count == 0) return Array.Empty<string>();
@@ -362,7 +362,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
         var names = new List<string>();
         foreach (int index in ordered)
         {
-            string name = NameGenerator.ForCopy(used, Save.Sequences[index].Name);
+            string name = givenNames is not null && names.Count < givenNames.Count
+                ? givenNames[names.Count]
+                : NameGenerator.ForCopy(used, Save.Sequences[index].Name);
             names.Add(name);
             used.Add(name);
         }
@@ -562,7 +564,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// topmost selected one; on top, in front of every track, when it is null or not a track), in copied order, each with a free
     /// name. Their sources join this file's source list as <see cref="PasteChains"/> does, all as one undo entry.
     /// </summary>
-    public TimelinePasteResult PasteTracks(IUndoManager undo, int sequence, TimelineClipboardContent content, int? selectedTrack)
+    public TimelinePasteResult PasteTracks(IUndoManager undo, int sequence, TimelineClipboardContent content, int? selectedTrack, int? insertAtSlot = null)
     {
         if (content.Tracks.Count == 0) return TimelinePasteResult.Empty;
         string host = Save.Sequences[sequence].Name;
@@ -575,7 +577,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
             };
         }
         var tracks = Save.Sequences[sequence].Tracks;
-        int insertAt = selectedTrack is { } selected && selected >= 0 && selected < tracks.Count ? selected : 0;
+        int insertAt = insertAtSlot ?? (selectedTrack is { } selected && selected >= 0 && selected < tracks.Count ? selected : 0);
         var used = tracks.Select(t => t.Name).ToList();
         var names = new List<string>();
         foreach (var track in content.Tracks)

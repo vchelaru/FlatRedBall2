@@ -85,7 +85,51 @@ public static class SequenceEdit
         return Ok(target.Name);
     }
 
+    /// <summary>
+    /// Inserts a deep copy of a sequence right after it, tracks, blocks and reference tracks included. A null name picks the
+    /// next free numbered one ("Run 2"); a given name must be unused. Reference tracks keep their targets.
+    /// </summary>
+    public static EditResult DuplicateSequence(SequenceDocument doc, IUndoManager undo, string sequence, string? name)
+    {
+        var at = SequenceAddress.ResolveSequence(doc.Save, sequence);
+        if (!at.Ok) return FromAddress(at);
+        if (name is not null)
+        {
+            name = name.Trim();
+            var bad = CheckNewName(name, doc.Save.Sequences.Select(s => s.Name), "sequence");
+            if (bad is not null) return bad;
+        }
+
+        undo.SealCoalescing();
+        var made = doc.DuplicateSequences(undo, [at.Value!.Sequence], name is null ? null : [name]);
+        return Ok(made[0]);
+    }
+
     // ---- tracks ----
+
+    /// <summary>
+    /// Copies a track, blocks included, into another (or the same) sequence at zero-based <paramref name="index"/> (default 0,
+    /// the front). The copy keeps the track's name when free there, else gets the next numbered one ("Body 2").
+    /// A reference track is refused when its target would play the destination back.
+    /// </summary>
+    public static EditResult CopyTrack(SequenceDocument doc, IUndoManager undo, string track, string to, int? index)
+    {
+        var at = SequenceAddress.ResolveTrack(doc.Save, track);
+        if (!at.Ok) return FromAddress(at);
+        var dest = SequenceAddress.ResolveSequence(doc.Save, to);
+        if (!dest.Ok) return FromAddress(dest);
+        var owner = doc.Save.Sequences[dest.Value!.Sequence];
+        if (index is { } i && (i < 0 || i > owner.Tracks.Count)) return OutOfRange(i, owner.Tracks.Count + 1, "track slot");
+
+        if (!TimelineClipboard.TryRead(doc.CopyTracks(at.Value!.Sequence, [at.Value.Track]), out var content, out var readError) || content is null)
+            return Fail(EditErrorCode.Refused, readError ?? "Could not copy the track.");
+        undo.SealCoalescing();
+        int slot = index ?? 0;
+        var pasted = doc.PasteTracks(undo, dest.Value.Sequence, content, null, slot);
+        if (pasted.Errors.Count > 0)
+            return Fail(pasted.Tracks.Count == 0 ? EditErrorCode.WouldCycle : EditErrorCode.Refused, pasted.Errors[0]);
+        return Ok($"{owner.Name}/{owner.Tracks[pasted.Tracks[0]].Name}");
+    }
 
     /// <summary>
     /// Adds an empty track at zero-based <paramref name="index"/> (default 0, the front: the first track draws on top).
