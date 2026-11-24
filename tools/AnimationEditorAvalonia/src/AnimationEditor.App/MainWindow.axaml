@@ -551,12 +551,15 @@
                 Background="{DynamicResource BgCanvas}"
                 BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="0,0,0,1"
-                Height="30"
                 IsVisible="False">
+            <!-- AllowAutoHide="False" gives the bar its own row. An auto-hide bar lies over the tabs
+                 and takes the clicks on their lower half even while it is collapsed (#2034). -->
             <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                          VerticalScrollBarVisibility="Disabled">
+                          VerticalScrollBarVisibility="Disabled"
+                          AllowAutoHide="False">
                 <StackPanel x:Name="TabStrip"
-                            Orientation="Horizontal" />
+                            Orientation="Horizontal"
+                            Height="29" />
             </ScrollViewer>
         </Border>
 
