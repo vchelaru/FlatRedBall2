@@ -55,6 +55,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.CloseProject)]                       = Category.MutatingNotUndoable, // resets the project; clears the undo stack
         [nameof(IAppCommands.SaveCurrentAnimationChainList)]      = Category.MutatingNotUndoable, // writes a file; no model change
         [nameof(IAppCommands.SaveDocument)]                       = Category.MutatingNotUndoable, // writes another document's file; no model change
+        [nameof(IAppCommands.LastSaveStored)]                     = Category.NonMutating,
         [nameof(IAppCommands.SaveCurrentAnimationChainListAsync)] = Category.MutatingNotUndoable, // writes a file; no model change
         [nameof(IAppCommands.ExportAsync)]                        = Category.MutatingNotUndoable, // writes an export file (PixiJS json, Godot tres); no model change
         [nameof(IAppCommands.HandleApplicationClosing)]           = Category.MutatingNotUndoable, // deletes a recovery file; no model change

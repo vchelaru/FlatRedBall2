@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System;
 using System.IO;
 using System.Linq;
@@ -85,6 +86,17 @@ public class AppCommandsTsxAchxOnlyEditsTests : IDisposable
 
         Assert.Empty(chain.Frames[0].Events);
         Assert.False(_ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
+    public void PasteShapes_OntoSeveralFramesInNativeTsxProject_DoesNothing()
+    {
+        var chain = OpenTsx();
+
+        _ctx.AppCommands.PasteShapes(chain.Frames, [new CircleSave { Name = "Hit" }]);
+
+        chain.Frames.ShouldAllBe(f => f.ShapesSave == null || f.ShapesSave.Shapes.Count == 0);
+        _ctx.UndoManager.CanUndo.ShouldBeFalse();
     }
 
     [Fact]

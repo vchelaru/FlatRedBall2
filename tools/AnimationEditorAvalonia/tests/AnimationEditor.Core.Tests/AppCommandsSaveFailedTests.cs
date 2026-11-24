@@ -50,7 +50,7 @@ public class AppCommandsSaveFailedTests : IDisposable
         string? saveFailure = null;
         System.Collections.Generic.IReadOnlyList<string>? warnings = null;
         _ctx.AppCommands.SaveFailed += message => saveFailure = message;
-        _ctx.AppCommands.TsxSaveCompletedWithWarnings += w => warnings = w;
+        _ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, w) => warnings = w;
 
         var copy = _ctx.AppCommands.DuplicateChains([chain]).Single();
 

@@ -1307,9 +1307,9 @@ public partial class MainWindow : Window
                     : $"Exported {name} — {string.Join(" ", warnings)}");
             });
 
-        _appCommands.TsxSaveCompletedWithWarnings += warnings =>
+        _appCommands.TsxSaveCompletedWithWarnings += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
-                ShowProblem($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
+                ShowProblem($"Saved {new FilePath(path).NoPath}, but not every change applied — {string.Join(" ", warnings)}"));
         _appCommands.IsPathOpenInAnotherTab = path => IsOpenInTabOtherThan(_tabManager.ActiveTab, path);
         _appCommands.IsDocumentTabInFront = () => _tabManager.ActiveTab?.Kind is null or TabKind.Achx;
         _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));
@@ -8158,7 +8158,7 @@ public partial class MainWindow : Window
             if (completingCutAcrossDocuments)
             {
                 _appCommands.PasteChains(chains);
-                RemoveCutSourcesAndSaveTheirDocument();
+                RemoveCutSourcesAndSaveTheirDocument(chains);
             }
             else if (completingCut)
                 _appCommands.PasteChainsCut(chains, _pendingCutState.Chains);
@@ -8175,7 +8175,7 @@ public partial class MainWindow : Window
             if (completingCutAcrossDocuments)
             {
                 if (!_appCommands.PasteFrames(targetChain, frames, insertIndex)) return;
-                RemoveCutSourcesAndSaveTheirDocument();
+                RemoveCutSourcesAndSaveTheirDocument([targetChain]);
             }
             else if (completingCut)
                 _appCommands.PasteFramesCut(targetChain, frames, insertIndex, _pendingCutState.Frames);
@@ -8200,7 +8200,7 @@ public partial class MainWindow : Window
             if (completingCutAcrossDocuments)
             {
                 if (!_appCommands.PasteShapes(frame, shapes)) return;
-                RemoveCutSourcesAndSaveTheirDocument();
+                RemoveCutSourcesAndSaveTheirDocument([]);
             }
             else if (completingCut)
             {
@@ -8230,14 +8230,16 @@ public partial class MainWindow : Window
     /// Completes a cross-document cut: takes the cut items out of the document they came from and
     /// writes that document to its file. The source is a background tab's cached model, which no
     /// auto-save covers; left unsaved, the chain would come back from disk when that tab is closed,
-    /// reopened or hot-reloaded, leaving the project with it twice.
+    /// reopened or hot-reloaded, leaving the project with it twice. Keeps the cut items (the paste was a copy)
+    /// when the save of the document they were pasted into did not store <paramref name="pastedInto"/> in full.
     /// </summary>
-    private void RemoveCutSourcesAndSaveTheirDocument()
+    private void RemoveCutSourcesAndSaveTheirDocument(IReadOnlyList<AnimationChainSave> pastedInto)
     {
+        if (!_appCommands.LastSaveStored(pastedInto)) return;
         var source = _pendingCutState.SourceDocument;
         if (source is null) return;
         var namesBefore = source.AnimationChains.Select(chain => chain.Name).ToList();
-        _pendingCutState.RemoveSourcesFrom(source);
+        if (!_pendingCutState.RemoveSourcesFrom(source)) return; // all of them in locked chains
 
         var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
         if (sourceTab is null || sourceTab.Kind != TabKind.Achx || IsUntitledTab(sourceTab)) return;
