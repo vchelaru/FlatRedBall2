@@ -90,7 +90,7 @@ public class DescribeFilterTests : IDisposable
 
         var text = await _w.RunAsync("describe", file, "--sequence", "Run", "--summary");
         text.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ShouldBe(
-            ["Run/Body  1 block  length 0.8", "Run/EyeLeft  1 block  length 0.8", "Run/EyeRight  1 block  length 0.8"]);
+            ["Run/Body  1 block  length 0.8s", "Run/EyeLeft  1 block  length 0.8s", "Run/EyeRight  1 block  length 0.8s"]);
 
         var json = await _w.RunAsync("describe", file, "--track", "Body", "--summary", "--json");
         using var doc = JsonDocument.Parse(json.Out);

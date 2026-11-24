@@ -26,9 +26,9 @@ public class SequenceOpsTests : IDisposable
         SequenceOps.Specs.Select(s => s.Name).ShouldBe(
         [
             "add-sequence", "rename-sequence", "delete-sequence", "reorder-sequence", "set-sequence-loop", "duplicate-sequence", "duplicate-track",
-            "add-track", "rename-track", "delete-track", "reorder-track", "set-track-continuous", "add-reference-track",
+            "add-track", "rename-track", "delete-track", "reorder-track", "set-track-continuous", "set-track-visible", "add-reference-track",
             "add-source", "remove-source", "replace-source",
-            "add-block", "set-block-start", "set-block-length", "set-block-end", "set-block-chain", "delete-block",
+            "add-block", "set-block-start", "set-block-length", "set-block-end", "set-block-chain", "delete-block", "duplicate-block", "move-block",
         ], ignoreOrder: true);
     }
 
@@ -151,6 +151,36 @@ public class SequenceOpsTests : IDisposable
         save.Sequences.ShouldAllBe(s => !s.Loop);
         save.Sequences[0].Tracks.ShouldAllBe(t => t.Continuous);
         save.Sequences[0].Tracks[0].Chains.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Apply_SetTrackVisible_TakesSelectors()
+    {
+        Apply("""{"ops":[{"op":"set-track-visible","track":"Run/*","value":false}]}""").Success.ShouldBeTrue();
+
+        var save = Reload();
+        save.Sequences[0].Tracks.ShouldAllBe(t => !t.Visible);
+        save.Sequences[1].Tracks.ShouldAllBe(t => t.Visible);
+    }
+
+    [Fact]
+    public void Apply_DuplicateAndMoveBlock_LaterOpsSeeTheResult()
+    {
+        var run = Apply("""
+            {"ops":[
+              {"op":"duplicate-block","block":"Run/Body/0"},
+              {"op":"move-block","block":"Run/Body/2","to":"Rest/Body","start":1},
+              {"op":"duplicate-block","block":"Rest/Body/1","to":"Run/Shadow","start":2},
+              {"op":"move-block","block":"Rest/Body/1","start":3}
+            ]}
+            """);
+
+        run.Success.ShouldBeTrue(string.Join("; ", run.Result.Errors));
+        run.Result.ChangedItems.ShouldBe(["Run/Body/2", "Rest/Body/1", "Run/Shadow/1"]);
+        var save = Reload();
+        save.Sequences[0].Tracks[0].Chains.Count.ShouldBe(2);
+        save.Sequences[1].Tracks[0].Chains.Select(c => (c.Chain, c.Start)).ShouldBe([("Idle", 0.0), ("Walk", 3.0)]);
+        save.Sequences[0].Tracks[1].Chains[1].Start.ShouldBe(2);
     }
 
     [Fact]
