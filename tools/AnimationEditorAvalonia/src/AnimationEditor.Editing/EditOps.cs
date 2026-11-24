@@ -427,7 +427,7 @@ public static class EditOps
 
     /// <summary>
     /// Applies <paramref name="ops"/> to <paramref name="session"/>'s document in order and, only if every op
-    /// succeeded and no new check error appeared, saves once. Otherwise nothing is written. An empty or no-change
+    /// succeeded and no check error code has more errors than before, saves once. Otherwise nothing is written. An empty or no-change
     /// batch writes nothing either, so the file stays byte-identical.
     /// </summary>
     public static async Task<EditRunResult> ApplyAsync(EditSession session, IReadOnlyList<EditOp> ops)
@@ -488,7 +488,7 @@ public static class EditOps
         var added = CheckReport.NewErrors(before, after);
         if (added.Count > 0)
             return new EditRunResult(
-                new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings,
+                new EditResult([], added.Select(i => $"The edit would raise the count of check errors [{i.Code}]: {i.Message}").ToList(), warnings,
                 added.Select(_ => EditErrorCode.WouldBreakFile).ToList()),
                 added.Select(_ => (int?)null).ToList());
 

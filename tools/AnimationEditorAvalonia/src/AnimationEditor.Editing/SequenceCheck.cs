@@ -22,21 +22,21 @@ public static class SequenceCheck
         {
             if (sources.Chains(source) is null)
                 issues.Add(new(CheckSeverity.Error, "missing-source",
-                    sources.Exists(source) ? $"Source '{source}' could not be read." : $"Source '{source}' not found.", source));
+                    sources.Exists(source) ? $"Source '{source}' could not be read." : $"Source '{source}' not found."));
             else
                 foreach (var texture in CheckReport.MissingTextures(sources.Chains(source)!, sources.FullPath(source)))
                     issues.Add(new(CheckSeverity.Warning, "missing-texture", $"Source '{source}': texture '{texture}' not found."));
         }
 
         foreach (var group in save.Sequences.GroupBy(s => s.Name).Where(g => g.Count() > 1))
-            issues.Add(new(CheckSeverity.Error, "duplicate-sequence-name", $"{group.Count()} sequences are named '{group.Key}'.", group.Key));
+            issues.Add(new(CheckSeverity.Error, "duplicate-sequence-name", $"{group.Count()} sequences are named '{group.Key}'."));
 
         var unlisted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var sequence in save.Sequences)
         {
             foreach (var group in sequence.Tracks.GroupBy(t => t.Name).Where(g => g.Count() > 1))
                 issues.Add(new(CheckSeverity.Error, "duplicate-track-name",
-                    $"{group.Count()} tracks of '{sequence.Name}' are named '{group.Key}'.", $"{sequence.Name}/{group.Key}"));
+                    $"{group.Count()} tracks of '{sequence.Name}' are named '{group.Key}'."));
 
             foreach (var track in sequence.Tracks)
             {
@@ -80,7 +80,7 @@ public static class SequenceCheck
                     {
                         if (unlisted.Add(block.Source))
                             issues.Add(new(CheckSeverity.Error, "missing-source",
-                                $"{where} uses source '{block.Source}', which is not in the sources list.", block.Source));
+                                $"{where} uses source '{block.Source}', which is not in the sources list."));
                         continue;
                     }
                     if (sources.Chains(block.Source) is null) continue; // the source error above covers it
