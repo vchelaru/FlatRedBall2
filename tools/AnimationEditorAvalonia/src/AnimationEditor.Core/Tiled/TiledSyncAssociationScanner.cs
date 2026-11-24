@@ -45,21 +45,21 @@ public static class TiledSyncAssociationScanner
         var owners = new List<string>();
         foreach (var syncFile in Directory.EnumerateFiles(tsxDir.FullPath, "*.tiledsync", SearchOption.AllDirectories))
         {
-            AETiledSyncSave? settings;
+            List<string>? associated;
             try
             {
                 var json = File.ReadAllText(syncFile);
-                settings = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
+                associated = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave)?.TiledTilesetPaths;
             }
             catch
             {
                 continue;
             }
-            if (settings == null || settings.TiledTilesetPaths.Count == 0)
+            if (associated == null)
                 continue;
 
             var syncFolder = new FilePath(syncFile).GetDirectoryContainingThis();
-            bool matches = settings.TiledTilesetPaths
+            bool matches = associated
                 .Any(relative => new FilePath(syncFolder.FullPath + relative) == targetTsx);
             if (matches)
                 owners.Add(FindOwningAchxPath(syncFile));
