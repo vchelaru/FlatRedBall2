@@ -11,7 +11,7 @@ A game project that copied this skill has no FRB2 checkout beside it: set the fu
 
 | Command | Does |
 |---|---|
-| `describe <file> [--json]` | Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end and `chainLength`. `--json` gives each `.achx` chain a `length` in seconds (unit-independent). |
+| `describe <file> [--chain G] [--sequence G] [--track G] [--summary] [--json]` | `--chain` (.achx) or `--sequence`/`--track` (.seqj) take names or globs and show only those; `--summary` is one line per chain (frames, length) or track (blocks, length); a filter matching nothing fails with Did-you-mean. Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end and `chainLength`. `--json` gives each `.achx` chain a `length` in seconds (unit-independent). |
 | `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks (warnings). |
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
@@ -65,7 +65,7 @@ The extension picks the op set for `describe`, `check`, `new` and `edit`; `--sch
 
 Addresses: sequence `Run`, track `Run/Body` or `Run/0` (a name wins over an index), block `Run/Body/1` (index in the track). A reference track (plays another sequence) has one block, its clip, at index 0. Ops: add/rename/delete/reorder `sequence`, `duplicate-sequence` (optional `name`, else `Run 2`; copy lands right after), `set-sequence-loop`; add/rename/delete/reorder `track`, `duplicate-track` (`track`, `to` sequence, optional `index`; keeps the name if free, else `Body 2`; reference tracks that would cycle fail), `set-track-continuous`, `add-reference-track`; `add-source`, `remove-source`, `replace-source`; `add-block`, `set-block-start`, `set-block-length` (`length` seconds, or `clear: true` back to auto), `set-block-end` (length so the block ends at `end` seconds, using its current start; clips too), `set-block-chain` (`chain`, optional `source`; keeps start and length; not for clips), `delete-block`. A block with no length plays one cycle of its chain (a clip, one run of its target) and follows edits to it; `describe` shows it as `length auto`. Setters and `delete-*` take selectors (`Run/*`, `Run/0-1`, `Run/Body/0,2`, globs); see `--schema`.
 
-- `add-block` needs the source in the library (`add-source` first) and the chain in that source.
+- `add-block` needs the source in the library (`add-source` first) and the chain in that source. Omitted `start` is the end of the track's last block (0 if empty); omitted `source` is the library's only source (several: error listing them).
 - `add-track` and `add-reference-track` insert at `index` (default 0, the front: index 0 draws on top).
 - A block is cut short by the next block on its track; `check` warns, `describe` shows the cut end.
 - Not available: moving a block between tracks, track flip fields (the model has none).

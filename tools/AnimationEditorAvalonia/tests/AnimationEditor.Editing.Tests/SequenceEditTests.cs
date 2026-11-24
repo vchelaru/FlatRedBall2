@@ -263,6 +263,75 @@ public class SequenceEditTests : IDisposable
     }
 
     [Fact]
+    public void AddBlock_OmittedStart_GoesToTrackEnd_UsingAutoLength()
+    {
+        var s = _w.Open();
+
+        // Run/Body ends with Walk auto from 1: one cycle of 0.4 s.
+        var r = Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Run/Body", null, "Idle", null, null));
+
+        r.ChangedItems.ShouldBe(["Run/Body/2"]);
+        var block = Seq(s, "Run").Tracks[0].Chains[2];
+        (block.Source, block.Chain, block.Start).ShouldBe(("hero.achj", "Idle", 1.4));
+    }
+
+    [Fact]
+    public void AddBlock_OmittedStart_UsesLastBlockInTimeNotInList()
+    {
+        var s = _w.Open();
+        // Listed last but earliest in time, with a set length that would end past the other block's end if mistaken for last.
+        Seq(s, "Rest").Tracks[0].Chains.Add(new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Walk", Start = 0, Length = 9 });
+        Seq(s, "Rest").Tracks[0].Chains[0].Start = 2;
+
+        SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Body", null, "Idle", null, null).Success.ShouldBeTrue();
+
+        // The block that starts last (Idle at 2, auto 0.5 s) decides the end.
+        Seq(s, "Rest").Tracks[0].Chains[2].Start.ShouldBe(2.5);
+    }
+
+    [Fact]
+    public void AddBlock_OmittedStart_OnEmptyTrack_IsZero()
+    {
+        var s = _w.Open();
+        SequenceEdit.AddTrack(s.Document, s.Undo, "Rest", "Fresh", null).Success.ShouldBeTrue();
+
+        SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Fresh", null, "Walk", null, 1).Success.ShouldBeTrue();
+
+        Seq(s, "Rest").Tracks[0].Chains.Single().Start.ShouldBe(0);
+    }
+
+    [Fact]
+    public void AddBlock_OmittedStart_AfterLastBlockWithSetLength_UsesItsLength()
+    {
+        var s = _w.Open();
+        // Rest/Body: Idle@0 auto; give it a set length 3 (longer than its cycle).
+        Seq(s, "Rest").Tracks[0].Chains[0].Length = 3;
+
+        SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Body", "hero.achj", "Walk", null, null).Success.ShouldBeTrue();
+
+        Seq(s, "Rest").Tracks[0].Chains[1].Start.ShouldBe(3);
+    }
+
+    [Fact]
+    public void AddBlock_OmittedSource_OneSource_UsesIt_ManyOrNone_Errors()
+    {
+        var s = _w.Open();
+        SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Body", null, "Walk", 1, null).Success.ShouldBeTrue();
+        Seq(s, "Rest").Tracks[0].Chains[1].Source.ShouldBe("hero.achj");
+
+        SequenceEdit.AddSource(s.Document, s.Undo, "villain.achj").Success.ShouldBeTrue();
+        var many = Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Body", null, "Walk", 1, null));
+        many.Success.ShouldBeFalse();
+        many.CodeAt(0).ShouldBe(EditErrorCode.InvalidValue);
+        many.Errors[0].ShouldContain("hero.achj");
+        many.Errors[0].ShouldContain("villain.achj");
+
+        SequenceEdit.RemoveSource(s.Document, s.Undo, "villain.achj").Success.ShouldBeTrue();
+        s.Document.Save.Sources.Clear();
+        Run(s, () => SequenceEdit.AddBlock(s.Document, s.Undo, "Rest/Body", null, "Walk", 1, null)).CodeAt(0).ShouldBe(EditErrorCode.NotFound);
+    }
+
+    [Fact]
     public void AddBlock_Errors()
     {
         var s = _w.Open();
