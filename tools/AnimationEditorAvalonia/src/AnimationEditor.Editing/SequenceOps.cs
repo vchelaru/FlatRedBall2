@@ -54,7 +54,7 @@ public static class SequenceOps
             new("sequence", "string", true, SequenceAddressDescription),
             new("name", "string", false, "Name of the copy, unique in the file, no '/'."),
         ]),
-        new("copy-track", "Copies a track with its blocks into a sequence (it may be the one it is in). The copy keeps the track's name when free there, else gets the next numbered one (Body 2); rename-track changes it. A reference track fails with WouldCycle if its target would play the destination back.",
+        new("duplicate-track", "Duplicates a track with its blocks into a sequence (it may be the one it is in). The copy keeps the track's name when free there, else gets the next numbered one (Body 2); rename-track changes it. A reference track fails with WouldCycle if its target would play the destination back.",
         [
             new("track", "string", true, TrackAddressDescription),
             new("to", "string", true, "Destination sequence."),
@@ -245,7 +245,7 @@ public static class SequenceOps
             case "reorder-sequence": return SequenceEdit.ReorderSequence(doc, undo, v["sequence"], OptInt("index")!.Value);
             case "set-sequence-loop": return SequenceEdit.SetSequenceLoop(doc, undo, target, Flag("value"));
             case "duplicate-sequence": return SequenceEdit.DuplicateSequence(doc, undo, v["sequence"], Opt("name"));
-            case "copy-track": return SequenceEdit.CopyTrack(doc, undo, v["track"], v["to"], OptInt("index"));
+            case "duplicate-track": return SequenceEdit.CopyTrack(doc, undo, v["track"], v["to"], OptInt("index"));
             case "add-track": return SequenceEdit.AddTrack(doc, undo, v["sequence"], Opt("name"), OptInt("index"));
             case "rename-track": return SequenceEdit.RenameTrack(doc, undo, v["track"], v["to"]);
             case "delete-track": return SequenceEdit.DeleteTrack(doc, undo, target);
