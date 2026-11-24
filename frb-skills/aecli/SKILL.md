@@ -13,6 +13,7 @@ Headless front end to the AnimationEditor's editing code (`tools/AnimationEditor
 | `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks (warnings). |
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
+| `render <file> --out <dir> [options]` | Writes PNGs without the editor, see Rendering below. |
 | `edit <file> --ops ops.json [--json]` | Applies the ops in order, then saves once. |
 | `--schema [--json]` | Lists every op (animation ops, then `sequenceOps` in JSON) with its fields, types and allowed values. Starts with a one-line example ops file (a `{"ops":[...]}` object, never a bare array). Run it before writing an ops file; it is the source of truth for ops. |
 
@@ -45,6 +46,15 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - `set-rect|circle|polygon` need that exact type in the address, change only the fields given, and require scale and radius above 0. `set-polygon` `points` is `[[x,y],...]`, at least 3, stored exactly as given: the editor's closed outlines repeat the first point at the end, so repeat it to keep one closed.
 - Keyframe flags: a chain's first frame, and the first shape of a run of frames with the same name, is always a keyframe, so turning that off fails. A curve can only be set on a keyframe; the curve is the glide to the next keyframe. `describe` lists each frame's non-zero `offset x,y` and set flips (`flip H V D`; always present in `--json`), plus `offset=skip` for a keyframe turned off and `offset-curve=Type/Easing` for a stored curve.
 - `reorder-shape` takes the final position among shapes of the same type in the frame; shapes never cross types. `set-frame-event` keeps an omitted name or data, and empty `data` clears it.
+
+## Rendering (`render`)
+
+`render hero.seqj --sequence Run --at 0,0.4 --out shots` writes `Run_0.png`, `Run_0.4.png` (composited like the editor's sequence preview: track 0 in front) and prints the paths. `.achx/.achj`: `--chain Walk --frame 0,1` (`Walk_frame0.png`) or `--at 0.3` (`Walk_0.3.png`). `--sequence`/`--chain` may be left out when the file has only one; `--at` defaults to 0, `--frame` to 0.
+
+- `--scale <1-16>` (default 4), `--background transparent|black|white|gray|#RRGGBB` (default transparent), `--grid` (origin axes plus a 16-unit grid).
+- `--bounds auto` (default) fits one canvas to every sprite across all requested times, so images line up and are the same size. `--bounds x,y,w,h` fixes it: x,y is the lower-left corner in offset units, Y up like frame offsets; sprites outside are cropped.
+- `--json` gives `{success, files, errors:[{code,message}]}`. Unknown names fail with exit 1 and a Did-you-mean; a bad option or missing `--out` is exit 2.
+- A track is hidden outside its chains, so a time can legitimately draw nothing, but all requested times drawing nothing fails.
 
 ## Sequence files (.seqj)
 

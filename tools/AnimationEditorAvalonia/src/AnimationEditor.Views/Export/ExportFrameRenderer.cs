@@ -12,6 +12,9 @@ namespace AnimationEditor.Views.Export;
 /// <summary>One composed frame as straight (not premultiplied) RGBA, row-major from the top-left.</summary>
 internal sealed record RenderedFrame(byte[] Rgba, int DelayTicks);
 
+/// <summary>A canvas rectangle in offset space: X, Y is the lower-left corner (Y up).</summary>
+internal readonly record struct CanvasRect(float X, float Y, float Width, float Height);
+
 internal sealed record RenderedAnimation(int Width, int Height, IReadOnlyList<RenderedFrame> Frames);
 
 /// <summary>
@@ -30,13 +33,17 @@ internal static class ExportFrameRenderer
     /// <param name="resolveTexturePath">Maps a frame to its texture file; <c>null</c> skips that layer.</param>
     /// <param name="offsetMultiplier">The editor's unit multiplier from stored offsets to pixels.</param>
     /// <param name="maxDimension">The format's limit for either side of the canvas.</param>
+    /// <param name="fixedCanvas">Replaces the fitted canvas when set; sprites that fall outside are cropped.</param>
+    /// <param name="overlay">Drawn over every frame with the output pixel position of the entity origin (x, y).</param>
     /// <exception cref="InvalidOperationException">Nothing drawable, or the result would be too large.</exception>
     public static RenderedAnimation Render(
         IReadOnlyList<ExportTimelineFrame> timeline,
         Func<AnimationFrameSave, string?> resolveTexturePath,
         float offsetMultiplier,
         AnimationExportOptions options,
-        int maxDimension)
+        int maxDimension,
+        CanvasRect? fixedCanvas = null,
+        Action<SKCanvas, float, float>? overlay = null)
     {
         if (options.Scale < 1 || options.Scale > AnimationExportOptions.MaxScale)
             throw new ArgumentOutOfRangeException(nameof(options), $"Scale must be 1 to {AnimationExportOptions.MaxScale}.");
@@ -70,10 +77,23 @@ internal static class ExportFrameRenderer
             if (placements.All(p => p.Count == 0))
                 throw new InvalidOperationException("None of the animations' textures could be loaded.");
 
-            int minLeft = placements.SelectMany(p => p).Min(p => p.Left);
-            int minTop = placements.SelectMany(p => p).Min(p => p.Top);
-            int width = placements.SelectMany(p => p).Max(p => p.Left + p.Width) - minLeft;
-            int height = placements.SelectMany(p => p).Max(p => p.Top + p.Height) - minTop;
+            int minLeft, minTop, width, height;
+            if (fixedCanvas is { } rect)
+            {
+                // The rect is in offset space (Y up, lower-left corner); the canvas is Y down.
+                minLeft = (int)Math.Round(rect.X * options.Scale);
+                minTop = (int)Math.Round(-(rect.Y + rect.Height) * options.Scale);
+                width = (int)Math.Round(rect.Width * options.Scale);
+                height = (int)Math.Round(rect.Height * options.Scale);
+                if (width < 1 || height < 1) throw new InvalidOperationException("The bounds are empty.");
+            }
+            else
+            {
+                minLeft = placements.SelectMany(p => p).Min(p => p.Left);
+                minTop = placements.SelectMany(p => p).Min(p => p.Top);
+                width = placements.SelectMany(p => p).Max(p => p.Left + p.Width) - minLeft;
+                height = placements.SelectMany(p => p).Max(p => p.Top + p.Height) - minTop;
+            }
             if (width > maxDimension || height > maxDimension)
                 throw new InvalidOperationException($"The image would be {width} x {height} pixels, over this format's {maxDimension} pixel limit. Lower the scale.");
             if ((long)width * height > MaxCanvasPixels)
@@ -98,6 +118,7 @@ internal static class ExportFrameRenderer
                         cx: p.Left - minLeft + p.Width / 2f, cy: p.Top - minTop + p.Height / 2f,
                         zoom: options.Scale, alpha: 1f, showOutline: false);
                 }
+                overlay?.Invoke(canvas, -minLeft, -minTop);
                 if (!surface.ReadPixels(readback, pixels.GetPixels(), pixels.RowBytes, 0, 0))
                     throw new InvalidOperationException("Could not read back a rendered frame.");
                 frames.Add(new RenderedFrame(pixels.Bytes, timeline[i].DelayTicks));
