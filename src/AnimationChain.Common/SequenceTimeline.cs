@@ -30,11 +30,12 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// different clips are one sprite (<see cref="SequenceReferences.Inline"/>).</item>
 /// <item>A <see cref="SequenceTrackSave.Continuous"/> reference track carries its first clip's target phase across the wrap of a looping holder (<see cref="ReferenceCarryOver"/>): the target keeps running instead of restarting.</item>
 /// <item>A sequence with <see cref="SequenceSave.Loop"/> off does not end by going blank: it stops at its length and holds
-/// its final pose (<see cref="PoseTime"/>). The hold is the composite of the last instant, so a track whose chains finished
-/// earlier stays hidden. With Loop on the sequence repeats from 0.</item>
+/// its final pose (<see cref="PoseTime"/>). The hold is the composite of the last instant (<see cref="LastInstant"/>), so a
+/// track whose chains finished earlier stays hidden. With Loop on the sequence repeats from 0.</item>
 /// <item>A time within the slack (<see cref="BoundaryTolerance"/>) before a loop's end is the start of the next loop, pass
 /// count included, so a time on a multiple of a length that summed to a hair more never lands on the hidden end
-/// (<see cref="WrapTime(double, double, out int)"/>). With Loop off such a time is the end, and holds.</item>
+/// (<see cref="WrapTime(double, double, out int)"/>). A player wraps its time that way before it samples: a looping sequence
+/// sampled at its own end is hidden. With Loop off such a time is the end, and holds.</item>
 /// </list>
 /// Cycle lengths come from the caller (a chain's frame lengths summed, doubled for ping-pong), so this class needs no
 /// chain data.
@@ -127,7 +128,7 @@ public static class SequenceTimeline
     /// <summary>
     /// Seconds of playback a <see cref="SequenceTrackSave.Continuous"/> track's first block has already advanced when pass
     /// <paramref name="pass"/> (0 = the first run through, 1 = after the first wrap) begins: 0 for pass 0, and for a track
-    /// that restarts at the wrap. At each wrap the carry becomes the playback time of the block playing at the wrap
+    /// that restarts at the wrap. At each wrap the carry becomes the playback time of the block playing at the <see cref="LastInstant"/>
     /// (<paramref name="sequenceLength"/> minus its start, plus its own carry when it is the first block), if that block
     /// is the same chain (source and name) as the first block and the first block starts at 0; otherwise 0. Passes are
     /// counted by the player: the number of times the looping sequence has wrapped.
@@ -140,7 +141,7 @@ public static class SequenceTimeline
         if (first.Start > Slack(0)) return 0;
 
         // The block playing just before the end of a pass: the wrap instant itself belongs to the next pass.
-        double endTime = sequenceLength - Math.Min(HoldEpsilon, sequenceLength);
+        double endTime = LastInstant(sequenceLength);
         double carry = 0;
         for (int i = 0; i < pass; i++)
         {
@@ -232,17 +233,27 @@ public static class SequenceTimeline
         return 0;
     }
 
-    /// <summary>How far before the end of a non-looping sequence its held final pose is sampled, in seconds.</summary>
+    /// <summary>How far before its end a sequence under 100 s has its <see cref="LastInstant"/>, in seconds.</summary>
     public const double HoldEpsilon = 1e-4;
+
+    /// <summary>
+    /// The last instant, in seconds, before the end of a sequence of <paramref name="length"/> seconds: what plays there is
+    /// what a non-looping sequence holds (<see cref="PoseTime"/>) and what a continuous track carries across the wrap
+    /// (<see cref="CarryOver"/>, <see cref="ReferenceCarryOver"/>). It is <see cref="HoldEpsilon"/> before the end, or twice
+    /// the slack (<see cref="BoundaryTolerance"/>, for <paramref name="length"/>) before it from 100 s on, where the slack
+    /// reaches <see cref="HoldEpsilon"/> and would hide everything. Never negative.
+    /// </summary>
+    public static double LastInstant(double length) =>
+        Math.Max(0, length - (length < 100 ? HoldEpsilon : 2 * Slack(length)));
 
     /// <summary>
     /// The time to sample a sequence's pose at for a playhead at <paramref name="time"/>. A sequence with
     /// <paramref name="loop"/> off stops at its end and holds its final pose: at or past <paramref name="length"/>, or within
-    /// the slack (<see cref="BoundaryTolerance"/>) before it, the pose is the one at the last instant before the end (<see cref="HoldEpsilon"/> earlier), so a track whose chains already
+    /// the slack (<see cref="BoundaryTolerance"/>) before it, the pose is the one at the <see cref="LastInstant"/> before the end, so a track whose chains already
     /// finished stays hidden and the rest keep their last frame. Otherwise, and for an empty sequence, the time is unchanged.
     /// </summary>
     public static double PoseTime(double time, double length, bool loop) =>
-        !loop && length > 0 && time + Slack(length) >= length ? length - Math.Min(HoldEpsilon, length) : time;
+        !loop && length > 0 && time + Slack(length) >= length ? LastInstant(length) : time;
 
     /// <summary>The track's reference clips in playback order: by start, ties kept in list order.</summary>
     public static IReadOnlyList<SequenceReferenceSave> OrderedClips(SequenceTrackSave track) =>
@@ -310,7 +321,7 @@ public static class SequenceTimeline
     /// when pass <paramref name="pass"/> (0 = the first run through, 1 = after the first wrap, counted by the player) of a
     /// looping holder of <paramref name="sequenceLength"/> seconds begins: 0 for pass 0, for a track that restarts at the
     /// wrap, and unless all of these hold: the first clip starts at 0, its target loops (<paramref name="loops"/>), and the
-    /// clip playing just before the holder's end (<see cref="ActiveClipAt"/>) plays the same sequence as the first clip.
+    /// clip playing at the holder's <see cref="LastInstant"/> (<see cref="ActiveClipAt"/>) plays the same sequence as the first clip.
     /// At each wrap the carry becomes the time that clip has played (<paramref name="sequenceLength"/> minus its start, plus
     /// its own carry when it is the first clip); otherwise 0. A clip that ends before the holder does is not playing at the
     /// wrap, so a default-length clip carries only when its target is as long as the holder; to carry a shorter looping
@@ -325,7 +336,7 @@ public static class SequenceTimeline
         if (first.Start > Slack(0) || targetLength(first) <= 0 || !loops(first)) return 0;
 
         // The clip playing just before the end of a pass: the wrap instant itself belongs to the next pass.
-        double endTime = sequenceLength - Math.Min(HoldEpsilon, sequenceLength);
+        double endTime = LastInstant(sequenceLength);
         double carry = 0;
         for (int i = 0; i < pass; i++)
         {

@@ -95,6 +95,32 @@ public class SequenceReferenceLoopWrapTests
         FramesAt(document, 0, 0, 0.39, 0.4, 0.41).ShouldBe("3 3 3");
     }
 
+    [Theory]
+    [InlineData(120)]
+    [InlineData(3600)]
+    public void At_LongNonLoopingSequence_HoldsItsFinalFrameDirectlyAndAsATarget(double length)
+    {
+        using var dir = new TestHelpers.TempDir();
+        var aura = Aura(loop: false);
+        aura.Tracks[0].Chains[0].Length = length;
+        var holder = Holder("Boss", false, Clip("Aura", 0, length));
+        holder.Loop = false;
+        var document = Load(dir, TimeMeasurementUnit.Second, aura, holder, Holder("Longer", false, Clip("Aura", 0, length + 10)));
+
+        FramesAt(document, 0, 0, length, length + 5).ShouldBe("3 3");
+        FramesAt(document, 1, 0, length, length + 5).ShouldBe("3 3");
+        FramesAt(document, 2, 0, length, length + 5).ShouldBe("3 3");
+    }
+
+    [Fact]
+    public void At_LongContinuousHolder_KeepsTheTargetsPhaseAcrossTheWrap()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, TimeMeasurementUnit.Second, Aura(), Holder("Boss", true, Clip("Aura", 0, 120.25)));
+
+        FramesAt(document, 1, 1, 0).ShouldBe("2"); // 120.25 s is 300 loops of 0.4 s and 0.25 s more
+    }
+
     [Fact]
     public void Clock_WrappingWithinTheSlackOfTheEnd_StartsTheNextPassAtZero()
     {

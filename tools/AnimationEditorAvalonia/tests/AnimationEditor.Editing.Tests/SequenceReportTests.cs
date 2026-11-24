@@ -196,4 +196,12 @@ public class SequenceReportTests : IDisposable
     {
         Check(WithContinuousClip(targetLoops: true, clipLength: 100)).Warnings.Select(i => i.Code).ShouldNotContain("continuous-ignored");
     }
+
+    [Theory]
+    [InlineData(120)]
+    [InlineData(3600)]
+    public void Check_ContinuousReferenceThatCarriesInALongHolder_HasNoWarning(double clipLength)
+    {
+        Check(WithContinuousClip(targetLoops: true, clipLength)).Warnings.Select(i => i.Code).ShouldNotContain("continuous-ignored");
+    }
 }
