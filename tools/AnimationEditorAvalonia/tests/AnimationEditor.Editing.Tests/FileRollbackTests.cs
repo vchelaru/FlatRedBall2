@@ -35,6 +35,28 @@ public class FileRollbackTests : IDisposable
     }
 
     [Fact]
+    public void Restore_OldContentCannotBeSavedEither_SaysSoAndRestoresTheOtherFiles()
+    {
+        var other = Path.Combine(_dir, "other.png");
+        var inUse = Path.Combine(_dir, "far.png");
+        File.WriteAllText(other, "old");
+        File.WriteAllText(inUse, "old");
+        // A file where the folder should be, so nothing can be saved in it.
+        var rollback = new FileRollback(other);
+        rollback.Remember(other);
+        rollback.Remember(inUse); // restored first
+        File.WriteAllText(other, "new");
+        File.WriteAllText(inUse, "new");
+
+        IReadOnlyList<string> failures;
+        using (new FileStream(inUse, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            failures = rollback.Restore();
+
+        failures.ShouldHaveSingleItem().ShouldContain("Its old content could not be saved");
+        File.ReadAllText(other).ShouldBe("old");
+    }
+
+    [Fact]
     public void Restore_PathRememberedTwice_GoesBackToTheFirstContent()
     {
         var path = Path.Combine(_dir, "far.png");

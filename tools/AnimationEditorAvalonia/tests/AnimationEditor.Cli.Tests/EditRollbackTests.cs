@@ -124,6 +124,7 @@ public class EditRollbackTests : IDisposable
             var r = await Edit(op);
 
             r.Code.ShouldBe(1, r.Out + r.Err);
+            if (OperatingSystem.IsWindows() || !op.Contains("copy=copy")) r.Out.ShouldContain("IoFailed"); // elsewhere the copy fails first
             Snapshot().ShouldBe(before);
         }
         finally { SetWritable(true); }
@@ -154,6 +155,34 @@ public class EditRollbackTests : IDisposable
             r = await Edit(CopyingOp + "copy", $"set-frame-texture Walk/0 texture={JsonSerializer.Serialize(other)} copy=overwrite");
 
         r.Out.ShouldContain("TextureCopyFailed");
+        Snapshot().ShouldBe(before);
+    }
+
+    // The sync file cannot be read or written, so the edit saves and only the sync is reported.
+    [Fact]
+    public async Task Edit_AssociateTilesetWithTheSyncFileInUse_SavesAndWarns()
+    {
+        using var held = new FileStream(_w.Write("hero.tiledsync", "{}"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        var r = await Edit("associate-tileset tiles.tsx");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        if (OperatingSystem.IsWindows()) r.Out.ShouldContain("was not updated"); // elsewhere the open file is replaced
+    }
+
+    // A null character makes the path unusable, which throws.
+    [Fact]
+    public async Task Edit_AnOpThrowsAfterACopy_LeavesTheFolderAsItWas()
+    {
+        ExistingFar();
+        var before = Snapshot();
+        var ops = JsonSerializer.Serialize(new { ops = new object[] {
+            new { op = "set-frame-texture", frame = "Idle/0", texture = _far, copy = "overwrite" },
+            new { op = "associate-tileset", path = "a\0.tsx" } } });
+
+        try { (await _w.RunWithStdinAsync(ops, "edit", _w.PathOf("hero.achx"), "--ops", "-")).Code.ShouldBe(1); }
+        catch (ArgumentException) { }
+
         Snapshot().ShouldBe(before);
     }
 

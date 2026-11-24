@@ -586,7 +586,8 @@ public static class EditOps
 
         foreach (var tsxPath in associations)
         {
-            session.Rollback.Remember(Path.ChangeExtension(session.Path, ".tiledsync"));
+            try { session.Rollback.Remember(Path.ChangeExtension(session.Path, ".tiledsync")); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // in use: the association reports it
             var associated = TsxEdit.AssociateTileset(session.Commands, session.ProjectManager, tsxPath);
             if (!associated.Success)
                 return new EditRunResult(
@@ -596,7 +597,7 @@ public static class EditOps
 
         var save = session.Save();
         if (!save.Success)
-            return new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
+            return new EditRunResult(new EditResult([], save.Errors, warnings, save.ErrorCodes), save.Errors.Select(_ => (int?)null).ToList());
         session.Rollback.Forget();
 
         // A .tsx save leaves out what a tileset cannot hold (a chain with no frames), so the document says nothing about the saved file.

@@ -1,7 +1,8 @@
 namespace AnimationEditor.Editing;
 
 /// <summary>Puts files back as they were before a batch wrote to them, for a batch that then fails (#1978).</summary>
-public sealed class FileRollback
+/// <param name="saveAsideFolder">Where the old content of a file that cannot be put back goes; the temp folder by default.</param>
+public sealed class FileRollback(string? saveAsideFolder = null)
 {
     // Bytes is null for a file that did not exist.
     private sealed record Original(string Path, byte[]? Bytes, DateTime LastWriteUtc, FileAttributes Attributes);
@@ -21,7 +22,7 @@ public sealed class FileRollback
     public void Forget() => _originals.Clear();
 
     /// <summary>
-    /// Restores every remembered file and forgets it. A file that could not be restored gives one line saying so; its
+    /// Restores every remembered file and forgets it; never throws. A file that could not be restored gives one line saying so; its
     /// old content, if it had any, is saved to the temp folder that line names.
     /// </summary>
     public IReadOnlyList<string> Restore()
@@ -31,7 +32,7 @@ public sealed class FileRollback
         foreach (var original in Enumerable.Reverse(_originals))
         {
             try { Restore(original); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex)
             {
                 failures.Add($"{original.Path} could not be put back as it was: {ex.Message}{SaveAside(original)}");
             }
@@ -61,12 +62,19 @@ public sealed class FileRollback
         File.SetAttributes(path, original.Attributes);
     }
 
-    private static string SaveAside(Original original)
+    private string SaveAside(Original original)
     {
         if (original.Bytes is null) return string.Empty;
-        var folder = Directory.CreateTempSubdirectory("aecli-").FullName;
-        var copy = Path.Combine(folder, Path.GetFileName(original.Path));
-        File.WriteAllBytes(copy, original.Bytes);
-        return $" Its old content is in {copy}.";
+        try
+        {
+            var folder = Directory.CreateDirectory(Path.Combine(saveAsideFolder ?? Path.GetTempPath(), $"aecli-{Guid.NewGuid():N}")).FullName;
+            var copy = Path.Combine(folder, Path.GetFileName(original.Path));
+            File.WriteAllBytes(copy, original.Bytes);
+            return $" Its old content is in {copy}.";
+        }
+        catch (Exception ex)
+        {
+            return $" Its old content could not be saved: {ex.Message}";
+        }
     }
 }
