@@ -184,15 +184,22 @@ namespace AnimationEditor.Core.CommandsAndState
         void RefreshAnimationFrameDisplay();
         void RefreshWireframe();
         void RefreshTreeView();
-        void SaveCurrentAnimationChainList(string? fileName = null);
+
+        /// <summary>
+        /// Writes the document to <paramref name="fileName"/>, or its own file, or the crash-recovery file when it has
+        /// none. Returns false, having raised <see cref="SaveFailed"/>, when it could not.
+        /// </summary>
+        bool SaveCurrentAnimationChainList(string? fileName = null);
 
         /// <summary>
         /// Asks for a path and saves there (Save As, and the first save of an Untitled document). A path another tab
         /// holds (<see cref="IsPathOpenInAnotherTab"/>) is refused through <see cref="SaveAsRefused"/> and nothing
         /// is written, since that tab's document would be out of step with its file. So is one with another type's
-        /// extension (<see cref="IO.SaveTarget.IsAnotherType"/>).
+        /// extension (<see cref="IO.SaveTarget.IsAnotherType"/>). A write that fails is reported the same way and leaves
+        /// the document as it was, or, when the path is its own file, through <see cref="SaveFailed"/> like any save.
         /// </summary>
-        Task SaveCurrentAnimationChainListAsync();
+        /// <returns>Whether the document was saved: false too when the dialog was cancelled.</returns>
+        Task<bool> SaveCurrentAnimationChainListAsync();
 
         /// <summary>Whether a tab other than the active one holds this path. Null (no tabs) means none does.</summary>
         Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
@@ -203,7 +210,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         Func<bool>? IsDocumentTabInFront { get; set; }
 
-        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> or <see cref="ExportAsync"/> refuses the picked path.</summary>
+        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> or <see cref="ExportAsync"/> refuses the picked path, or Save As cannot write it.</summary>
         event Action<string>? SaveAsRefused;
 
         /// <summary>

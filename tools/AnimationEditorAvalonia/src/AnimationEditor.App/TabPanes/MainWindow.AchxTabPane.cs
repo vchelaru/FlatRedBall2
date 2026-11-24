@@ -69,8 +69,8 @@ public partial class MainWindow
         /// <summary>
         /// Prompts to save first when <paramref name="tab"/> is an untitled tab with actual content
         /// (issue #928); an untitled tab that was never edited (or was edited back to empty) closes
-        /// silently. "Save" runs the normal Save-As flow; cancelling that dialog keeps the tab open
-        /// rather than closing with no file written.
+        /// silently. "Save" runs the normal Save-As flow; cancelling that dialog or a failed write keeps the tab
+        /// open rather than closing with no file written.
         /// </summary>
         public async Task<TabEntry?> PrepareCloseAsync(TabEntry tab)
         {
@@ -85,9 +85,8 @@ public partial class MainWindow
             if (tab != _window._tabManager.ActiveTab)
                 await _window.ActivateTabAsync(tab);
 
-            await _window._appCommands.SaveCurrentAnimationChainListAsync();
-            if (string.IsNullOrEmpty(_window._projectManager.FileName))
-                return null; // Save As was cancelled -- leave the tab open, nothing was written.
+            if (!await _window._appCommands.SaveCurrentAnimationChainListAsync())
+                return null; // Cancelled, refused or failed -- leave the tab open, nothing was written.
 
             // A successful save renames the sentinel tab in place (the CurrentFileChanged
             // handler's Rename), which replaces the TabEntry instance -- re-resolve through
