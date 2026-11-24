@@ -171,6 +171,24 @@ public class TsxEditTests : IDisposable
         save.Warnings.ShouldHaveSingleItem().ShouldStartWith("Associated tileset tiles.tsx was not updated: ");
     }
 
+    [Fact]
+    public async Task Save_ChainOnAnotherImageOfTheSameName_WarnsNamingTheTilesetAndBothImages()
+    {
+        Copy("sheet.png");
+        var tsx = Copy("tiles.tsx");
+        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
+        TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, tsx).Success.ShouldBeTrue();
+        s.Document.AnimationChains.RemoveRange(1, s.Document.AnimationChains.Count - 1);
+        foreach (var frame in s.Document.AnimationChains[0].Frames) frame.TextureName = "sub/sheet.png";
+
+        var save = s.Save();
+
+        var warning = save.Warnings.ShouldHaveSingleItem();
+        warning.ShouldStartWith($"Associated tileset tiles.tsx: chain \"{s.Document.AnimationChains[0].Name}\": ");
+        warning.ShouldContain("/sub/sheet.png\"");
+        warning.ShouldContain("/sheet.png\".");
+    }
+
     // The .achx is not a tileset, so the warning must not name it as one (#1996).
     [Fact]
     public async Task Save_UnreadableSyncFile_SavesAndWarnsNamingTheSyncFile()
