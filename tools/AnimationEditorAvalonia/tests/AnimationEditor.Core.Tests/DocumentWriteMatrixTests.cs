@@ -43,7 +43,6 @@ public class DocumentWriteMatrixTests
     {
         (DocAction.OutsideChangeOverUnsavedEdits, DocType.Seqj) => ("#2030", "a refused save says so"),
         (DocAction.SaveAsToAnotherFolder, DocType.Achx or DocType.Achj) => ("#2031", "the new file names files that are not there"),
-        (DocAction.SaveAsToAnotherFolder, DocType.Tsx) => ("#2016", "the new file names files that are not there"),
         _ => null,
     };
 

@@ -243,6 +243,7 @@ public class TsxCorpusRoundTripTests : IDisposable
         new("image after the tiles", Tsx(image: "", tail: "<image source=\"Heroes.png\" width=\"64\" height=\"64\"/>")),
         new("attributes in single quotes", Tsx(tile0Attributes: " type='a \"b\"'").Replace("tileid=\"1\" duration=\"100\"", "duration = '100'  tileid='1'")),
         new("spaces inside tags", Tsx(tiles: "<tile id=\"5\"  type=\"Water\"   />\n <tile id=\"6\" ></tile >")),
+        new("CR line endings", Tsx(tiles: "<tile id=\"5\" type=\"Water\"/>").Replace("\n", "\r")),
         new("mixed line endings", Tsx(tiles: "<tile id=\"5\" type=\"A\"/>\r\n <tile id=\"6\" type=\"B\"/>")),
 
         // Constructs DotTiled cannot read.

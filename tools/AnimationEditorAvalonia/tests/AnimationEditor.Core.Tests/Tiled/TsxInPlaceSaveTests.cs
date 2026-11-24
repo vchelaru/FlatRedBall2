@@ -1,3 +1,6 @@
+using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.HotReload;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Tiled;
 using Shouldly;
 using System;
@@ -144,23 +147,156 @@ public sealed class TsxInPlaceSaveTests : IDisposable
         File.ReadAllText(path).ShouldBe(opened);
     }
 
-    // Undo of a rename puts back the document's state from before the Save As, not the file's.
+    // The history holds frames that name the image from the old folder.
+    [Theory]
+    [InlineData("Copies/Copy.tsx", false)]
+    [InlineData("Copy.tsx", true)]
+    public async Task SaveAs_UndoHistory_IsKeptOnlyInTheSameFolder(string name, bool kept)
+    {
+        var path = Write(Xml);
+        var target = Path.Combine(_dir.Path, name);
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        var ctx = TestHelpers.SetupFreshAcls();
+        await ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        var run = ctx.ProjectManager.AnimationChainListSave!.AnimationChains[1];
+        ctx.AppCommands.RenameChain(run, "Sprint");
+        ctx.AppCommands.RenameChain(run, "Dash");
+        ctx.UndoManager.Undo();
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        (ctx.UndoManager.CanUndo, ctx.UndoManager.CanRedo).ShouldBe((kept, kept));
+        ctx.UndoManager.SaveState.ShouldBe(SaveState.AutoSaveOn);
+        ctx.UndoManager.Undo();
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        File.ReadAllText(target).ShouldContain(kept ? "\"Run\"" : "\"Sprint\"");
+    }
+
+    [Theory]
+    [InlineData("tilewidth=\"16\"", "tilewidth=\"8\"")]
+    [InlineData("tileheight=\"16\"", "tileheight=\"8\"")]
+    [InlineData("tilecount=\"16\"", "tilecount=\"15\"")]
+    [InlineData("columns=\"4\"", "columns=\"8\"")]
+    [InlineData("columns=\"4\"", "columns=\"4\" spacing=\"1\"")]
+    [InlineData("columns=\"4\"", "columns=\"4\" margin=\"1\"")]
+    [InlineData("Heroes.png", "Other.png")]
+    [InlineData("width=\"64\"", "width=\"128\"")]
+    [InlineData("height=\"64\"", "height=\"128\"")]
+    public void SaveTsxProject_GridOrImageChangedOnDiskBeforeTheReload_IsRefusedAndLeftAlone(string from, string to)
+    {
+        var path = Write(Xml);
+        var pm = Open(path);
+        SetFirstDuration(pm, 300);
+        var disk = Xml.Replace(from, to);
+        disk.ShouldNotBe(Xml);
+        File.WriteAllText(path, disk);
+
+        Should.Throw<InvalidOperationException>(() => pm.SaveTsxProject())
+            .Message.ShouldStartWith("\"Heroes.tsx\" changed on disk and couldn't be reloaded (");
+
+        File.ReadAllText(path).ShouldBe(disk);
+    }
+
     [Fact]
-    public async Task SaveAs_AnotherFolderThenUndoOfARename_SavesIntoTheNewFile()
+    public void SaveTsxProject_FileChangedOnDiskThenTheLastEditUndone_PutsTheOpenedValueBack()
+    {
+        var path = Write(Xml);
+        var pm = Open(path);
+        SetFirstDuration(pm, 300);
+        pm.SaveTsxProject();
+        var disk = File.ReadAllText(path).Replace("duration=\"150\"", "duration=\"151\"");
+        File.WriteAllText(path, disk);
+
+        SetFirstDuration(pm, 200);
+        pm.SaveTsxProject();
+
+        File.ReadAllText(path).ShouldBe(disk.Replace("duration=\"300\"", "duration=\"200\""));
+    }
+
+    [Fact]
+    public void MoveTsxProject_CopyChangedOnDisk_KeepsThatChange()
+    {
+        var pm = Open(Write(Xml));
+        SetFirstDuration(pm, 300);
+        var copy = Path.Combine(_dir.Path, "Copy.tsx");
+        pm.SaveTsxProject(copy);
+        pm.MoveTsxProject(new FilePath(copy));
+        var disk = File.ReadAllText(copy).Replace("duration=\"150\"", "duration=\"151\"");
+        File.WriteAllText(copy, disk);
+
+        SetFirstDuration(pm, 200);
+        pm.SaveTsxProject(copy);
+
+        File.ReadAllText(copy).ShouldBe(disk.Replace("duration=\"300\"", "duration=\"200\""));
+    }
+
+    [Fact]
+    public void MoveTsxProject_CopyNotChangedOnDisk_StillStartsFromTheOpenedText()
+    {
+        var pm = Open(Write(Xml));
+        var chains = pm.AnimationChainListSave!.AnimationChains;
+        var deleted = chains.ToList();
+        chains.Clear();
+        var copy = Path.Combine(_dir.Path, "Copy.tsx");
+        pm.SaveTsxProject(copy);
+        pm.MoveTsxProject(new FilePath(copy));
+
+        chains.AddRange(deleted);
+        pm.SaveTsxProject(copy);
+
+        File.ReadAllText(copy).ShouldBe(Xml);
+    }
+
+    [Fact]
+    public async Task SaveAs_TargetCannotBeWritten_DocumentStaysAtItsFile()
     {
         var path = Write(Xml);
         var target = Path.Combine(Directory.CreateDirectory(Path.Combine(_dir.Path, "Copies")).FullName, "Copy.tsx");
+        // A folder in the way fails the write on every platform.
+        Directory.CreateDirectory(target);
         var ctx = TestHelpers.SetupFreshAcls();
         await ctx.AppCommands.OpenTsxWorkflowAsync(path);
-        ctx.AppCommands.RenameChain(ctx.ProjectManager.AnimationChainListSave!.AnimationChains[1], "Sprint");
+        string? failure = null;
+        ctx.AppCommands.SaveFailed += message => failure = message;
         ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
+
         await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
-        ctx.UndoManager.Undo();
-        ctx.AppCommands.SaveCurrentAnimationChainList();
+        failure.ShouldNotBeNull();
+        new FilePath(ctx.ProjectManager.FileName!).ShouldBe(new FilePath(path));
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[0].TextureName.ShouldBe("Heroes.png");
+    }
 
-        File.ReadAllText(target).ShouldBe(Xml.Replace("\"Heroes.png\"", "\"../Heroes.png\""));
-        File.ReadAllText(path).ShouldBe(Xml.Replace("\"Run\"", "\"Sprint\""));
+    /// <summary>The reload that takes another program's change runs even when a save went into that change first.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Save_RealWatcher_ReloadsOnlyWhenAnotherProgramChangedTheFile(bool changedOutside)
+    {
+        var path = Write(Xml);
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var watcher = new HotReloadWatcher();
+        var reports = 0;
+        watcher.AchxChangedOnDisk += _ => System.Threading.Interlocked.Increment(ref reports);
+        ctx.AppCommands.HotReloadWatcher = watcher;
+        ctx.AppCommands.AutosaveOnChange = true;
+        await ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        SetFirstDuration((ProjectManager)ctx.ProjectManager, 300);
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        await Task.Delay(600);
+        reports.ShouldBe(0);
+
+        if (changedOutside)
+            File.WriteAllText(path, File.ReadAllText(path).Replace("duration=\"150\"", "duration=\"151\""));
+        SetFirstDuration((ProjectManager)ctx.ProjectManager, 400);
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        for (var i = 0; i < 40 && reports == 0 && changedOutside; i++)
+            await Task.Delay(100);
+        await Task.Delay(600);
+
+        reports.ShouldBe(changedOutside ? 1 : 0);
+        File.ReadAllText(path).ShouldContain("duration=\"400\"");
     }
 
     [Theory]

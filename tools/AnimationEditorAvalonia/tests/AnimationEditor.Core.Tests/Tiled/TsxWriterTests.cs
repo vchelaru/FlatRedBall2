@@ -236,6 +236,7 @@ public class TsxWriterTests
     [Theory]
     [InlineData("<tile id=\"5\" type=\"A\" />", "<tile id=\"5\" type=\"A\">{0}{1}\n </tile>")]
     [InlineData("<tile id=\"5\"></tile>", "<tile id=\"5\">{0}{1}\n </tile>")]
+    [InlineData("<tile id=\"5\" type='a>\"b'></tile>", "<tile id=\"5\" type='a>\"b'>{0}{1}\n </tile>")]
     [InlineData("<tile id=\"5\">\n  <objectgroup/>\n  <!-- a -->\n </tile>", "<tile id=\"5\">{0}\n  <objectgroup/>\n  <!-- a -->{1}\n </tile>")]
     public void Write_TileGetsANameAndAnAnimation_PutsThemWhereTiledDoes(string tile, string expected)
     {
@@ -255,6 +256,7 @@ public class TsxWriterTests
     [InlineData("<property value = 'old' name='Name' x='1'/>", "<property value = 'new' name='Name' x='1'/>")]
     [InlineData("<property x=\" value='a'\" name=\"Name\" value=\"old\" />", "<property x=\" value='a'\" name=\"Name\" value=\"new\" />")]
     [InlineData("<property name=\"Name\">old</property>", "<property name=\"Name\">new</property>")]
+    [InlineData("<property name=\"Name\"><![CDATA[old]]></property>", "<property name=\"Name\">new</property>")]
     [InlineData("<property name=\"Name\"/>", "<property value=\"new\" name=\"Name\"/>")]
     [InlineData("<property name=\"Name\" type=\"string\" value=\"&#111;ld\"/>", "<property name=\"Name\" type=\"string\" value=\"new\"/>")]
     public void Write_PropertyValueChanged_ReplacesOnlyTheValue(string property, string expected)
@@ -262,6 +264,13 @@ public class TsxWriterTests
         static string Tile(string content) => $"\n <tile id=\"5\">\n  <properties>\n   <property name=\"B\" type=\"bool\" value=\"true\"/>\n   {content}\n  </properties>\n </tile>\n";
 
         Assert.Equal(Tile(expected), Edit(Tile(property), tileset => Find(tileset, 5).Properties.OfType<StringProperty>().Single().Value = "new"));
+    }
+
+    [Fact]
+    public void LoadTileset_PropertyInTextAndCData_ReadsBoth()
+    {
+        Edit("<tile id='5'><properties><property name='Name'>a <![CDATA[< b]]>&amp;</property></properties></tile>",
+            tileset => Assert.Equal("a < b&", Find(tileset, 5).Properties.OfType<StringProperty>().Single().Value));
     }
 
     [Fact]
