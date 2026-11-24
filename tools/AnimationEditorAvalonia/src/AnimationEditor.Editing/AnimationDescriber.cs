@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using AnimationEditor.Core.Keyframes;
+using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -39,12 +40,12 @@ public static class AnimationDescriber
                     $"  {i}  {f.TextureName}  length {Num(f.FrameLength)}  region {Num(f.LeftCoordinate)},{Num(f.TopCoordinate)},{Num(f.RightCoordinate - f.LeftCoordinate)},{Num(f.BottomCoordinate - f.TopCoordinate)}"));
                 var placement = PlacementText(f);
                 if (placement.Length > 0) sb.AppendLine($"       {placement}");
-                var color = ColorText(f);
+                var color = ColorText(StoredColor(f));
                 if (color.Length > 0) sb.AppendLine($"       color {color}");
                 var frameKeys = FrameKeyframeText(chain, f);
                 if (frameKeys.Length > 0) sb.AppendLine($"       keyframes {frameKeys}");
                 for (int e = 0; e < f.Events.Count; e++)
-                    sb.AppendLine($"       {chain.Name}/{i}/event/{e}  {f.Events[e].Name}{(f.Events[e].Data is { } d ? "  data " + d : "")}");
+                    sb.AppendLine($"       {chain.Name}/{i}/event/{e}  {EventText(f.Events[e])}");
                 foreach (var shape in Shapes(f))
                 {
                     var keys = ShapeKeyframeText(chain, shape);
@@ -100,19 +101,8 @@ public static class AnimationDescriber
                 w.WriteNumber("x", f.RelativeX);
                 w.WriteNumber("y", f.RelativeY);
                 w.WriteEndObject();
-                w.WriteBoolean("flipHorizontal", f.FlipHorizontal);
-                w.WriteBoolean("flipVertical", f.FlipVertical);
-                w.WriteBoolean("flipDiagonal", f.FlipDiagonal);
-                if (f.Red is not null || f.Green is not null || f.Blue is not null || f.Alpha is not null || f.ColorOperation is not null)
-                {
-                    w.WriteStartObject("color");
-                    if (f.Red is { } r) w.WriteNumber("red", r);
-                    if (f.Green is { } g) w.WriteNumber("green", g);
-                    if (f.Blue is { } b) w.WriteNumber("blue", b);
-                    if (f.Alpha is { } a) w.WriteNumber("alpha", a);
-                    if (f.ColorOperation is { } op) w.WriteString("operation", op.ToString());
-                    w.WriteEndObject();
-                }
+                WriteFlips(w, f.FlipHorizontal, f.FlipVertical, f.FlipDiagonal);
+                WriteColor(w, StoredColor(f));
                 w.WriteStartObject("keyframes");
                 WriteKeyframe(w, "offset", KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Offset, f, chain), f.OffsetInterpolation, f.OffsetEasing);
                 WriteKeyframe(w, "color", KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Color, f, chain), f.ColorInterpolation, f.ColorEasing);
@@ -122,8 +112,7 @@ public static class AnimationDescriber
                 {
                     w.WriteStartObject();
                     w.WriteString("address", $"{chain.Name}/{i}/event/{e}");
-                    w.WriteString("name", f.Events[e].Name);
-                    if (f.Events[e].Data is { } data) w.WriteString("data", data);
+                    WriteEventBody(w, f.Events[e]);
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -194,24 +183,63 @@ public static class AnimationDescriber
     {
         var parts = new List<string>();
         if (f.RelativeX != 0 || f.RelativeY != 0) parts.Add(FormattableString.Invariant($"offset {Num(f.RelativeX)},{Num(f.RelativeY)}"));
-        var flips = new List<string>();
-        if (f.FlipHorizontal) flips.Add("H");
-        if (f.FlipVertical) flips.Add("V");
-        if (f.FlipDiagonal) flips.Add("D");
-        if (flips.Count > 0) parts.Add("flip " + string.Join(" ", flips));
+        var flips = FlipText(f.FlipHorizontal, f.FlipVertical, f.FlipDiagonal);
+        if (flips.Length > 0) parts.Add(flips);
         return string.Join("  ", parts);
     }
 
-    /// <summary>Only the color parts a frame sets; parts it leaves out inherit from earlier frames.</summary>
-    private static string ColorText(AnimationFrameSave f)
+    /// <summary><c>flip H D</c>, or empty when no flag is set.</summary>
+    internal static string FlipText(bool horizontal, bool vertical, bool diagonal)
+    {
+        var flips = new List<string>();
+        if (horizontal) flips.Add("H");
+        if (vertical) flips.Add("V");
+        if (diagonal) flips.Add("D");
+        return flips.Count > 0 ? "flip " + string.Join(" ", flips) : "";
+    }
+
+    internal static void WriteFlips(Utf8JsonWriter w, bool horizontal, bool vertical, bool diagonal)
+    {
+        w.WriteBoolean("flipHorizontal", horizontal);
+        w.WriteBoolean("flipVertical", vertical);
+        w.WriteBoolean("flipDiagonal", diagonal);
+    }
+
+    // Only the color parts the frame itself sets; parts it leaves out inherit from earlier frames.
+    private static ResolvedFrameColor StoredColor(AnimationFrameSave f) => new(f.Red, f.Green, f.Blue, f.Alpha, f.ColorOperation);
+
+    /// <summary>The parts that are set, or empty.</summary>
+    internal static string ColorText(ResolvedFrameColor c)
     {
         var parts = new List<string>();
-        if (f.Red is { } r) parts.Add($"red={r}");
-        if (f.Green is { } g) parts.Add($"green={g}");
-        if (f.Blue is { } b) parts.Add($"blue={b}");
-        if (f.Alpha is { } a) parts.Add($"alpha={a}");
-        if (f.ColorOperation is { } op) parts.Add($"operation={op}");
+        if (c.Red is { } r) parts.Add($"red={r}");
+        if (c.Green is { } g) parts.Add($"green={g}");
+        if (c.Blue is { } b) parts.Add($"blue={b}");
+        if (c.Alpha is { } a) parts.Add($"alpha={a}");
+        if (c.Operation is { } op) parts.Add($"operation={op}");
         return string.Join(" ", parts);
+    }
+
+    /// <summary>A <c>color</c> object holding the parts that are set; writes nothing when none is.</summary>
+    internal static void WriteColor(Utf8JsonWriter w, ResolvedFrameColor c)
+    {
+        if (c == default) return;
+        w.WriteStartObject("color");
+        if (c.Red is { } r) w.WriteNumber("red", r);
+        if (c.Green is { } g) w.WriteNumber("green", g);
+        if (c.Blue is { } b) w.WriteNumber("blue", b);
+        if (c.Alpha is { } a) w.WriteNumber("alpha", a);
+        if (c.Operation is { } op) w.WriteString("operation", op.ToString());
+        w.WriteEndObject();
+    }
+
+    internal static string EventText(AnimationFrameEvent e) => e.Name + (e.Data is { } data ? "  data " + data : "");
+
+    /// <summary>The event's properties, inside an object the caller opened.</summary>
+    internal static void WriteEventBody(Utf8JsonWriter w, AnimationFrameEvent e)
+    {
+        w.WriteString("name", e.Name);
+        if (e.Data is { } data) w.WriteString("data", data);
     }
 
     /// <summary>Only what differs from the default: a keyframe turned off (<c>offset=skip</c>) or a stored curve (<c>offset-curve=Quadratic/In</c>).</summary>

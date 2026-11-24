@@ -1,5 +1,7 @@
 using AnimationEditor.Core.Keyframes;
+using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
+using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Globalization;
 using System.Text;
@@ -14,19 +16,32 @@ namespace AnimationEditor.Editing;
 /// <param name="Points">Polygon vertices relative to the shape's offset; empty otherwise.</param>
 public sealed record AtShape(string Type, string Name, float X, float Y, float SizeX, float SizeY, IReadOnlyList<(float X, float Y)> Points);
 
-/// <summary>One visible track at an instant: its active chain, frame, sampled sprite offset and the frame's shapes.</summary>
-public sealed record AtSprite(int Track, string TrackName, string Chain, int Frame, float OffsetX, float OffsetY, IReadOnlyList<AtShape> Shapes);
+/// <summary>
+/// One sprite at an instant: its chain, frame, sampled offset and color, and what the frame stores (shapes, events, flip flags).
+/// <paramref name="Events"/> fire when the frame is entered, so a time inside the frame lists them without meaning they fire then.
+/// </summary>
+/// <param name="Track">The sequence track; null for a chain played on its own.</param>
+public sealed record AtSprite(
+    int? Track, string TrackName, string Chain, int Frame, float OffsetX, float OffsetY, IReadOnlyList<AtShape> Shapes,
+    ResolvedFrameColor Color, bool FlipHorizontal, bool FlipVertical, bool FlipDiagonal, IReadOnlyList<AnimationFrameEvent> Events);
 
-/// <summary>What <c>aecli at</c> reports for one sequence at one time; sprites are front to back (track 0 first).</summary>
+/// <summary>What <c>aecli at</c> reports at one time; a sequence's sprites are front to back (track 0 first), a chain has one.</summary>
 public sealed record AtMoment(double Time, IReadOnlyList<AtSprite> Sprites);
 
-/// <summary>Builds and prints the <c>aecli at</c> report from <see cref="SequenceScene"/>, the same scene the preview and render use.</summary>
+/// <summary>The report of one sequence or chain.</summary>
+/// <param name="Kind"><c>sequence</c> or <c>chain</c>.</param>
+public sealed record AtResult(string Kind, string Name, IReadOnlyList<AtMoment> Moments);
+
+/// <summary>
+/// Builds and prints the <c>aecli at</c> report from <see cref="SequenceScene"/> (a sequence) or <see cref="ChainClock"/> (a chain),
+/// as the preview and render do.
+/// </summary>
 public static class AtReport
 {
-    /// <summary>The sequence and its moments, or null with <paramref name="error"/> (<paramref name="usage"/> when the request itself is malformed).</summary>
+    /// <summary>The report of a .seqj's sequence, or null with <paramref name="error"/> (<paramref name="usage"/> when the request itself is malformed).</summary>
     /// <param name="trackPattern">Track name or glob (as <c>describe --track</c>); other tracks are left out. A pattern matching no track is an error.</param>
     /// <param name="shapesOnly">Leave out tracks whose active frame has no shapes.</param>
-    public static (string Sequence, IReadOnlyList<AtMoment> Moments)? Build(
+    public static AtResult? BuildSequence(
         string file, string? sequenceName, IReadOnlyList<double> times, string? trackPattern, bool shapesOnly, out string? error, out bool usage)
     {
         error = null; usage = false;
@@ -54,7 +69,24 @@ public static class AtReport
                 .Where(sprite => trackPattern is null || (sprite.Track >= 0 && sprite.Track < tracks.Count && filter.Includes(tracks[sprite.Track])))
                 .Select(sprite => ToSprite(sprite, tracks))
                 .Where(sprite => !shapesOnly || sprite.Shapes.Count > 0).ToList())).ToList();
-        return (sequences[index].Name, moments);
+        return new AtResult("sequence", sequences[index].Name, moments);
+    }
+
+    /// <summary>The report of an .achx/.achj chain, or null with <paramref name="error"/> (<paramref name="usage"/> when the request itself is malformed).</summary>
+    /// <param name="shapesOnly">Leave out the sprite at times whose frame has no shapes.</param>
+    public static AtResult? BuildChain(string file, string? chainName, IReadOnlyList<double> times, bool shapesOnly, out string? error, out bool usage)
+    {
+        usage = false;
+        error = RenderPlanner.CheckChainFile(file, "at");
+        if (error is not null || RenderPlanner.OpenChain(file, chainName, out error, out usage) is not var (chain, unit)) return null;
+
+        var moments = times.Select(time =>
+        {
+            var (frame, elapsed) = ChainClock.Locate(chain, time, unit);
+            var sprite = ToSprite(new SequenceSprite(0, chain, unit, frame, elapsed, null), []) with { Track = null };
+            return new AtMoment(time, shapesOnly && sprite.Shapes.Count == 0 ? [] : [sprite]);
+        }).ToList();
+        return new AtResult("chain", chain.Name, moments);
     }
 
     private static AtSprite ToSprite(SequenceSprite sprite, IList<SequenceTrackSave> tracks)
@@ -69,19 +101,25 @@ public static class AtReport
             return new AtShape(EditAddress.TypeName(shape), shape.Name, v.X, v.Y, shape is PolygonSave ? 0 : v.SizeX, shape is AARectSave ? v.SizeY : 0, points);
         }).ToList() ?? [];
         string trackName = sprite.Track >= 0 && sprite.Track < tracks.Count ? tracks[sprite.Track].Name : "";
-        return new AtSprite(sprite.Track, trackName, sprite.Chain.Name, sprite.FrameIndex, sample.OffsetX, sample.OffsetY, shapes);
+        return new AtSprite(sprite.Track, trackName, sprite.Chain.Name, sprite.FrameIndex, sample.OffsetX, sample.OffsetY, shapes,
+            sample.Color, sprite.Frame.FlipHorizontal, sprite.Frame.FlipVertical, sprite.Frame.FlipDiagonal, sprite.Frame.Events);
     }
 
-    public static string ToText(string sequence, IReadOnlyList<AtMoment> moments)
+    public static string ToText(AtResult result)
     {
         var sb = new StringBuilder();
-        foreach (var moment in moments)
+        foreach (var moment in result.Moments)
         {
-            sb.AppendLine($"{sequence} at {Num(moment.Time)}s");
+            sb.AppendLine($"{result.Name} at {Num(moment.Time)}s");
             if (moment.Sprites.Count == 0) sb.AppendLine("  (nothing visible)");
             foreach (var s in moment.Sprites)
             {
-                sb.AppendLine($"  track {s.Track}{(s.TrackName.Length > 0 ? " " + s.TrackName : "")}: {s.Chain} frame {s.Frame} offset {Num(s.OffsetX)},{Num(s.OffsetY)}");
+                string track = s.Track is { } t ? $"track {t}{(s.TrackName.Length > 0 ? " " + s.TrackName : "")}: " : "";
+                string flips = AnimationDescriber.FlipText(s.FlipHorizontal, s.FlipVertical, s.FlipDiagonal);
+                sb.AppendLine($"  {track}{s.Chain} frame {s.Frame} offset {Num(s.OffsetX)},{Num(s.OffsetY)}{(flips.Length > 0 ? "  " + flips : "")}");
+                string color = AnimationDescriber.ColorText(s.Color);
+                if (color.Length > 0) sb.AppendLine($"    color {color}");
+                foreach (var e in s.Events) sb.AppendLine($"    event {AnimationDescriber.EventText(e)}");
                 foreach (var shape in s.Shapes)
                 {
                     string detail = shape.Type switch
@@ -97,13 +135,13 @@ public static class AtReport
         return sb.ToString();
     }
 
-    public static void WriteJson(Utf8JsonWriter w, string sequence, IReadOnlyList<AtMoment> moments)
+    public static void WriteJson(Utf8JsonWriter w, AtResult result)
     {
         w.WriteStartObject();
         w.WriteBoolean("success", true);
-        w.WriteString("sequence", sequence);
+        w.WriteString(result.Kind, result.Name);
         w.WriteStartArray("times");
-        foreach (var moment in moments)
+        foreach (var moment in result.Moments)
         {
             w.WriteStartObject();
             w.WriteNumber("time", moment.Time);
@@ -111,12 +149,20 @@ public static class AtReport
             foreach (var s in moment.Sprites)
             {
                 w.WriteStartObject();
-                w.WriteNumber("track", s.Track);
-                w.WriteString("trackName", s.TrackName);
+                if (s.Track is { } track)
+                {
+                    w.WriteNumber("track", track);
+                    w.WriteString("trackName", s.TrackName);
+                }
                 w.WriteString("chain", s.Chain);
                 w.WriteNumber("frame", s.Frame);
                 w.WriteNumber("offsetX", s.OffsetX);
                 w.WriteNumber("offsetY", s.OffsetY);
+                AnimationDescriber.WriteFlips(w, s.FlipHorizontal, s.FlipVertical, s.FlipDiagonal);
+                AnimationDescriber.WriteColor(w, s.Color);
+                w.WriteStartArray("events");
+                foreach (var e in s.Events) { w.WriteStartObject(); AnimationDescriber.WriteEventBody(w, e); w.WriteEndObject(); }
+                w.WriteEndArray();
                 w.WriteStartArray("shapes");
                 foreach (var shape in s.Shapes)
                 {

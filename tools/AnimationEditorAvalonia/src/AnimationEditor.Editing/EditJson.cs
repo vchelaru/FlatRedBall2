@@ -116,10 +116,12 @@ public static class EditJson
 
     /// <summary>The <c>at</c> command is not an op either.</summary>
     public const string AtHelp =
-        "at <file.seqj> --time 0,2.15,4.2 [--sequence <name>] [--track <glob>] [--shapes-only]: what a sequence shows at each time (seconds), without the editor: per visible track (front first) the active chain, frame index, sprite offset, " +
+        "at <file.seqj> --time 0,2.15,4.2 [--sequence <name>] [--track <glob>] [--shapes-only]: what a sequence shows at each time (seconds), without the editor: per visible track (front first) the active chain, frame index, sprite offset and color glided by the keyframe curves (color only when set), the frame's flip flags and events, " +
         "and that frame's shapes with offset and size glided by the keyframe curves (rect scaleX/scaleY, circle radius, polygon points). Tracks hidden at that time are left out; --track keeps tracks whose name matches a name or glob (as describe --track; no match is exit 1 with a Did-you-mean) and --shapes-only drops tracks whose active frame has no shapes. " +
-        "--json gives {success, sequence, times:[{time, sprites:[{track, trackName, chain, frame, offsetX, offsetY, shapes:[{type, name, x, y, scaleX, scaleY | radius | points}]}]}]}. " +
-        "--sequence may be left out when the file has only one; an unknown name fails with exit 1 and a Did-you-mean; a bad --time is exit 2.";
+        "at <file.achx|.achj> --time 0,0.3 [--chain <name>] [--shapes-only]: the same for one chain, with its loop, ping-pong and reverse as render --at plays them. " +
+        "An event fires when its frame is entered; a time inside the frame lists it but does not mean it fires at that instant. " +
+        "--json gives {success, sequence | chain, times:[{time, sprites:[{track, trackName (sequences only), chain, frame, offsetX, offsetY, flipHorizontal, flipVertical, flipDiagonal, color:{red, green, blue, alpha, operation}, events:[{name, data}], shapes:[{type, name, x, y, scaleX, scaleY | radius | points}]}]}]}. " +
+        "--sequence or --chain may be left out when the file has only one; an unknown name fails with exit 1 and a Did-you-mean; a bad --time is exit 2.";
 
     public static string SchemaText()
     {
