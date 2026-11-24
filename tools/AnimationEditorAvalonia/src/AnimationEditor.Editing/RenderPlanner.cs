@@ -128,7 +128,7 @@ public static class RenderPlanner
     }
 
     // The index of the named item, or the only one when no name is given; -1 with an error (usage when the request is at fault).
-    private static int Pick(string? name, IReadOnlyList<string> names, string kind, string option, string plural, out string? error, out bool usage)
+    internal static int Pick(string? name, IReadOnlyList<string> names, string kind, string option, string plural, out string? error, out bool usage)
     {
         error = null; usage = false;
         if (name is null)

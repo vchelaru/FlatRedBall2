@@ -72,6 +72,7 @@ public static class EditJson
         foreach (var spec in EditOps.Specs) WriteSpec(w, spec);
         w.WriteEndArray();
         w.WriteString("render", RenderHelp);
+        w.WriteString("at", AtHelp);
         w.WriteString("sequenceSelectors", SequenceOps.AddressSyntax);
         w.WriteStartArray("sequenceOps");
         foreach (var spec in SequenceOps.Specs) WriteSpec(w, spec);
@@ -113,6 +114,13 @@ public static class EditJson
         "--bounds auto|x,y,w,h (auto fits every sprite of every image so frames line up; x,y is the lower-left corner in offset units, Y up), --grid (origin axes and a 16-unit grid). " +
         "Prints each written path; --json gives {success, files:[...], errors:[{code,message}]}. Exit codes as the other commands; an unknown name carries a Did-you-mean.";
 
+    /// <summary>The <c>at</c> command is not an op either.</summary>
+    public const string AtHelp =
+        "at <file.seqj> --time 0,2.15,4.2 [--sequence <name>]: what a sequence shows at each time (seconds), without the editor: per visible track (front first) the active chain, frame index, sprite offset, " +
+        "and that frame's shapes with offset and size glided by the keyframe curves (rect scaleX/scaleY, circle radius, polygon points). Tracks hidden at that time are left out. " +
+        "--json gives {success, sequence, times:[{time, sprites:[{track, trackName, chain, frame, offsetX, offsetY, shapes:[{type, name, x, y, scaleX, scaleY | radius | points}]}]}]}. " +
+        "--sequence may be left out when the file has only one; an unknown name fails with exit 1 and a Did-you-mean; a bad --time is exit 2.";
+
     public static string SchemaText()
     {
         var sb = new System.Text.StringBuilder();
@@ -130,6 +138,7 @@ public static class EditJson
         AppendSpecs(sb, SequenceOps.Specs);
         sb.AppendLine();
         sb.AppendLine(RenderHelp);
+        sb.AppendLine(AtHelp);
         return sb.ToString();
     }
 
