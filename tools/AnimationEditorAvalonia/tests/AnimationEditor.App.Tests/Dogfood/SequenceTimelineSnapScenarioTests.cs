@@ -87,6 +87,28 @@ public class SequenceTimelineSnapScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task DraggingAReferenceClip_NearAnotherClipsEnd_LandsExactlyOnIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor, Track("Body", ("Walk", 0, null)));
+        var save = SequenceListSave.FromFile(boss);
+        var combo = new SequenceSave { Name = "Combo" };
+        combo.Tracks.Add(new SequenceTrackSave { Name = "A", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 0 } });
+        combo.Tracks.Add(new SequenceTrackSave { Name = "B", Reference = new SequenceReferenceSave { Sequence = "Attack", Start = 1 } });
+        save.Sequences.Insert(0, combo);
+        save.Save(boss);
+        await editor.OpenAsync(boss);
+        var timeline = Timeline(editor);
+
+        // Clip A plays 0 to 0.5. Grab B inside its body and drop its start 3 px past A's end.
+        editor.DragHold(At(editor, 1, 1.1), At(editor, 1, 0.6, dx: 3));
+
+        timeline.SnapGuideTime!.Value.ShouldBe(0.5, 1e-6);
+        editor.DragRelease(At(editor, 1, 0.6, dx: 3));
+        SequenceListSave.FromFile(boss).Sequences[0].Tracks[1].Reference!.Start.ShouldBe(0.5, 1e-6);
+    }
+
+    [AvaloniaFact]
     public async Task DraggingTheRightEdge_AtVeryHighZoom_IsFreeBetweenTargets()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
