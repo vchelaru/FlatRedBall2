@@ -19,7 +19,7 @@ public static class CliApp
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
           edit <file> --op "<op> <address> key=value ..." [--op ...] [--json]   same, inline (see --schema); --ops - reads the file from stdin
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2) or a chain (--chain <name> --frame 0 | --at 0.3)
-              --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  [--json]
+              --scale <1-16>  --background transparent|black|white|gray|#RRGGBB  --bounds auto|x,y,w,h  --grid  --shapes  --sheet  [--json]
           --schema [--json]                      list the operations and their fields
         exit codes: 0 ok, 1 problems found or edit failed, 2 usage error
         """;
@@ -79,6 +79,7 @@ public static class CliApp
                     case "--json": json = true; break;
                     case "--schema": schema = true; break;
                     case "--grid": grid = true; break;
+                    case "--shapes" or "--sheet": values[a] = ""; break;
                     case "--summary": summary = true; break;
                     case "--out" or "--track" or "--sequence" or "--chain" or "--at" or "--frame" or "--scale" or "--background" or "--bounds":
                         if (i + 1 >= args.Length) return Bad($"{a} needs a value.");
