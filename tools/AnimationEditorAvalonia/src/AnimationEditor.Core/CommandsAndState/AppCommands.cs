@@ -675,10 +675,16 @@ namespace AnimationEditor.Core.CommandsAndState
             string path = tab.Path.FullPath;
             tab.SaveFailed = true;
             if (RefuseIfStale(path) || RefuseIfChangedOnDisk(path, tab.CachedDiskState)) return false;
+            IReadOnlyList<string> tsxWarnings = [];
             try
             {
-                HotReloadWatcher.RunOwnSave(path,
-                    () => _pm.SaveAnimationChainList(tab.CachedEditorModel!, path, tab.CachedOnDiskCoordinateType));
+                HotReloadWatcher.RunOwnSave(path, () =>
+                {
+                    if (tab.CachedTsxState != null)
+                        tsxWarnings = SaveTsxDocument(tab, path);
+                    else
+                        _pm.SaveAnimationChainList(tab.CachedEditorModel!, path, tab.CachedOnDiskCoordinateType);
+                });
             }
             catch (Exception ex)
             {
@@ -687,7 +693,29 @@ namespace AnimationEditor.Core.CommandsAndState
             }
             tab.CachedDiskState = ReadDiskState(path);
             tab.SaveFailed = false;
+            if (tsxWarnings.Count > 0)
+                TsxSaveCompletedWithWarnings?.Invoke(tsxWarnings);
             return true;
+        }
+
+        /// <summary>SaveTsxProject writes the current document, so the tab's document stands in for it meanwhile.</summary>
+        private IReadOnlyList<string> SaveTsxDocument(TabEntry tab, string path)
+        {
+            var currentModel = _pm.AnimationChainListSave;
+            var currentTsxState = _pm.CaptureTsxState();
+            try
+            {
+                _pm.AnimationChainListSave = tab.CachedEditorModel;
+                _pm.RestoreTsxState(tab.CachedTsxState);
+                var warnings = _pm.SaveTsxProject(path);
+                tab.CachedTsxState = _pm.CaptureTsxState();
+                return warnings;
+            }
+            finally
+            {
+                _pm.AnimationChainListSave = currentModel;
+                _pm.RestoreTsxState(currentTsxState);
+            }
         }
 
         /// <inheritdoc/>
@@ -2766,21 +2794,23 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.PasteFrames"/>
-        public void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
+        public bool PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
             int? insertIndex = null)
         {
-            if (IsChainLocked(chain)) return;
+            if (IsChainLocked(chain)) return false;
             var clones = frames.Select(AnimationCloneHelper.CloneFrame).ToArray();
             _undoManager.Execute(new AddFramesCommand(clones, chain, this, _events, _selectedState, insertIndex));
+            return true;
         }
 
         /// <inheritdoc cref="IAppCommands.PasteShapes(AnimationFrameSave, IReadOnlyList{object})"/>
-        public void PasteShapes(AnimationFrameSave frame, IReadOnlyList<object> shapes)
+        public bool PasteShapes(AnimationFrameSave frame, IReadOnlyList<object> shapes)
         {
-            if (IsAchxOnlyEditBlocked()) return;
+            if (IsAchxOnlyEditBlocked()) return false;
             var clones = BuildShapeClones(frame, shapes);
-            if (clones.Count == 0) return;
+            if (clones.Count == 0) return false;
             _undoManager.Execute(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
+            return true;
         }
 
         /// <inheritdoc cref="IAppCommands.PasteShapes(IReadOnlyList{AnimationFrameSave}, IReadOnlyList{object})"/>

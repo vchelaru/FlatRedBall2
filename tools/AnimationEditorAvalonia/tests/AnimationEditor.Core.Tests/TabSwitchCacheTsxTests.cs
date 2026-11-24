@@ -4,7 +4,9 @@ using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -77,6 +79,48 @@ public class TabSwitchCacheTsxTests : IDisposable
         if (!saveFailed) return;
         _ctx.AppCommands.SaveCurrentAnimationChainList();
         Assert.Equal(outside, File.ReadAllText(path));
+    }
+
+    // A cross-document cut writes a background tab's document while another one is current (#1994).
+    [Theory]
+    [InlineData("Other.achx")]
+    [InlineData("Other.tsx")]
+    public async Task SaveDocument_BackgroundTsxTab_WritesTheTilesetAndLeavesTheCurrentDocumentAlone(string currentName)
+    {
+        // Tile 5 is not its own first frame, so its tile survives only through the tab's own tile ids.
+        string path = Path.Combine(_dir.Path, "Heroes.tsx");
+        File.WriteAllText(path, TsxFixtureXml.Replace("</tileset>",
+            " <tile id=\"5\">\n  <animation>\n   <frame tileid=\"6\" duration=\"300\"/>\n  </animation>\n </tile>\n</tileset>"));
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        bool currentIsTsx = currentName.EndsWith(".tsx");
+        string currentPath = currentIsTsx ? WriteTsx(currentName) : WriteAchx(currentName, "Idle");
+        if (currentIsTsx) await _ctx.AppCommands.OpenTsxWorkflowAsync(currentPath);
+        else await _ctx.AppCommands.OpenAchxWorkflowAsync(currentPath);
+        byte[] currentBytes = File.ReadAllBytes(currentPath);
+        var currentModel = _ctx.ProjectManager.AnimationChainListSave;
+        var currentTsxState = _ctx.ProjectManager.CaptureTsxState();
+        tab.CachedEditorModel!.AnimationChains.RemoveAt(0);
+        tab.CachedEditorModel.AnimationChains[0].Loop = false;
+        IReadOnlyList<string> warnings = [];
+        _ctx.AppCommands.TsxSaveCompletedWithWarnings += raised => warnings = raised;
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        AnimatedTileIds(path).ShouldBe([5u]);
+        warnings.ShouldHaveSingleItem().ShouldContain("loop off");
+        _ctx.ProjectManager.AnimationChainListSave.ShouldBeSameAs(currentModel);
+        _ctx.ProjectManager.CaptureTsxState().ShouldBe(currentTsxState);
+        File.ReadAllBytes(currentPath).ShouldBe(currentBytes);
+        // The tab's own later save still knows tile 5.
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+        _ctx.ProjectManager.SaveTsxProject();
+        AnimatedTileIds(path).ShouldBe([5u]);
+
+        static IEnumerable<uint> AnimatedTileIds(string tsx) =>
+            DotTiled.Serialization.Loader.Default().LoadTileset(tsx).Tiles
+                .Where(tile => tile.Animation.Count > 0).Select(tile => tile.ID);
     }
 
     [Fact]

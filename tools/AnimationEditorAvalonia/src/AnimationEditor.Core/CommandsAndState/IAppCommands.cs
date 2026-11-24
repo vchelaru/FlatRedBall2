@@ -52,7 +52,7 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
         /// <summary>
-        /// Raised after <see cref="SaveCurrentAnimationChainList"/> saves a native tsx project
+        /// Raised after <see cref="SaveCurrentAnimationChainList"/> or <see cref="SaveDocument"/> saves a native tsx project
         /// (<see cref="ProjectManager.IsNativeTsxProject"/>) with one or more chains whose mapping
         /// failed this save (bad geometry, wrong texture, etc. -- see <see
         /// cref="ProjectManager.SaveTsxProject"/>). The chain's previously-written tile is left
@@ -699,11 +699,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Adds clipboard frames to <paramref name="chain"/>. Undoable.
         /// <paramref name="insertIndex"/> <c>null</c> appends; a value inserts the frames
         /// there in order (paste after the selected frame).</summary>
-        void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
+        /// <returns>False when nothing was added: the chain is locked.</returns>
+        bool PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
             int? insertIndex = null);
 
         /// <summary>Adds clones of clipboard shapes to <paramref name="frame"/>, in order, in one undo step.</summary>
-        void PasteShapes(AnimationFrameSave frame, IReadOnlyList<object> shapes);
+        /// <returns>False when nothing was added: the frame's chain is locked, or the project is a tsx, which holds no shapes.</returns>
+        bool PasteShapes(AnimationFrameSave frame, IReadOnlyList<object> shapes);
 
         /// <summary>Adds multiple clipboard shapes to every frame in <paramref name="frames"/> in one
         /// undo step — each frame gets its own independent clone. Frames in a locked chain are
