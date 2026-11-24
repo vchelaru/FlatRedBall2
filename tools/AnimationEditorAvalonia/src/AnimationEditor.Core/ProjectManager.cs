@@ -198,11 +198,11 @@ namespace AnimationEditor.Core
             var achxDirectory = System.IO.Path.GetDirectoryName(targetPath) ?? string.Empty;
             var textureNames = acls.AnimationChains.SelectMany(chain => chain.Frames)
                 .Select(frame => (Frame: frame, frame.TextureName)).ToList();
-            NormalizeFrameTextureNames(acls, achxDirectory);
             void Write() { if (IsJsonPath(targetPath)) acls.SaveJson(targetPath); else acls.Save(targetPath); }
 
             try
             {
+                NormalizeFrameTextureNames(acls, achxDirectory);
                 TextureCoordinateConverter.WriteAs(acls, diskFormat, TextureCoordinateConverter.SizesIn(achxDirectory), Write);
             }
             catch

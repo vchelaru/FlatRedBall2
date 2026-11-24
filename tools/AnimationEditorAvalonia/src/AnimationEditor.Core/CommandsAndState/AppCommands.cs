@@ -597,10 +597,16 @@ namespace AnimationEditor.Core.CommandsAndState
         // Null in the CLI: it has no tabs to switch back to, and hashing would slow its startup.
         private DiskState? ReadDiskState(string path) => AutosaveOnChange ? DiskState.Read(new FilePath(path)) : null;
 
-        private bool RefuseIfStale(string path)
+        private bool RefuseIfStale(string path, bool toAnotherFile = false)
         {
             if (!_staleOnDiskReasons.TryGetValue(new AnimationEditor.Core.Paths.FilePath(path).FullPath, out var staleReason))
                 return false;
+            if (toAnotherFile)
+            {
+                SaveAsRefused?.Invoke(
+                    $"Could not save {new FilePath(path).NoPath}: it changed on disk and couldn't be reloaded ({staleReason}). Pick another name.");
+                return true;
+            }
             SaveFailed?.Invoke(
                 $"\"{System.IO.Path.GetFileName(path)}\" changed on disk and couldn't be reloaded ({staleReason}). " +
                 "Saving would overwrite that change. Fix the file and use File > Reload from Disk to drop the edits, or Save As a different file.");
@@ -630,7 +636,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (!string.IsNullOrEmpty(target))
             {
                 // Only after a failed save: otherwise the live reload takes the file's change.
-                if (RefuseIfStale(target)
+                if (RefuseIfStale(target, toAnotherFile)
                     || (_undoManager.SaveState == SaveState.Failed && RefuseIfChangedOnDisk(target, _diskState)))
                 {
                     if (!toAnotherFile) _undoManager.MarkSaveFailed();

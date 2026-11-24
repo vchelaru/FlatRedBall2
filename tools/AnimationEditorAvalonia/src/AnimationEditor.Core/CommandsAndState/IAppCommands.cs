@@ -186,8 +186,9 @@ namespace AnimationEditor.Core.CommandsAndState
         void RefreshTreeView();
 
         /// <summary>
-        /// Writes the document to <paramref name="fileName"/>, or its own file, or the crash-recovery file when it has
-        /// none. Returns false, having raised <see cref="SaveFailed"/>, when it could not.
+        /// Writes the document to <paramref name="fileName"/>, or its own file. Returns false, having raised <see
+        /// cref="SaveFailed"/>, when it could not. A document with no file goes to the crash-recovery file instead, which
+        /// returns true either way (<see cref="IO.IIoManager.SaveFailed"/> reports that one).
         /// </summary>
         bool SaveCurrentAnimationChainList(string? fileName = null);
 

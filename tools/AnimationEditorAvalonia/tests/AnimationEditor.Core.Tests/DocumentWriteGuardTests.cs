@@ -16,6 +16,8 @@ public class DocumentWriteGuardTests
     private static readonly Dictionary<string, DocAction[]> WritesDocuments = new()
     {
         ["AppCommands.OnAnimationChainsChanged"] = [DocAction.Autosave],
+        ["AppCommands.SaveCurrentAnimationChainList"] = [DocAction.Save, DocAction.Autosave, DocAction.WriteRecovery],
+        ["AppCommands.SaveCurrentAnimationChainListAsync"] = [DocAction.SaveAs, DocAction.FailedSaveAs, DocAction.SaveAsOntoAnotherFormat, DocAction.SaveAsOntoOpenTab],
         ["AppCommands.WriteDocument"] = [DocAction.Save, DocAction.Autosave, DocAction.WriteRecovery, DocAction.SaveAs, DocAction.FailedSaveAs,
             DocAction.SaveAsOntoAnotherFormat, DocAction.SaveAsOntoOpenTab],
         ["AppCommands.SaveDocument"] = [DocAction.SaveBackgroundDocument, DocAction.CutChain, DocAction.CutFrame, DocAction.CutShape],
