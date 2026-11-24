@@ -7,7 +7,7 @@ namespace AnimationEditor.Editing;
 /// Errors, which a game would trip on: missing-source (a library source whose file is missing or unreadable, or a block
 /// using a source not in the library), missing-chain, missing-reference-target, reference-cycle, duplicate-sequence-name,
 /// duplicate-track-name. Warnings, which are legal but suspect: continuous-ignored (a continuous reference track whose target cannot carry across the wrap), cut-short (the next block on the track starts before
-/// this one reaches its length) and unreachable-block (the next block starts at the same time, so this one never plays).
+/// this one reaches its length), unreachable-block (the next block starts at the same time, so this one never plays) and missing-texture (a source names a texture that is not there).
 /// </summary>
 public static class SequenceCheck
 {
@@ -23,6 +23,9 @@ public static class SequenceCheck
             if (sources.Chains(source) is null)
                 issues.Add(new(CheckSeverity.Error, "missing-source",
                     sources.Exists(source) ? $"Source '{source}' could not be read." : $"Source '{source}' not found.", source));
+            else
+                foreach (var texture in CheckReport.MissingTextures(sources.Chains(source)!, sources.FullPath(source)))
+                    issues.Add(new(CheckSeverity.Warning, "missing-texture", $"Source '{source}': texture '{texture}' not found."));
         }
 
         foreach (var group in save.Sequences.GroupBy(s => s.Name).Where(g => g.Count() > 1))

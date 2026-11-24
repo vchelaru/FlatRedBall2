@@ -484,7 +484,8 @@ public static class EditOps
             }
         }
 
-        var added = CheckReport.NewErrors(before, CheckReport.Run(session.Document, session.Path));
+        var after = CheckReport.Run(session.Document, session.Path);
+        var added = CheckReport.NewErrors(before, after);
         if (added.Count > 0)
             return new EditRunResult(
                 new EditResult([], added.Select(i => $"The edit would introduce a check error: {i.Message}").ToList(), warnings,
@@ -512,6 +513,8 @@ public static class EditOps
         if (!save.Success)
             return new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
 
+        // A .tsx save leaves out what a tileset cannot hold (a chain with no frames), so the document says nothing about the saved file.
+        if (!session.IsNativeTsx) warnings.AddRange(CheckReport.RaisedWarnings(before, after));
         var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path)).Distinct().ToList();
         return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
     }

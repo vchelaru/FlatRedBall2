@@ -33,6 +33,7 @@ public sealed class SeqWorkspace : IDisposable
     {
         Directory.CreateDirectory(Dir);
         File.WriteAllText(HeroPath, Hero);
+        File.WriteAllText(Path.Combine(Dir, "sheet.png"), ""); // hero.achj's texture; only its presence is checked
         File.WriteAllText(Path.Combine(Dir, "villain.achj"), Hero);
         File.WriteAllText(Path.Combine(Dir, "notes.txt"), "not an animation");
         Build().Save(SeqPath);

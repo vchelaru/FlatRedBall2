@@ -35,6 +35,7 @@ public class FrameLengthUnitGuardTests
         "Core/ViewModels/TreeBuilder.cs",
         "Views/Dialogs/EditorDialogs.cs",
         "Editing/AnimationDescriber.cs", // prints lengths in the file's own unit, labelled with it
+        "Editing/CheckReport.cs", // only compares the raw value with zero
     };
 
     /// <summary>Files still treating the raw value as seconds. Empty: every file that touches FrameLength is reviewed.</summary>
