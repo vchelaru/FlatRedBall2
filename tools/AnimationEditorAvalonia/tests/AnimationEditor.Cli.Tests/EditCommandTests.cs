@@ -161,6 +161,18 @@ public class EditCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task SetFrameTexture_OnALockedChain_FailsBeforeCopyingTheFile()
+    {
+        var far = Path.Combine(_outside, "far.png");
+
+        var r = await Edit("hero.achx", $$"""{"ops":[{"op":"set-chain-locked","chain":"Idle","value":true},{"op":"set-frame-texture","frame":"Idle/0","texture":{{JsonSerializer.Serialize(far)}},"copy":"copy"}]}""", "--json");
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        r.Out.ShouldContain("Locked");
+        File.Exists(_w.PathOf("far.png")).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task SetFrameTexture_OutsideFolder_KeepReferencesInPlaceWithoutCopying()
     {
         var far = Path.Combine(_outside, "far.png");

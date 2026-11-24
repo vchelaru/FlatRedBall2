@@ -117,6 +117,18 @@ public static class ShapeEdit
         return Ok(Address(owner.Chain!, owner.Frame!, "rect", rect.Name));
     }
 
+    /// <summary>Centers a rectangle on its frame's offset and gives it the frame's region size, which must be known.</summary>
+    public static EditResult MatchFrameSize(IAppCommands commands, IObjectFinder finder, AARectSave rect)
+    {
+        var owner = Owner(finder, rect);
+        if (owner.Error is not null) return owner.Error;
+        if (PropertyEdit.CheckRegionSize(commands, owner.Chain!, owner.Frame!) is { } bad) return bad;
+
+        var before = (rect.X, rect.Y, rect.ScaleX, rect.ScaleY);
+        commands.MatchRectangleToFrame(rect, owner.Frame!);
+        return (rect.X, rect.Y, rect.ScaleX, rect.ScaleY) == before ? Ok() : Ok(Address(owner.Chain!, owner.Frame!, "rect", rect.Name));
+    }
+
     /// <summary>Sets any of a circle's center and radius; a null field is left as it is.</summary>
     public static EditResult SetCircle(
         IAppCommands commands, IObjectFinder finder, CircleSave circle, float? x, float? y, float? radius)
