@@ -54,7 +54,10 @@ public static class NativeTsxAnimationSync
         }
     }
 
-    public static NativeTsxAnimationSyncResult Apply(Tileset tileset, IReadOnlyList<MultiTileMappingResult> results)
+    /// <param name="userProperties">What the user owned when the file was loaded; null reads it from
+    /// <paramref name="tileset"/> as it is now.</param>
+    public static NativeTsxAnimationSyncResult Apply(
+        Tileset tileset, IReadOnlyList<MultiTileMappingResult> results, TsxUserProperties? userProperties = null)
     {
         ValidateNoTileIdCollisions(results);
 
@@ -78,9 +81,7 @@ public static class NativeTsxAnimationSync
             .Select(t => t.ID)
             .ToHashSet();
 
-        // A Name is this sync's only where the editor reads it as a chain's name (issue #2014).
-        TiledAnimationToAchjMapper.Map(tileset, out var ownTileIdsByChain, out _, out _);
-        var chainTileIds = ownTileIdsByChain.Values.ToHashSet();
+        userProperties ??= TsxUserProperties.Read(tileset);
 
         var newTileIds = new HashSet<uint>();
         foreach (var result in results)
@@ -96,7 +97,7 @@ public static class NativeTsxAnimationSync
         foreach (var staleTileId in previouslyAnimatedTileIds.Except(newTileIds))
         {
             var staleTile = tilesById[staleTileId];
-            ClearTile(staleTile, chainTileIds);
+            ClearTile(staleTile, userProperties);
             changed = true;
             if (IsTileEmpty(staleTile))
             {
@@ -118,11 +119,11 @@ public static class NativeTsxAnimationSync
             if (result.EntryTileId is not { } entryTileId)
                 continue;
 
-            if (ApplyTile(tileset, tilesById, chainTileIds, result.ChainName, entryTileId, result.AnchorFrames, parentId: null))
+            if (ApplyTile(tileset, tilesById, userProperties, result.ChainName, entryTileId, result.AnchorFrames, parentId: null))
                 changed = true;
 
             foreach (var satellite in result.Satellites)
-                if (ApplyTile(tileset, tilesById, chainTileIds, result.ChainName, satellite.TileId, satellite.Frames, parentId: entryTileId))
+                if (ApplyTile(tileset, tilesById, userProperties, result.ChainName, satellite.TileId, satellite.Frames, parentId: entryTileId))
                     changed = true;
         }
 
@@ -243,7 +244,7 @@ public static class NativeTsxAnimationSync
 
     /// <param name="parentId">The anchor's tile id for a satellite, null for the chain's own tile.</param>
     private static bool ApplyTile(
-        Tileset tileset, Dictionary<uint, Tile> tilesById, HashSet<uint> chainTileIds, string chainName, uint tileId,
+        Tileset tileset, Dictionary<uint, Tile> tilesById, TsxUserProperties userProperties, string chainName, uint tileId,
         IReadOnlyList<MappedFrame> frames, uint? parentId)
     {
         var isNewTile = false;
@@ -257,9 +258,8 @@ public static class NativeTsxAnimationSync
 
         var changed = isNewTile;
 
-        // Before the animation is replaced: whose a property is depends on the tile as it was read.
-        if (SetParentId(tile, chainName, parentId)) changed = true;
-        if (parentId is null ? SetName(tile, chainName, chainTileIds) : RemoveOwnName(tile, chainTileIds)) changed = true;
+        if (SetParentId(tile, chainName, parentId, userProperties)) changed = true;
+        if (parentId is null ? SetName(tile, chainName, userProperties) : RemoveOwnName(tile, userProperties)) changed = true;
 
         var newAnimation = frames.Select(f => new Frame { TileID = f.TileId, Duration = f.Duration }).ToList();
         if (!AnimationEquals(tile.Animation, newAnimation))
@@ -274,10 +274,11 @@ public static class NativeTsxAnimationSync
     /// <summary>Clears a stale tile's animation and the properties this sync wrote. Doesn't remove the tile
     /// itself -- callers that want that call <see cref="IsTileEmpty"/> afterward, since a tile carrying other,
     /// non-editor-owned properties must stay in the file.</summary>
-    private static void ClearTile(Tile tile, HashSet<uint> chainTileIds)
+    private static void ClearTile(Tile tile, TsxUserProperties userProperties)
     {
-        RemoveOwnName(tile, chainTileIds);
-        SetParentId(tile, chainName: "", parentId: null);
+        RemoveOwnName(tile, userProperties);
+        if (TiledAnimationToAchjMapper.GetParentId(tile) is not null && !userProperties.ParentIdTileIds.Contains(tile.ID))
+            tile.Properties.Remove(FindProperty(tile, TiledAnimationToAchjMapper.ParentIdPropertyName)!);
         tile.Animation = [];
     }
 
@@ -312,45 +313,53 @@ public static class NativeTsxAnimationSync
 
     /// <summary>Stores a chain's name on its own tile; the synthetic <c>"ID:N"</c> name is not stored.</summary>
     /// <exception cref="InvalidOperationException">The user's own <c>Name</c> is in the way.</exception>
-    private static bool SetName(Tile tile, string chainName, HashSet<uint> chainTileIds)
+    private static bool SetName(Tile tile, string chainName, TsxUserProperties userProperties)
     {
-        var existing = FindProperty(tile, TiledAnimationToAchjMapper.NamePropertyName);
-        var readName = existing is StringProperty { Value: var value } ? value : "";
-        if (readName == chainName)
+        var existing = TiledAnimationToAchjMapper.FindNameProperty(tile);
+        if ((existing?.Value ?? "") == chainName)
             return false;
 
-        var isStored = chainName != TiledAnimationToAchjMapper.SyntheticChainName(tile.ID);
-        var isOwnedByUser = readName != "" ? !chainTileIds.Contains(tile.ID) : existing is not (null or StringProperty) && isStored;
-        if (isOwnedByUser)
-            throw OwnedByUser(tile, TiledAnimationToAchjMapper.NamePropertyName, chainName);
+        if (userProperties.Names.TryGetValue(tile.ID, out var userName) && !TsxUserProperties.IsNoName(tile, userName))
+            throw OwnedByUser(tile, TiledAnimationToAchjMapper.NamePropertyName, chainName, $"Rename the animation to \"{userName}\", use");
 
-        if (!isStored)
-            return RemoveOwnName(tile, chainTileIds);
-        if (existing is StringProperty name)
-            name.Value = chainName;
+        var syntheticName = TiledAnimationToAchjMapper.SyntheticChainName(tile.ID);
+        if (chainName == syntheticName)
+            return RemoveOwnName(tile, userProperties);
+
+        if (existing is not null)
+            existing.Value = chainName;
+        // A second property of the name would be invalid in Tiled.
+        else if (FindProperty(tile, TiledAnimationToAchjMapper.NamePropertyName) is not null)
+            throw OwnedByUser(tile, TiledAnimationToAchjMapper.NamePropertyName, chainName, $"Rename the animation to \"{syntheticName}\", use");
         else
             tile.Properties.Add(new StringProperty { Name = TiledAnimationToAchjMapper.NamePropertyName, Value = chainName });
         return true;
     }
 
-    /// <summary>Removes a tile's <c>Name</c> if the editor read it as a chain's name.</summary>
-    private static bool RemoveOwnName(Tile tile, HashSet<uint> chainTileIds) =>
-        chainTileIds.Contains(tile.ID)
-        && FindProperty(tile, TiledAnimationToAchjMapper.NamePropertyName) is StringProperty { Value: not "" } name
-        && tile.Properties.Remove(name);
+    /// <summary>Removes a tile's <c>Name</c>, or puts back the one the user had.</summary>
+    private static bool RemoveOwnName(Tile tile, TsxUserProperties userProperties)
+    {
+        if (TiledAnimationToAchjMapper.FindNameProperty(tile) is not { } existing)
+            return false;
+        if (!userProperties.Names.TryGetValue(tile.ID, out var userName))
+            return tile.Properties.Remove(existing);
+        if (existing.Value == userName)
+            return false;
+        existing.Value = userName;
+        return true;
+    }
 
-    /// <summary>Makes a tile a satellite of <paramref name="parentId"/>, or of none. An existing value is this
-    /// sync's only if the tile is animated and the editor reads the value as a tile id.</summary>
+    /// <summary>Makes a tile a satellite of <paramref name="parentId"/>, or of none.</summary>
     /// <exception cref="InvalidOperationException">The user's own <c>ParentId</c> is in the way.</exception>
-    private static bool SetParentId(Tile tile, string chainName, uint? parentId)
+    private static bool SetParentId(Tile tile, string chainName, uint? parentId, TsxUserProperties userProperties)
     {
         var existing = FindProperty(tile, TiledAnimationToAchjMapper.ParentIdPropertyName);
         var readParentId = TiledAnimationToAchjMapper.GetParentId(tile);
         if (readParentId == parentId)
             return false;
 
-        if (existing is not null && (readParentId is null || tile.Animation.Count == 0))
-            throw OwnedByUser(tile, TiledAnimationToAchjMapper.ParentIdPropertyName, chainName);
+        if (existing is not null && (readParentId is null || userProperties.ParentIdTileIds.Contains(tile.ID)))
+            throw OwnedByUser(tile, TiledAnimationToAchjMapper.ParentIdPropertyName, chainName, "Use");
 
         if (parentId is not { } newParentId)
             tile.Properties.Remove(existing!);
@@ -361,8 +370,7 @@ public static class NativeTsxAnimationSync
         return true;
     }
 
-    private static InvalidOperationException OwnedByUser(Tile tile, string propertyName, string chainName) =>
+    private static InvalidOperationException OwnedByUser(Tile tile, string propertyName, string chainName, string advice) =>
         new($"Can't save: Tiled tile {tile.ID} has its own \"{propertyName}\" property, which the animation " +
-            $"\"{chainName}\" would overwrite. Remove or rename that property in Tiled, or use another tile" +
-            (propertyName == TiledAnimationToAchjMapper.NamePropertyName ? " or the same name for the animation." : "."));
+            $"\"{chainName}\" would overwrite. {advice} another tile, or undo.");
 }

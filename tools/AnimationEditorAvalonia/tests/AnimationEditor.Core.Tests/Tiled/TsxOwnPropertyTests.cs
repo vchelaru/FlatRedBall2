@@ -206,13 +206,13 @@ public class TsxOwnPropertyTests : IDisposable
 
     /// <summary>A tile holds one property of a name, so a chain that needs the user's is refused, not given it.</summary>
     [Theory]
-    [InlineData(Name, 1, "Name")]
-    [InlineData(IntName, 1, "Name")]
-    [InlineData(IntParentId, 1, "ParentId")]
-    [InlineData(StringParentId, 0, "ParentId")]
-    [InlineData(NegativeParentId, 0, "ParentId")]
-    [InlineData("<property name=\"ParentId\" type=\"int\" value=\"9\"/>", 0, "ParentId")]
-    public void SaveTsxProject_NewChainNeedsThePropertyOfTheUser_IsRefusedAndNothingIsWritten(string property, int chainTile, string expected)
+    [InlineData(Name, 1, "Name", "Rename the animation to \"Gold chest\", use another tile, or undo.")]
+    [InlineData(IntName, 1, "Name", "Rename the animation to \"ID:1\", use another tile, or undo.")]
+    [InlineData(IntParentId, 1, "ParentId", "Use another tile, or undo.")]
+    [InlineData(StringParentId, 0, "ParentId", "Use another tile, or undo.")]
+    [InlineData(NegativeParentId, 0, "ParentId", "Use another tile, or undo.")]
+    [InlineData("<property name=\"ParentId\" type=\"int\" value=\"9\"/>", 0, "ParentId", "Use another tile, or undo.")]
+    public void SaveTsxProject_NewChainNeedsThePropertyOfTheUser_IsRefusedAndNothingIsWritten(string property, int chainTile, string expected, string way)
     {
         Open(Tile(1, property));
         var before = File.ReadAllText(_path);
@@ -222,6 +222,7 @@ public class TsxOwnPropertyTests : IDisposable
         var message = Should.Throw<InvalidOperationException>(() => _pm.SaveTsxProject()).Message;
         message.ShouldContain($"tile 1 has its own \"{expected}\" property");
         message.ShouldContain("\"Walk\"");
+        message.ShouldEndWith(way);
         File.ReadAllText(_path).ShouldBe(before);
     }
 
@@ -245,6 +246,143 @@ public class TsxOwnPropertyTests : IDisposable
 
         SavedProperties(1).ShouldBe(Name);
         File.ReadAllText(_path).ShouldContain("<animation>");
+    }
+
+    /// <summary>The refusal's advice, followed in the open document.</summary>
+    [Theory]
+    [InlineData(Name, "Gold chest")]
+    [InlineData(IntName, "ID:1")]
+    public void SaveTsxProject_RefusedChainRenamedAsAdvised_IsSaved(string property, string advised)
+    {
+        Open(Tile(1, property));
+        _pm.AnimationChainListSave!.AnimationChains.Add(NewChain("Walk", tile: 1));
+        Should.Throw<InvalidOperationException>(() => _pm.SaveTsxProject());
+
+        Chain("Walk").Name = advised;
+        _pm.SaveTsxProject();
+
+        SavedProperties(1).ShouldBe(property);
+        File.ReadAllText(_path).ShouldContain("<animation>");
+    }
+
+    /// <summary>Whose a property is was settled when the file was opened, so a chain on the tile does not take it over.</summary>
+    [Theory]
+    [InlineData(Name, "Gold chest")]
+    [InlineData(IntName, "ID:1")]
+    [InlineData(EmptyName, "Walk")]
+    [InlineData("<property name=\"Name\" value=\"ID:1\"/>", "Walk")]
+    public void SaveTsxProject_ChainAddedSavedAndUndone_TileIsAsOpened(string property, string chain)
+    {
+        Open(Tile(1, property));
+
+        _pm.AnimationChainListSave!.AnimationChains.Add(NewChain(chain, tile: 1));
+        _pm.SaveTsxProject();
+        _pm.SaveTsxProject();
+        Delete(chain);
+        _pm.SaveTsxProject();
+
+        SavedProperties(1).ShouldBe(property);
+        File.ReadAllText(_path).ShouldNotContain("<animation>");
+    }
+
+    [Fact]
+    public void SaveTsxProject_MultiTileChainAddedSavedAndUndone_SatelliteIsAsOpened()
+    {
+        Open(Tile(1, IntParentId + Name));
+
+        _pm.AnimationChainListSave!.AnimationChains.Add(NewChain("Walk", tile: 0, widthInTiles: 2));
+        _pm.SaveTsxProject();
+        Delete("Walk");
+        _pm.SaveTsxProject();
+
+        SavedProperties(1).ShouldBe(IntParentId + Name);
+    }
+
+    /// <summary>A satellite's own Name was not a chain's when the file was opened either.</summary>
+    [Fact]
+    public void SaveTsxProject_ChainOnAFormerSatelliteAddedSavedAndUndone_KeepsTheUsersName()
+    {
+        Open(Tile(0, "", 0, 2), Tile(1, IntParentId + Name, 1, 3));
+        Delete("ID:0");
+        _pm.SaveTsxProject();
+
+        _pm.AnimationChainListSave!.AnimationChains.Add(NewChain("Gold chest", tile: 1));
+        _pm.SaveTsxProject();
+        Delete("Gold chest");
+        _pm.SaveTsxProject();
+
+        SavedProperties(1).ShouldBe(Name);
+    }
+
+    [Theory]
+    [InlineData(EmptyName)]
+    [InlineData("<property name=\"Name\" value=\"ID:0\"/>")]
+    public void SaveTsxProject_NameOfAnUnnamedChainFilledInAndUndone_TileIsAsOpened(string property)
+    {
+        Open(Tile(0, property, 0, 1));
+        var before = File.ReadAllText(_path);
+
+        Chain("ID:0").Name = "Walk";
+        _pm.SaveTsxProject();
+        Chain("Walk").Name = "ID:0";
+        _pm.SaveTsxProject();
+
+        File.ReadAllText(_path).Replace(" />", "/>").ShouldBe(before);
+    }
+
+    /// <summary>The other tab's document must not decide whose the properties of this one are.</summary>
+    [Fact]
+    public void RestoreTsxState_TabSwitchedAwayAndBack_TheUsersNameIsStillTheUsers()
+    {
+        Open(Tile(1, Name));
+        _pm.AnimationChainListSave!.AnimationChains.Add(NewChain("Gold chest", tile: 1));
+        _pm.SaveTsxProject();
+
+        var (model, state) = (_pm.AnimationChainListSave, _pm.CaptureTsxState());
+        _pm.ResetToBlankDocument();
+        (_pm.AnimationChainListSave, _pm.FileName) = (model, _path);
+        _pm.RestoreTsxState(state);
+        Delete("Gold chest");
+        _pm.SaveTsxProject();
+
+        SavedProperties(1).ShouldBe(Name);
+    }
+
+    /// <summary>The file cannot say who wrote the Name of an animated tile, so a reload makes it the chain's.</summary>
+    [Fact]
+    public void LoadTsxProject_AfterAChainTookTheSameName_TheNameIsTheChains()
+    {
+        Open(Tile(1, Name));
+        _pm.AnimationChainListSave!.AnimationChains.Add(NewChain("Gold chest", tile: 1));
+        _pm.SaveTsxProject();
+
+        _pm.LoadTsxProject(new FilePath(_path));
+        Delete("Gold chest");
+        _pm.SaveTsxProject();
+
+        SavedProperties(1).ShouldBeNull();
+    }
+
+    /// <summary>Not valid in Tiled, but a file can hold it: the editor reads the string one.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SaveTsxProject_TileWithAnIntAndAStringName_TheStringIsTheChainsAndTheIntStays(bool intFirst)
+    {
+        static string Both(bool intFirst, string name) => intFirst ? IntName + name : name + IntName;
+        Open(Tile(0, Both(intFirst, Name), 0, 1));
+        var before = File.ReadAllText(_path);
+
+        _pm.SaveTsxProject();
+        File.ReadAllText(_path).ShouldBe(before);
+
+        Chain("Gold chest").Name = "Walk";
+        _pm.SaveTsxProject();
+        SavedProperties(0).ShouldBe(Both(intFirst, "<property name=\"Name\" value=\"Walk\"/>"));
+
+        Delete("Walk");
+        _pm.SaveTsxProject();
+        SavedProperties(0).ShouldBe(IntName);
     }
 
     /// <summary>The Name of a tile with no animation is not a chain's, so it clashes with none.</summary>

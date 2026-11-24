@@ -256,6 +256,37 @@ public class NativeTsxAnimationSyncTests
     }
 
     [Fact]
+    public void Apply_ExistingNamePropertyHasWrongType_IsRefusedNotDuplicated()
+    {
+        var tileset = EmptyTileset();
+        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
+        tile.Properties.Add(new IntProperty { Name = "Name", Value = 42 });
+        tileset.Tiles.Add(tile);
+
+        var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
+        Assert.Throws<InvalidOperationException>(() => NativeTsxAnimationSync.Apply(tileset, results));
+
+        var single = Assert.Single(tile.Properties, p => p.Name == "Name");
+        Assert.Equal(42, Assert.IsType<IntProperty>(single).Value);
+    }
+
+    [Fact]
+    public void Apply_ExistingParentIdPropertyHasWrongType_IsRefusedNotDuplicated()
+    {
+        var tileset = EmptyTileset();
+        var satelliteTile = new Tile { ID = 1, Width = 0, Height = 0 };
+        satelliteTile.Properties.Add(new StringProperty { Name = "ParentId", Value = "not-a-number" });
+        tileset.Tiles.Add(satelliteTile);
+
+        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)], (1, 0));
+        var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)], satellite) };
+        Assert.Throws<InvalidOperationException>(() => NativeTsxAnimationSync.Apply(tileset, results));
+
+        var single = Assert.Single(satelliteTile.Properties, p => p.Name == "ParentId");
+        Assert.Equal("not-a-number", Assert.IsType<StringProperty>(single).Value);
+    }
+
+    [Fact]
     public void Apply_StaleClearExistingUpdateAndNewTileAllInOneCall_DictionaryLookupMatchesSequentialScan()
     {
         // Exercises Apply's dictionary-based tile lookup against all three code paths in a single
