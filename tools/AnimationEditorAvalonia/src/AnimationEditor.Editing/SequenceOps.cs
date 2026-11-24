@@ -108,9 +108,9 @@ public static class SequenceOps
         new("add-block", "Appends a block (a chain placement) to a chain track. The source must be in the library and have the chain.",
         [
             new("track", "string", true, TrackAddressDescription),
-            new("source", "string", true, "Source as listed in the file."),
+            new("source", "string", false, "Source as listed in the file. Default: the library's only source; with several sources it is required."),
             new("chain", "string", true, "Chain name in the source."),
-            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default 0."),
+            new("start", "number", false, "Seconds from the sequence start, 0 or more. Default: the end of the block that starts last on the track (an auto-length block ends after one cycle), 0 on an empty track."),
             new("length", "number", false, "Length in seconds, above 0. Default: none, so the block plays one cycle of the chain and follows edits to it."),
         ]),
         new("set-block-start", "Moves a block to a start time in seconds. The next block on the track cuts it short from there.",
@@ -255,7 +255,7 @@ public static class SequenceOps
             case "add-source": return SequenceEdit.AddSource(doc, undo, v["path"]);
             case "remove-source": return SequenceEdit.RemoveSource(doc, undo, v["source"]);
             case "replace-source": return SequenceEdit.ReplaceSource(doc, undo, v["source"], v["path"]);
-            case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], v["source"], v["chain"], Num("start"), v.ContainsKey("length") ? Num("length") : (double?)null);
+            case "add-block": return SequenceEdit.AddBlock(doc, undo, v["track"], Opt("source"), v["chain"], v.ContainsKey("start") ? Num("start") : (double?)null, v.ContainsKey("length") ? Num("length") : (double?)null);
             case "set-block-start": return SequenceEdit.SetBlockStart(doc, undo, target, Num("start"));
             case "set-block-length":
                 bool clear = v.TryGetValue("clear", out var c) && c == "true";

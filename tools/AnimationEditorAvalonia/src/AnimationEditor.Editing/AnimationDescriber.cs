@@ -12,12 +12,19 @@ namespace AnimationEditor.Editing;
 /// </summary>
 public static class AnimationDescriber
 {
-    public static string ToText(AnimationChainListSave doc, string path, IReadOnlyDictionary<AnimationChainSave, uint>? ownerTiles = null)
+    public static string ToText(AnimationChainListSave doc, string path, IReadOnlyDictionary<AnimationChainSave, uint>? ownerTiles = null,
+        IReadOnlyCollection<string>? only = null, bool summary = false)
     {
         var sb = new StringBuilder();
+        if (summary)
+        {
+            foreach (var chain in Selected(doc, only))
+                sb.AppendLine(FormattableString.Invariant($"{chain.Name}  {chain.Frames.Count} frames  length {Num(chain.Frames.Sum(f => f.FrameLength))}"));
+            return sb.ToString();
+        }
         sb.AppendLine(FormattableString.Invariant(
             $"{Path.GetFileName(path)}  coordinates={doc.CoordinateType}  unit={doc.TimeMeasurementUnit}  chains={doc.AnimationChains.Count}"));
-        foreach (var chain in doc.AnimationChains)
+        foreach (var chain in Selected(doc, only))
         {
             var flags = new List<string>();
             if (chain.Loop) flags.Add("loop");
@@ -48,17 +55,28 @@ public static class AnimationDescriber
         return sb.ToString();
     }
 
-    public static void WriteJson(Utf8JsonWriter w, AnimationChainListSave doc, string path, IReadOnlyDictionary<AnimationChainSave, uint>? ownerTiles = null)
+    private static IEnumerable<AnimationChainSave> Selected(AnimationChainListSave doc, IReadOnlyCollection<string>? only) =>
+        only is null ? doc.AnimationChains : doc.AnimationChains.Where(c => only.Contains(c.Name));
+
+    public static void WriteJson(Utf8JsonWriter w, AnimationChainListSave doc, string path, IReadOnlyDictionary<AnimationChainSave, uint>? ownerTiles = null,
+        IReadOnlyCollection<string>? only = null, bool summary = false)
     {
         w.WriteStartObject();
         w.WriteString("file", Path.GetFileName(path));
         w.WriteString("coordinateType", doc.CoordinateType.ToString());
         w.WriteString("unit", doc.TimeMeasurementUnit.ToString());
         w.WriteStartArray("chains");
-        foreach (var chain in doc.AnimationChains)
+        foreach (var chain in Selected(doc, only))
         {
             w.WriteStartObject();
             w.WriteString("name", chain.Name);
+            if (summary)
+            {
+                w.WriteNumber("frames", chain.Frames.Count);
+                w.WriteNumber("length", Math.Round(AnimationEditor.Core.Rendering.ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Of(doc)), 6));
+                w.WriteEndObject();
+                continue;
+            }
             w.WriteBoolean("loop", chain.Loop);
             w.WriteBoolean("pingPong", chain.PingPong);
             w.WriteBoolean("reverse", chain.Reverse);
