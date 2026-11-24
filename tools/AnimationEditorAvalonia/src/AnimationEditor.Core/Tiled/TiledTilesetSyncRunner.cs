@@ -1,3 +1,4 @@
+using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
 using DotTiled;
 using FlatRedBall2.AnimationEditorCommon;
@@ -47,8 +48,10 @@ public static class TiledTilesetSyncRunner
             try
             {
                 var tileset = TsxLoader.LoadTileset(tsxPath);
-                var tilesetInfo = BuildTilesetInfo(tileset);
-                var sourceLabel = new FilePath(achxFilePath).RelativeTo(new FilePath(tsxPath).GetDirectoryContainingThis());
+                var achxFile = new FilePath(achxFilePath);
+                var tsxFolder = new FilePath(tsxPath).GetDirectoryContainingThis();
+                var tilesetInfo = BuildTilesetInfo(tileset, tsxFolder, achxFile.GetDirectoryContainingThis());
+                var sourceLabel = achxFile.RelativeTo(tsxFolder);
 
                 var results = AchjToTiledAnimationMapper.Map(achj, tilesetInfo, tallySkips: true);
                 var syncResult = TilesetAnimationSync.Apply(tileset, results, sourceLabel);
@@ -66,7 +69,9 @@ public static class TiledTilesetSyncRunner
         return outcomes;
     }
 
-    private static TilesetAnimationInfo BuildTilesetInfo(Tileset tileset)
+    /// <summary>The image is resolved here, against the .tsx folder, because the frames' texture names are
+    /// relative to <paramref name="achxFolder"/> instead.</summary>
+    private static TilesetAnimationInfo BuildTilesetInfo(Tileset tileset, FilePath tsxFolder, FilePath achxFolder)
     {
         var image = tileset.Image.HasValue ? tileset.Image.Value : null;
         return new TilesetAnimationInfo
@@ -77,7 +82,8 @@ public static class TiledTilesetSyncRunner
             TileCount = tileset.TileCount,
             Margin = tileset.Margin,
             TileSpacing = tileset.Spacing,
-            ImageFileName = image?.Source.HasValue == true ? image.Source.Value : "",
+            ImageFileName = image?.Source.HasValue == true ? TexturePathHelper.ResolveDisplayPath(image.Source.Value, tsxFolder.FullPath) : "",
+            Folder = achxFolder.FullPath,
             TextureWidth = image?.Width.HasValue == true ? image.Width.Value : null,
             TextureHeight = image?.Height.HasValue == true ? image.Height.Value : null,
         };

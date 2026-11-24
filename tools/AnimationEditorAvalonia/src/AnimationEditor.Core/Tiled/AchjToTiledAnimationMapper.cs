@@ -1,3 +1,4 @@
+using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
@@ -57,6 +58,10 @@ public sealed record TilesetAnimationInfo
     public required string ImageFileName { get; init; }
     /// <summary>The folder a relative <see cref="ImageFileName"/> or frame texture name is resolved against.</summary>
     public string Folder { get; init; } = string.Empty;
+    /// <summary>Whether <paramref name="textureName"/> is this tileset's image, compared by resolved path.</summary>
+    public bool IsImage(string textureName) =>
+        textureName == ImageFileName || Resolve(textureName) == Resolve(ImageFileName);
+    private FilePath Resolve(string name) => new(TexturePathHelper.ResolveDisplayPath(name, Folder));
     /// <summary>Required only when the source uses <see cref="TextureCoordinateType.UV"/> frames,
     /// to convert normalized (0-1) coordinates to pixels.</summary>
     public int? TextureWidth { get; init; }
@@ -152,9 +157,7 @@ public static class AchjToTiledAnimationMapper
             return null;
         }
 
-        var textureBaseName = new FilePath(frame.TextureName).NoPath;
-        var tilesetBaseName = new FilePath(tilesetInfo.ImageFileName).NoPath;
-        if (!string.Equals(textureBaseName, tilesetBaseName, StringComparison.OrdinalIgnoreCase))
+        if (!tilesetInfo.IsImage(frame.TextureName))
             return Skip(s => s.TextureMismatch++,
                 $"{label}: references a different texture (\"{frame.TextureName}\") than the open tileset (\"{tilesetInfo.ImageFileName}\") - skipped.");
 

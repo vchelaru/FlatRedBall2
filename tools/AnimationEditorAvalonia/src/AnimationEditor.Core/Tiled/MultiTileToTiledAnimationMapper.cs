@@ -1,5 +1,3 @@
-using AnimationEditor.Core.IO;
-using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
@@ -154,12 +152,9 @@ public static class MultiTileToTiledAnimationMapper
             for (var dx = 0; dx < footprintColumns; dx++)
                 perOffset[(dx, dy)] = [];
 
-        FilePath Resolve(string name) => new(TexturePathHelper.ResolveDisplayPath(name, tilesetInfo.Folder));
-        var tilesetImage = Resolve(tilesetInfo.ImageFileName);
-
         foreach (var frame in chain.Frames)
         {
-            if (frame.TextureName != tilesetInfo.ImageFileName && Resolve(frame.TextureName) != tilesetImage)
+            if (!tilesetInfo.IsImage(frame.TextureName))
                 return Empty($"chain \"{chain.Name}\": references a different texture (\"{frame.TextureName}\") than the open tileset (\"{tilesetInfo.ImageFileName}\") - skipped.");
 
             var rect = AchjToTiledAnimationMapper.FrameRectPixels(frame, coordinateType, tilesetInfo);

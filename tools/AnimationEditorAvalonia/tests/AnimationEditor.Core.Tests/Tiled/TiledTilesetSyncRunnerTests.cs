@@ -2,6 +2,7 @@ using AnimationEditor.Core.Tiled;
 using DotTiled;
 using DotTiled.Serialization;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System.IO;
 using System.Linq;
 using Xunit;
@@ -13,7 +14,7 @@ public class TiledTilesetSyncRunnerTests
     // 4 columns, 16x16 tiles, no image pixel size needed since the achx below uses Pixel
     // coordinates (ProjectManager.AnimationChainListSave is always UV in memory, but the mapper
     // itself supports Pixel too -- see AchjToTiledAnimationMapperTests for the UV path).
-    private static string WriteFixtureTileset(string tempDir, string fileName = "Heroes.tsx")
+    private static string WriteFixtureTileset(string tempDir, string fileName = "Heroes.tsx", string imageSource = "Heroes.png")
     {
         var tileset = new Tileset
         {
@@ -22,7 +23,7 @@ public class TiledTilesetSyncRunnerTests
             TileHeight = 16,
             TileCount = 64,
             Columns = 4,
-            Image = new Image { Source = "Heroes.png" },
+            Image = new Image { Source = imageSource },
         };
         var path = Path.Combine(tempDir, fileName);
         TsxWriter.Write(tileset, path);
@@ -64,6 +65,56 @@ public class TiledTilesetSyncRunnerTests
         var tile0 = reloaded.Tiles.Single(t => t.ID == 0);
         Assert.Equal([((uint)0, 100), ((uint)1, 100)], tile0.Animation.Select(f => (f.TileID, f.Duration)));
         Assert.Equal("Walk", tile0.GetProperty<StringProperty>("achjAnimationName").Value);
+    }
+
+    // No image file exists in any case: the comparison is by path only.
+    [Theory]
+    [InlineData("Hero.achx", "Heroes.png", "Heroes.png", true)]
+    [InlineData("Hero.achx", "Heroes.png", "sub/Heroes.png", false)]
+    [InlineData("Hero.achx", "Heroes.png", "<root>sub/Heroes.png", false)]
+    [InlineData("Hero.achx", "Heroes.png", "<root>Heroes.png", true)]
+    [InlineData("Hero.achx", "<root>Heroes.png", "Heroes.png", true)]
+    [InlineData("Hero.achx", "Heroes.png", "HEROES.PNG", true)]
+    [InlineData("Hero.achx", "Heroes.png", "sub/../Heroes.png", true)]
+    [InlineData("Hero.achx", "images/Heroes.png", "images/Heroes.png", true)]
+    [InlineData("Hero.achx", "images/Heroes.png", "Heroes.png", false)]
+    // A frame's texture is relative to the .achx, the image to the .tsx.
+    [InlineData("anims/Hero.achx", "Heroes.png", "../Heroes.png", true)]
+    [InlineData("anims/Hero.achx", "Heroes.png", "Heroes.png", false)]
+    [InlineData("anims/Hero.achx", "anims/Heroes.png", "Heroes.png", true)]
+    [InlineData("anims/Hero.achx", "images/Heroes.png", "images/Heroes.png", false)]
+    [InlineData("Hero.achx", "//server/share/Heroes.png", "//server/share/heroes.png", true)]
+    [InlineData("Hero.achx", "//server/share/Heroes.png", "//server/other/Heroes.png", false)]
+    public void SyncAll_FrameTexture_IsComparedByResolvedPath(
+        string achxName, string imageSource, string textureName, bool isPushed)
+    {
+        var root = Directory.CreateTempSubdirectory().FullName + Path.DirectorySeparatorChar;
+        var tsxPath = WriteFixtureTileset(root, imageSource: imageSource.Replace("<root>", root));
+        var achj = AchjWithWalkChain();
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = textureName.Replace("<root>", root);
+
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(root, achxName), [tsxPath]).Single();
+
+        outcome.Error.ShouldBeNull();
+        outcome.AppliedCount.ShouldBe(isPushed ? 1 : 0);
+        outcome.Changed.ShouldBe(isPushed);
+    }
+
+    [Fact]
+    public void SyncAll_FramesMovedToASameNamedImage_ClearsTheTileTheyHadPushed()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = "sub/Heroes.png";
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        Loader.Default().LoadTileset(tsxPath).Tiles.ShouldBeEmpty();
     }
 
     [Fact]
