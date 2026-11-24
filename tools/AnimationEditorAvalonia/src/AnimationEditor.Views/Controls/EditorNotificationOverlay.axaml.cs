@@ -13,7 +13,7 @@ namespace AnimationEditor.Views.Controls;
 /// <summary>
 /// The editor's pop-up notifications, in two kinds. <see cref="ShowInfo"/> is a confirmation or FYI that needs nothing
 /// from the user (top-right toast, about 6 s). <see cref="ShowProblem"/> is work that is not saved or an action the user
-/// asked for that failed (top-centre banner, about 8 s, dismissable, optional Retry). <see cref="ShowItemDeleted"/> is
+/// asked for that failed (bottom-centre banner, about 8 s, dismissable, optional Retry). <see cref="ShowItemDeleted"/> is
 /// the info kind with an Undo button. The status bar message is a separate, ambient label and is not part of this.
 /// </summary>
 public partial class EditorNotificationOverlay : UserControl
@@ -100,7 +100,7 @@ public partial class EditorNotificationOverlay : UserControl
 
     /// <summary>
     /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",
-    /// "Could not open x", "Nothing to paste"). Shows the prominent top-centre banner for about 8 s; hovering it keeps
+    /// "Could not open x", "Nothing to paste"). Shows the prominent bottom-centre banner for about 8 s; hovering it keeps
     /// it up and the dismiss button closes it. <paramref name="retry"/>, when given, adds a Retry button that closes
     /// the banner and runs it. <paramref name="sticky"/> keeps the banner up until the user dismisses it, for a problem
     /// that stays true after the 8 s (editing a file written by a newer version may lose data).

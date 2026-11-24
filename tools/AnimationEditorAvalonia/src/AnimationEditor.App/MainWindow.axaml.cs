@@ -7623,7 +7623,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// PROBLEM: the user's work is not saved, or an action they asked for failed or was refused ("Auto save failed",
-    /// "Could not open x", "Nothing to paste", "Start must be 0 or more"). Shows the top-centre banner for about 8 s,
+    /// "Could not open x", "Nothing to paste", "Start must be 0 or more"). Shows the bottom-centre banner for about 8 s,
     /// dismissable, with a Retry button when <paramref name="retry"/> is given; <paramref name="sticky"/> keeps it up until
     /// dismissed. The status bar message is separate.
     /// </summary>

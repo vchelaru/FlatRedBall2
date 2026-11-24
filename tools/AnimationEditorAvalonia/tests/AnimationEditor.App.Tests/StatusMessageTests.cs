@@ -21,7 +21,7 @@ public class StatusMessageTests
         return (window, ctx);
     }
 
-    // Errors route to the prominent top-centre ErrorBanner, not the thin bottom status bar,
+    // Errors route to the prominent bottom-centre ErrorBanner, not the thin bottom status bar,
     // so failures can't be missed (#479 follow-up). The bottom StatusMessage stays for info.
     //
     // The banner lives inside the shared EditorNotificationOverlay (#695 A5), which has its own

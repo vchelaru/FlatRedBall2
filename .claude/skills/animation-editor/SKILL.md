@@ -81,7 +81,7 @@ All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff
 
 ## Pop-ups are INFO or PROBLEM, nothing else
 
-Call `MainWindow.ShowInfo(message)` for a confirmation or FYI that needs nothing from the user (top-right toast, about 6 s), and `ShowProblem(message, retry?)` when work is not saved or an action the user asked for failed or was refused (top-centre banner, about 8 s, dismissable, optional Retry; `sticky: true` keeps it until dismissed, used for the newer-format `.seqj` notice); `NotificationEntryPointGuardTests` fails on any other entry point. The status bar message (`ShowStatusMessage`) is a separate ambient label, so a failure never goes there.
+Call `MainWindow.ShowInfo(message)` for a confirmation or FYI that needs nothing from the user (top-right toast, about 6 s), and `ShowProblem(message, retry?)` when work is not saved or an action the user asked for failed or was refused (bottom-centre banner, about 8 s, dismissable, optional Retry; `sticky: true` keeps it until dismissed, used for the newer-format `.seqj` notice); `NotificationEntryPointGuardTests` fails on any other entry point. The status bar message (`ShowStatusMessage`) is a separate ambient label, so a failure never goes there.
 
 ## Frame lengths are in the file's own unit, never assumed seconds
 

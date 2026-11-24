@@ -4,7 +4,7 @@
     <!--
         The two notification kinds, with their timer/dismiss logic, lifted out of MainWindow.axaml so
         it can be tested on its own: INFO is ToastPanel (top-right, ShowInfo) and PROBLEM is ErrorBanner
-        (top-centre, ShowProblem, optional ErrorBannerRetryBtn). ItemDeletedToastPanel is the info kind
+        (bottom-centre, ShowProblem, optional ErrorBannerRetryBtn). ItemDeletedToastPanel is the info kind
         with an Undo button.
 
         #1130 follow-up: this root UserControl (and the Panel below it) used to carry
@@ -41,14 +41,17 @@
             </StackPanel>
         </Border>
 
-        <!-- The banner above the toast, so two long messages never cover each other. The top margin clears a
-             pane's one-row toolbar. Empty space passes clicks through: this panel has no Background. -->
-        <StackPanel VerticalAlignment="Top" Margin="0,44,0,0" Spacing="8">
+        <!-- The top margin clears a pane's one-row toolbar and the bottom one clears ItemDeletedToastPanel.
+             Banner and toast are placed separately, never stacked: a toast that moved when the banner hid would
+             slide away from a click aimed at it. Their MaxHeights keep them apart at the minimum window size.
+             Empty space passes clicks through: this panel has no Background. -->
+        <Panel Margin="0,44,0,50">
             <Border x:Name="ErrorBanner" x:FieldModifier="Public"
                     IsVisible="False"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Top"
+                    VerticalAlignment="Bottom"
                     MaxWidth="640"
+                    MaxHeight="180"
                     Background="#2D2122"
                     BorderBrush="#E0533F"
                     BorderThickness="1.5"
@@ -99,11 +102,12 @@
                                Foreground="#F2A03E"
                                Margin="0,0,10,0"
                                VerticalAlignment="Top" />
-                    <TextBlock x:Name="ErrorBannerText" x:FieldModifier="Public"
-                               FontSize="12"
-                               Foreground="#F5E2DF"
-                               TextWrapping="Wrap"
-                               VerticalAlignment="Center" />
+                    <ScrollViewer VerticalAlignment="Center">
+                        <TextBlock x:Name="ErrorBannerText" x:FieldModifier="Public"
+                                   FontSize="12"
+                                   Foreground="#F5E2DF"
+                                   TextWrapping="Wrap" />
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
 
@@ -119,6 +123,7 @@
                     VerticalAlignment="Top"
                     Margin="0,0,16,0"
                     MaxWidth="420"
+                    MaxHeight="180"
                     Background="{DynamicResource InfoBannerBg}"
                     BorderBrush="{DynamicResource LineBrush}"
                     BorderThickness="1"
@@ -169,14 +174,15 @@
                               Fill="{DynamicResource InkMid}"
                               Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
                     </Button>
-                        <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
-                                   VerticalAlignment="Center"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource Ink}"
-                                   TextWrapping="Wrap" />
+                        <ScrollViewer VerticalAlignment="Center">
+                            <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Ink}"
+                                       TextWrapping="Wrap" />
+                        </ScrollViewer>
                     </DockPanel>
                 </DockPanel>
             </Border>
-        </StackPanel>
+        </Panel>
     </Panel>
 </UserControl>

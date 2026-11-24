@@ -717,6 +717,7 @@
         </Border>
 
         <!-- ── Main content: [ANIMATIONS tree + Inspector/Files/History tabs] | [Wireframe / Preview] ── -->
+        <Panel>
         <Grid x:Name="MainContentGrid" ColumnDefinitions="300,4,*">
 
             <!-- ── Left: ANIMATIONS tree (fixed, top) + tabbed Inspector/Files/History (bottom) ── -->
@@ -2464,14 +2465,16 @@
                     <views:PreviewControl x:Name="SequencePreview" />
                 </DockPanel>
             </Grid>
-
-            <!-- Item-deleted undo toast, generic status toast, and error banner. The panels and their
-                 timer/dismiss logic live in EditorNotificationOverlay. Hosted in the content grid, not
-                 over the whole window, so a pop-up never covers the title bar, the menu, the tab strip
-                 or the status bar (#2022). These auto-hide mid-click, and a stray click that lands on CloseBtn
-                 closes the app. ZIndex 60 keeps it above every pane. -->
-            <viewsControls:EditorNotificationOverlay x:Name="Notifications" Grid.ColumnSpan="3" ZIndex="60" />
         </Grid>
+
+        <!-- Item-deleted undo toast, generic status toast, and error banner. The panels and their
+             timer/dismiss logic live in EditorNotificationOverlay. Hosted over the content, not over
+             the whole window, so a pop-up never covers the title bar, the menu, the tab strip or the
+             status bar (#2022): they auto-hide, and a click aimed at one that lands on CloseBtn instead
+             closes the app. Outside MainContentGrid, whose columns can be wider than the window. Last
+             in the Panel, so it is above every pane. -->
+        <viewsControls:EditorNotificationOverlay x:Name="Notifications" />
+        </Panel>
     </DockPanel>
         <!-- Resize grips — 4px edges + 8px corners, transparent overlays -->
         <Canvas x:Name="DragOverlayCanvas" IsHitTestVisible="False" ZIndex="99" />

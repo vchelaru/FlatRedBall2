@@ -108,7 +108,7 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     public EditorNotificationOverlay Notifications => Control<EditorNotificationOverlay>("Notifications");
 
-    /// <summary>The PROBLEM banner's text (top-centre) while it shows, else null.</summary>
+    /// <summary>The PROBLEM banner's text (bottom-centre) while it shows, else null.</summary>
     public string? ProblemText =>
         Notifications.ErrorBanner.IsVisible ? Notifications.ErrorBannerText.Text : null;
 

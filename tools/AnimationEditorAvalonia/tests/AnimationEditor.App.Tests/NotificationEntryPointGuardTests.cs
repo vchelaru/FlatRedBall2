@@ -6,7 +6,7 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// The editor has two pop-up kinds, INFO (top-right toast) and PROBLEM (top-centre banner), reached only through
+/// The editor has two pop-up kinds, INFO (top-right toast) and PROBLEM (bottom-centre banner), reached only through
 /// <c>ShowInfo</c> and <c>ShowProblem</c>. This fails when a third kind or an old entry point comes back.
 /// </summary>
 public class NotificationEntryPointGuardTests
