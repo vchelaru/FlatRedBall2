@@ -80,6 +80,9 @@ public sealed record EditResult(
 {
     public bool Success => Errors.Count == 0;
 
+    /// <summary>The sequence a newly created .seqj starts with; null for every other operation.</summary>
+    public string? Sequence { get; init; }
+
     /// <summary>The code of the error at <paramref name="index"/>.</summary>
     public EditErrorCode CodeAt(int index) =>
         ErrorCodes is not null && index < ErrorCodes.Count ? ErrorCodes[index] : EditErrorCode.Unspecified;
