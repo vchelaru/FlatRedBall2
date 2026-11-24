@@ -57,10 +57,12 @@ public class SeqjChainUsageScannerTests
     [Fact]
     public void FindMatches_SourceThatCannotBeResolved_DoesNotHideOtherBlocks()
     {
-        var tooManyUps = string.Concat(Enumerable.Repeat("../", 60)) + "hero.achx";
-        var document = Document([tooManyUps, "../hero.achx"], (tooManyUps, "Walk"), ("../hero.achx", "Walk"));
+        // A drive-relative folder has no root for ".." to stop at.
+        const string seqjPath = @"C:Sequences\fight.seqj";
+        const string tooManyUps = "../../hero.achx";
+        var document = Document([tooManyUps, HeroPath], (tooManyUps, "Walk"), (HeroPath, "Walk"));
 
-        var matches = SeqjChainUsageScanner.FindMatches(document, SeqjPath, HeroPath, ["Walk"]);
+        var matches = SeqjChainUsageScanner.FindMatches(document, seqjPath, HeroPath, ["Walk"]);
 
         matches.Select(m => m.Address).ShouldBe(["Run/Body/1"]);
     }
