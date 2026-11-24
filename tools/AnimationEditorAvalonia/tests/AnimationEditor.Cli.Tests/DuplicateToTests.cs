@@ -44,6 +44,17 @@ public abstract class InlineBatchTests : IDisposable
 
     protected async Task<string> Describe(string file) => (await _w.RunAsync("describe", _w.PathOf(file))).Out;
 
+    /// <summary>The batch is refused before it runs (exit 2) and the file is untouched; returns the error message.</summary>
+    protected async Task<string> UsageError(string file, params string[] ops)
+    {
+        var before = _w.Bytes(file);
+        var r = await Edit(file, ops);
+        r.Code.ShouldBe(2, r.Out + r.Err);
+        _w.Bytes(file).ShouldBe(before);
+        using var doc = JsonDocument.Parse(r.Out);
+        return doc.RootElement.GetProperty("errors")[0].GetProperty("message").GetString()!;
+    }
+
     private Task<CliOutput> Edit(string file, string[] ops) =>
         _w.RunAsync(["edit", _w.PathOf(file), "--json", .. ops.SelectMany(o => new[] { "--op", o })]);
 
