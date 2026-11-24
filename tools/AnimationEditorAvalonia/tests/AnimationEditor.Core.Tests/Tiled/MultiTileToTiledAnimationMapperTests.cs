@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Tiled;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -51,6 +52,23 @@ public class MultiTileToTiledAnimationMapperTests
         var result = Assert.Single(results);
         Assert.Empty(result.Satellites);
         Assert.Equal((uint)0, result.EntryTileId);
+    }
+
+    [Theory]
+    [InlineData("sub/Heroes.png", false)]
+    [InlineData("C:/elsewhere/Heroes.png", false)]
+    [InlineData("C:/game/art/Heroes.png", true)]
+    [InlineData("../art/heroes.png", true)]
+    public void Map_TextureName_IsComparedByResolvedPath(string textureName, bool isTheTilesetImage)
+    {
+        var frame = PixelFrame(0, 0, 16, 16);
+        frame.TextureName = textureName;
+        var tilesetInfo = TilesetInfo with { Folder = "C:/game/art/", ImageFileName = "Heroes.png" };
+
+        var result = MultiTileToTiledAnimationMapper.Map(AchjWithChain("Idle", frame), tilesetInfo).Single();
+
+        (result.Warnings.Count == 0).ShouldBe(isTheTilesetImage);
+        (result.EntryTileId == 0u).ShouldBe(isTheTilesetImage);
     }
 
     [Fact]

@@ -265,10 +265,13 @@ public class TsxAndAchjScenarioTests
     public static TheoryData<string, Action<AnimationChainSave>, bool> WhatATsxCannotStore => new()
     {
         { "other texture", chain => chain.Frames[0].TextureName = "other.png", false },
+        { "another sheet of the same name", chain => chain.Frames[0].TextureName = "sub/Heroes.png", false },
         { "off the tile grid", chain => chain.Frames[0].LeftCoordinate += 1, false },
         { "a tile another animation owns", chain => (chain.Frames[0].LeftCoordinate, chain.Frames[0].RightCoordinate,
             chain.Frames[0].TopCoordinate, chain.Frames[0].BottomCoordinate) = (0, 16, 0, 16), false },
         { "no frames", chain => chain.Frames.Clear(), false },
+        { "a length that rounds to 0 ms", chain => chain.Frames[0].FrameLength = 0.0004f, true },
+        { "keyframe", chain => chain.Frames[0].OffsetInterpolation = "Linear", true },
         { "flip", chain => chain.Frames[0].FlipHorizontal = true, true },
         { "color", chain => chain.Frames[0].Red = 77, true },
         { "event", chain => chain.Frames[0].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Footstep" }), true },
@@ -284,6 +287,8 @@ public class TsxAndAchjScenarioTests
         AnimationChainSave tsxChain = await OpenTsxAsync(editor);
         string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
         editor.WritePng("other.png", 64, 64);
+        Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "sub"));
+        editor.WritePng("sub/Heroes.png", 64, 64);
         AnimationChainSave walk = AnimationEditorHarness.Chain("Walk", "Heroes.png", (32, 32, 16, 16));
         edit(walk);
         string achx = editor.WriteAchx("hero.achx", walk);

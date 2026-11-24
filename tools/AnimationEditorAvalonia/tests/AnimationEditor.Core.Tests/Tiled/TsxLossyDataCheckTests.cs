@@ -1,7 +1,10 @@
 using AnimationEditor.Core.Tiled;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests.Tiled;
@@ -61,6 +64,88 @@ public class TsxLossyDataCheckTests
 
         Assert.Contains("\"Walk\"", warning);
         Assert.Contains(expectedKind, warning);
+    }
+
+    // What a tsx keeps. Everything else a chain, frame or event stores must be reported when it is set, because a cut
+    // pasted into a tsx removes its source unless something is reported.
+    private static readonly string[] KeptByATsx =
+    [
+        "AnimationChainSave.Name", "AnimationChainSave.Frames",
+        "AnimationChainSave.IsLocked", // editor state, accepted as lost (#2002)
+        "AnimationFrameSave.TextureName", "AnimationFrameSave.FrameLength",
+        "AnimationFrameSave.LeftCoordinate", "AnimationFrameSave.RightCoordinate",
+        "AnimationFrameSave.TopCoordinate", "AnimationFrameSave.BottomCoordinate",
+    ];
+
+    public static TheoryData<string, string> StoredMembersATsxDrops()
+    {
+        var data = new TheoryData<string, string>();
+        foreach (var type in new[] { typeof(AnimationChainSave), typeof(AnimationFrameSave), typeof(FlatRedBall2.Animation.AnimationFrameEvent) })
+            foreach (var member in type.GetMembers(BindingFlags.Public | BindingFlags.Instance))
+                if (member is FieldInfo or PropertyInfo && !KeptByATsx.Contains($"{type.Name}.{member.Name}"))
+                    data.Add(type.Name, member.Name);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(StoredMembersATsxDrops))]
+    public void Warnings_AnyStoredMemberATsxDrops_IsReported(string typeName, string memberName)
+    {
+        var chain = CleanChain();
+        var frameEvent = new FlatRedBall2.Animation.AnimationFrameEvent();
+        object owner = typeName switch
+        {
+            nameof(AnimationChainSave) => chain,
+            nameof(AnimationFrameSave) => chain.Frames[0],
+            _ => frameEvent,
+        };
+        if (owner == frameEvent) chain.Frames[0].Events.Add(frameEvent);
+
+        SetToNonDefault(owner, memberName);
+
+        TsxLossyDataCheck.Warnings(WithChain(chain)).Count.ShouldBe(1,
+            $"{typeName}.{memberName} is lost in a .tsx save: report it in TsxLossyDataCheck, or add it to KeptByATsx if the save keeps it");
+    }
+
+    private static void SetToNonDefault(object owner, string memberName)
+    {
+        var member = owner.GetType().GetMember(memberName, BindingFlags.Public | BindingFlags.Instance).Single();
+        var field = member as FieldInfo;
+        var property = member as PropertyInfo;
+        var type = field?.FieldType ?? property!.PropertyType;
+        var current = field != null ? field.GetValue(owner) : property!.GetValue(owner);
+        if (current is List<FlatRedBall2.Animation.AnimationFrameEvent> events)
+        {
+            events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Footstep" });
+            return;
+        }
+        var shapes = new ShapesSave();
+        shapes.Add(new CircleSave { Name = "Hit" });
+        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+        object value =
+            underlying == typeof(bool) ? !(bool)current!
+            : underlying == typeof(int) ? 5
+            : underlying == typeof(float) ? 3f
+            : underlying == typeof(string) ? "Linear"
+            : underlying.IsEnum ? Enum.GetValues(underlying).GetValue(1)!
+            : underlying == typeof(ShapesSave) ? shapes
+            : throw new NotSupportedException($"Give {memberName} ({type.Name}) a non-default value here");
+        if (field != null) field.SetValue(owner, value);
+        else property!.SetValue(owner, value);
+    }
+
+    [Theory]
+    [InlineData(0.0004f, TimeMeasurementUnit.Second, 1)]
+    [InlineData(0.4f, TimeMeasurementUnit.Millisecond, 1)]
+    [InlineData(0.0167f, TimeMeasurementUnit.Second, 0)] // rounding to a whole millisecond is accepted
+    [InlineData(0f, TimeMeasurementUnit.Second, 0)]
+    public void Warnings_FrameLengthThatRoundsToZeroMilliseconds_IsReported(float length, TimeMeasurementUnit unit, int expected)
+    {
+        var acls = WithChain(CleanChain());
+        acls.TimeMeasurementUnit = unit;
+        acls.AnimationChains[0].Frames[0].FrameLength = length;
+
+        TsxLossyDataCheck.Warnings(acls).Count.ShouldBe(expected);
     }
 
     [Fact]

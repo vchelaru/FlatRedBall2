@@ -123,6 +123,26 @@ public class TabSwitchCacheTsxTests : IDisposable
                 .Where(tile => tile.Animation.Count > 0).Select(tile => tile.ID);
     }
 
+    // A pasted frame's texture is an absolute path, which must be matched against the tab's own folder.
+    [Fact]
+    public async Task SaveDocument_BackgroundTsxTabInAnotherFolder_StoresAChainWithAnAbsoluteTexture()
+    {
+        string path = WriteTsx("Heroes.tsx");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        Directory.CreateDirectory(Path.Combine(_dir.Path, "other"));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(WriteAchx("other/Other.achx", "Idle"));
+        var pasted = new AnimationChainSave { Name = "New" };
+        pasted.Frames.Add(new AnimationFrameSave { TextureName = Path.Combine(_dir.Path, "Heroes.png"), FrameLength = 0.1f,
+            LeftCoordinate = 16, RightCoordinate = 32, TopCoordinate = 16, BottomCoordinate = 32 });
+        tab.CachedEditorModel!.AnimationChains.Add(pasted);
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        File.ReadAllText(path).ShouldContain("<tile id=\"5\">");
+    }
+
     [Fact]
     public async Task SaveDocument_BackgroundTsxTabThatCannotBeWritten_KeepsTheFileAndTheCurrentDocument()
     {
