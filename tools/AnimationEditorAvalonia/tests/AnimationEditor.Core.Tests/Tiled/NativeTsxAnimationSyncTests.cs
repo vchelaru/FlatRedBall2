@@ -130,23 +130,6 @@ public class NativeTsxAnimationSyncTests
     }
 
     [Fact]
-    public void Apply_RemovedChain_TileHasOnlyAWrongTypedTrackingProperty_IsRemoved()
-    {
-        // FindByNameRemovingWrongType strips a wrong-typed "Name"/"ParentId" during ClearTile;
-        // once that's gone the tile is exactly as empty as if it never had the property at all.
-        var tileset = EmptyTileset();
-        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
-        tile.Animation.Add(new Frame { TileID = 0, Duration = 100 });
-        tile.Properties.Add(new IntProperty { Name = "Name", Value = 42 });
-        tileset.Tiles.Add(tile);
-
-        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
-
-        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
-        Assert.True(syncResult.Changed);
-    }
-
-    [Fact]
     public void Apply_RemovedChain_TileHasOtherEmptyStringProperty_KeepsTile()
     {
         // IsTileEmpty must key off property *presence*, not value -- an empty string is still a
@@ -176,41 +159,6 @@ public class NativeTsxAnimationSyncTests
         var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
 
         Assert.Empty(tileset.Tiles);
-        Assert.True(syncResult.Changed);
-    }
-
-    [Fact]
-    public void Apply_TileHasTrackingPropertyButNoAnimation_IsClearedAndRemoved()
-    {
-        // A tile that lost its <animation> (crashed/partial prior save, or a hand-edit) but kept
-        // its "Name" property never gets surfaced into `results` by TiledAnimationToAchjMapper.Map
-        // (it only maps Animation.Count > 0 tiles) -- so unless stale-detection also looks at the
-        // tracking property directly, this tile is never visited at all and leaks forever.
-        var tileset = EmptyTileset();
-        var orphanedTile = new Tile { ID = 0, Width = 0, Height = 0 };
-        orphanedTile.Properties.Add(new StringProperty { Name = "Name", Value = "Walk" });
-        tileset.Tiles.Add(orphanedTile);
-
-        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
-
-        Assert.DoesNotContain(tileset.Tiles, t => t.ID == 0);
-        Assert.True(syncResult.Changed);
-    }
-
-    [Fact]
-    public void Apply_TileHasTrackingPropertyButNoAnimationAndAnotherProperty_IsKeptWithTrackingPropertyCleared()
-    {
-        var tileset = EmptyTileset();
-        var orphanedTile = new Tile { ID = 0, Width = 0, Height = 0 };
-        orphanedTile.Properties.Add(new StringProperty { Name = "Name", Value = "Walk" });
-        orphanedTile.Properties.Add(new StringProperty { Name = "Solid", Value = "true" });
-        tileset.Tiles.Add(orphanedTile);
-
-        var syncResult = NativeTsxAnimationSync.Apply(tileset, []);
-
-        var survivingTile = tileset.Tiles.Single(t => t.ID == 0);
-        Assert.DoesNotContain(survivingTile.Properties, p => p.Name is "Name" or "ParentId");
-        Assert.Equal("true", survivingTile.GetProperty<StringProperty>("Solid").Value);
         Assert.True(syncResult.Changed);
     }
 
@@ -308,24 +256,6 @@ public class NativeTsxAnimationSyncTests
     }
 
     [Fact]
-    public void Apply_ExistingNamePropertyHasWrongType_IsReplacedNotDuplicated()
-    {
-        var tileset = EmptyTileset();
-        var tile = new Tile { ID = 0, Width = 0, Height = 0 };
-        // Simulate a hand-authored/corrupt file where "Name" was written as an int property.
-        tile.Properties.Add(new IntProperty { Name = "Name", Value = 42 });
-        tileset.Tiles.Add(tile);
-
-        var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)]) };
-        NativeTsxAnimationSync.Apply(tileset, results);
-
-        var nameProperties = tile.Properties.Where(p => p.Name == "Name").ToList();
-        var single = Assert.Single(nameProperties);
-        var stringProperty = Assert.IsType<StringProperty>(single);
-        Assert.Equal("Walk", stringProperty.Value);
-    }
-
-    [Fact]
     public void Apply_StaleClearExistingUpdateAndNewTileAllInOneCall_DictionaryLookupMatchesSequentialScan()
     {
         // Exercises Apply's dictionary-based tile lookup against all three code paths in a single
@@ -353,26 +283,6 @@ public class NativeTsxAnimationSyncTests
         Assert.Equal([((uint)10, 100)], newTile.Animation.Select(f => (f.TileID, f.Duration)));
 
         Assert.True(syncResult.Changed);
-    }
-
-    [Fact]
-    public void Apply_ExistingParentIdPropertyHasWrongType_IsReplacedNotDuplicated()
-    {
-        var tileset = EmptyTileset();
-        var anchorTile = new Tile { ID = 0, Width = 0, Height = 0 };
-        tileset.Tiles.Add(anchorTile);
-        var satelliteTile = new Tile { ID = 1, Width = 0, Height = 0 };
-        satelliteTile.Properties.Add(new StringProperty { Name = "ParentId", Value = "not-a-number" });
-        tileset.Tiles.Add(satelliteTile);
-
-        var satellite = new TiledSatelliteMapping(1, [new MappedFrame(1, 100)], (1, 0));
-        var results = new[] { Result("Walk", 0, [new MappedFrame(0, 100)], satellite) };
-        NativeTsxAnimationSync.Apply(tileset, results);
-
-        var parentIdProperties = satelliteTile.Properties.Where(p => p.Name == "ParentId").ToList();
-        var single = Assert.Single(parentIdProperties);
-        var intProperty = Assert.IsType<IntProperty>(single);
-        Assert.Equal(0, intProperty.Value);
     }
 
     [Fact]

@@ -171,7 +171,8 @@ public static class TsxAnimationValidator
         // two chains silently diverging under one shared name with no way to reconcile them from
         // the UI. A satellite's own Name (never read/written by this codebase, but a hand-authored
         // file could still set one) must never trip this -- it isn't an independent chain.
-        var trueAnchors = tileset.Tiles.Where(t => TiledAnimationToAchjMapper.GetParentId(t) is null);
+        // Nor may the Name of a tile with no animation, which is the user's own (issue #2014).
+        var trueAnchors = animatedTilesById.Values.Where(t => TiledAnimationToAchjMapper.GetParentId(t) is null);
         var anchorsByName = trueAnchors
             .Select(t => (Tile: t, Name: t.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == TiledAnimationToAchjMapper.NamePropertyName)?.Value))
             .Where(t => !string.IsNullOrEmpty(t.Name))
