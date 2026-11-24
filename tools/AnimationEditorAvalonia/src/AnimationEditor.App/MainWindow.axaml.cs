@@ -23,6 +23,7 @@ using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
 using AnimationEditor.Views.Dialogs;
 using AnimationEditor.Views.Export;
+using AnimationEditor.Views.Services;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -1509,11 +1510,7 @@ public partial class MainWindow : Window
             var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;
             return string.IsNullOrEmpty(texPath) ? null : RelativizeTexturePath(texPath);
         };
-        _appCommands.DecodedTextureSize = path =>
-        {
-            using var codec = File.Exists(path) ? SKCodec.Create(path) : null;
-            return codec is null ? null : (codec.Info.Width, codec.Info.Height);
-        };
+        _appCommands.DecodedTextureSize = SkiaFileDecoder.ReadSize;
         // WireframeZoom follows the live zoom itself (ZoomControl.Attach subscribes ZoomChanged);
         // this handler only persists the settled state — once the smooth wheel-zoom (#425) stops
         // animating (IsZoomAnimating == false), not on every frame.

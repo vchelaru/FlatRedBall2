@@ -16,10 +16,16 @@ public class JpegTextureSizeTests : IDisposable
 
     public void Dispose() => Directory.Delete(_dir, true);
 
-    [AvaloniaFact]
-    public async Task ApplyPickedTextureAsync_JpegOnAFrameWithNoRegion_ShowsTheWholeImage()
+    // The second folder is past the classic 260-character Windows path limit, which Skia's own file open cannot read.
+    [AvaloniaTheory]
+    [InlineData(0)]
+    [InlineData(300)]
+    public async Task ApplyPickedTextureAsync_JpegOnAFrameWithNoRegion_ShowsTheWholeImage(int folderLength)
     {
-        var jpg = Path.Combine(_dir, "pic.jpg");
+        var dir = _dir;
+        while (dir.Length < folderLength) dir = Path.Combine(dir, "level-" + new string('x', 20));
+        Directory.CreateDirectory(dir);
+        var jpg = Path.Combine(dir, "pic.jpg");
         using (var bitmap = new SKBitmap(48, 32))
         {
             bitmap.Erase(SKColors.Green);
@@ -38,7 +44,7 @@ public class JpegTextureSizeTests : IDisposable
             chain.Frames.Add(frame);
             list.AnimationChains.Add(chain);
             ctx.ProjectManager.AnimationChainListSave = list;
-            ctx.ProjectManager.FileName = Path.Combine(_dir, "hero.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "hero.achx");
             ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
 
@@ -48,7 +54,7 @@ public class JpegTextureSizeTests : IDisposable
             frame.TextureName.ShouldBe("pic.jpg");
             (frame.LeftCoordinate, frame.TopCoordinate, frame.RightCoordinate, frame.BottomCoordinate).ShouldBe((0f, 0f, 48f, 32f));
             // A file that is not an image has no size, so nothing to show whole.
-            File.WriteAllText(Path.Combine(_dir, "notes.jpg"), "not an image");
+            File.WriteAllText(Path.Combine(dir, "notes.jpg"), "not an image");
             ctx.AppCommands.GetTextureSize("notes.jpg").ShouldBeNull();
             ctx.AppCommands.GetTextureSize("gone.jpg").ShouldBeNull();
         }

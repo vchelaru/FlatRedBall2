@@ -17,6 +17,19 @@ public static class SkiaFileDecoder
     /// <summary>The decoded bitmap, or null when the file is missing, unreadable, not an image or too large.</summary>
     public static SKBitmap? DecodeFile(string path) => DecodeFile(path, out _);
 
+    /// <summary>The size in the image's header, without decoding it, or null when the file is missing, unreadable or not an image.</summary>
+    public static (int Width, int Height)? ReadSize(string path)
+    {
+        try
+        {
+            using FileStream stream = File.OpenRead(path);
+            using SKCodec? codec = SKCodec.Create(stream);
+            return codec is null ? null : (codec.Info.Width, codec.Info.Height);
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+    }
+
     /// <summary>
     /// Like <see cref="DecodeFile(string)"/>, and also explains a failure the user can act on:
     /// <paramref name="error"/> is set for an image too large to decode (see <see cref="ImageSizeLimit"/>),
