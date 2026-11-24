@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AnimationEditor.Editing;
 using Shouldly;
 using Xunit;
 
@@ -16,6 +17,28 @@ public class SchemaTests
         r.Code.ShouldBe(0);
         foreach (var token in new[] { "rename-chain", "rename-shape", "set-frame-texture", "chain", "shape", "frame", "texture", "copy", "to" })
             r.Out.ShouldContain(token);
+    }
+
+    [Fact]
+    public async Task Text_StartsWithAValidOneLineOpsFileExample()
+    {
+        using var w = new CliWorkspace();
+
+        var r = await w.RunAsync("--schema");
+
+        var first = r.Out.Split('\n')[0].TrimEnd('\r');
+        first.ShouldStartWith("Example ops file: ");
+        var example = first["Example ops file: ".Length..];
+        EditOps.Parse(example).Error.ShouldBeNull();
+    }
+
+    [Fact]
+    public void BareArray_ErrorShowsTheRequiredShape()
+    {
+        var error = EditOps.Parse("[{\"op\":\"rename-chain\"}]").Error;
+
+        error.ShouldNotBeNull();
+        error.ShouldContain(EditOps.ExampleFile);
     }
 
     [Fact]
