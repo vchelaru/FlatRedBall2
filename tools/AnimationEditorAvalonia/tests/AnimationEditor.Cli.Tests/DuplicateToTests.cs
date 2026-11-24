@@ -177,7 +177,7 @@ public class DuplicateToTests : InlineBatchTests
         await Ok("tiles.tsx", "duplicate-frame Walk/1-2 to=ID:5");
 
         Raw("tiles.tsx").ReplaceLineEndings("\n").ShouldContain(
-            "<frame tileid=\"5\" duration=\"150\" />\n   <frame tileid=\"1\" duration=\"100\" />\n   <frame tileid=\"2\" duration=\"200\" />");
+            "<frame tileid=\"5\" duration=\"150\"/>\n   <frame tileid=\"1\" duration=\"100\"/>\n   <frame tileid=\"2\" duration=\"200\"/>");
     }
 
     // ---- duplicate-shape ----

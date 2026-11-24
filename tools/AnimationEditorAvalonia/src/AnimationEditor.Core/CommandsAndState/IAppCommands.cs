@@ -203,7 +203,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         Func<bool>? IsDocumentTabInFront { get; set; }
 
-        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> refuses the picked path.</summary>
+        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> or <see cref="ExportAsync"/> refuses the picked path.</summary>
         event Action<string>? SaveAsRefused;
 
         /// <summary>
@@ -794,5 +794,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// with <see cref="TiledSyncFailed"/> for a UI status indicator that needs both outcomes.
         /// </summary>
         event Action<string, int>? TiledSyncSucceeded;
+
+        /// <summary>
+        /// Raised after a save whose sync left something out of an associated .tsx, with one message per problem,
+        /// each starting with the .tsx's path relative to the saved file. Comes after every <see cref="TiledSyncSucceeded"/>
+        /// of the save and before any <see cref="TiledSyncFailed"/>, so a status indicator that shows the last event shows
+        /// the worst one. The next save, of any file, first raises it with an empty list to take the warning back.
+        /// </summary>
+        event Action<IReadOnlyList<string>>? TiledSyncWarned;
     }
 }

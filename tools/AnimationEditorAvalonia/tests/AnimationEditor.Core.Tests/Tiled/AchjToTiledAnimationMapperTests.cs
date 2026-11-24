@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Tiled;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System.Linq;
 using Xunit;
 
@@ -83,6 +84,39 @@ public class AchjToTiledAnimationMapperTests
 
         Assert.Empty(results[0].Frames);
         Assert.Contains("different texture", results[0].Warnings[0]);
+    }
+
+    [Theory]
+    [InlineData("C:/Game/Maps/")]
+    [InlineData("//server/share/Maps/")]
+    public void Map_SameNamedTextureInAnotherFolder_SkipsOnlyThatFrameAndWarns(string folder)
+    {
+        var tilesetInfo = TilesetInfo with { Folder = folder };
+        var achj = AchjWithChain("Walk",
+            PixelFrame(0, 0, 16, 32, textureName: "sub/AnimatedSpritesheet.png"),
+            PixelFrame(16, 0, 32, 32, textureName: "sub/../animatedspritesheet.png"),
+            PixelFrame(32, 0, 48, 32, textureName: "AnimatedSpritesheet.png"));
+
+        var result = AchjToTiledAnimationMapper.Map(achj, tilesetInfo).Single();
+
+        result.Frames.Select(f => f.TileId).ShouldBe([1u, 2u]);
+        result.Warnings.Single().ShouldContain("frame 0: references a different texture");
+        result.SkipCounts.TextureMismatch.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Map_AbsoluteTextureInAUncFolder_MatchesTheRelativeImage()
+    {
+        // Elsewhere Path.GetFullPath collapses the leading slashes, and there is no such path.
+        if (!System.OperatingSystem.IsWindows()) return;
+        var tilesetInfo = TilesetInfo with { Folder = "//server/share/Maps/" };
+        var achj = AchjWithChain("Walk",
+            PixelFrame(0, 0, 16, 32, textureName: @"\\server\share\Maps\AnimatedSpritesheet.png"),
+            PixelFrame(16, 0, 32, 32, textureName: @"\\server\other\Maps\AnimatedSpritesheet.png"));
+
+        var result = AchjToTiledAnimationMapper.Map(achj, tilesetInfo).Single();
+
+        result.Frames.Select(f => f.TileId).ShouldBe([0u]);
     }
 
     [Fact]
