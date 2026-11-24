@@ -512,7 +512,7 @@ public static class EditOps
         if (!save.Success)
             return new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
 
-        var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path && !changed.Contains(p))).ToList();
+        var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path)).Distinct().ToList();
         return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
     }
 

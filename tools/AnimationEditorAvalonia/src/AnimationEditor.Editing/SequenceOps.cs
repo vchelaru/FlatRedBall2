@@ -184,7 +184,7 @@ public static class SequenceOps
 
         var save = session.Save();
         return save.Success
-            ? new EditRunResult(new EditResult(changed, [], warnings), [])
+            ? new EditRunResult(new EditResult(changed.Distinct().ToList(), [], warnings), [])
             : new EditRunResult(new EditResult([], save.Errors, warnings), save.Errors.Select(_ => (int?)null).ToList());
     }
 
