@@ -879,12 +879,12 @@ namespace AnimationEditor.Core.CommandsAndState
             if (SaveTarget.IsAnotherType(path, fileTypeChoices.Select(choice => choice.Extension).ToArray()))
             {
                 string kind = _pm.IsNativeTsxProject ? "a .tsx" : "an .achj or .achx";
-                SaveAsRefused?.Invoke($"{new FilePath(path).NoPath} is not {kind} file. Give it {kind} extension.");
+                SaveAsRefused?.Invoke(SaveTarget.WrongTypeMessage(path, kind));
                 return;
             }
             if (IsPathOpenInAnotherTab?.Invoke(path) == true)
             {
-                SaveAsRefused?.Invoke($"{new FilePath(path).NoPath} is open in another tab. Close that tab first.");
+                SaveAsRefused?.Invoke(SaveTarget.OpenInAnotherTabMessage(path));
                 return;
             }
 
@@ -898,7 +898,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Show a file picker and export the current animation chain list in <paramref name="format"/>.
-        /// Does nothing if there is no project or the user cancels. Copies the referenced textures
+        /// Does nothing if there is no project or the user cancels, and refuses another type's extension
+        /// (<see cref="SaveTarget.IsAnotherType"/>) through <see cref="SaveAsRefused"/>. Copies the referenced textures
         /// next to the export and fires <see cref="ExportCompleted"/> with the path and any
         /// non-fatal warnings (data the format can't carry, textures that couldn't be copied).
         /// </summary>
@@ -910,6 +911,11 @@ namespace AnimationEditor.Core.CommandsAndState
             var path = await FileDialogService.PickSaveFileAsync(
                 format.DialogTitle, format.Extension, new[] { new FileTypeChoice(format.Extension, format.FileTypeDescription) });
             if (string.IsNullOrEmpty(path)) return;
+            if (SaveTarget.IsAnotherType(path, format.Extension))
+            {
+                SaveAsRefused?.Invoke(SaveTarget.WrongTypeMessage(path, "a ." + format.Extension));
+                return;
+            }
 
             var result = format.Export(acls, _pm.GetTextureSizeInPixels);
             System.IO.File.WriteAllText(path, result.Text);
