@@ -13,7 +13,8 @@ namespace AnimationEditor.Editing;
 /// <param name="Name">The sequence or chain; null picks the file's only one.</param>
 /// <param name="Times">Seconds; null when not given.</param>
 /// <param name="Frames">Chain frame indexes; null when not given.</param>
-public sealed record RenderRequest(string File, string? Name, IReadOnlyList<double>? Times, IReadOnlyList<int>? Frames);
+/// <param name="Pass">Sequence only: how many times a looping sequence has wrapped, so continuous tracks show their carried phase.</param>
+public sealed record RenderRequest(string File, string? Name, IReadOnlyList<double>? Times, IReadOnlyList<int>? Frames, int Pass = 0);
 
 /// <summary>The images to draw: one file-name stem, one caption (the time or frame, for a contact sheet) and one composed frame each, back to front, ready for the renderer.</summary>
 public sealed record RenderPlan(
@@ -60,7 +61,7 @@ public static class RenderPlanner
         var frames = new List<ExportTimelineFrame>();
         foreach (double time in times)
         {
-            var layers = SequenceScene.At(document, index, time).Select(sprite =>
+            var layers = SequenceScene.At(document, index, time, request.Pass).Select(sprite =>
             {
                 var sample = sprite.Sample();
                 return new ExportLayer(sprite.Chain, sprite.Frame, sample.OffsetX, sample.OffsetY, sample.Color,
@@ -69,16 +70,16 @@ public static class RenderPlanner
             frames.Add(new ExportTimelineFrame(layers, 0));
         }
         string name = sequences[index].Name;
-        var textureOf = SpriteTextures(document, index, times);
-        return new RenderPlan(name, times.Select(t => Stem(name, Time(t))).ToList(), times.Select(t => Time(t) + "s").ToList(), frames, frame => textureOf.GetValueOrDefault(frame));
+        var textureOf = SpriteTextures(document, index, times, request.Pass);
+        return new RenderPlan(name, times.Select(t => Stem(name, Time(t) + PassSuffix(request.Pass))).ToList(), times.Select(t => Time(t) + "s" + (request.Pass > 0 ? $" pass {request.Pass}" : "")).ToList(), frames, frame => textureOf.GetValueOrDefault(frame));
     }
 
     // The texture of every frame the requested times can show, resolved through the sprite's own source.
-    private static Dictionary<AnimationFrameSave, string?> SpriteTextures(SequenceDocument document, int index, IReadOnlyList<double> times)
+    private static Dictionary<AnimationFrameSave, string?> SpriteTextures(SequenceDocument document, int index, IReadOnlyList<double> times, int pass)
     {
         var map = new Dictionary<AnimationFrameSave, string?>(ReferenceEqualityComparer.Instance);
         foreach (double time in times)
-            foreach (var sprite in SequenceScene.At(document, index, time))
+            foreach (var sprite in SequenceScene.At(document, index, time, pass))
                 map[sprite.Frame] = sprite.TexturePath;
         return map;
     }
@@ -144,6 +145,8 @@ public static class RenderPlanner
         error = $"No {kind} named '{name}'." + NameHints.For(name, names, plural);
         return -1;
     }
+
+    private static string PassSuffix(int pass) => pass > 0 ? "_pass" + pass.ToString(CultureInfo.InvariantCulture) : "";
 
     private static string Time(double seconds) => seconds.ToString("0.######", CultureInfo.InvariantCulture);
 

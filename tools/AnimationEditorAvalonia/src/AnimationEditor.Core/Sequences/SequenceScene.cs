@@ -67,7 +67,7 @@ public static class SequenceScene
     /// <see cref="SequenceTimeline.ReferenceTime"/> and honouring each hidden track on the way; they report the reference
     /// track's index as <see cref="SequenceSprite.Track"/>, so a click selects it. Pass <paramref name="file"/>, the file's
     /// sequences, to resolve references; without it they show nothing. <paramref name="pass"/> counts the wraps of a looping
-    /// sequence, and applies to this sequence's own chain tracks only: a played sequence runs at pass 0.
+    /// sequence, and carries the phase of this sequence's own continuous tracks, chain or reference (a played sequence runs at pass 0).
     /// </summary>
     public static IReadOnlyList<SequenceSprite> At(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
         IReadOnlyList<SequenceSave>? file = null, int pass = 0)
@@ -100,9 +100,9 @@ public static class SequenceScene
                 // A cycle read from disk plays nothing; the stack check is the backstop for duplicate names.
                 if (file is null || !SequenceReferences.Plays(file, sequence.Name, playing.Sequence)
                     || SequenceReferences.Find(file, playing.Sequence) is not { } target || stack.Contains(target)) continue;
-                if (SequenceTimeline.ReferenceTime(playing, target, LengthOf(target, lookup, file), time) is not { } inner) continue;
+                if (SequenceTimeline.ReferenceTimeAtPass(track, target, LengthOf(target, lookup, file), time, pass, length, out int targetPass) is not { } inner) continue;
                 stack.Add(target);
-                Collect(target, sequenceIndex, inner, lookup, file, sprites, reported, stack);
+                Collect(target, sequenceIndex, inner, lookup, file, sprites, reported, stack, targetPass);
                 stack.RemoveAt(stack.Count - 1);
                 continue;
             }

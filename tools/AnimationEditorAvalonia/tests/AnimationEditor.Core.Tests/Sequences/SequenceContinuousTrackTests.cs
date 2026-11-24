@@ -261,4 +261,58 @@ public class SequenceContinuousTrackTests
         tracks.Single(t => t.Name == "Body").Continuous.ShouldBeTrue();
         tracks.Single(t => t.Name == "Fx").Continuous.ShouldBeFalse();
     }
+
+    // ── Reference tracks ──────────────────────────────────────────────────────
+
+    private static SequenceSave Holder(bool continuous, double? clipLength)
+    {
+        var holder = new SequenceSave { Name = "Main", Loop = true };
+        holder.Tracks.Add(new SequenceTrackSave
+        {
+            Name = "Leg", Continuous = continuous,
+            Reference = new SequenceReferenceSave { Sequence = "Leg", Start = 0, Length = clipLength },
+        });
+        return holder;
+    }
+
+    [Theory]
+    [InlineData(true, 0, "0:Walk#0@0.1")]
+    [InlineData(true, 1, "0:Walk#1@0.05")] // 1.2 + 0.1 = 1.3 s into a 0.5 s loop: 0.3 s, frame 1
+    [InlineData(false, 1, "0:Walk#0@0.1")]
+    public void At_ContinuousReferenceTrack_CarriesTheTargetPhaseAcrossTheWrap(bool continuous, int pass, string expected)
+    {
+        using var dir = new TestHelpers.TempDir();
+        var leg = Sequence(Track("Body", false, ("body.achj", "Walk", 0, null)));
+        leg.Name = "Leg";
+        var document = Load(dir, Holder(continuous, clipLength: 1.2), leg);
+
+        Describe(SequenceScene.At(document, 0, 0.1, pass)).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void SetTracksContinuous_ReferenceTrack_SetsTheFlagAsOneUndoStep()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir, Holder(false, 1.2), Sequence(Track("Body", false, ("body.achj", "Walk", 0, null))));
+        var undo = new UndoManager();
+
+        document.SetTracksContinuous(undo, 0, [0], true);
+
+        document.Save.Sequences[0].Tracks[0].Continuous.ShouldBeTrue();
+        undo.Undo();
+        document.Save.Sequences[0].Tracks[0].Continuous.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(true, 1, "0:Walk#1@0.1")] // pass 1 of the carried target: its continuous chain is 0.75 + 0.1 = 0.85 s in, 0.35 s into the 0.5 s walk
+    [InlineData(false, 1, "0:Walk#0@0.1")]
+    public void At_ContinuousReferenceTrack_PassesTheTargetsWrapsToItsOwnContinuousTracks(bool continuous, int pass, string expected)
+    {
+        using var dir = new TestHelpers.TempDir();
+        var leg = Sequence(Track("Body", true, ("body.achj", "Walk", 0, 0.75)));
+        leg.Name = "Leg";
+        var document = Load(dir, Holder(continuous, clipLength: 0.75), leg);
+
+        Describe(SequenceScene.At(document, 0, 0.1, pass)).ShouldBe(expected);
+    }
 }

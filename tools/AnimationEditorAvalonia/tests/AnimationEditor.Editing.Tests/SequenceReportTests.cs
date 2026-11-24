@@ -168,4 +168,32 @@ public class SequenceReportTests : IDisposable
         body.GetProperty("blocks")[0].GetProperty("length").GetDouble().ShouldBe(0.8, 1e-6);
         block.GetProperty("end").GetDouble().ShouldBe(1.4, 1e-6);
     }
+
+    private static SequenceListSave WithContinuousClip(bool targetLoops, double? clipLength, double start = 0)
+    {
+        var save = SeqWorkspace.Build();
+        var target = new SequenceSave { Name = "Tgt", Loop = targetLoops };
+        target.Tracks.Add(new SequenceTrackSave { Name = "Fx", Chains = { new SequenceChainReferenceSave { Source = "hero.achj", Chain = "Idle", Start = 0 } } });
+        save.Sequences.Add(target);
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave
+        {
+            Name = "Clip", Continuous = true,
+            Reference = new SequenceReferenceSave { Sequence = "Tgt", Start = start, Length = clipLength },
+        });
+        return save;
+    }
+
+    [Fact]
+    public void Check_ContinuousReferenceThatCannotCarry_WarnsWhy()
+    {
+        Check(WithContinuousClip(targetLoops: false, clipLength: 100)).Warnings.Single(i => i.Code == "continuous-ignored").Message.ShouldContain("'Tgt' does not loop");
+        Check(WithContinuousClip(targetLoops: true, clipLength: 0.1)).Warnings.Single(i => i.Code == "continuous-ignored").Message.ShouldContain("set the clip length to");
+        Check(WithContinuousClip(targetLoops: true, clipLength: 100, start: 0.5)).Warnings.Single(i => i.Code == "continuous-ignored").Message.ShouldContain("not 0");
+    }
+
+    [Fact]
+    public void Check_ContinuousReferenceThatCarries_HasNoWarning()
+    {
+        Check(WithContinuousClip(targetLoops: true, clipLength: 100)).Warnings.Select(i => i.Code).ShouldNotContain("continuous-ignored");
+    }
 }

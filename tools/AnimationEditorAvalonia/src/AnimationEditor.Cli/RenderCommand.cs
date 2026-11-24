@@ -56,7 +56,14 @@ internal static class RenderCommand
         if (isSequence && values.ContainsKey("--chain")) return Usage("--chain is for .achx/.achj; use --sequence with a .seqj.");
         if (!isSequence && values.ContainsKey("--sequence")) return Usage("--sequence is for .seqj; use --chain with an .achx/.achj.");
 
-        var plan = RenderPlanner.Plan(new RenderRequest(file, name, times, frames), out var error, out var usage);
+        int pass = 0;
+        if (values.TryGetValue("--pass", out var passText))
+        {
+            if (!isSequence) return Usage("--pass is for .seqj sequences.");
+            if (!(int.TryParse(passText, NumberStyles.None, CultureInfo.InvariantCulture, out pass) && pass >= 0)) return Usage("--pass must be a whole number, 0 or more (the number of loop wraps so far).");
+        }
+
+        var plan = RenderPlanner.Plan(new RenderRequest(file, name, times, frames, pass), out var error, out var usage);
         if (plan is null) return usage ? Usage(error!) : Failed(CodeOf(error!), error!);
 
         StillImages images;

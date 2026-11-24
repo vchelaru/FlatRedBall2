@@ -26,7 +26,9 @@ public class SequenceTrackSave
     /// is the same chain (same source and chain name) as the track's first block, which must start at 0. It carries its
     /// playback phase across the wrap instead, so a chain stretched to a fractional number of cycles does not snap back.
     /// If a different chain is playing at the wrap, or none, the track restarts as usual. Tracks then drift against each
-    /// other across passes; that is intended. The rule is <see cref="SequenceTimeline.ActiveAtPass"/>. Written to the file
+    /// other across passes; that is intended. On a <see cref="Reference"/> track the target keeps running across the wrap
+    /// instead of restarting, when the clip starts at 0, the target loops and the clip lasts to the holder's end
+    /// (<see cref="SequenceTimeline.CarriesAcrossWrap"/>); otherwise the flag is ignored. The chain rule is <see cref="SequenceTimeline.ActiveAtPass"/>. Written to the file
     /// only when true, so every file without it stays unchanged.
     /// </summary>
     public bool Continuous { get; set; }
