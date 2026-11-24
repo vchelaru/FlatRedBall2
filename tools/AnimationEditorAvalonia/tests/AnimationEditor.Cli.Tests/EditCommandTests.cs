@@ -201,6 +201,40 @@ public class EditCommandTests : IDisposable
         d.RootElement.GetProperty("chains")[0].GetProperty("name").GetString().ShouldBe("Run");
     }
 
+    // "The whole texture" needs the texture's size, and only a PNG header gives one here. Region 0,0,1,1 would be one pixel.
+    [Theory]
+    [InlineData("add-frame Idle texture=pic.jpg")]
+    [InlineData("set-frame-texture New/0 texture=pic.jpg")]
+    public async Task WholeTexture_OfAnImageWhoseSizeCannotBeRead_IsRefused_AndNothingIsWritten(string op)
+    {
+        File.WriteAllBytes(_w.PathOf("pic.jpg"), [0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46]);
+        var hero = File.ReadAllText(_w.PathOf("hero.achx"));
+        File.WriteAllText(_w.PathOf("hero.achx"), hero.Replace("</AnimationChainArraySave>",
+            "<AnimationChain><Name>New</Name><Frame><TextureName></TextureName><FrameLength>0.1</FrameLength><LeftCoordinate>0</LeftCoordinate>" +
+            "<RightCoordinate>1</RightCoordinate><TopCoordinate>0</TopCoordinate><BottomCoordinate>1</BottomCoordinate></Frame></AnimationChain></AnimationChainArraySave>"));
+        var before = _w.Bytes("hero.achx");
+
+        var r = await _w.RunAsync("edit", _w.PathOf("hero.achx"), "--op", op);
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        r.Out.ShouldContain("pic.jpg");
+        r.Out.ShouldContain("size");
+        _w.Bytes("hero.achx").ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task SetFrameTexture_ToAnImageWhoseSizeCannotBeRead_KeepsASetRegion()
+    {
+        File.WriteAllBytes(_w.PathOf("pic.jpg"), [0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46]);
+
+        var r = await _w.RunAsync("edit", _w.PathOf("hero.achx"), "--op", "set-frame-texture Walk/1 texture=pic.jpg");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var region = (await Describe("hero.achx")).RootElement.GetProperty("chains")[0].GetProperty("frames")[1].GetProperty("region");
+        region.GetProperty("x").GetDouble().ShouldBe(16);
+        region.GetProperty("width").GetDouble().ShouldBe(16);
+    }
+
     // A Pixel file saves as it is stored, so a missing texture no longer blocks it (#1952).
     [Fact]
     public async Task MissingTexture_DoesNotBlockSavingAPixelFile_AndKeepsItsRegion()

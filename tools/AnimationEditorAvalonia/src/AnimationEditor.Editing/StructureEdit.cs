@@ -76,8 +76,8 @@ public static class StructureEdit
 
     /// <summary>
     /// Appends a frame showing <paramref name="absoluteTexture"/>, stored relative to the .achx. The file must
-    /// exist and pass <paramref name="probe"/>. Without <paramref name="region"/> the frame shows the whole texture;
-    /// a region needs the texture's size, which is only known for PNG files. Without <paramref name="length"/> the
+    /// exist and pass <paramref name="probe"/>. Without <paramref name="region"/> the frame shows the whole texture, whose
+    /// size must be readable; a region needs the texture's size, which is only known for PNG files. Without <paramref name="length"/> the
     /// frame gets the default length of the file's own time unit; a given length is in that unit.
     /// </summary>
     public static EditResult AddFrame(
@@ -101,6 +101,10 @@ public static class StructureEdit
             if (r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 || r.X + r.Width > size.Width || r.Y + r.Height > size.Height)
                 return Fail(EditErrorCode.InvalidValue,
                     $"The region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {size.Width}x{size.Height} texture.");
+        }
+        else if (FrameTextureEdit.CheckWholeTexture(commands, absoluteTexture) is { } refused)
+        {
+            return refused;
         }
 
         var folder = string.IsNullOrEmpty(projectManager.FileName) ? string.Empty : Path.GetDirectoryName(projectManager.FileName) ?? string.Empty;

@@ -214,6 +214,18 @@ public class PixelDocumentTests : IDisposable
         Region(SaveAndRead(path)[0]).ShouldBe((16f, 8f, 32f, 24f));
     }
 
+    [Fact]
+    public void AddFrame_ImageTheHostDecodes_ShowsTheWholeTexture()
+    {
+        Open(WriteFile("hero.achx", Frame("sheet.png", 0, 0, 16, 32)));
+        var chain = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0];
+        _ctx.AppCommands.DecodedTextureSize = path => Path.GetFileName(path) == "photo.jpg" ? (48, 32) : null;
+
+        _ctx.AppCommands.AddFrame(chain, "photo.jpg");
+
+        Region(chain.Frames[^1]).ShouldBe((0f, 0f, 48f, 32f));
+    }
+
     // ── UV files convert at the boundary ──
 
     private string WriteUvFile(string texture)

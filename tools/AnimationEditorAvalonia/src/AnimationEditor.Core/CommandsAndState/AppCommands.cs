@@ -906,7 +906,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         private IUndoableCommand MatchRectangleToFrameCommand(AARectSave rectangle, AnimationFrameSave animationFrame)
         {
-            bool unset = FrameRegion.IsUnset(animationFrame, _pm.GetTextureSizeInPixels);
+            bool unset = FrameRegion.IsUnset(animationFrame, GetTextureSize);
             float scaleX = unset ? rectangle.ScaleX : Math.Abs(animationFrame.RightCoordinate - animationFrame.LeftCoordinate) / 2f;
             float scaleY = unset ? rectangle.ScaleY : Math.Abs(animationFrame.BottomCoordinate - animationFrame.TopCoordinate) / 2f;
             return SetShapePropsCommand.ForRect(
@@ -1170,6 +1170,18 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public Func<string?>? CanvasDefaultTexturePath { get; set; }
 
+        public Func<string, (int Width, int Height)?>? DecodedTextureSize { get; set; }
+
+        /// <inheritdoc cref="IAppCommands.GetTextureSize"/>
+        public (int Width, int Height)? GetTextureSize(string textureName)
+        {
+            if (string.IsNullOrEmpty(textureName)) return null;
+            if (_pm.GetTextureSizeInPixels(textureName) is { } size) return size;
+
+            var folder = string.IsNullOrEmpty(_pm.FileName) ? string.Empty : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
+            return DecodedTextureSize?.Invoke(TexturePathHelper.ResolveDisplayPath(textureName, folder));
+        }
+
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
             // When no texture is passed, inherit both the texture and the sub-region from a
@@ -1189,8 +1201,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
             // A region nobody has set shows the whole texture once there is one of a known size.
             var region = source is null ? FrameRegion.Unset : FrameRegion.Of(source);
-            if ((source is null || FrameRegion.IsUnset(source, _pm.GetTextureSizeInPixels))
-                && !string.IsNullOrEmpty(resolvedTextureName) && _pm.GetTextureSizeInPixels(resolvedTextureName) is { } size)
+            if ((source is null || FrameRegion.IsUnset(source, GetTextureSize))
+                && !string.IsNullOrEmpty(resolvedTextureName) && GetTextureSize(resolvedTextureName) is { } size)
                 region = FrameRegion.Whole(size);
 
             CreateAndAddFrame(chain, resolvedTextureName ?? string.Empty, region);
@@ -1905,7 +1917,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     foreach (var frame in chain.Frames)
                     {
-                        if (!FrameRegion.IsUnset(frame, _pm.GetTextureSizeInPixels))
+                        if (!FrameRegion.IsUnset(frame, GetTextureSize))
                             AdjustOffsetCalculator.ApplyJustifyBottom([frame], offsetMultiplier);
                     }
                 },
@@ -1983,7 +1995,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
             var result    = BatchFrameBuilder.BuildBatch(
                 lastFrame, count, incrementUV, CurrentFrameLengthUnit,
-                lastFrame is null ? null : _pm.GetTextureSizeInPixels(lastFrame.TextureName));
+                lastFrame is null ? null : GetTextureSize(lastFrame.TextureName));
 
             var added = result.Frames.ToArray();
             if (added.Length > 0)
@@ -2066,7 +2078,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void SetFrameTextureName(AnimationFrameSave frame, string? textureName)
         {
             if (frame == null || IsFrameLocked(frame)) return;
-            _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, _pm.GetTextureSizeInPixels, this, _events));
+            _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, GetTextureSize, this, _events));
         }
 
         public void AddFrameEvent(AnimationFrameSave frame, string name, string? data = null)
@@ -2104,7 +2116,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToArray();
             if (unlockedFrames.Length == 0) return;
             var cmds = unlockedFrames
-                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, _pm.GetTextureSizeInPixels, this, _events))
+                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, GetTextureSize, this, _events))
                 .ToArray();
             _undoManager.Execute(new CompositeCommand(cmds, "Set Frame Texture"));
         }
@@ -2113,7 +2125,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (chain.Frames.Count == 0 || IsChainLocked(chain)) return;
             var cmds = chain.Frames
-                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, _pm.GetTextureSizeInPixels, this, _events))
+                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, GetTextureSize, this, _events))
                 .ToArray();
             _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
         }

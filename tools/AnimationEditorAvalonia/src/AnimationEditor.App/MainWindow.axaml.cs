@@ -1386,6 +1386,11 @@ public partial class MainWindow : Window
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
         string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
+        if (FrameTextureEdit.CheckWholeTexture(_appCommands, absolutePath, frames) is { } refused)
+        {
+            ReportTextureResult(refused);
+            return;
+        }
         _appCommands.SetFrameTextureName(frames, storePath);
         RefreshPropertyPanel();
     }
@@ -1503,6 +1508,11 @@ public partial class MainWindow : Window
         {
             var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;
             return string.IsNullOrEmpty(texPath) ? null : RelativizeTexturePath(texPath);
+        };
+        _appCommands.DecodedTextureSize = path =>
+        {
+            using var codec = File.Exists(path) ? SKCodec.Create(path) : null;
+            return codec is null ? null : (codec.Info.Width, codec.Info.Height);
         };
         // WireframeZoom follows the live zoom itself (ZoomControl.Attach subscribes ZoomChanged);
         // this handler only persists the settled state — once the smooth wheel-zoom (#425) stops
@@ -4071,6 +4081,19 @@ public partial class MainWindow : Window
             targetChain, targetFrame, resolvedFilePath, _projectManager.FileName, createFrameOnCtrl);
 
         Trace.WriteLine($"[DragDrop] Result={result}");
+
+        var refused = result switch
+        {
+            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath),
+            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath, [targetFrame!]),
+            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath, targetChain!.Frames),
+            _ => null,
+        };
+        if (refused is not null)
+        {
+            ReportTextureResult(refused);
+            return false;
+        }
 
         bool applied = TextureDropApplier.Apply(_appCommands, _selectedState, targetChain, targetFrame, result, relPath);
         if (!applied)

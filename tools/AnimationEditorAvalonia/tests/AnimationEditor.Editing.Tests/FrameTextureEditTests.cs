@@ -18,7 +18,7 @@ public class FrameTextureEditTests : IDisposable
     private AppCommands _commands => _graph.Commands;
     private UndoManager _undo => _graph.Undo;
     private string _root => _graph.Root;
-    private readonly AnimationFrameSave _frame = new() { TextureName = "old.png" };
+    private readonly AnimationFrameSave _frame = new() { TextureName = "old.png", RightCoordinate = 16, BottomCoordinate = 16 };
 
     private sealed class FakeProbe(bool decodes = true) : ITextureProbe
     {
@@ -54,6 +54,25 @@ public class FrameTextureEditTests : IDisposable
     }
 
     private static TextureCopyChooser Always(TextureCopyChoice choice) => _ => Task.FromResult(choice);
+
+    // A frame with no region yet shows the whole texture: the size comes from the PNG header or the host's decoder, and
+    // without one there is no region to store.
+    [Fact]
+    public void SetResolved_FrameWithNoRegion_NeedsTheTextureSize()
+    {
+        var unset = new AnimationFrameSave { TextureName = "" };
+        _pm.AnimationChainListSave!.AnimationChains[0].Frames.Add(unset);
+        var jpg = Png(_achxFolder, "pic.jpg");
+
+        var refused = FrameTextureEdit.SetResolved(_pm, _commands, [unset], jpg, new FakeProbe());
+        _commands.DecodedTextureSize = path => path.EndsWith("pic.jpg") ? (48, 32) : null;
+        var applied = FrameTextureEdit.SetResolved(_pm, _commands, [unset], jpg, new FakeProbe());
+
+        refused.HasError(EditErrorCode.UnsupportedFile).ShouldBeTrue();
+        applied.Success.ShouldBeTrue();
+        unset.TextureName.ShouldBe("pic.jpg");
+        (unset.RightCoordinate, unset.BottomCoordinate).ShouldBe((48f, 32f));
+    }
 
     [Fact]
     public void SetFromText_RelativeExistingFile_StoresRelativePath()
@@ -152,7 +171,7 @@ public class FrameTextureEditTests : IDisposable
     public void SetFromText_SeveralFrames_OneUndoStep()
     {
         Png(_achxFolder, "new.png");
-        var second = new AnimationFrameSave { TextureName = "other.png" };
+        var second = new AnimationFrameSave { TextureName = "other.png", RightCoordinate = 16, BottomCoordinate = 16 };
 
         FrameTextureEdit.SetFromText(_pm, _commands, [_frame, second], "new.png", new FakeProbe());
         _frame.TextureName.ShouldBe("new.png");

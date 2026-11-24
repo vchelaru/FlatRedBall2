@@ -63,6 +63,7 @@ public class UndoCoverageRosterTests
 
         // Non-mutating -----------------------------------------------------------
         [nameof(IAppCommands.RefreshTreeNode)]              = Category.NonMutating,
+        [nameof(IAppCommands.GetTextureSize)]               = Category.NonMutating,
         [nameof(IAppCommands.RefreshAnimationFrameDisplay)] = Category.NonMutating,
         [nameof(IAppCommands.RefreshWireframe)]             = Category.NonMutating,
         [nameof(IAppCommands.RefreshTreeView)]              = Category.NonMutating,

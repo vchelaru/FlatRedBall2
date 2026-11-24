@@ -14,7 +14,7 @@ public class SequenceTextureReloadScenarioTests
 {
     private static readonly TimeSpan ReloadTimeout = TimeSpan.FromSeconds(5);
 
-    // Walk: 16x16 frames on a 64x64 sheet, so every sprite is square until the sheet changes shape.
+    // Walk: 16x16 frames on a 64x64 sheet, so every sprite is square.
     private static string WriteFixture(AnimationEditorHarness editor)
     {
         editor.WritePng("sheet.png", 64, 64);
@@ -45,7 +45,7 @@ public class SequenceTextureReloadScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ReplacingTheSheetOnDisk_ReSizesTheFilmstripCells_WithoutReopeningTheTab()
+    public async Task ReplacingTheSheetOnDisk_LaysTheFilmstripCellsOutAgain_WithoutReopeningTheTab()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string seqj = WriteFixture(editor);
@@ -54,11 +54,14 @@ public class SequenceTextureReloadScenarioTests
         await editor.OpenAsync(seqj);
         SpriteWidthOfFirstCell(editor).ShouldBe(TimelineLayout.FilmHeight, 1e-6);
 
-        // Twice as wide: the same UV region is now a 2:1 sprite.
+        var timeline = editor.Control<SequenceTimelineControl>("SequenceTimeline");
+        var cells = timeline.FilmstripCells(timeline.Blocks.Single());
+
         editor.WritePng("sheet.png", 128, 64, SKColors.Red);
 
-        (await editor.WaitUntilAsync(() => Math.Abs(SpriteWidthOfFirstCell(editor) - 2 * TimelineLayout.FilmHeight) < 1e-6, ReloadTimeout))
-            .ShouldBeTrue("the filmstrip should lay its cells out from the replaced texture");
+        (await editor.WaitUntilAsync(() => !ReferenceEquals(cells, timeline.FilmstripCells(timeline.Blocks.Single())), ReloadTimeout))
+            .ShouldBeTrue("the filmstrip should lay its cells out again for the replaced texture");
+        SpriteWidthOfFirstCell(editor).ShouldBe(TimelineLayout.FilmHeight, 1e-6, "the frame keeps its 16x16 pixels on a wider sheet (#1952)");
     }
 
     [AvaloniaFact]
@@ -72,9 +75,10 @@ public class SequenceTextureReloadScenarioTests
         var before = ChipImageSize(editor);
         before.Width.ShouldBe(before.Height);
 
-        editor.WritePng("sheet.png", 128, 64, SKColors.Red);
+        // Half a frame wide: the chip crops what is left of the 16x16 region, 8x16.
+        editor.WritePng("sheet.png", 8, 64, SKColors.Red);
 
-        (await editor.WaitUntilAsync(() => ChipImageSize(editor).Width == 2 * ChipImageSize(editor).Height, ReloadTimeout))
-            .ShouldBeTrue("the chip should show the replaced texture's 2:1 sprite");
+        (await editor.WaitUntilAsync(() => ChipImageSize(editor).Height == 2 * ChipImageSize(editor).Width, ReloadTimeout))
+            .ShouldBeTrue("the chip should show the replaced texture's 1:2 sprite");
     }
 }

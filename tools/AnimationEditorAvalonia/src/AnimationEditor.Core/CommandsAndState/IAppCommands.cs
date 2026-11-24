@@ -268,6 +268,18 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         Func<string?>? CanvasDefaultTexturePath { get; set; }
 
+        /// <summary>
+        /// Reads the size of an image the host can decode, given its absolute path, for <see cref="GetTextureSize"/>
+        /// to fall back to when the file is not a PNG. Left <c>null</c> in headless/Core-only contexts.
+        /// </summary>
+        Func<string, (int Width, int Height)?>? DecodedTextureSize { get; set; }
+
+        /// <summary>
+        /// The pixel size of a texture named relative to the open document (or by absolute path): its PNG header, else
+        /// <see cref="DecodedTextureSize"/>. <c>null</c> when neither can read it.
+        /// </summary>
+        (int Width, int Height)? GetTextureSize(string textureName);
+
         void MoveChain(AnimationChainSave chain, int delta);
 
         /// <summary>
