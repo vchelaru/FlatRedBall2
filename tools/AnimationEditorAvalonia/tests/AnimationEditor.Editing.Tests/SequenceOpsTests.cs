@@ -28,7 +28,7 @@ public class SequenceOpsTests : IDisposable
             "add-sequence", "rename-sequence", "delete-sequence", "reorder-sequence", "set-sequence-loop", "duplicate-sequence", "copy-track",
             "add-track", "rename-track", "delete-track", "reorder-track", "set-track-continuous", "add-reference-track",
             "add-source", "remove-source", "replace-source",
-            "add-block", "set-block-start", "set-block-length", "set-block-end", "delete-block",
+            "add-block", "set-block-start", "set-block-length", "set-block-end", "set-block-chain", "delete-block",
         ], ignoreOrder: true);
     }
 

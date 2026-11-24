@@ -152,6 +152,46 @@ public class SequenceCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Edit_SetBlockChain_RepointsChainAndSource_KeepingStartAndLength()
+    {
+        var file = WriteSeq();
+
+        var r = await Edit(file, """
+            {"ops":[
+              {"op":"set-block-chain","block":"Run/Body/0","chain":"Idle"},
+              {"op":"add-source","path":"hero.achx"},
+              {"op":"set-block-chain","block":"Run/Body/1","source":"hero.achx","chain":"Walk"}
+            ]}
+            """);
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var blocks = SequenceListSave.FromFile(file).Sequences[0].Tracks[0].Chains;
+        (blocks[0].Source, blocks[0].Chain, blocks[0].Start, blocks[0].Length).ShouldBe(("hero.achj", "Idle", 0d, (double?)0.8));
+        (blocks[1].Source, blocks[1].Chain, blocks[1].Start, blocks[1].Length).ShouldBe(("hero.achx", "Walk", 1d, (double?)null));
+    }
+
+    [Fact]
+    public async Task Edit_SetBlockChain_RefusesReferenceClip_UnknownChain_AndUnlistedSource()
+    {
+        var file = WriteSeq();
+        var save = SequenceListSave.FromFile(file);
+        save.Sequences.Add(new SequenceSave { Name = "Other" });
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Sub", Reference = new SequenceReferenceSave { Sequence = "Other" } });
+        save.Save(file);
+        var before = File.ReadAllBytes(file);
+
+        var clip = await Edit(file, """{"ops":[{"op":"set-block-chain","block":"Run/Sub/0","chain":"Idle"}]}""", "--json");
+        var chain = await Edit(file, """{"ops":[{"op":"set-block-chain","block":"Run/Body/0","chain":"Nope"}]}""");
+        var source = await Edit(file, """{"ops":[{"op":"set-block-chain","block":"Run/Body/0","source":"x.achj","chain":"Idle"}]}""");
+
+        clip.Code.ShouldBe(1);
+        clip.Out.ShouldContain("WrongTrackKind");
+        (chain.Out + chain.Err).ShouldContain("no chain named 'Nope'");
+        (source.Out + source.Err).ShouldContain("not in the library");
+        File.ReadAllBytes(file).ShouldBe(before);
+    }
+
+    [Fact]
     public async Task Edit_Failure_WritesNothing_AndReportsCodeInJson()
     {
         var file = WriteSeq();

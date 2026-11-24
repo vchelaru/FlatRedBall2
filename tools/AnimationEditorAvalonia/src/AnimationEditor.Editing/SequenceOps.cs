@@ -14,7 +14,7 @@ public static class SequenceOps
         "Sequence files (.seqj): sequence Run, track Run/Body or Run/0 (name wins over index), block Run/Body/1 (zero-based index in the track). "
         + "A track that plays another sequence has one block, its clip, at index 0. "
         + "Selectors: set-sequence-loop takes a glob over sequence names (R*, *); set-track-continuous and delete-track take a track name, glob or index selector "
-        + "(Run/*, Run/Sh*, Run/0-1, Run/0,2, R*/Body); set-block-start, set-block-length, set-block-end and delete-block take the same track part and a block index selector "
+        + "(Run/*, Run/Sh*, Run/0-1, Run/0,2, R*/Body); set-block-start, set-block-length, set-block-end, set-block-chain and delete-block take the same track part and a block index selector "
         + "(Run/Body/*, Run/*/0, Run/Body/0-1). Every other op takes one exact address. A selector matching nothing is NoMatch, an index past the end is "
         + "IndexOutOfRange, and any failing target fails the whole batch and nothing is written. delete-block and delete-track run from the highest index down. "
         + "Sources are named as listed in the file (relative to the .seqj). Times and lengths are seconds. A block with no length set plays one cycle of its chain (one run of the played sequence for a clip) and follows edits to it; a set length keeps the block's end. "
@@ -129,6 +129,12 @@ public static class SequenceOps
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
             new("end", "number", true, "Seconds from the sequence start, after the block's start."),
         ]),
+        new("set-block-chain", "Points a block at another chain, keeping its start and length. Give source to take the chain from another library source; default is the block's own source. A reference track's clip has no chain and is refused.",
+        [
+            new("block", "string", true, BlockAddressDescription + " Takes selectors."),
+            new("source", "string", false, "Source as listed in the file. Default: the block's current source."),
+            new("chain", "string", true, "Chain name in the source."),
+        ]),
         new("delete-block", "Deletes a block of a chain track; later blocks shift down. To remove a reference track use delete-track.",
         [
             new("block", "string", true, BlockAddressDescription + " Takes selectors."),
@@ -198,7 +204,7 @@ public static class SequenceOps
     {
         "set-sequence-loop" => "sequence",
         "delete-track" or "set-track-continuous" => "track",
-        "set-block-start" or "set-block-length" or "set-block-end" or "delete-block" => "block",
+        "set-block-start" or "set-block-length" or "set-block-end" or "set-block-chain" or "delete-block" => "block",
         _ => null,
     };
 
@@ -257,6 +263,7 @@ public static class SequenceOps
                     return new EditResult([], ["set-block-length needs exactly one of length and clear."], [], [EditErrorCode.InvalidValue]);
                 return clear ? SequenceEdit.ClearBlockLength(doc, undo, target) : SequenceEdit.SetBlockLength(doc, undo, target, Num("length"));
             case "set-block-end": return SequenceEdit.SetBlockEnd(doc, undo, target, Num("end"));
+            case "set-block-chain": return SequenceEdit.SetBlockChain(doc, undo, target, Opt("source"), v["chain"]);
             case "delete-block": return SequenceEdit.DeleteBlock(doc, undo, target);
             default: throw new InvalidOperationException($"No handler for op '{op.Spec.Name}'.");
         }

@@ -396,6 +396,35 @@ public static class SequenceEdit
         return SetBlockLength(doc, undo, block, Math.Round(end - start, 6));
     }
 
+    /// <summary>
+    /// Points a block at <paramref name="chain"/> of <paramref name="source"/> (null: the block's current source), keeping
+    /// its start and length. A reference track's clip has no chain, so it is refused.
+    /// </summary>
+    public static EditResult SetBlockChain(SequenceDocument doc, IUndoManager undo, string block, string? source, string chain)
+    {
+        var at = SequenceAddress.ResolveBlock(doc.Save, block);
+        if (!at.Ok) return FromAddress(at);
+        var a = at.Value!;
+        var owner = doc.Save.Sequences[a.Sequence];
+        var track = owner.Tracks[a.Track];
+        if (track.Reference is not null)
+            return Fail(EditErrorCode.WrongTrackKind, $"Track '{owner.Name}/{track.Name}' plays a sequence, so its clip has no chain to set.");
+
+        var wanted = source ?? track.Chains[a.Block].Source;
+        var listed = FindSource(doc, wanted);
+        if (listed is null)
+            return Fail(EditErrorCode.NotFound, $"Source '{wanted}' is not in the library; add it with add-source first.");
+        var chains = doc.SourceChains(listed);
+        if (chains is null)
+            return Fail(EditErrorCode.NotFound, $"Source '{listed}' is missing or could not be read.");
+        if (chains.AnimationChains.All(c => c.Name != chain))
+            return Fail(EditErrorCode.NotFound, $"Source '{listed}' has no chain named '{chain}'.");
+
+        undo.SealCoalescing();
+        doc.SetChainTarget(undo, a.Sequence, a.Track, a.Block, listed, chain);
+        return Ok(block);
+    }
+
     /// <summary>Deletes a block of a chain track; later blocks of the track shift down by one. A reference track is deleted whole.</summary>
     public static EditResult DeleteBlock(SequenceDocument doc, IUndoManager undo, string block)
     {
