@@ -42,9 +42,14 @@ public partial class MainWindow
         await CreateSequenceFileAsync(path);
     }
 
-    /// <summary>Writes a file with one empty sequence at <paramref name="path"/> and opens it. Shared by File &gt; New Sequence File and the Animations tab's folder menu.</summary>
-    internal async Task CreateSequenceFileAsync(string path)
+    /// <summary>Writes a file with one empty sequence at <paramref name="path"/> and opens it. A path any tab holds is refused.</summary>
+    private async Task CreateSequenceFileAsync(string path)
     {
+        if (IsOpenInTabOtherThan(null, path))
+        {
+            ShowProblem(SaveTarget.OpenInAnotherTabMessage(path));
+            return;
+        }
         // The save dialog already confirmed any overwrite.
         var result = NewFileEdit.CreateSequenceFile(path, overwrite: true);
         if (!result.Success)
@@ -355,7 +360,7 @@ public partial class MainWindow
                 // Our own saves go through the watcher's guard so their change events do not reload the document.
                 document.SaveRunner = _watcher.RunOwnSave;
                 // The same toast an achx shows (MainWindow wires AppCommands.SaveFailed), so a failed write is never silent.
-                document.SaveFailed += message => _window.ShowProblem($"Auto save failed — {message}");
+                document.SaveFailed += message => _window.ShowProblem($"{AutoSaveFailedPrefix}{message}");
                 // Open and tab restore both create the document here, so this is where the remembered sequence applies.
                 document.SelectedSequence = SequenceSelectionMemory.IndexToRestore(
                     _window._appSettings.SelectedSequences, document.Path.Standardized, SequenceNames(document));
@@ -470,7 +475,7 @@ public partial class MainWindow
 
             var oldPath = tab.Path;
             var newPath = new FilePath(picked);
-            if (newPath != oldPath && _window._tabManager.Tabs.Any(other => other.Path == newPath))
+            if (_window.IsOpenInTabOtherThan(tab, picked))
             {
                 _window.ShowProblem($"{newPath.NoPath} is already open in another tab. Close that tab first, or pick another name.");
                 return;

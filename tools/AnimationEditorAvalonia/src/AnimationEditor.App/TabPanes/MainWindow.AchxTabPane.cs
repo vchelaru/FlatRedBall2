@@ -140,6 +140,30 @@ public partial class MainWindow
             return !HasFailedSave(tab);
         }
 
+        /// <summary>
+        /// Writes the edits a failed save left in <paramref name="tab"/> (<see cref="HasFailedSave"/>), without switching to it. Returns why that failed
+        /// again, or null when the file has them.
+        /// </summary>
+        public string? SaveFailedEdits(TabEntry tab)
+        {
+            string? reason = null;
+            void OnFailed(string message) => reason = message;
+            var commands = _window._appCommands;
+            commands.SaveFailed += OnFailed;
+            try
+            {
+                if (tab == _window._tabManager.ActiveTab)
+                    commands.SaveCurrentAnimationChainList();
+                else
+                    commands.SaveDocument(tab);
+            }
+            finally
+            {
+                commands.SaveFailed -= OnFailed;
+            }
+            return reason;
+        }
+
         /// <summary>An Untitled document goes through Save As; a file-backed one saves in place.</summary>
         public async Task SaveAsync(TabEntry? tab)
         {
