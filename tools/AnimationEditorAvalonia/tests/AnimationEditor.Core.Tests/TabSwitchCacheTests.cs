@@ -300,38 +300,20 @@ public class TabSwitchCacheTests : IDisposable
         AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Renamed");
     }
 
-    // Save As over a file another tab holds: that tab's model is still the old one.
     [Fact]
-    public async Task TryActivateTabFromCache_WhenAnotherDocumentWasSavedOverTheFile_ReturnsFalse()
+    public async Task SaveDocument_WhenTheFileChanged_RefusesAndMarksTheTab()
     {
-        var (ctx, boss) = await SaveHeroOverBoss();
+        var ctx = new TestServices();
+        string path = WriteAchx("cut.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        ctx.AppCommands.CaptureTabEditorState(tab);
+        WriteAchx("cut.achx", "Outside");
 
-        ctx.AppCommands.TryActivateTabFromCache(boss).ShouldBeFalse();
-    }
+        ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
 
-    [Fact]
-    public async Task SaveDocument_WhenAnotherDocumentWasSavedOverTheFile_RefusesAndMarksTheTab()
-    {
-        var (ctx, boss) = await SaveHeroOverBoss();
-
-        ctx.AppCommands.SaveDocument(boss).ShouldBeFalse();
-
-        AnimationChainListSave.FromFile(boss.Path.FullPath).AnimationChains[0].Name.ShouldBe("Hero");
-        boss.SaveFailed.ShouldBeTrue();
-    }
-
-    // The other side of it: hero's tab still names hero.achx, but edits after the Save As went to boss.achx.
-    [Fact]
-    public async Task TryActivateTabFromCache_WhenEditsWentToTheSaveAsFile_ReloadsTheTabsOwnFile()
-    {
-        var (ctx, boss) = await SaveHeroOverBoss();
-        ctx.ProjectManager.FileName = boss.Path.FullPath;
-        ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "Edited";
-        ctx.AppCommands.SaveCurrentAnimationChainList();
-        var hero = new TabEntry(new FilePath(Path.Combine(_dir.Path, "hero.achx")));
-        ctx.AppCommands.CaptureTabEditorState(hero);
-
-        ctx.AppCommands.TryActivateTabFromCache(hero).ShouldBeFalse();
+        AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Outside");
+        tab.SaveFailed.ShouldBeTrue();
     }
 
     // A failed Save As already moved the document to the new path; its retry is not an overwrite of an unseen edit.
@@ -367,18 +349,6 @@ public class TabSwitchCacheTests : IDisposable
         ctx.AppCommands.SaveCurrentAnimationChainList();
 
         AnimationChainListSave.FromFile(path).AnimationChains[0].Name.ShouldBe("Renamed");
-    }
-
-    private async Task<(TestServices Ctx, TabEntry Boss)> SaveHeroOverBoss()
-    {
-        var ctx = new TestServices();
-        string bossPath = WriteAchx("boss.achx", "Boss");
-        var boss = new TabEntry(new FilePath(bossPath));
-        await ctx.AppCommands.OpenAchxWorkflowAsync(bossPath);
-        ctx.AppCommands.CaptureTabEditorState(boss);
-        await ctx.AppCommands.OpenAchxWorkflowAsync(WriteAchx("hero.achx", "Hero"));
-        ctx.AppCommands.SaveCurrentAnimationChainList(bossPath);
-        return (ctx, boss);
     }
 
     private static FileStream Lock(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.None);

@@ -318,23 +318,6 @@ public class AchxFailedSaveScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task SaveAsOverAnotherTabsFile_ThatTabShowsTheSavedContent()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        await OpenAsync(editor, "hero.achx");
-        string boss = await OpenAsync(editor, "boss.achx");
-        editor.ClickTab("hero.achx");
-        EditFirstFrame(editor, "8");
-        editor.Dialogs.AnswerNextSaveFile(boss);
-        editor.ClickMenu("MenuSaveAs");
-        editor.WaitUntil(() => SavedX(boss) == 8, TimeSpan.FromSeconds(5)).ShouldBeTrue();
-
-        editor.ClickTab("boss.achx");
-
-        editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(8);
-    }
-
-    [AvaloniaFact]
     public async Task LeavingATabRightAfterAnExternalEdit_ShowsTheEditOnReturn()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

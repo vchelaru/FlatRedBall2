@@ -6,8 +6,7 @@ namespace AnimationEditor.Core.Models
 {
     /// <summary>
     /// What the file at <paramref name="Path"/> held when a document was last read from or written to it. It belongs
-    /// to that document (the open one, or a tab's cached one), so a file written by anything else, another document
-    /// included, reads as changed.
+    /// to that document: the open one, or a tab's cached one.
     /// </summary>
     public sealed record DiskState(FilePath Path, byte[]? Hash, DateTime? WriteTimeUtc)
     {

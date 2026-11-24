@@ -1307,6 +1307,9 @@ public partial class MainWindow : Window
         _appCommands.TsxSaveCompletedWithWarnings += warnings =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowProblem($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
+        _appCommands.IsPathOpenInAnotherTab = path =>
+            _tabManager.Tabs.Any(tab => tab != _tabManager.ActiveTab && tab.Path == new FilePath(path));
+        _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));
         _appCommands.SaveFailed += message =>
             Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"Auto save failed — {message}"));
         _appCommands.InfoRaised += message => Dispatcher.UIThread.InvokeAsync(() => ShowInfo(message));

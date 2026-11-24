@@ -185,7 +185,20 @@ namespace AnimationEditor.Core.CommandsAndState
         void RefreshWireframe();
         void RefreshTreeView();
         void SaveCurrentAnimationChainList(string? fileName = null);
+
+        /// <summary>
+        /// Asks for a path and saves there (Save As, and the first save of an Untitled document). A path another tab
+        /// holds (<see cref="IsPathOpenInAnotherTab"/>) is refused through <see cref="SaveAsRefused"/> and nothing
+        /// is written, since that tab's document would be out of step with its file.
+        /// </summary>
         Task SaveCurrentAnimationChainListAsync();
+
+        /// <summary>Whether a tab other than the active one holds this path. Null (no tabs) means none does.</summary>
+        Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
+
+        /// <summary>Raised with a user-readable reason when <see cref="SaveCurrentAnimationChainListAsync"/> refuses the picked path.</summary>
+        event Action<string>? SaveAsRefused;
+
         /// <summary>
         /// Writes a background tab's cached document to its own file, in that file's disk format: a cross-document cut removes chains from a background tab's model, and unless
         /// that model reaches disk the chain comes back from the file on the next load or reload.

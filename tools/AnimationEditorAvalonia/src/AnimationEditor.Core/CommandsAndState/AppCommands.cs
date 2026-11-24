@@ -270,6 +270,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.SaveFailed"/>
         public event Action<string>? SaveFailed;
 
+        /// <inheritdoc cref="IAppCommands.IsPathOpenInAnotherTab"/>
+        public Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
+
+        /// <inheritdoc cref="IAppCommands.SaveAsRefused"/>
+        public event Action<string>? SaveAsRefused;
+
         /// <inheritdoc cref="IAppCommands.LoadFailed"/>
         public event Action<string, Exception>? LoadFailed;
 
@@ -811,6 +817,12 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Save Animation Chain", defaultExtension, fileTypeChoices, SaveDialogStart.For(_pm.FileName));
 
             if (string.IsNullOrEmpty(path)) return;
+
+            if (IsPathOpenInAnotherTab?.Invoke(path) == true)
+            {
+                SaveAsRefused?.Invoke($"{new FilePath(path).NoPath} is open in another tab. Close that tab first.");
+                return;
+            }
 
             SaveCurrentAnimationChainList(path);
             _pm.FileName = path;
