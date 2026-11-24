@@ -19,8 +19,15 @@ internal static class TextureCase
             {
                 if (parts[i] is not ("" or "." or ".."))
                 {
-                    var entries = Directory.EnumerateFileSystemEntries(folder).Select(Path.GetFileName).ToList();
-                    if (!entries.Contains(parts[i]) && entries.Find(e => string.Equals(e, parts[i], StringComparison.OrdinalIgnoreCase)) is { } onDisk)
+                    string? onDisk = null;
+                    foreach (var entry in Directory.EnumerateFileSystemEntries(folder))
+                    {
+                        var found = Path.GetFileName(entry);
+                        if (!string.Equals(found, parts[i], StringComparison.OrdinalIgnoreCase)) continue;
+                        onDisk = found;
+                        if (found == parts[i]) break; // an exact match wins where both can exist
+                    }
+                    if (onDisk is not null && onDisk != parts[i])
                     {
                         parts[i] = onDisk;
                         differs = true;

@@ -32,9 +32,10 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
             issues.Add(new(CheckSeverity.Warning, "unit-undefined",
                 "TimeMeasurementUnit is Undefined; frame lengths are read as seconds."));
 
-        foreach (var group in doc.AnimationChains.GroupBy(c => c.Name).Where(g => g.Count() > 1))
-            issues.Add(new(CheckSeverity.Error, "duplicate-chain-name",
-                $"{group.Count()} chains are named '{group.Key}'.", group.Key));
+        var names = new List<string>();
+        foreach (var chain in doc.AnimationChains) names.Add(chain.Name);
+        foreach (var (name, count) in Repeats(names))
+            issues.Add(new(CheckSeverity.Error, "duplicate-chain-name", $"{count} chains are named '{name}'.", name));
 
         var textures = new Dictionary<string, Texture>();
         for (int c = 0; c < doc.AnimationChains.Count; c++)
@@ -58,20 +59,24 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
                     issues.Add(new(CheckSeverity.Warning, "zero-length-frame",
                         $"Frame {chain.Name}/{f} has length {SequenceCheck.Num(frame.FrameLength)} in a chain of {chain.Frames.Count} frames.", frame));
 
-                var shapes = frame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [];
-                foreach (var dup in shapes.GroupBy(s => s.Name).Where(g => g.Count() > 1))
+                if (frame.ShapesSave is not { Shapes.Count: > 1 } saved) continue;
+                names.Clear();
+                foreach (var shape in saved.Shapes)
+                    if (shape is ShapeSave named) names.Add(named.Name);
+                foreach (var (name, count) in Repeats(names))
                     issues.Add(new(CheckSeverity.Error, "duplicate-shape-name",
-                        $"{dup.Count()} shapes are named '{dup.Key}' in frame {chain.Name}/{f}.", dup.Key));
+                        $"{count} shapes are named '{name}' in frame {chain.Name}/{f}.", name));
             }
         }
 
         foreach (var (name, texture) in textures)
         {
+            var onDisk = texture.Exists ? TextureCase.NameOnDisk(name, folder) : null;
+            if (texture.Exists && onDisk is null) continue;
             var shown = string.Join(", ", texture.Frames.Take(3)) + (texture.Frames.Count > 3 ? $" and {texture.Frames.Count - 3} more" : "");
-            if (!texture.Exists)
-                issues.Add(new(CheckSeverity.Error, "missing-texture", $"Texture '{name}' not found (frames: {shown}).", name));
-            else if (TextureCase.NameOnDisk(name, folder) is { } onDisk)
-                issues.Add(new(CheckSeverity.Warning, "texture-case",
+            issues.Add(onDisk is null
+                ? new(CheckSeverity.Error, "missing-texture", $"Texture '{name}' not found (frames: {shown}).", name)
+                : new(CheckSeverity.Warning, "texture-case",
                     $"Texture '{name}' is '{onDisk}' on disk, so it is not found where file names are case-sensitive (frames: {shown}).", name));
         }
 
@@ -85,6 +90,12 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
         return doc.AnimationChains.SelectMany(c => c.Frames).Select(f => f.TextureName).Where(t => !string.IsNullOrEmpty(t)).Distinct()
             .Where(t => !File.Exists(Path.Combine(folder, t)));
     }
+
+    // Each name that appears more than once, with its count. Grouping runs only when there is one: it is slow to start up.
+    private static IReadOnlyList<(string Name, int Count)> Repeats(List<string> names) =>
+        new HashSet<string>(names).Count == names.Count
+            ? []
+            : names.GroupBy(n => n).Where(g => g.Count() > 1).Select(g => (g.Key, g.Count())).ToList();
 
     // Why the frame's region cannot be drawn, or null when it can or the texture's size is unknown (not a PNG).
     private static string? RegionProblem(AnimationFrameSave frame, TextureCoordinateType type, (int W, int H)? size)
@@ -109,6 +120,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
     /// <summary>The errors of <paramref name="after"/> that <paramref name="before"/> did not already have.</summary>
     public static IReadOnlyList<CheckIssue> NewErrors(CheckReport before, CheckReport after)
     {
+        if (after.Ok) return []; // the usual case, and cheaper than building the set
         var known = before.Errors.Select(i => (i.Code, i.Subject ?? i.Message)).ToHashSet();
         return after.Errors.Where(i => !known.Contains((i.Code, i.Subject ?? i.Message))).ToList();
     }
@@ -119,6 +131,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
     /// </summary>
     public static IReadOnlyList<CheckIssue> NewWarnings(CheckReport before, CheckReport after)
     {
+        if (!after.Warnings.Any()) return [];
         var known = before.Warnings.ToLookup(i => (i.Code, i.Subject ?? i.Message), i => i.Message);
         return after.Warnings.GroupBy(i => (i.Code, i.Subject ?? i.Message)).SelectMany(group =>
         {

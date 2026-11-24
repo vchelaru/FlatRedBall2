@@ -12,7 +12,7 @@ A game project that copied this skill has no FRB2 checkout beside it: set the fu
 | Command | Does |
 |---|---|
 | `describe <file> [--chain G] [--sequence G] [--track G] [--summary] [--json]` | `--chain` (.achx) or `--sequence`/`--track` (.seqj) take names or globs and show only those; `--summary` is one line per chain (frames, length) or track (blocks, length); a filter matching nothing fails with Did-you-mean. Chains, frames by index (texture, length, region as `x,y,width,height`, the form region ops take) and shapes, as stored on disk. For a `.seqj`: sources, sequences, tracks and blocks with computed end and `chainLength`. `--json` gives each `.achx` chain a `length` in seconds (unit-independent). |
-| `check <file> [--json]` | Missing textures, duplicate chain or shape names, undefined unit. Exit 1 on errors. For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks and ignored continuous reference tracks (warnings). |
+| `check <file> [--json]` | Errors (exit 1): missing textures, duplicate chain or shape names. Warnings: undefined unit, `region-outside-texture` (PNG only), `empty-chain`, `zero-length-frame`, `texture-case` (the name differs from the file only by case). For a `.seqj`: missing sources or chains, reference problems (errors), cut-short blocks, ignored continuous reference tracks and a source's missing textures (warnings). |
 | `new <file>` | Empty `.achx`, `.achj` or `.seqj`, chosen by extension. Never overwrites. |
 | `convert <file> --to achj\|achx [--json]` | Writes the other format next to the file. Keeps the source, never overwrites (exit 1 if the target exists). |
 | `render <file> --out <dir> [options]` | Writes PNGs without the editor, see Rendering below. |
@@ -43,7 +43,7 @@ Ops cover renaming, texture changes, and structure: `add-chain`, `delete-chain`,
 - Frame indexes shift after `delete-frame`, `duplicate-frame` and `add-frame`; address later frames of the same batch by their new index.
 
 - Ops apply in order, so after `rename-chain` later ops must use the new name.
-- `edit` writes nothing unless every op succeeds and no new `check` error appears. A batch that changes nothing leaves the file byte-identical.
+- `edit` writes nothing unless every op succeeds and no new `check` error appears. New `check` warnings do not stop it; they come back in `warnings` as `The edit introduced a check warning [code]: ...`. A batch that changes nothing leaves the file byte-identical.
 - A file that already has check errors can still be edited, with one exception: a `.achx` with a missing texture cannot be saved in pixel coordinates (the editor's save path needs the texture size), so every edit of it fails. Fix the texture path first.
 - A file in legacy UV coordinates is refused. Open and save it in the editor once.
 - `set-frame-texture` takes a path relative to the animation file or absolute. Outside the file's folder it references the texture in place unless `copy` is `copy` or `overwrite`. The image check reads the file header only, so a truncated PNG passes.

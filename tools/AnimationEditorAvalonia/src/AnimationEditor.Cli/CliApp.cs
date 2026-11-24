@@ -109,7 +109,7 @@ public static class CliApp
                         to = args[++i];
                         break;
                     default:
-                        if (a.StartsWith("--")) return Bad($"unknown option '{a}'.");
+                        if (a.StartsWith("--", StringComparison.Ordinal)) return Bad($"unknown option '{a}'.");
                         if (command is null) command = a;
                         else if (file is null) file = a;
                         else return Bad($"unexpected argument '{a}'.");
