@@ -643,6 +643,8 @@ namespace AnimationEditor.Core.CommandsAndState
                             _pm.SaveAnimationChainList(target);
                     });
                     _diskState = ReadDiskState(target);
+                    if (tsxWarnings != null && _pm.TsxSaveMergedOutsideChange)
+                        HotReloadWatcher.ReportChange(target);
                     if (tsxWarnings is { Count: > 0 })
                         TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
                     _undoManager.MarkSaved();
@@ -887,7 +889,13 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             SaveCurrentAnimationChainList(path);
-            _pm.MoveTsxProject(new FilePath(path));
+            if (_undoManager.SaveState == SaveState.Failed) return;
+
+            if (_pm.MoveTsxProject(new FilePath(path)))
+            {
+                _undoManager.Clear();
+                _undoManager.MarkSaved();
+            }
             _pm.FileName = path;
             SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();

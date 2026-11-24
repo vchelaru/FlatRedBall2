@@ -280,6 +280,7 @@ public sealed class TsxInPlaceSaveTests : IDisposable
         var reports = 0;
         watcher.AchxChangedOnDisk += _ => System.Threading.Interlocked.Increment(ref reports);
         ctx.AppCommands.HotReloadWatcher = watcher;
+        ctx.AppCommands.WireHotReloadWatcher();
         ctx.AppCommands.AutosaveOnChange = true;
         await ctx.AppCommands.OpenTsxWorkflowAsync(path);
         SetFirstDuration((ProjectManager)ctx.ProjectManager, 300);
@@ -297,6 +298,8 @@ public sealed class TsxInPlaceSaveTests : IDisposable
 
         reports.ShouldBe(changedOutside ? 1 : 0);
         File.ReadAllText(path).ShouldContain("duration=\"400\"");
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Select(chain => chain.Frames[0].FrameLength)
+            .ShouldBe([0.4f, changedOutside ? 0.151f : 0.15f]);
     }
 
     [Theory]

@@ -56,7 +56,14 @@ namespace AnimationEditor.Core
         /// After Save As wrote the open tsx to <paramref name="path"/>, makes that its file. From another folder, the
         /// image and the frames' textures are now relative to the new one. No-op unless a tsx project is loaded.
         /// </summary>
-        void MoveTsxProject(FilePath path);
+        /// <returns>Whether the folder changed. Frames in the undo history still name the image from the old one.</returns>
+        bool MoveTsxProject(FilePath path);
+
+        /// <summary>
+        /// Whether the last <see cref="SaveTsxProject"/> went into a change another program made to the file, which the
+        /// open document does not have yet.
+        /// </summary>
+        bool TsxSaveMergedOutsideChange { get; }
 
         /// <summary>The chains the last <see cref="SaveTsxProject"/> did not store in full.
         /// See <see cref="ProjectManager.TsxChainsNotFullySaved"/>.</summary>

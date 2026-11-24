@@ -61,7 +61,11 @@ namespace AnimationEditor.Core
             private string _diskText = source.Text;
             private DotTiled.Tileset _diskTileset = tileset;
 
-            public void Save(DotTiled.Tileset tileset, FilePath target)
+            /// <summary>What the last <see cref="Save"/> wrote, to either file.</summary>
+            private string _writtenText = source.Text;
+
+            /// <returns>Whether the save went into a change another program made to the file.</returns>
+            public bool Save(DotTiled.Tileset tileset, FilePath target)
             {
                 if (target == Path && target.Exists() && File.ReadAllText(target.FullPath) != _diskText)
                 {
@@ -70,7 +74,9 @@ namespace AnimationEditor.Core
                     Tiled.TsxSource disk;
                     try
                     {
-                        disk = ReadTsx(target).Source;
+                        (disk, var diskTileset) = ReadTsx(target);
+                        if (Layout(diskTileset) != Layout(_openedTileset) with { ImageSource = ImageSource })
+                            throw new InvalidOperationException("its tile grid or image is not the open one");
                     }
                     catch (Exception ex)
                     {
@@ -79,21 +85,31 @@ namespace AnimationEditor.Core
                     var merged = disk.WithText(Tiled.TsxWriter.Render(disk, _diskTileset, tileset));
                     Tiled.TsxWriter.Write(merged, merged.Text, target);
                     (_opened, _openedTileset, _diskText, _diskTileset) = (merged, tileset, merged.Text, tileset);
-                    return;
+                    _writtenText = merged.Text;
+                    return true;
                 }
 
                 var text = Tiled.TsxWriter.Render(_opened, _openedTileset, tileset);
-                text = Tiled.TsxWriter.Write(_opened, text, target);
+                _writtenText = Tiled.TsxWriter.Write(_opened, text, target);
                 if (target == Path)
-                    (_diskText, _diskTileset) = (text, tileset);
+                    (_diskText, _diskTileset) = (_writtenText, tileset);
+                return false;
+            }
+
+            /// <summary>What decides which tile an animation's rects are on.</summary>
+            private static (int, int, int, int, int, int, string ImageSource, int, int) Layout(DotTiled.Tileset tileset)
+            {
+                var image = tileset.Image.Value;
+                return (tileset.TileWidth, tileset.TileHeight, tileset.Columns, tileset.TileCount, tileset.Spacing, tileset.Margin,
+                    image.Source.HasValue ? image.Source.Value : string.Empty,
+                    image.Width.HasValue ? image.Width.Value : 0, image.Height.HasValue ? image.Height.Value : 0);
             }
 
             /// <summary>Makes the file a Save As just wrote <paramref name="tileset"/> to this one.</summary>
             public void MoveTo(FilePath path, DotTiled.Tileset tileset)
             {
                 ImageSource = Tiled.TsxWriter.RebasePath(ImageSource, Path.GetDirectoryContainingThis(), path.GetDirectoryContainingThis());
-                (Path, _diskTileset) = (path, tileset);
-                _diskText = path.Exists() ? File.ReadAllText(path.FullPath) : string.Empty;
+                (Path, _diskText, _diskTileset) = (path, _writtenText, tileset);
             }
         }
 
@@ -558,6 +574,9 @@ namespace AnimationEditor.Core
                 : new FilePath(tsxPath.GetDirectoryContainingThis().FullPath + source);
         }
 
+        /// <inheritdoc/>
+        public bool TsxSaveMergedOutsideChange { get; private set; }
+
         /// <summary>
         /// The chains the last <see cref="SaveTsxProject"/> did not store in full: not written at all (a mapping
         /// warning, or no frames), or written without data the format can't hold.
@@ -626,7 +645,7 @@ namespace AnimationEditor.Core
 
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
             Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped, _tsxUserProperties);
-            _tsxFile.Save(workingTileset, new FilePath(targetPath ?? FileName!));
+            TsxSaveMergedOutsideChange = _tsxFile.Save(workingTileset, new FilePath(targetPath ?? FileName!));
             _tsxTileset = workingTileset;
 
             // Commits this save's tile assignments (including a brand-new chain's freshly-chosen
@@ -786,15 +805,16 @@ namespace AnimationEditor.Core
             "Saving would overwrite that change. Fix the file and use File > Reload from Disk to drop the edits, or Save As a different file.";
 
         /// <inheritdoc/>
-        public void MoveTsxProject(FilePath path)
+        public bool MoveTsxProject(FilePath path)
         {
             if (_tsxFile == null || _tsxTileset == null || AnimationChainListSave == null)
-                return;
+                return false;
 
+            var (from, to) = (_tsxFile.Path.GetDirectoryContainingThis(), path.GetDirectoryContainingThis());
             foreach (var frame in AnimationChainListSave.AnimationChains.SelectMany(chain => chain.Frames))
-                frame.TextureName = Tiled.TsxWriter.RebasePath(
-                    frame.TextureName, _tsxFile.Path.GetDirectoryContainingThis(), path.GetDirectoryContainingThis());
+                frame.TextureName = Tiled.TsxWriter.RebasePath(frame.TextureName, from, to);
             _tsxFile.MoveTo(path, _tsxTileset);
+            return from != to;
         }
 
         /// <summary>

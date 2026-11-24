@@ -168,6 +168,21 @@ namespace AnimationEditor.Core.HotReload
             }
         }
 
+        /// <inheritdoc/>
+        public void ReportChange(string filePath)
+        {
+            var canonical = Canonicalize(filePath);
+            lock (_ownSaveLock)
+            {
+                lock (_lock)
+                {
+                    _ownSaveHashes.Remove(canonical);
+                    _seenHashes.Remove(canonical);
+                }
+                _coalescer.Record(canonical, WatcherChangeType.Modified, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            }
+        }
+
         /// <summary>Whether <paramref name="filePath"/> still holds exactly what the last <see
         /// cref="RunOwnSave"/> wrote: false for a file never saved here or since deleted, null when
         /// the file exists but can't be read right now (another process holds it), so the caller
