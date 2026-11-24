@@ -59,6 +59,26 @@ public class TabSwitchCacheTsxTests : IDisposable
         return path;
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TryActivateTabFromCache_WhenTheTsxChangedOnDisk_ReloadsUnlessItsSaveFailed(bool saveFailed)
+    {
+        string path = WriteTsx("Heroes.tsx");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        if (saveFailed) _ctx.UndoManager.MarkSaveFailed();
+        string outside = TsxFixtureXml.Replace("200", "300");
+        File.WriteAllText(path, outside);
+        _ctx.AppCommands.CaptureTabEditorState(tab); // Left before the watcher reported the edit.
+
+        Assert.Equal(saveFailed, _ctx.AppCommands.TryActivateTabFromCache(tab));
+
+        if (!saveFailed) return;
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
+        Assert.Equal(outside, File.ReadAllText(path));
+    }
+
     [Fact]
     public async Task TryActivateTabFromCache_TsxThenAchxThenBackToTsx_RestoresNativeTsxStateAndSaveWritesEdit()
     {
@@ -118,7 +138,7 @@ public class TabSwitchCacheTsxTests : IDisposable
         Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tabA));
         Assert.True(_ctx.ProjectManager.IsNativeTsxProject);
         _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "RenamedA";
-        _ctx.ProjectManager.SaveTsxProject();
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
         _ctx.AppCommands.CaptureTabEditorState(tabA);
 
         // Switch to B, edit, save -- must land in HeroesB.tsx only, and must not carry forward
@@ -126,7 +146,7 @@ public class TabSwitchCacheTsxTests : IDisposable
         Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tabB));
         Assert.True(_ctx.ProjectManager.IsNativeTsxProject);
         _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Name = "RenamedB";
-        _ctx.ProjectManager.SaveTsxProject();
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
         _ctx.AppCommands.CaptureTabEditorState(tabB);
 
         // Switch back to A again -- must still reflect A's own edit, not B's.

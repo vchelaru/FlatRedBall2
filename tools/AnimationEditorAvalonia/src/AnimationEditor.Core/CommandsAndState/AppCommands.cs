@@ -270,6 +270,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.SaveFailed"/>
         public event Action<string>? SaveFailed;
 
+        /// <inheritdoc cref="IAppCommands.IsPathOpenInAnotherTab"/>
+        public Func<string, bool>? IsPathOpenInAnotherTab { get; set; }
+
+        /// <inheritdoc cref="IAppCommands.SaveAsRefused"/>
+        public event Action<string>? SaveAsRefused;
+
         /// <inheritdoc cref="IAppCommands.LoadFailed"/>
         public event Action<string, Exception>? LoadFailed;
 
@@ -288,6 +294,7 @@ namespace AnimationEditor.Core.CommandsAndState
             // on extension the same way ProjectManager.LoadAnimationChain does (#878) -- a .achj
             // (JSON) file hits the XML parser otherwise and fails with an XmlException.
             AnimationChainListSave preview;
+            var diskState = ReadDiskState(path);
             try
             {
                 preview = ProjectManager.IsJsonPath(path)
@@ -331,7 +338,7 @@ namespace AnimationEditor.Core.CommandsAndState
             bool failed = false;
             void OnFail(string _, Exception __) => failed = true;
             LoadFailed += OnFail;
-            try { LoadAnimationChainFromParsed(path, preview); }
+            try { LoadAnimationChainFromParsed(path, preview, diskState); }
             finally { LoadFailed -= OnFail; }
 
             if (failed) return false;
@@ -348,6 +355,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.OpenTsxWorkflowAsync"/>
         public Task<bool> OpenTsxWorkflowAsync(string path)
         {
+            var diskState = ReadDiskState(path);
             try
             {
                 _pm.LoadTsxProject(new FilePath(path));
@@ -366,7 +374,7 @@ namespace AnimationEditor.Core.CommandsAndState
             // on every tsx open). Calling the shared helper, same as the achx open path
             // (OpenAchxWorkflowAsync -> LoadAnimationChainFromParsed -> FinishLoadIntoEditor)
             // below, makes this impossible to drift out of sync with again.
-            FinishLoadIntoEditor(path);
+            FinishLoadIntoEditor(path, diskState);
 
             // Reuses the achx-named event -- both mean "a project file finished loading,"
             // and every current subscriber (recent files, window title, etc.) treats it generically.
@@ -384,6 +392,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void LoadAnimationChain(string fileName)
         {
+            var diskState = ReadDiskState(fileName);
             try
             {
                 _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(fileName));
@@ -394,10 +403,10 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
-            FinishLoadIntoEditor(fileName);
+            FinishLoadIntoEditor(fileName, diskState);
         }
 
-        private void LoadAnimationChainFromParsed(string fileName, AnimationChainListSave preParsed)
+        private void LoadAnimationChainFromParsed(string fileName, AnimationChainListSave preParsed, DiskState? diskState)
         {
             try
             {
@@ -409,13 +418,15 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
-            FinishLoadIntoEditor(fileName);
+            FinishLoadIntoEditor(fileName, diskState);
         }
 
-        private void FinishLoadIntoEditor(string fileName)
+        /// <param name="diskState">Taken before the file was read, so an edit made while it loaded is not missed.</param>
+        private void FinishLoadIntoEditor(string fileName, DiskState? diskState)
         {
             // A fresh, successful load of this path is by definition in sync with disk again.
             _staleOnDiskReasons.Remove(new AnimationEditor.Core.Paths.FilePath(fileName).FullPath);
+            _diskState = diskState;
             _undoManager.Clear();
             _undoManager.MarkSaved();
             _selectedState.Reset();
@@ -457,6 +468,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void CaptureTabEditorState(TabEntry tab)
         {
             TabEditorCache.CaptureFromProject(tab, _pm);
+            tab.CachedDiskState = _diskState;
             tab.SaveFailed = _undoManager.SaveState == SaveState.Failed;
             tab.CachedSelectedChainName = _selectedState.SelectedChain?.Name;
             tab.CachedSelectedFrameIndex = _selectedState.SelectedFrame != null
@@ -467,13 +479,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.TryActivateTabFromCache"/>
         public bool TryActivateTabFromCache(TabEntry tab)
         {
-            if (!TabEditorCache.HasFreshCache(tab))
+            if (tab.CachedEditorModel == null || (!tab.SaveFailed && tab.CachedDiskState?.HasChanged(tab.Path) == true))
             {
                 TabEditorCache.Invalidate(tab);
                 return false;
             }
 
             TabEditorCache.ApplyToProject(tab, _pm);
+            _diskState = tab.CachedDiskState;
             // The undo manager is shared by every tab, so the save state shown (and asked about on close) must be this tab's.
             if (tab.SaveFailed)
                 _undoManager.MarkSaveFailed();
@@ -484,6 +497,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
             _events.RaiseCurrentFileChanged(tab.Path.FullPath);
             _events.RaiseAvailableTexturesChanged();
+            if (tab.SaveFailed)
+                RefuseIfChangedOnDisk(tab.Path.FullPath, _diskState);
             return true;
         }
 
@@ -573,17 +588,46 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         private readonly Dictionary<string, string> _staleOnDiskReasons = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>The open document's <see cref="TabEntry.CachedDiskState"/>.</summary>
+        private DiskState? _diskState;
+
+        // Null in the CLI: it has no tabs to switch back to, and hashing would slow its startup.
+        private DiskState? ReadDiskState(string path) => AutosaveOnChange ? DiskState.Read(new FilePath(path)) : null;
+
+        private bool RefuseIfStale(string path)
+        {
+            if (!_staleOnDiskReasons.TryGetValue(new AnimationEditor.Core.Paths.FilePath(path).FullPath, out var staleReason))
+                return false;
+            SaveFailed?.Invoke(
+                $"\"{System.IO.Path.GetFileName(path)}\" changed on disk and couldn't be reloaded ({staleReason}). " +
+                "Saving would overwrite that change. Fix the file so it reloads, or Save As a different file.");
+            return true;
+        }
+
+        /// <summary>
+        /// Reports and returns true when <paramref name="state"/> is for <paramref name="path"/> and the file no longer
+        /// holds it. A document moved to another path (Save As) has seen nothing there, so it is not refused.
+        /// </summary>
+        private bool RefuseIfChangedOnDisk(string path, DiskState? state)
+        {
+            var file = new FilePath(path);
+            if (state == null || state.Path != file || !state.HasChanged(file)) return false;
+            SaveFailed?.Invoke(
+                $"\"{file.NoPath}\" changed on disk, and this tab has edits that could not be saved. " +
+                "Saving would overwrite that change. Use File > Reload from Disk to drop the edits, or Save As a different file.");
+            return true;
+        }
+
         public void SaveCurrentAnimationChainList(string? fileName = null)
         {
             var target = fileName ?? _pm.FileName;
             if (!string.IsNullOrEmpty(target))
             {
-                if (_staleOnDiskReasons.TryGetValue(new AnimationEditor.Core.Paths.FilePath(target).FullPath, out var staleReason))
+                // Only after a failed save: otherwise the live reload takes the file's change.
+                if (RefuseIfStale(target)
+                    || (_undoManager.SaveState == SaveState.Failed && RefuseIfChangedOnDisk(target, _diskState)))
                 {
                     _undoManager.MarkSaveFailed();
-                    SaveFailed?.Invoke(
-                        $"\"{System.IO.Path.GetFileName(target)}\" changed on disk and couldn't be reloaded ({staleReason}). " +
-                        "Saving would overwrite that change. Fix the file so it reloads, or Save As a different file.");
                     return;
                 }
 
@@ -597,6 +641,7 @@ namespace AnimationEditor.Core.CommandsAndState
                         else
                             _pm.SaveAnimationChainList(target);
                     });
+                    _diskState = ReadDiskState(target);
                     if (tsxWarnings is { Count: > 0 })
                         TsxSaveCompletedWithWarnings?.Invoke(tsxWarnings);
                     _undoManager.MarkSaved();
@@ -622,18 +667,24 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <inheritdoc/>
         /// <inheritdoc cref="IAppCommands.SaveDocument"/>
-        public bool SaveDocument(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat)
+        public bool SaveDocument(TabEntry tab)
         {
+            string path = tab.Path.FullPath;
+            tab.SaveFailed = true;
+            if (RefuseIfStale(path) || RefuseIfChangedOnDisk(path, tab.CachedDiskState)) return false;
             try
             {
-                HotReloadWatcher.RunOwnSave(targetPath, () => _pm.SaveAnimationChainList(document, targetPath, diskFormat));
-                return true;
+                HotReloadWatcher.RunOwnSave(path,
+                    () => _pm.SaveAnimationChainList(tab.CachedEditorModel!, path, tab.CachedOnDiskCoordinateType));
             }
             catch (Exception ex)
             {
                 SaveFailed?.Invoke(ex.Message);
                 return false;
             }
+            tab.CachedDiskState = ReadDiskState(path);
+            tab.SaveFailed = false;
+            return true;
         }
 
         /// <inheritdoc/>
@@ -766,6 +817,12 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Save Animation Chain", defaultExtension, fileTypeChoices, SaveDialogStart.For(_pm.FileName));
 
             if (string.IsNullOrEmpty(path)) return;
+
+            if (IsPathOpenInAnotherTab?.Invoke(path) == true)
+            {
+                SaveAsRefused?.Invoke($"{new FilePath(path).NoPath} is open in another tab. Close that tab first.");
+                return;
+            }
 
             SaveCurrentAnimationChainList(path);
             _pm.FileName = path;
@@ -2873,6 +2930,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? _selectedState.SelectedChain?.Frames.IndexOf(_selectedState.SelectedFrame)
                 : null;
 
+            // Taken even when the reload fails: the save pause covers that content, and only a
+            // further change should reload the tab.
+            _diskState = ReadDiskState(path);
             try
             {
                 // SyncHotReloadWatcher watches whatever IProjectManager.FileName currently is,

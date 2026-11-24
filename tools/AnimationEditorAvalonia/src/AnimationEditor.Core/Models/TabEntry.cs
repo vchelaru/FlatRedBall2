@@ -74,7 +74,7 @@ namespace AnimationEditor.Core.Models
 
         /// <summary>
         /// In-memory editor model for this tab. Populated when the tab is deactivated and
-        /// reused on re-activation when the on-disk file has not changed.
+        /// reused on re-activation when the on-disk file has not changed, or when <see cref="SaveFailed"/>.
         /// </summary>
         public AnimationChainListSave? CachedEditorModel { get; set; }
 
@@ -92,16 +92,10 @@ namespace AnimationEditor.Core.Models
         public TextureCoordinateType CachedOnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
         /// <summary>
-        /// Hash of the file at <see cref="Path"/> when <see cref="CachedEditorModel"/> was captured, or
-        /// null when it could not be read. Used to detect external edits while the tab was in the background.
+        /// What the file held when <see cref="CachedEditorModel"/> was last loaded, reloaded or saved. Null when
+        /// the model was never loaded from or saved to a file.
         /// </summary>
-        public byte[]? CachedDiskHash { get; set; }
-
-        /// <summary>
-        /// UTC last-write time of <see cref="Path"/> when <see cref="CachedEditorModel"/> was
-        /// captured. Compared only when a hash is missing, since a locked file still has a time.
-        /// </summary>
-        public DateTime? CachedDiskWriteTimeUtc { get; set; }
+        public DiskState? CachedDiskState { get; set; }
 
         /// <summary>
         /// Snapshot of this tab's native-tsx state (see <see cref="IProjectManager.CaptureTsxState"/>),

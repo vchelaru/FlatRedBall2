@@ -1307,6 +1307,9 @@ public partial class MainWindow : Window
         _appCommands.TsxSaveCompletedWithWarnings += warnings =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowProblem($"Saved, but not every change applied — {string.Join(" ", warnings)}"));
+        _appCommands.IsPathOpenInAnotherTab = path =>
+            _tabManager.Tabs.Any(tab => tab != _tabManager.ActiveTab && tab.Path == new FilePath(path));
+        _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));
         _appCommands.SaveFailed += message =>
             Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"Auto save failed — {message}"));
         _appCommands.InfoRaised += message => Dispatcher.UIThread.InvokeAsync(() => ShowInfo(message));
@@ -8216,7 +8219,7 @@ public partial class MainWindow : Window
 
         var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
         if (sourceTab is null || sourceTab.Kind != TabKind.Achx || IsUntitledTab(sourceTab)) return;
-        if (!_appCommands.SaveDocument(source, sourceTab.Path.FullPath, sourceTab.CachedOnDiskCoordinateType)) return; // the file still has them
+        if (!_appCommands.SaveDocument(sourceTab)) return; // the file still has them
         WarnAboutBrokenSequences(sourceTab.Path.FullPath, new RemovedChainNames(source, "Cutting",
             namesBefore.Except(source.AnimationChains.Select(chain => chain.Name)).ToList()));
     }
