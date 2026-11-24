@@ -27,4 +27,14 @@ public static class SaveTarget
     /// <summary>The refusal shown for a <paramref name="path"/> that another tab of the window holds.</summary>
     public static string OpenInAnotherTabMessage(string path) =>
         $"{new FilePath(path).NoPath} is open in another tab. Close that tab first.";
+
+    /// <summary>The refusal shown when <paramref name="path"/> changed on disk after a save to it failed.</summary>
+    public static string ChangedOnDiskMessage(string path) =>
+        $"\"{new FilePath(path).NoPath}\" changed on disk, and this tab has edits that could not be saved. " +
+        "Saving would overwrite that change. Use File > Reload from Disk to drop the edits, or Save As a different file.";
+
+    /// <summary>The refusal shown when <paramref name="path"/> changed on disk into something that does not load.</summary>
+    public static string UnreadableOnDiskMessage(string path, string reason) =>
+        $"\"{new FilePath(path).NoPath}\" changed on disk and couldn't be reloaded ({reason}). " +
+        "Saving would overwrite that change. Fix the file and use File > Reload from Disk to drop the edits, or Save As a different file.";
 }

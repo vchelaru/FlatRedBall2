@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
@@ -36,15 +37,14 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
     private readonly record struct FileStamp(bool Exists, DateTime WrittenUtc, long Length);
 
-    // SHA-256 of the file as this document last read or wrote it (the hash the hot-reload watcher uses), or null when it
-    // could not be read then. A file whose content still hashes to this has not changed under us.
-    private byte[]? _diskHash;
+    // The file as this document last read or wrote it. A file that still holds this has not changed under us.
+    private DiskState _diskState;
 
-    private SequenceDocument(string path, SequenceListSave save, byte[]? diskHash)
+    private SequenceDocument(string path, SequenceListSave save, DiskState diskState)
     {
         Path = new FilePath(path);
         Save = save;
-        _diskHash = diskHash;
+        _diskState = diskState;
         SelectedSequence = save.Sequences.Count > 0 ? 0 : -1;
         SyncSources();
     }
@@ -161,7 +161,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     {
         SequenceListSave loaded;
         // Recorded even when the read fails, so an unchanged bad file is not retried at every tab switch.
-        _diskHash = HotReload.HotReloadWatcher.TryHash(Path.FullPath);
+        _diskState = DiskState.Read(Path);
         try
         {
             loaded = SequenceListSave.FromFile(Path.FullPath);
@@ -172,13 +172,11 @@ public sealed class SequenceDocument : ISequenceChainLookup
             return new SequenceReloadResult(false, ex.Message);
         }
         DuplicateNamesNotice = NumberDuplicateNames(loaded);
-        // The "saving is paused" failure is over once the file reads again; a real write failure is not.
-        if (StaleOnDiskReason is not null) SaveError = null;
+        // Memory equals the file again, so a failed write of edits it already holds, or that are discarded below, no longer applies.
+        SaveError = null;
         StaleOnDiskReason = null;
         if (loaded.ToJsonString() == Save.ToJsonString()) return new SequenceReloadResult(false, null);
 
-        // Memory now equals the file again, so a failed write of edits that were just discarded no longer applies.
-        SaveError = null;
         string? selectedName = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count
             ? Save.Sequences[SelectedSequence].Name
             : null;
@@ -196,15 +194,36 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// Re-reads the file only when its content differs from what this document last read or wrote. For a tab coming back
     /// to the front: a file rewritten while it was away (a git pull) is picked up, while our own saves and rewrites with
     /// identical content are not mistaken for a change. A file gone from disk reports <see cref="SequenceReloadResult.Deleted"/>
-    /// and the document stays as it is.
+    /// and the document stays as it is, as does one that <see cref="KeepUnsavedEdits"/> keeps.
     /// </summary>
     public SequenceReloadResult ReloadIfChangedOnDisk()
     {
-        byte[]? current = HotReload.HotReloadWatcher.TryHash(Path.FullPath);
-        if (current is null && !File.Exists(Path.FullPath)) return new SequenceReloadResult(false, null, Deleted: true);
-        if (current is not null && _diskHash is not null && current.AsSpan().SequenceEqual(_diskHash))
+        var now = DiskState.Read(Path);
+        if (now.WriteTimeUtc is null) return new SequenceReloadResult(false, null, Deleted: true);
+        if (KeepUnsavedEdits()) return new SequenceReloadResult(false, null);
+        if (now.Hash is not null && _diskState.Hash is not null && now.Hash.AsSpan().SequenceEqual(_diskState.Hash))
             return new SequenceReloadResult(false, null);
         return ReloadFromDisk();
+    }
+
+    /// <summary>
+    /// Whether this document holds edits its file lacks, so a change of the file must not replace it: only
+    /// <see cref="ReloadFromDisk"/> drops them. Raises <see cref="SaveFailed"/> when the file did change, since saving is
+    /// then refused.
+    /// </summary>
+    public bool KeepUnsavedEdits()
+    {
+        if (!HasUnsavedEdits) return false;
+        if (SaveRefusal() is { } refusal) SaveFailed?.Invoke(refusal);
+        return true;
+    }
+
+    // Why writing the file now would destroy what something else wrote there, or null. A change after a save that worked
+    // is not one: the live reload takes it.
+    private string? SaveRefusal()
+    {
+        if (HasUnsavedEdits && _diskState.HasChanged(Path)) return SaveTarget.ChangedOnDiskMessage(Path.FullPath);
+        return StaleOnDiskReason is { } reason ? SaveTarget.UnreadableOnDiskMessage(Path.FullPath, reason) : null;
     }
 
     /// <summary>Reads <paramref name="path"/> and loads its sources. A source that can't be read is kept and flagged.</summary>
@@ -212,10 +231,10 @@ public sealed class SequenceDocument : ISequenceChainLookup
     public static SequenceDocument Load(string path)
     {
         // Hashed before the read: a write in between makes the next catch-up read once more, never miss.
-        byte[]? hash = HotReload.HotReloadWatcher.TryHash(path);
+        var diskState = DiskState.Read(new FilePath(path));
         var save = SequenceListSave.FromFile(path);
         var notice = NumberDuplicateNames(save);
-        return new SequenceDocument(path, save, hash) { DuplicateNamesNotice = notice };
+        return new SequenceDocument(path, save, diskState) { DuplicateNamesNotice = notice };
     }
 
     /// <summary>
@@ -1299,7 +1318,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
         Path = target;
         Save = copy;
-        _diskHash = HotReload.HotReloadWatcher.TryHash(target.FullPath);
+        _diskState = DiskState.Read(target);
         SaveError = null;
         StaleOnDiskReason = null;
         // The source strings changed, so the loaded sources are looked up under their new spelling.
@@ -1388,11 +1407,10 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>Writes the file. A failure is reported through <see cref="SaveError"/>, not thrown.</summary>
     public void SaveToDisk()
     {
-        if (StaleOnDiskReason is { } stale)
+        if (SaveRefusal() is { } refusal)
         {
-            // The file holds something this document could not read; writing now would destroy it.
-            SaveError = $"{Path.NoPath} changed on disk and couldn't be reloaded ({stale}). Saving is paused until it reloads.";
-            SaveFailed?.Invoke(SaveError);
+            SaveError = refusal;
+            SaveFailed?.Invoke(refusal);
             return;
         }
         try
@@ -1400,7 +1418,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
             SaveRunner(Path.FullPath, () =>
             {
                 Save.Save(Path.FullPath);
-                _diskHash = HotReload.HotReloadWatcher.TryHash(Path.FullPath);
+                _diskState = DiskState.Read(Path);
             });
             SaveError = null;
         }

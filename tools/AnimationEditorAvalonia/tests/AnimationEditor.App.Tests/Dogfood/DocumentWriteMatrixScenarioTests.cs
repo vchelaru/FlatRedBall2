@@ -46,8 +46,7 @@ public class DocumentWriteMatrixScenarioTests
             // Onto another format is refused before this, in Core's rows.
             DocAction.SaveAsOntoOpenTab => background != DocType.Untitled && (front == background || (front == DocType.Untitled && background == DocType.Achx)),
             DocAction.CloseTabWithUnsavedEdits or DocAction.Detach => eitherPaneInFront,
-            // A sequence tab in front loses its edits to the outside change itself (#2030).
-            DocAction.CloseBehindOutsideChange => front is (DocType.Achx or DocType.Tsx) && background == DocType.Achx,
+            DocAction.CloseBehindOutsideChange => front is (DocType.Achx or DocType.Tsx or DocType.Seqj) && background == DocType.Achx,
             // Both tabs are asked about, whichever is in front.
             DocAction.CloseWindowWithUnsavedEdits => front <= background,
             DocAction.LeaveDuringRename => background is DocType.Achx or DocType.Seqj,
@@ -61,7 +60,6 @@ public class DocumentWriteMatrixScenarioTests
     /// <summary>The issue of a row that is a real bug and how it fails, or null. Such a row is skipped while it fails so; the fix deletes its line.</summary>
     private static (string Issue, string Failure)? KnownBug(DocAction action, DocType front, DocType background) => (action, front, background) switch
     {
-        (DocAction.LeaveDuringRename, DocType.Untitled, DocType.Seqj) => ("#2023", "has no header label"),
         _ => null,
     };
 
@@ -162,12 +160,13 @@ public class DocumentWriteMatrixScenarioTests
                 break;
             case DocAction.CloseBehindOutsideChange:
                 EditWithoutSaving(editor, current);
-                File.WriteAllText(current.Path!, File.ReadAllText(current.Path!).Replace("Walk-front", "Walk-outside"));
+                File.WriteAllText(current.Path!, File.ReadAllText(current.Path!).Replace("Walk-front", "Walk-outside").Replace("Idle-front", "Idle-outside"));
                 byte[] outside = File.ReadAllBytes(current.Path!);
                 editor.CloseTab(back.Label);
                 (await editor.WaitUntilAsync(() => editor.Tabs.Tabs.Count == 1, Soon)).ShouldBeTrue("the tab did not close");
                 // The edits stay in the tab and the outside change in the file.
-                Documents.Lines(editor.Project, current.Folder).ShouldBe(current.Expected.Lines(current.Folder));
+                if (front == DocType.Seqj) editor.SequenceNames.ShouldBe(current.Expected.Sequences.Sequences.Select(sequence => sequence.Name));
+                else Documents.Lines(editor.Project, current.Folder).ShouldBe(current.Expected.Lines(current.Folder));
                 File.ReadAllBytes(current.Path!).ShouldBe(outside);
                 written.Add(current.Path);
                 tabs.Remove(current);
