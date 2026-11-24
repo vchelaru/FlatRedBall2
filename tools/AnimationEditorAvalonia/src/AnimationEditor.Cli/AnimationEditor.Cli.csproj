@@ -11,6 +11,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!-- Build time for the aecli version flag. The source commit is already in the informational version (+<sha>) that the SDK embeds. -->
+  <ItemGroup>
+    <AssemblyMetadata Include="BuildTimeUtc" Value="$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss'))Z" />
+  </ItemGroup>
+
   <!-- Command-line front end for the editing operations. References Editing, and Views for the render command (SkiaSharp drawing; Avalonia assemblies ride along, no window is ever created). -->
   <ItemGroup>
     <ProjectReference Include="..\AnimationEditor.Editing\AnimationEditor.Editing.csproj" />
