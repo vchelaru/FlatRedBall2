@@ -84,7 +84,9 @@ public static class CliApp
             string? name = null, file = null;
             var values = new Dictionary<string, string>();
             var inline = new List<string>();
-            var given = new List<(string Option, string Value)>();
+            // Every option in order, and beside each the value it took. Two string lists because a struct list costs startup (JIT).
+            var given = new List<string>();
+            var taken = new List<string>();
             for (int i = 0; i < args.Length; i++)
             {
                 var a = args[i];
@@ -99,7 +101,8 @@ public static class CliApp
                 var option = CliCommands.FindOption(a);
                 bool needsValue = option?.Needs is not null, missing = needsValue && i + 1 >= args.Length;
                 string value = needsValue && !missing ? args[++i] : "";
-                given.Add((a, value));
+                given.Add(a);
+                taken.Add(value);
                 if (option is null) return Bad(Refused() ?? $"unknown option '{a}'.");
                 if (missing) return Bad(Refused() ?? option.Needs!);
                 if (a == "--op") inline.Add(value);
@@ -116,12 +119,10 @@ public static class CliApp
             {
                 if (name is null) return null;
                 if (CliCommands.Find(name) is not { } command) return $"unknown command '{name}'.";
-                foreach (var (option, _) in given)
-                    if (command.Find(option) is null) return command.Refusal(option);
-                foreach (var (option, value) in given)
-                    if (command.Find(value) is not null) return $"{command.Find(option)!.Needs} {value} is an option, not its value.";
-                var repeated = given.Where(g => g.Option != "--op").GroupBy(g => g.Option).FirstOrDefault(g => g.Count() > 1);
-                return repeated is null ? null : $"{repeated.Key} is given twice.";
+                if (given.FirstOrDefault(g => command.Find(g) is null) is { } extra) return command.Refusal(extra);
+                if (taken.FindIndex(t => command.Find(t) is not null) is var i and >= 0)
+                    return $"{command.Find(given[i])!.Needs} {taken[i]} is an option, not its value.";
+                return given.FirstOrDefault(g => g != "--op" && given.IndexOf(g) != given.LastIndexOf(g)) is { } twice ? $"{twice} is given twice." : null;
             }
 
             static Arguments Bad(string error) => new(null, null, new Dictionary<string, string>(), [], error);
