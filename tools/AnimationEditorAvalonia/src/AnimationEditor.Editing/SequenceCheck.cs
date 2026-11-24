@@ -62,7 +62,8 @@ public static class SequenceCheck
                     if (sources.Chains(block.Source) is null) continue; // the source error above covers it
                     if (!sources.HasChain(block))
                     {
-                        issues.Add(new(CheckSeverity.Error, "missing-chain", $"{where}: source '{block.Source}' has no chain '{block.Chain}'."));
+                        var hint = NameHints.For(block.Chain, sources.Chains(block.Source)!.AnimationChains.Select(c => c.Name), "chains");
+                        issues.Add(new(CheckSeverity.Error, "missing-chain", $"{where}: source '{block.Source}' has no chain '{block.Chain}'.{hint}"));
                         continue;
                     }
 

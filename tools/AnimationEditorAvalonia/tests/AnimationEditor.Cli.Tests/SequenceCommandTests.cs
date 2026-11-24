@@ -104,6 +104,22 @@ public class SequenceCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Check_MisspelledChain_SuggestsTheNearestName_InTextAndJson()
+    {
+        var file = WriteSeq();
+        var save = SequenceListSave.FromFile(file);
+        save.Sequences[0].Tracks[0].Chains[0].Chain = "Wlak";
+        save.Save(file);
+
+        var text = await _w.RunAsync("check", file);
+        text.Out.ShouldContain("Did you mean 'Walk'");
+
+        var json = await _w.RunAsync("check", file, "--json");
+        using var doc = JsonDocument.Parse(json.Out);
+        doc.RootElement.GetProperty("issues")[0].GetProperty("message").GetString()!.ShouldContain("Did you mean 'Walk'");
+    }
+
+    [Fact]
     public async Task Check_CutShortBlock_IsAWarningOnly()
     {
         var file = WriteSeq();
