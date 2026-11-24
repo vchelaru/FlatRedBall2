@@ -45,9 +45,11 @@ namespace AnimationEditor.Core.IO
         /// <summary>
         /// Records <paramref name="tsxFile"/> (stored relative to <paramref name="achxFile"/>'s
         /// folder) as a tileset that should be kept in sync with this .achx/.achj's animation
-        /// chains. A no-op if already associated. An existing <c>.tiledsync</c> that cannot be read is
-        /// left as it is, and <see cref="TiledSyncParseFailed"/> is raised.
+        /// chains. A no-op if already associated. When it throws, nothing was stored and an existing
+        /// <c>.tiledsync</c> is as it was.
         /// </summary>
+        /// <exception cref="System.IO.InvalidDataException">The existing <c>.tiledsync</c> cannot be read.</exception>
+        /// <exception cref="System.IO.IOException">The <c>.tiledsync</c> cannot be written.</exception>
         void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile);
 
         void WriteRecoveryFile(AnimationChainListSave? animationChainListSave);

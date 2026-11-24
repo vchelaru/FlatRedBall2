@@ -79,13 +79,11 @@ public static class TsxEdit
         {
             return Fail(EditErrorCode.InvalidValue, ex.Message);
         }
-
-        // The editor reports a failed companion write through an IoManager event no caller here sees,
-        // so check the file is there.
-        var companion = Path.ChangeExtension(projectManager.FileName!, ".tiledsync");
-        return File.Exists(companion)
-            ? check
-            : Fail(EditErrorCode.IoFailed, $"Could not write the Tiled sync file {Path.GetFileName(companion)}.");
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            return Fail(EditErrorCode.IoFailed, ex.Message);
+        }
+        return check;
     }
 
     private static EditResult NotTsx() =>
