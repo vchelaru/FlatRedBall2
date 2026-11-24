@@ -2465,13 +2465,14 @@
                 </DockPanel>
             </Grid>
 
+            <!-- Item-deleted undo toast, generic status toast, and error banner. The panels and their
+                 timer/dismiss logic live in EditorNotificationOverlay. Hosted in the content grid, not
+                 over the whole window, so a pop-up never covers the title bar, the menu, the tab strip
+                 or the status bar (#2022). These auto-hide mid-click, and a stray click that lands on CloseBtn
+                 closes the app. ZIndex 60 keeps it above every pane. -->
+            <viewsControls:EditorNotificationOverlay x:Name="Notifications" Grid.ColumnSpan="3" ZIndex="60" />
         </Grid>
     </DockPanel>
-        <!-- Item-deleted undo toast, generic status toast, and error banner. The panels and their
-             timer/dismiss logic live in EditorNotificationOverlay. ZIndex 60 keeps the
-             whole overlay above the editor content but below the drag canvas / resize grips,
-             matching the per-panel ZIndex values these three used to carry individually. -->
-        <viewsControls:EditorNotificationOverlay x:Name="Notifications" ZIndex="60" />
         <!-- Resize grips — 4px edges + 8px corners, transparent overlays -->
         <Canvas x:Name="DragOverlayCanvas" IsHitTestVisible="False" ZIndex="99" />
         <Border x:Name="GripN"  Height="4" VerticalAlignment="Top"    Background="Transparent" Cursor="TopSide"         PointerPressed="OnResizeGrip" />

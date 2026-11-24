@@ -25,11 +25,10 @@
                 IsVisible="False"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
-                Margin="0,0,0,30"
+                Margin="0,0,0,8"
                 Background="#333"
                 CornerRadius="4"
-                Padding="12,6"
-                ZIndex="50">
+                Padding="12,6">
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <TextBlock x:Name="ItemDeletedToastLabel" x:FieldModifier="Public"
                            Foreground="White"
@@ -42,151 +41,142 @@
             </StackPanel>
         </Border>
 
-        <Border x:Name="ErrorBanner" x:FieldModifier="Public"
-                IsVisible="False"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Top"
-                Margin="0,16,0,0"
-                MaxWidth="640"
-                Background="#2D2122"
-                BorderBrush="#E0533F"
-                BorderThickness="1.5"
-                CornerRadius="6"
-                Padding="14,10"
-                ZIndex="60">
-            <DockPanel>
-                <!-- #1130 follow-up: a Path icon, not a Unicode "✕" glyph; see ToastDismissBtn's
-                     comment below for why. -->
-                <Button x:Name="ErrorBannerDismissBtn" x:FieldModifier="Public"
-                        DockPanel.Dock="Right"
-                        Width="24" Height="22"
-                        Margin="10,0,0,0"
-                        Padding="0" BorderThickness="0"
-                        Background="Transparent"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        VerticalAlignment="Top">
-                    <Path Width="10" Height="10" Stretch="Uniform"
-                          Fill="#E8B0A8"
-                          Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
-                </Button>
-                <Button x:Name="ErrorBannerCopyBtn" x:FieldModifier="Public"
-                        DockPanel.Dock="Right"
-                        Width="24" Height="22"
-                        Margin="10,0,0,0"
-                        Padding="0" BorderThickness="0"
-                        Background="Transparent"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        VerticalAlignment="Top"
-                        ToolTip.Tip="Copy message"
-                        AutomationProperties.Name="Copy message">
-                    <Path Width="10" Height="10" Stretch="Uniform"
-                          Fill="#E8B0A8"
-                          Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
-                </Button>
-                <Button x:Name="ErrorBannerRetryBtn" x:FieldModifier="Public"
-                        IsVisible="False"
-                        DockPanel.Dock="Right"
-                        Content="Retry"
-                        Height="22"
-                        Padding="8,0"
-                        Margin="10,0,0,0"
-                        VerticalAlignment="Top" />
-                <TextBlock x:Name="ErrorBannerIcon" DockPanel.Dock="Left"
-                           Text="⚠"
-                           FontSize="15"
-                           Foreground="#F2A03E"
-                           Margin="0,0,10,0"
-                           VerticalAlignment="Top" />
-                <TextBlock x:Name="ErrorBannerText" x:FieldModifier="Public"
-                           FontSize="12"
-                           Foreground="#F5E2DF"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center" />
-            </DockPanel>
-        </Border>
-
-        <!-- #1130: floating top-right card instead of a bottom chrome-colored bar, so a
-             confirmation reads like a phone/desktop notification instead of blending into the
-             window rail. ZIndex above ErrorBanner (60) since this is the most frequent overlay
-             and must never end up hidden behind it; top-right (not ErrorBanner's top-center)
-             so the two never occupy the same screen region if both are visible at once.
-             InfoBannerBg + AccentCool left stripe reuses MainWindow's existing "tier-2
-             actionable info" styling instead of inventing a new
-             color language, while staying distinct from ErrorBanner's red and
-             ItemDeletedToastPanel's plain #333.
-
-             Top margin (44) clears MainWindow's 36px custom title bar (WindowDecorations="None"
-             means Minimize/Maximize/CloseBtn are ordinary in-tree controls at the top-right
-             corner, not native OS chrome the overlay can't reach). This overlay auto-hides on a
-             timer, so a user's click can land after the panel has vanished; if any part of it
-             sat over CloseBtn, that stray click would close the whole app instead of hitting
-             nothing. See ToastCloseButtonOverlapTests. -->
-        <Border x:Name="ToastPanel" x:FieldModifier="Public"
-                IsVisible="False"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="0,44,16,0"
-                MaxWidth="420"
-                Background="{DynamicResource InfoBannerBg}"
-                BorderBrush="{DynamicResource LineBrush}"
-                BorderThickness="1"
-                CornerRadius="6"
-                BoxShadow="0 4 16 0 #4D000000"
-                ZIndex="70">
-            <DockPanel>
-                <Border DockPanel.Dock="Left"
-                        Width="3"
-                        Background="{DynamicResource AccentCool}" />
-                <DockPanel Margin="10,8">
-                    <!-- #1130 follow-up: Content="✕" (the Unicode MULTIPLICATION X glyph) rendered
-                         visibly off-center in this button's 28x22 box; the visible ink sat left
-                         of the TextBlock's own (correctly centered) layout bounds, with empty
-                         space on the right, even with HorizontalContentAlignment/
-                         VerticalContentAlignment explicitly set to Center. Root cause: this app's
-                         "Inter" font has no glyph for U+2715, so it silently falls back to the
-                         system font for just that character, and the fallback glyph's advance
-                         width doesn't match its visible ink width; most visible on this button's
-                         small, tight box (MainWindow's CloseBtn uses the same glyph and the same
-                         font fallback, but its much larger 46x36 box hides the same absolute pixel
-                         offset). A Path with our own geometry has no font/fallback involved, so its
-                         bounds are exactly its visible ink, so it centers correctly regardless of
-                         box size. See NotificationDismissGlyphCenteredTests. -->
-                    <Button x:Name="ToastDismissBtn" x:FieldModifier="Public"
+        <!-- The banner above the toast, so two long messages never cover each other. The top margin clears a
+             pane's one-row toolbar. Empty space passes clicks through: this panel has no Background. -->
+        <StackPanel VerticalAlignment="Top" Margin="0,44,0,0" Spacing="8">
+            <Border x:Name="ErrorBanner" x:FieldModifier="Public"
+                    IsVisible="False"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    MaxWidth="640"
+                    Background="#2D2122"
+                    BorderBrush="#E0533F"
+                    BorderThickness="1.5"
+                    CornerRadius="6"
+                    Padding="14,10">
+                <DockPanel>
+                    <!-- #1130 follow-up: a Path icon, not a Unicode "✕" glyph; see ToastDismissBtn's
+                         comment below for why. -->
+                    <Button x:Name="ErrorBannerDismissBtn" x:FieldModifier="Public"
                             DockPanel.Dock="Right"
-                            Width="28" Height="22"
+                            Width="24" Height="22"
+                            Margin="10,0,0,0"
                             Padding="0" BorderThickness="0"
                             Background="Transparent"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center"
                             VerticalAlignment="Top">
                         <Path Width="10" Height="10" Stretch="Uniform"
-                              Fill="{DynamicResource InkMid}"
+                              Fill="#E8B0A8"
                               Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
                     </Button>
-                    <Button x:Name="ToastCopyBtn" x:FieldModifier="Public"
-                        DockPanel.Dock="Right"
-                        Width="28" Height="22"
-                        Margin="0,0,2,0"
-                        Padding="0" BorderThickness="0"
-                        Background="Transparent"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        VerticalAlignment="Top"
-                        ToolTip.Tip="Copy message"
-                        AutomationProperties.Name="Copy message">
-                    <Path Width="10" Height="10" Stretch="Uniform"
-                          Fill="{DynamicResource InkMid}"
-                          Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
-                </Button>
-                    <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
-                               VerticalAlignment="Center"
+                    <Button x:Name="ErrorBannerCopyBtn" x:FieldModifier="Public"
+                            DockPanel.Dock="Right"
+                            Width="24" Height="22"
+                            Margin="10,0,0,0"
+                            Padding="0" BorderThickness="0"
+                            Background="Transparent"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            VerticalAlignment="Top"
+                            ToolTip.Tip="Copy message"
+                            AutomationProperties.Name="Copy message">
+                        <Path Width="10" Height="10" Stretch="Uniform"
+                              Fill="#E8B0A8"
+                              Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
+                    </Button>
+                    <Button x:Name="ErrorBannerRetryBtn" x:FieldModifier="Public"
+                            IsVisible="False"
+                            DockPanel.Dock="Right"
+                            Content="Retry"
+                            Height="22"
+                            Padding="8,0"
+                            Margin="10,0,0,0"
+                            VerticalAlignment="Top" />
+                    <TextBlock x:Name="ErrorBannerIcon" DockPanel.Dock="Left"
+                               Text="⚠"
+                               FontSize="15"
+                               Foreground="#F2A03E"
+                               Margin="0,0,10,0"
+                               VerticalAlignment="Top" />
+                    <TextBlock x:Name="ErrorBannerText" x:FieldModifier="Public"
                                FontSize="12"
-                               Foreground="{DynamicResource Ink}"
-                               TextWrapping="Wrap" />
+                               Foreground="#F5E2DF"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
                 </DockPanel>
-            </DockPanel>
-        </Border>
+            </Border>
+
+            <!-- #1130: floating top-right card instead of a bottom chrome-colored bar, so a
+                 confirmation reads like a phone/desktop notification instead of blending into the
+                 window rail. InfoBannerBg + AccentCool left stripe reuses MainWindow's existing "tier-2
+                 actionable info" styling instead of inventing a new
+                 color language, while staying distinct from ErrorBanner's red and
+                 ItemDeletedToastPanel's plain #333. -->
+            <Border x:Name="ToastPanel" x:FieldModifier="Public"
+                    IsVisible="False"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,0,16,0"
+                    MaxWidth="420"
+                    Background="{DynamicResource InfoBannerBg}"
+                    BorderBrush="{DynamicResource LineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    BoxShadow="0 4 16 0 #4D000000">
+                <DockPanel>
+                    <Border DockPanel.Dock="Left"
+                            Width="3"
+                            Background="{DynamicResource AccentCool}" />
+                    <DockPanel Margin="10,8">
+                        <!-- #1130 follow-up: Content="✕" (the Unicode MULTIPLICATION X glyph) rendered
+                             visibly off-center in this button's 28x22 box; the visible ink sat left
+                             of the TextBlock's own (correctly centered) layout bounds, with empty
+                             space on the right, even with HorizontalContentAlignment/
+                             VerticalContentAlignment explicitly set to Center. Root cause: this app's
+                             "Inter" font has no glyph for U+2715, so it silently falls back to the
+                             system font for just that character, and the fallback glyph's advance
+                             width doesn't match its visible ink width; most visible on this button's
+                             small, tight box (MainWindow's CloseBtn uses the same glyph and the same
+                             font fallback, but its much larger 46x36 box hides the same absolute pixel
+                             offset). A Path with our own geometry has no font/fallback involved, so its
+                             bounds are exactly its visible ink, so it centers correctly regardless of
+                             box size. See NotificationDismissGlyphCenteredTests. -->
+                        <Button x:Name="ToastDismissBtn" x:FieldModifier="Public"
+                                DockPanel.Dock="Right"
+                                Width="28" Height="22"
+                                Padding="0" BorderThickness="0"
+                                Background="Transparent"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                VerticalAlignment="Top">
+                            <Path Width="10" Height="10" Stretch="Uniform"
+                                  Fill="{DynamicResource InkMid}"
+                                  Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+                        </Button>
+                        <Button x:Name="ToastCopyBtn" x:FieldModifier="Public"
+                            DockPanel.Dock="Right"
+                            Width="28" Height="22"
+                            Margin="0,0,2,0"
+                            Padding="0" BorderThickness="0"
+                            Background="Transparent"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            VerticalAlignment="Top"
+                            ToolTip.Tip="Copy message"
+                            AutomationProperties.Name="Copy message">
+                        <Path Width="10" Height="10" Stretch="Uniform"
+                              Fill="{DynamicResource InkMid}"
+                              Data="M16,1H4C2.9,1 2,1.9 2,3V17H4V3H16V1M19,5H8C6.9,5 6,5.9 6,7V21C6,22.1 6.9,23 8,23H19C20.1,23 21,22.1 21,21V7C21,5.9 20.1,5 19,5M19,21H8V7H19V21Z" />
+                    </Button>
+                        <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Ink}"
+                                   TextWrapping="Wrap" />
+                    </DockPanel>
+                </DockPanel>
+            </Border>
+        </StackPanel>
     </Panel>
 </UserControl>
