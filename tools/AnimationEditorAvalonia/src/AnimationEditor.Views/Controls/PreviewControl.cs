@@ -1672,7 +1672,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             if (texPath is not null &&
                 _thumbnailService.BitmapCache.TryGetValue(texPath, out var bm) && bm is not null)
             {
-                var (_, _, sw, sh) = ComputeSourceRect(frame);
+                var (sw, sh) = ComputeDisplayedSize(frame);
                 Include(frame.RelativeX * om, -frame.RelativeY * om, sw * _zoom / 2f, sh * _zoom / 2f);
             }
 
@@ -1695,7 +1695,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 if (CacheKey(sprite.TexturePath) is { } key &&
                     _thumbnailService!.BitmapCache.TryGetValue(key, out var bitmap) && bitmap is not null)
                 {
-                    var (_, _, sw, sh) = ComputeSourceRect(sprite.Frame);
+                    var (sw, sh) = ComputeDisplayedSize(sprite.Frame);
                     Include(sample.OffsetX * om, -sample.OffsetY * om, sw * _zoom / 2f, sh * _zoom / 2f);
                 }
             }
@@ -2886,7 +2886,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             !_thumbnailService.BitmapCache.TryGetValue(texPath, out var bm) || bm is null)
             return false;
 
-        var (_, _, sw, sh) = ComputeSourceRect(frame);
+        var (sw, sh) = ComputeDisplayedSize(frame);
         float om = _appState!.OffsetMultiplier * _zoom;
         float sx = GetCenterX() + frame.RelativeX * om;
         float sy = GetCenterY() - frame.RelativeY * om;
@@ -3903,6 +3903,13 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         int sw = FrameDisplayValues.GetPixelWidth(frame);
         int sh = FrameDisplayValues.GetPixelHeight(frame);
         return (sx, sy, sw, sh);
+    }
+
+    /// <summary>The whole-pixel size <paramref name="frame"/> is drawn at before zoom.</summary>
+    internal static (int Width, int Height) ComputeDisplayedSize(AnimationFrameSave frame)
+    {
+        var (_, _, sw, sh) = ComputeSourceRect(frame);
+        return FrameDisplayValues.DisplayedSize(frame, sw, sh);
     }
 
     internal static void DrawFrameCore(

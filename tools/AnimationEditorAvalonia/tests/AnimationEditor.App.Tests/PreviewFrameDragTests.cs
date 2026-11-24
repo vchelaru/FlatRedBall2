@@ -181,7 +181,7 @@ public class PreviewFrameDragTests
 
     // #1979: a 64x16 region with a diagonal flip is drawn 16x64, so it is grabbed there.
     [AvaloniaTheory]
-    [InlineData(0, 25, true)]
+    [InlineData(0, -25, true)]
     [InlineData(25, 0, false)]
     public void RealDrag_OnADiagonallyFlippedSprite_GrabsItWhereItIsDrawn(int offsetX, int offsetY, bool grabbed)
     {

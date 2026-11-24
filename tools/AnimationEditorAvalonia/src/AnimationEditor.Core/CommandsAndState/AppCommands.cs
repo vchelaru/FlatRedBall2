@@ -916,14 +916,18 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>
         /// Centres <paramref name="rectangle"/> on <paramref name="animationFrame"/>'s offset and
-        /// sizes it to the frame (scale is the half-size in pixels). The size is left alone when
+        /// sizes it to the frame as drawn (scale is the half-size in pixels). The size is left alone when
         /// the frame's region is not set.
         /// </summary>
         private IUndoableCommand MatchRectangleToFrameCommand(AARectSave rectangle, AnimationFrameSave animationFrame)
         {
             bool unset = FrameRegion.IsUnset(animationFrame, GetTextureSize);
-            float scaleX = unset ? rectangle.ScaleX : Math.Abs(animationFrame.RightCoordinate - animationFrame.LeftCoordinate) / 2f;
-            float scaleY = unset ? rectangle.ScaleY : Math.Abs(animationFrame.BottomCoordinate - animationFrame.TopCoordinate) / 2f;
+            var (width, height) = FrameDisplayValues.DisplayedSize(
+                animationFrame,
+                Math.Abs(animationFrame.RightCoordinate - animationFrame.LeftCoordinate),
+                Math.Abs(animationFrame.BottomCoordinate - animationFrame.TopCoordinate));
+            float scaleX = unset ? rectangle.ScaleX : width / 2f;
+            float scaleY = unset ? rectangle.ScaleY : height / 2f;
             return SetShapePropsCommand.ForRect(
                 animationFrame, rectangle, rectangle.Name ?? "",
                 animationFrame.RelativeX, animationFrame.RelativeY, scaleX, scaleY,

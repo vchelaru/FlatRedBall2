@@ -34,7 +34,7 @@ public partial class PreviewControl
         {
             if (sprite.Sequence != EditableSequence) continue;
             if (CacheKey(sprite.TexturePath) is not { } key || !_thumbnailService.BitmapCache.TryGetValue(key, out var bitmap) || bitmap is null) continue;
-            var (_, _, width, height) = ComputeSourceRect(sprite.Frame);
+            var (width, height) = ComputeDisplayedSize(sprite.Frame);
             boxes.Add(SpriteBox.Of(sprite, width, height, _zoom, _appState.OffsetMultiplier, centerX, centerY));
         }
         return boxes;
