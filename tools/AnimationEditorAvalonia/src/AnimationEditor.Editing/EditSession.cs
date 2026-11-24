@@ -100,6 +100,7 @@ public sealed class EditSession
         void OnFailed(string message) => errors.Add(message);
         void OnTsxWarnings(string tsx, IReadOnlyList<string> notes) => warnings.AddRange(notes);
         void OnSynced(string tsx, int count) => changed.Add(tsx);
+        void OnSyncWarned(IReadOnlyList<string> notes) => warnings.AddRange(notes.Select(note => $"Associated tileset {note}"));
         void OnSyncFailed(string target, Exception ex) =>
             // The target is this file when its .tiledsync cannot be read, so no tileset is known.
             warnings.Add(target == Path
@@ -108,6 +109,7 @@ public sealed class EditSession
         _commands.SaveFailed += OnFailed;
         _commands.TsxSaveCompletedWithWarnings += OnTsxWarnings;
         _commands.TiledSyncSucceeded += OnSynced;
+        _commands.TiledSyncWarned += OnSyncWarned;
         _commands.TiledSyncFailed += OnSyncFailed;
         try
         {
@@ -118,6 +120,7 @@ public sealed class EditSession
             _commands.SaveFailed -= OnFailed;
             _commands.TsxSaveCompletedWithWarnings -= OnTsxWarnings;
             _commands.TiledSyncSucceeded -= OnSynced;
+            _commands.TiledSyncWarned -= OnSyncWarned;
             _commands.TiledSyncFailed -= OnSyncFailed;
         }
         return errors.Count == 0
