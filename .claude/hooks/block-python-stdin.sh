@@ -1,7 +1,7 @@
 #!/bin/bash
 # PreToolUse(Bash|PowerShell): refuses commands that read their script or input from a stdin nothing feeds.
-#  1. `python -` / `python3 -` (a script read from stdin, usually a heredoc): a heredoc that loses its
-#     terminator, or a script piped from a command that never closes, leaves python waiting forever.
+#  1. `python -` / `python3 -` or another interpreter (a script read from stdin, usually a heredoc): a heredoc that
+#     loses its terminator, or a script piped from a command that never closes, leaves it waiting forever.
 #  2. A bare `cat > file` / `cat >> file` that starts a command with no file argument, no heredoc and no
 #     input redirect: cat waits on stdin forever.
 # Both leave an orphan process the app lists as a background task for hours. Write the file with the Write
@@ -11,14 +11,30 @@
 input=$(cat)
 
 case "$input" in
-  *python*|*cat*) ;;
+  *py*|*node*|*perl*|*ruby*|*sh*|*cat*) ;;
   *) exit 0 ;;
 esac
 
-# `python -`, `python3 -`, `python3.14 -`, `python.exe -`, also `python3 -I -` style flags before the dash,
-# and a heredoc straight after the interpreter (`python3 <<EOF`).
-if printf '%s' "$input" | grep -Eq '(^|[^[:alnum:]_./-])python([0-9.]*)(\.exe)?( +-[A-Za-z]+)* +(-( |\n|\r|<|"|$)|<<)'; then
-  echo "Refused: python reading its script from stdin (python -, or a heredoc) can hang forever waiting on stdin. Write the script to a file with the Write tool and run python3 <file>." >&2
+# The command's lines as lines: in the JSON a line break is \n, whose n would read as a letter in front of the
+# interpreter. A doubled backslash is a path separator.
+lines=${input//\\\\/\/}
+lines=${lines//\\r/}
+lines=${lines//\\n/$'\n'}
+lines=${lines//\\\"/\"}
+
+# `python -`, `python3 -`, `python3.14 -`, `python.exe -`, `py -`, with a path in front or flags before the dash
+# (`python3 -I -`, `python -X utf8 -`), a heredoc straight after the interpreter (`python3 <<EOF`), and the same
+# for the other interpreters.
+interpreter='(python[0-9.]*|py|pypy[0-9.]*|node|perl|ruby|bash|sh|pwsh|powershell)(\.exe)?["'\'']?'
+flags='( +(-[XW] +[^ <-][^ ]*|--?[[:alnum:]][^ <]*))*'
+if printf '%s\n' "$lines" | grep -Eq "(^|[^[:alnum:]_.-])${interpreter}${flags}( +-([] ;&|)<\"'\`]|\$)| *<<)"; then
+  echo "Refused: an interpreter reading its script from stdin (python -, or a heredoc) can hang forever waiting on stdin. Write the script to a file with the Write tool and run python3 <file>." >&2
+  exit 2
+fi
+
+# An interpreter alone in a command that is not fed by a pipe reads its script from stdin too.
+if printf '%s\n' "$lines" | grep -Eq "(^|[;&(]|\"command\": *\")[ ]*(timeout +[0-9smh]+ +)?${interpreter}[ ]*([;&)]|\|\||\",\"|\$)"; then
+  echo "Refused: an interpreter with no script reads it from stdin and hangs forever. Write the script to a file with the Write tool and run python3 <file>." >&2
   exit 2
 fi
 
