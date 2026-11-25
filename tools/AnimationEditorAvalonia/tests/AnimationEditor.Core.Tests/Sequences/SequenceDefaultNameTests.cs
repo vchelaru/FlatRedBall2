@@ -66,20 +66,20 @@ public class SequenceDefaultNameTests
     }
 
     [Fact]
-    public void AddSequence_IgnoresCase_WhenLookingForAFreeName()
+    public void AddSequence_MatchesCase_WhenLookingForAFreeName()
     {
         var document = DocumentWith("sequence", "SEQUENCE 2");
         var undo = new UndoManager();
 
-        document.AddSequence(undo).ShouldBe("Sequence 3");
+        document.AddSequence(undo).ShouldBe("Sequence");
     }
 
     [Fact]
-    public void AddTrack_IgnoresCase_WhenLookingForAFreeName()
+    public void AddTrack_MatchesCase_WhenLookingForAFreeName()
     {
         var document = DocumentWithTracks("track", "TRACK 2");
 
-        document.AddTrack(new UndoManager(), 0).ShouldBe("Track 3");
+        document.AddTrack(new UndoManager(), 0).ShouldBe("Track");
     }
 
     [Fact]

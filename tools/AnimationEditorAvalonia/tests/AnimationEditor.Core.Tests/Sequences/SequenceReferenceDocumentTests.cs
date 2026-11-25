@@ -416,7 +416,7 @@ public class SequenceReferenceDocumentTests
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0.25);
 
-        string copyName = document.DuplicateSequences(undo, new[] { 0 }).Single();
+        string copyName = document.DuplicateSequences(undo, new[] { 0 }).Names.Single();
         int copy = document.Save.Sequences.FindIndex(s => s.Name == copyName);
         document.SetReferenceStart(undo, copy, 0, 2).ShouldBeNull();
 
@@ -682,7 +682,7 @@ public class SequenceReferenceDocumentTests
         var undo = new UndoManager();
         document.AddSequenceReference(undo, 0, "Earth", 0);
 
-        var names = document.DuplicateSequences(undo, new[] { 0, 1 });
+        var names = document.DuplicateSequences(undo, new[] { 0, 1 }).Names;
 
         ReferenceOf(document, names[0]).ShouldBe(names[1]);
         ReferenceOf(document, "Idle").ShouldBe("Earth");
@@ -697,7 +697,7 @@ public class SequenceReferenceDocumentTests
         document.AddSequenceReference(undo, 0, "Earth", 0);
         document.AddSequenceReference(undo, 1, "Action", 0);
 
-        var names = document.DuplicateSequences(undo, new[] { 0, 1, 2 });
+        var names = document.DuplicateSequences(undo, new[] { 0, 1, 2 }).Names;
 
         ReferenceOf(document, names[0]).ShouldBe(names[1]);
         ReferenceOf(document, names[1]).ShouldBe(names[2]);

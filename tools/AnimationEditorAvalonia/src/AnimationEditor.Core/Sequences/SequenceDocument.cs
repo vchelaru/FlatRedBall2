@@ -243,12 +243,12 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     /// <summary>
-    /// Gives each sequence whose name an earlier one already has (ignoring case, like <see cref="NameGenerator"/>) the next
+    /// Gives each sequence whose name an earlier one already has (exactly; names differing by case are two sequences) the next
     /// free numbered name, so every sequence can be reached by name. Returns what was renamed as a sentence, or null.
     /// </summary>
     private static string? NumberDuplicateNames(SequenceListSave save)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>();
         var renames = new List<string>();
         foreach (var sequence in save.Sequences)
         {
@@ -376,12 +376,13 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>
     /// Inserts a deep copy of each given sequence, as one block in document order right after the last of them, each with
     /// the next free name, and selects the copies (the first is the primary), as one undo entry. A copy plays the copy of a
-    /// sequence duplicated with it. Undo selects the originals again. Returns the new names.
+    /// sequence duplicated with it. Undo selects the originals again. Nothing is made, and the error says why, when a copy
+    /// would play itself.
     /// </summary>
-    public IReadOnlyList<string> DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices, IReadOnlyList<string>? givenNames = null)
+    public SequencePasteResult DuplicateSequences(IUndoManager undo, IReadOnlyList<int> indices, IReadOnlyList<string>? givenNames = null)
     {
         var ordered = InDocumentOrder(indices);
-        if (ordered.Count == 0) return Array.Empty<string>();
+        if (ordered.Count == 0) return new SequencePasteResult(Array.Empty<string>(), Array.Empty<string>());
         var used = Save.Sequences.Select(s => s.Name).ToList();
         var names = new List<string>();
         foreach (int index in ordered)
@@ -395,9 +396,11 @@ public sealed class SequenceDocument : ISequenceChainLookup
         int insertAt = ordered[^1] + 1;
         string description = SequenceLabel.OneOrMany("Duplicate", "Sequence", ordered.Select(index => Save.Sequences[index].Name).ToList());
         var before = SelectionOf(indices);
-        Edit(undo, description, save => save.Sequences.InsertRange(insertAt, Renamed(ordered.Select(index => save.Sequences[index]).ToList(), names)),
+        bool made = Edit(undo, description, save => save.Sequences.InsertRange(insertAt, Renamed(ordered.Select(index => save.Sequences[index]).ToList(), names)),
             stateBefore: before, stateAfter: new SequenceSelectionState(names, names[0]));
-        return names;
+        return made
+            ? new SequencePasteResult(names, Array.Empty<string>())
+            : new SequencePasteResult(Array.Empty<string>(), new[] { $"Can't duplicate to {string.Join(", ", names.Select(n => $"\"{n}\""))}: that would make the sequences play each other in a loop." });
     }
 
     /// <summary>
@@ -661,7 +664,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return new TimelinePasteResult(made, Array.Empty<int>(), Array.Empty<string>());
     }
 
-    /// <summary>Copies the given tracks, with their chains, as a block directly in front of the topmost of them (their relative order kept), each with a free name. One undo entry.</summary>
+    /// <summary>Copies the given tracks, with their chains, as a block directly in front of the topmost of them (their relative order kept), each with a free name. One undo entry. Refused, with the reason as an error, when a track plays a sequence that plays this one.</summary>
     public TimelinePasteResult DuplicateTracks(IUndoManager undo, int sequence, IReadOnlyList<int> tracks)
     {
         var indices = tracks.Distinct().OrderBy(track => track).ToList();
@@ -677,13 +680,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
             used.Add(name);
         }
         string description = SequenceLabel.OneOrMany("Duplicate", "Track", indices.Select(index => existing[index].Name).ToList());
-        Edit(undo, description, save =>
+        bool made = Edit(undo, description, save =>
         {
             var destination = save.Sequences[sequence].Tracks;
             var copies = TimelineClipboard.CloneTracks(indices.Select(index => destination[index]).ToList());
             for (int i = 0; i < copies.Count; i++) copies[i].Name = names[i];
             destination.InsertRange(insertAt, copies);
         }, trackBefore: indices[0], trackAfter: insertAt);
+        if (!made)
+        {
+            return TimelinePasteResult.Empty with
+            {
+                Errors = new[] { $"Can't duplicate {string.Join(", ", indices.Select(index => $"\"{existing[index].Name}\""))}: that would make the sequences play each other in a loop." },
+            };
+        }
         return new TimelinePasteResult(Array.Empty<TimelineChainId>(), Enumerable.Range(insertAt, names.Count).ToList(), Array.Empty<string>());
     }
 
@@ -882,16 +892,19 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// Adds <paramref name="chain"/> of <paramref name="source"/> at <paramref name="start"/> seconds on track
     /// <paramref name="track"/> of sequence <paramref name="sequence"/>, for <paramref name="length"/> seconds (null: one
     /// cycle, following the chain). A null track adds a new track named after the chain, as the first track (index 0),
-    /// so it is drawn in front. The caller selects the placed chain.
+    /// so it is drawn in front. The caller selects the placed chain. Returns why it was refused (the track plays a
+    /// sequence), or null.
     /// </summary>
-    public void PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start, double? length = null)
+    public string? PlaceChain(IUndoManager undo, int sequence, int? track, string source, string chain, double start, double? length = null)
     {
         var reference = new SequenceChainReferenceSave { Source = source, Chain = chain, Start = Math.Max(0, start), Length = length };
         if (track is { } index)
         {
             string trackName = Save.Sequences[sequence].Tracks[index].Name;
+            if (Save.Sequences[sequence].Tracks[index].References is not null)
+                return $"Can't add a chain to track \"{trackName}\": it plays a sequence. Select a track that plays chains.";
             Edit(undo, $"Add '{chain}' to '{trackName}'", save => save.Sequences[sequence].Tracks[index].Chains.Add(reference));
-            return;
+            return null;
         }
         string name = NameGenerator.Unique(Save.Sequences[sequence].Tracks.Select(t => t.Name), chain);
         Edit(undo, SequenceLabel.Named("Add", "Track", name), save =>
@@ -899,6 +912,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
             var tracks = save.Sequences[sequence].Tracks;
             tracks.Insert(0, new SequenceTrackSave { Name = name, Chains = { reference } });
         });
+        return null;
     }
 
     /// <summary>
@@ -1451,8 +1465,25 @@ public sealed class SequenceDocument : ISequenceChainLookup
         }
     }
 
-    /// <summary>Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry.</summary>
-    private void Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
+    // See KeepSelection.
+    private bool _keepSelection;
+
+    /// <summary>
+    /// Runs <paramref name="edit"/> without selecting the sequence it changes, for an edit committed by a click on another
+    /// sequence, which must stay selected. Undo and redo still select the changed one.
+    /// </summary>
+    public void KeepSelection(Action edit)
+    {
+        _keepSelection = true;
+        try { edit(); }
+        finally { _keepSelection = false; }
+    }
+
+    /// <summary>
+    /// Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry. False when the edit was
+    /// dropped because the result may not be written (see the checks inside); an edit that changes nothing is not dropped.
+    /// </summary>
+    private bool Edit(IUndoManager undo, string description, Action<SequenceListSave> mutate, int? selectBefore = null, int? selectAfter = null,
         int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null,
         SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null, string? coalesceGroup = null)
     {
@@ -1460,18 +1491,19 @@ public sealed class SequenceDocument : ISequenceChainLookup
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
         mutate(copy);
-        // An edit that would close a new cycle (a paste into another file) is dropped; the edits that can do this check
-        // first and say why. A cycle the file already held (edited outside the editor) does not block other edits.
-        if (AddsCycle(copy)) return;
+        // An edit that would close a new cycle (a paste into another file) is dropped; the edits that can do this say why.
+        // A cycle the file already held (edited outside the editor) does not block other edits.
+        if (AddsCycle(copy)) return false;
         // A track holding both a reference and chains makes a file that does not load, so such an edit is dropped too.
-        if (HasTrackWithReferenceAndChains(copy)) return;
+        if (HasTrackWithReferenceAndChains(copy)) return false;
         string after = copy.ToJsonString();
-        if (after == before) return;
+        if (after == before) return true;
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
         if (selectBefore is null && selectAfter is null && stateBefore is null && stateAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
-        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed,
+        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo && !_keepSelection, renamed,
             stateBefore, stateAfter, coalesceGroup));
+        return true;
     }
 
     /// <summary>Whether <paramref name="mutate"/>, applied to a copy of the file, would close a cycle the file does not already hold.</summary>

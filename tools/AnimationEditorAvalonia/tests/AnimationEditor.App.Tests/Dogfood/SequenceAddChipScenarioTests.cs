@@ -194,4 +194,25 @@ public class SequenceAddChipScenarioTests
         editor.ProblemText.ShouldNotBeNull().ShouldContain("sequence");
         editor.UndoLabels.ShouldBeEmpty();
     }
+
+    [AvaloniaFact]
+    public async Task ChipMenu_AddToSelectedTrack_OnATrackThatPlaysASequence_SaysWhy()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = WriteFixture(editor);
+        var save = SequenceListSave.FromFile(boss);
+        save.Sequences.Add(new SequenceSave { Name = "Idle" });
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "Sub", References = [new SequenceReferenceSave { Sequence = "Idle" }] });
+        save.Save(boss);
+        await editor.OpenAsync(boss);
+        Timeline(editor).Select(null, 1);
+        LibraryChipView run = Chip(editor, "Run");
+
+        editor.RightClick(run);
+        editor.PickMenuItem(run.ContextMenu!, "Add to Selected Track");
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("\"Sub\"");
+        editor.UndoLabels.ShouldBeEmpty();
+        Timeline(editor).SelectedTrack.ShouldBe(1);
+    }
 }

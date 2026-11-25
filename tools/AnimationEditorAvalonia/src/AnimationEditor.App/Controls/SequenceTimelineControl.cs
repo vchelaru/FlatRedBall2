@@ -563,13 +563,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     }
 
     // The drop and "add without dragging" end the same way: one PlaceChain (so one undo entry, named alike) and the new chain selected.
-    private void PlaceAndSelect(LibraryChip chip, int? track, double start)
+    private string? PlaceAndSelect(LibraryChip chip, int? track, double start)
     {
-        _document!.PlaceChain(_undo!, _sequenceIndex, track, chip.Source, chip.Chain.Name, start);
+        if (_document!.PlaceChain(_undo!, _sequenceIndex, track, chip.Source, chip.Chain.Name, start) is { } refusal) return refusal;
         var sequence = Sequence!;
         int placed = track ?? 0; // a new track is the first one, in front
         SetSelection(new TimelineChainId(placed, sequence.Tracks[placed].Chains.Count - 1), null);
         Rebuild();
+        return null;
     }
 
     /// <summary>True when the selection names exactly one track, so <see cref="ChipAddMode.SelectedTrack"/> has somewhere to add.</summary>
@@ -579,14 +580,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>
     /// Adds <paramref name="chip"/>'s chain at the playhead without a drag: on a new track in front (the top of the list), or on the
     /// one selected track (see <see cref="ChipAddPlan"/>). The new chain is selected and scrolled into view, as a drop's is.
-    /// Returns null when added, else why nothing was (no sequence in the file, or no single selected track).
+    /// Returns null when added, else why nothing was (no sequence in the file, no single selected track, or one that plays a sequence).
     /// </summary>
     public string? AddChip(LibraryChip chip, ChipAddMode mode)
     {
         if (_document is null || _undo is null || Sequence is null) return "Add a sequence first: the file has none to put the chain on.";
         var plan = ChipAddPlan.For(mode, SelectedChains, SelectedTracks, _playhead);
         if (!plan.CanAdd) return plan.Refusal;
-        PlaceAndSelect(chip, plan.Track, plan.Start);
+        if (PlaceAndSelect(chip, plan.Track, plan.Start) is { } refusal) return refusal;
         RevealPlaced(plan.Start);
         return null;
     }

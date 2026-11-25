@@ -50,7 +50,7 @@ public static class SequenceOps
             new("sequence", "string", true, "Sequence name or glob."),
             new("value", "boolean", true, "true to loop."),
         ]),
-        new("duplicate-sequence", "Inserts a copy of a sequence right after it: tracks, blocks and reference tracks (which keep their targets). Without a name the copy gets the next numbered one (Run 2); a given name must be unused.",
+        new("duplicate-sequence", "Inserts a copy of a sequence right after it: tracks, blocks and reference tracks (which keep their targets). Without a name the copy gets the next numbered one (Run 2); a given name must be unused. Fails with WouldCycle if the copy would play itself.",
         [
             new("sequence", "string", true, SequenceAddressDescription),
             new("name", "string", false, "Name of the copy, unique in the file, no '/'."),

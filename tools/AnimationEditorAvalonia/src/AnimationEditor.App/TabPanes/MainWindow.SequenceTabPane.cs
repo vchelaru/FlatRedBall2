@@ -1183,6 +1183,8 @@ public partial class MainWindow
                 if (_items[index].IsEditing) CommitListRename(document, index);
             }
             _window.SequenceTimeline.CommitRename();
+            // As CommitPendingInspectorName does for the .achx Inspector.
+            _window.SequenceInspector.CommitTypedText();
         }
 
         private void CommitListRename(SequenceDocument document, int index)
@@ -1488,7 +1490,14 @@ public partial class MainWindow
         private void DuplicateSelected()
         {
             if (_document is not { } document || document.SelectedIndices.Count == 0) return;
-            var names = document.DuplicateSequences(_window._undoManager, document.SelectedIndices);
+            var result = document.DuplicateSequences(_window._undoManager, document.SelectedIndices);
+            if (result.Errors.Count > 0)
+            {
+                _window.ShowProblem(string.Join(" ", result.Errors));
+                RefocusListSoon();
+                return;
+            }
+            var names = result.Names;
             // The copies start from their beginning.
             StopPlayback();
             // Name a lone copy right away: its name is selected, so typing replaces it and Escape keeps it. Several copies
