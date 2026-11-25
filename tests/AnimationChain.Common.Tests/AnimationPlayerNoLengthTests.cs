@@ -81,4 +81,34 @@ public class AnimationPlayerNoLengthTests
 
         player.CurrentFrame.ShouldBe(list[0][1]);
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void Update_LoopingChainOfNoLengthIsGivenFrames_StartsAtZero(int zeroLengthFrames)
+    {
+        var chain = Looping(false, false, new long[zeroLengthFrames]);
+        var player = new AnimationPlayer<Frame>(new AnimationChainList<Frame> { chain });
+        player.Play("a");
+        for (int i = 0; i < 60; i++) player.Update(TimeSpan.FromSeconds(1 / 60.0));
+        int raised = 0;
+        player.FrameEventRaised += _ => raised++;
+
+        chain.Clear();
+        chain.AddRange(Looping(false, false, 5_000_000, 5_000_000, 5_000_000));
+        player.Update(TimeSpan.Zero);
+
+        player.CurrentFrame.ShouldBe(chain[0]);
+        raised.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(10)]
+    public void Update_ZeroStepOnAChainOfTenTicksOrLess_DoesNotLoop(long ticks)
+    {
+        var chain = Looping(false, false, ticks);
+
+        EventsRaised(chain, TimeSpan.Zero).ShouldBe(0);
+    }
 }

@@ -63,8 +63,6 @@ public class Sprite : IRenderable, IAttachable
     private KeyframeColor _frameColor;
     // Bumped whenever playback switches chain, so event dispatch can tell a handler replaced the animation.
     private int _playbackVersion;
-    // Null until game code sets the property, so a hot reloaded chain's own values apply to a playing sprite.
-    private bool? _isLooping, _isPingPong, _isReversed;
 
     /// <summary>The entity this sprite is attached to, or <c>null</c> if unattached. Set by <see cref="Entity.Add(IAttachable, Layer?)"/>.</summary>
     public Entity? Parent { get; set; }
@@ -365,40 +363,29 @@ public class Sprite : IRenderable, IAttachable
     public bool ShouldAnimationAdvanceOnPause { get; set; }
 
     /// <summary>
-    /// Whether the current animation loops. Follows the played chain's <see cref="AnimationChain.Loop"/>;
-    /// set this to override it per instance until <see cref="PlayAnimation(string)"/> or
-    /// <see cref="PlayAnimation(AnimationChain)"/> switches to a new chain. When <c>false</c>, the
-    /// animation stops on its last frame and fires <see cref="AnimationFinished"/>.
+    /// Whether the current animation loops. Seeded from the played chain's
+    /// <see cref="AnimationChain.Loop"/> each time <see cref="PlayAnimation(string)"/> or
+    /// <see cref="PlayAnimation(AnimationChain)"/> switches to a new chain; set this afterward to
+    /// override per-instance. When <c>false</c>, the animation stops on its last frame and fires
+    /// <see cref="AnimationFinished"/>.
     /// </summary>
-    public bool IsLooping
-    {
-        get => _isLooping ?? CurrentAnimation?.Loop ?? true;
-        set => _isLooping = value;
-    }
+    public bool IsLooping { get; set; } = true;
 
     /// <summary>
     /// Whether each cycle plays the animation forward and then mirrored (backward). A cycle is twice the chain's
     /// length, the end frames show for twice their length across the turnaround, and keyframe glides (offset, color,
     /// shapes) play backward on the way back. <see cref="AnimationLooped"/> fires once per cycle; when
-    /// <see cref="IsLooping"/> is <c>false</c> one cycle plays, then <see cref="AnimationFinished"/> fires. Follows
-    /// <see cref="AnimationChain.PingPong"/> until set, like <see cref="IsLooping"/>.
+    /// <see cref="IsLooping"/> is <c>false</c> one cycle plays, then <see cref="AnimationFinished"/> fires. Seeded from
+    /// <see cref="AnimationChain.PingPong"/> like <see cref="IsLooping"/>; set it afterward to override per instance.
     /// </summary>
-    public bool IsPingPong
-    {
-        get => _isPingPong ?? CurrentAnimation?.PingPong ?? false;
-        set => _isPingPong = value;
-    }
+    public bool IsPingPong { get; set; }
 
     /// <summary>
     /// Whether the animation's forward timeline plays mirrored: it starts at the end of the last frame and runs to the
     /// start of the first, keyframe glides included. With <see cref="IsPingPong"/> the mirrored half comes first.
-    /// Follows <see cref="AnimationChain.Reversed"/> until set, like <see cref="IsLooping"/>.
+    /// Seeded from <see cref="AnimationChain.Reversed"/> like <see cref="IsLooping"/>; set it afterward to override.
     /// </summary>
-    public bool IsReversed
-    {
-        get => _isReversed ?? CurrentAnimation?.Reversed ?? false;
-        set => _isReversed = value;
-    }
+    public bool IsReversed { get; set; }
 
     /// <summary>Multiplier applied to animation playback speed. Default is <c>1f</c> (normal speed).</summary>
     public float AnimationSpeed { get; set; } = 1f;
@@ -537,10 +524,12 @@ public class Sprite : IRenderable, IAttachable
         RaiseFrameZeroEvents();
     }
 
-    // Drops the per-instance playback overrides and rewinds to the start of the chain's cycle.
+    // Seeds the per-instance playback flags from the chain and rewinds to the start of its cycle.
     private void StartChain(AnimationChain chain)
     {
-        _isLooping = _isPingPong = _isReversed = null;
+        IsLooping = chain.Loop;
+        IsPingPong = chain.PingPong;
+        IsReversed = chain.Reversed;
         _timeIntoAnimation = 0;
         LocateCurrentFrame(chain);
     }
@@ -560,11 +549,11 @@ public class Sprite : IRenderable, IAttachable
         if (!Animate || _currentChainIndex < 0 || _animationChains == null) return;
 
         var chain = _animationChains[_currentChainIndex];
-        _timeIntoAnimation += deltaSeconds * AnimationSpeed;
-
         // Convert TimeSpan totals to seconds once at the boundary; per-frame math stays in double.
         double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
         if (totalLength <= 0 && IsLooping) return;
+
+        _timeIntoAnimation += deltaSeconds * AnimationSpeed;
 
         int previousFrameIndex = _currentFrameIndex;
         int previousVisitIndex = _currentVisitIndex;

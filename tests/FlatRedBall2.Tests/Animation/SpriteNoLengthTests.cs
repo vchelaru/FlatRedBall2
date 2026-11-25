@@ -80,4 +80,34 @@ public class SpriteNoLengthTests
 
         sprite.Animate.ShouldBeTrue();
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void AnimateSelf_LoopingChainOfNoLengthIsGivenFrames_StartsAtZero(int zeroLengthFrames)
+    {
+        var chain = Looping(false, false, new long[zeroLengthFrames]);
+        var sprite = new Sprite { AnimationChains = new AnimationChainList { chain } };
+        sprite.PlayAnimation("a");
+        for (int i = 0; i < 60; i++) sprite.AnimateSelf(1 / 60.0);
+        int raised = 0;
+        sprite.FrameEventRaised += _ => raised++;
+
+        chain.Clear();
+        chain.AddRange(Looping(false, false, 5_000_000, 5_000_000, 5_000_000));
+        sprite.AnimateSelf(0);
+
+        sprite.CurrentFrame.ShouldBe(chain[0]);
+        raised.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(10)]
+    public void AnimateSelf_ZeroStepOnAChainOfTenTicksOrLess_DoesNotLoop(long ticks)
+    {
+        var chain = Looping(false, false, ticks);
+
+        EventsRaised(chain, TimeSpan.Zero).ShouldBe(0);
+    }
 }

@@ -40,7 +40,7 @@ public static class PlaybackTimeline
     /// <summary>
     /// How far before a frame boundary or a cycle's end, in seconds, a time already counts as on it. Times add up
     /// inexactly (0.1 + 0.1 + 0.1 is past 0.3, eight steps of 0.1 fall short of 0.8). Far below one update; a frame
-    /// shorter than this may not be shown.
+    /// shorter than this may not be shown, and a cycle shorter than twice this ends at most half of it early.
     /// </summary>
     public const double BoundaryTolerance = 1e-6;
 
@@ -54,9 +54,10 @@ public static class PlaybackTimeline
     /// </summary>
     public static CyclePoint Wrap(double time, double cycleLength, bool loop)
     {
-        if (time < cycleLength - BoundaryTolerance) return new(time, 0, false);
+        double tolerance = Math.Min(BoundaryTolerance, cycleLength / 2);
+        if (time < cycleLength - tolerance) return new(time, 0, false);
         if (!loop || cycleLength <= 0) return new(cycleLength, 0, !loop);
-        double wraps = Math.Floor((time + BoundaryTolerance) / cycleLength);
+        double wraps = Math.Floor((time + tolerance) / cycleLength);
         return new(Math.Max(0, time - wraps * cycleLength), (int)Math.Min(wraps, int.MaxValue), false);
     }
 

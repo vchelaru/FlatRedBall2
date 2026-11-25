@@ -75,34 +75,6 @@ public class HotReloadMergeTests
     }
 
     [Fact]
-    public void TryReloadFrom_LoopTurnedOffWhilePlaying_PlayerFinishes()
-    {
-        var list = Load(Achx(Chain("Walk", "", "1")));
-        var player = new AnimationPlayer<Frame>(list);
-        int finished = 0;
-        player.AnimationFinished += () => finished++;
-        player.Play("Walk");
-
-        Reload(list, Achx(Chain("Walk", "<Loop>false</Loop>", "1"))).ShouldBeTrue();
-        player.Update(TimeSpan.FromSeconds(1.5));
-
-        finished.ShouldBe(1);
-    }
-
-    [Fact]
-    public void TryReloadFrom_PlayerOverridesIsLooping_OverrideStays()
-    {
-        var list = Load(Achx(Chain("Walk", "", "1")));
-        var player = new AnimationPlayer<Frame>(list);
-        player.Play("Walk");
-        player.IsLooping = true;
-
-        Reload(list, Achx(Chain("Walk", "<Loop>false</Loop><Reverse>true</Reverse>", "1"))).ShouldBeTrue();
-
-        (player.IsLooping, player.IsReversed).ShouldBe((true, true));
-    }
-
-    [Fact]
     public void AnimationFinished_NonLoopingChainWithNoLength_IsRaised()
     {
         var list = new AnimationChainList<Frame> { new AnimationChain<Frame> { Name = "Hit", Loop = false } };

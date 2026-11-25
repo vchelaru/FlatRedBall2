@@ -39,8 +39,8 @@ generic package (namespaces `FlatRedBall.AnimationChain` / `FlatRedBall2.Animati
 | `PlayAnimation(string name)` | — | Looks up by name; no-op if not found |
 | `PlayAnimation(AnimationChain chain)` | — | Play a specific chain directly |
 | `Animate` | `false` | Auto-managed. **Do not write to express idle state** — see Gotchas |
-| `IsLooping` | follows `AnimationChain.Loop` | set it after `PlayAnimation` to override per instance; switching chains drops the override |
-| `IsPingPong`, `IsReversed` | follow `AnimationChain.PingPong`/`Reversed` the same way | Both mirror the forward timeline (`PlaybackTimeline`): Reversed shows forward time T - t; PingPong plays forward then mirrored, a 2T cycle in which the end frames show twice as long and glides play backward. One cycle is one `AnimationLooped`; the turnaround raises no `FrameChanged` |
+| `IsLooping` | seeded from `AnimationChain.Loop` on `PlayAnimation` | overridable per-instance after `PlayAnimation` — set it before that and it gets reseeded |
+| `IsPingPong`, `IsReversed` | seeded from `AnimationChain.PingPong`/`Reversed` the same way | Both mirror the forward timeline (`PlaybackTimeline`): Reversed shows forward time T - t; PingPong plays forward then mirrored, a 2T cycle in which the end frames show twice as long and glides play backward. One cycle is one `AnimationLooped`; the turnaround raises no `FrameChanged` |
 | `AnimationSpeed` | `1f` | Multiplier |
 | `CurrentAnimation` | — | Read-only; returns the active chain |
 | `AnimationFinished` | — | Fires when a non-looping animation ends (on the first update when it has no length) |
@@ -66,7 +66,7 @@ When you want an AI assistant to wire animation selection to gameplay state, des
 
 ## Hot-Reload
 
-`AnimationChainList.TryReloadFrom(path, content)` patches a list in place by chain-name match. Live `Sprite.CurrentAnimation` references keep playing with the new frames and the file's Loop/PingPong/Reverse. **Every sprite must share one list instance** — re-parsing per spawn defeats hot-reload. Wire via `WatchContentDirectory` — see `content-hot-reload`.
+`AnimationChainList.TryReloadFrom(path, content)` patches a list in place by chain-name match. Live `Sprite.CurrentAnimation` references keep playing with the new frames and any Loop/PingPong/Reverse the file changed. **Every sprite must share one list instance** — re-parsing per spawn defeats hot-reload. Wire via `WatchContentDirectory` — see `content-hot-reload`.
 
 ## Topics (load on demand)
 

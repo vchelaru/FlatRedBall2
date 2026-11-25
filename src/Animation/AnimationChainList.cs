@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Xml;
 using FlatRedBall2.AnimationEditorCommon;
+using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2.Animation;
 
@@ -62,7 +64,8 @@ public class AnimationChainList : List<AnimationChain>
     /// frames and Loop, PingPong and Reverse (instance identity preserved); otherwise the fresh chain is
     /// appended. Chains only in this list (removed from
     /// the file) are left alone — sprites still playing them keep rendering their old art until
-    /// the caller switches them.
+    /// the caller switches them. A Loop, PingPong or Reverse the file changed is also set on the
+    /// current screen's sprites playing that chain, replacing a value game code set.
     /// <para>
     /// Returns <c>false</c> on I/O or parse failure (e.g. file mid-write) — XML or JSON, depending
     /// on <paramref name="path"/>'s extension. Callers should fall back to
@@ -81,7 +84,19 @@ public class AnimationChainList : List<AnimationChain>
         catch (XmlException) { return false; }
         catch (System.Text.Json.JsonException) { return false; }
 
+        var before = ConvertAll(chain => (chain, chain.Loop, chain.PingPong, chain.Reversed));
         ChainReload.Apply<AnimationChain, AnimationFrame>(this, fresh);
+        if (content.LiveRenderables is not { } renderables) return true;
+
+        // A sprite took these from the chain when it started playing. Only what the file changed is set again.
+        foreach (var (chain, loop, pingPong, reversed) in before)
+            foreach (var sprite in renderables().OfType<Sprite>())
+            {
+                if (sprite.CurrentAnimation != chain) continue;
+                if (chain.Loop != loop) sprite.IsLooping = chain.Loop;
+                if (chain.PingPong != pingPong) sprite.IsPingPong = chain.PingPong;
+                if (chain.Reversed != reversed) sprite.IsReversed = chain.Reversed;
+            }
         return true;
     }
 }

@@ -18,22 +18,23 @@ public class AnimationChain : List<AnimationFrame>, IReloadableChain
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Whether this chain loops by default. <see cref="FlatRedBall2.Rendering.Sprite.IsLooping"/> follows
-    /// this value while the chain plays, unless it is set on the sprite.
+    /// Whether this chain loops by default. <see cref="FlatRedBall2.Rendering.Sprite.PlayAnimation(string)"/>
+    /// seeds <see cref="FlatRedBall2.Rendering.Sprite.IsLooping"/> from this value when the chain
+    /// starts playing, but that flag stays overridable per-instance afterward.
     /// </summary>
     public bool Loop { get; set; } = true;
 
     /// <summary>
     /// Whether this chain plays forward and then mirrored by default (see
-    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.PingPong"/>).
-    /// <see cref="FlatRedBall2.Rendering.Sprite.IsPingPong"/> follows it like <see cref="Loop"/>.
+    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.PingPong"/>). Seeds
+    /// <see cref="FlatRedBall2.Rendering.Sprite.IsPingPong"/> when the chain starts playing; overridable per instance afterward.
     /// </summary>
     public bool PingPong { get; set; }
 
     /// <summary>
     /// Whether this chain plays its timeline mirrored (backward) by default (see
-    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.Reverse"/>).
-    /// <see cref="FlatRedBall2.Rendering.Sprite.IsReversed"/> follows it like <see cref="Loop"/>.
+    /// <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.Reverse"/>). Seeds
+    /// <see cref="FlatRedBall2.Rendering.Sprite.IsReversed"/> when the chain starts playing; overridable per instance afterward.
     /// </summary>
     public bool Reversed { get; set; }
 

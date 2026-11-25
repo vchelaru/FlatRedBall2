@@ -103,6 +103,7 @@ public class Screen : ILifecycleEvents
         var cams = new CameraList(this);
         cams.Add(new Camera());
         Cameras = cams;
+        ContentLoader.LiveRenderables = () => _renderList;
     }
 
     /// <summary>

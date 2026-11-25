@@ -212,8 +212,6 @@ public class AnimationChainListReloadTests
     {
         var content = MakeContent();
         var list = LoadFresh(WriteAchx("anim.achx", ("Walk", 1), ("Walk", 2)), content);
-        var sprite = new Sprite { AnimationChains = list };
-        sprite.PlayAnimation(list[1]);
         const string frame = "<Frame><FrameLength>0.1</FrameLength></Frame>";
         WriteRaw("anim.achx", $"<AnimationChainArraySave><AnimationChain><Name>Walk</Name>{frame}</AnimationChain>"
             + $"<AnimationChain><Name>Walk</Name><Loop>false</Loop><PingPong>true</PingPong><Reverse>true</Reverse>{frame}{frame}{frame}</AnimationChain></AnimationChainArraySave>");
@@ -221,7 +219,76 @@ public class AnimationChainListReloadTests
         list.TryReloadFrom("anim.achx", content).ShouldBeTrue();
 
         list.ConvertAll(c => (c.Count, c.Loop, c.PingPong, c.Reversed)).ShouldBe([(1, true, false, false), (3, false, true, true)]);
+    }
+
+    private const string OneFrame = "<Frame><FrameLength>0.1</FrameLength></Frame>";
+
+    private static string WalkFile(string flags) =>
+        $"<AnimationChainArraySave><AnimationChain><Name>Walk</Name>{flags}{OneFrame}</AnimationChain></AnimationChainArraySave>";
+
+    // A sprite on the current screen playing Walk, which the engine's or the screen's own loader reloads.
+    private static (AnimationChainList List, Sprite Sprite, Action<string> Reload) PlayingOnScreen(bool screenLoader)
+    {
+        var engine = new FlatRedBallService();
+        string file = WalkFile("");
+        var content = screenLoader ? engine.CurrentScreen.ContentLoader : engine.Content;
+        content.StreamProvider = _ => new MemoryStream(Encoding.UTF8.GetBytes(file));
+        var list = content.LoadAnimationChainList("a.achx");
+        var sprite = new Sprite { AnimationChains = list };
+        sprite.PlayAnimation("Walk");
+        engine.CurrentScreen.Add(sprite);
+        return (list, sprite, text =>
+        {
+            file = text;
+            list.TryReloadFrom("a.achx", content).ShouldBeTrue();
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TryReloadFrom_FlagsChangedInFile_PlayingSpriteTakesThem(bool screenLoader)
+    {
+        var (_, sprite, reload) = PlayingOnScreen(screenLoader);
+
+        reload(WalkFile("<Loop>false</Loop><PingPong>true</PingPong><Reverse>true</Reverse>"));
+
         (sprite.IsLooping, sprite.IsPingPong, sprite.IsReversed).ShouldBe((false, true, true));
+    }
+
+    [Fact]
+    public void TryReloadFrom_FlagNotChangedInFile_GameOverrideStays()
+    {
+        var (_, sprite, reload) = PlayingOnScreen(screenLoader: false);
+        sprite.IsLooping = false;
+        sprite.IsReversed = true;
+
+        reload(WalkFile("<PingPong>true</PingPong>"));
+
+        (sprite.IsLooping, sprite.IsPingPong, sprite.IsReversed).ShouldBe((false, true, true));
+    }
+
+    [Fact]
+    public void TryReloadFrom_FlagsChangedInFile_SpritePlayingAnotherChainKeepsItsOwn()
+    {
+        var (list, sprite, reload) = PlayingOnScreen(screenLoader: false);
+        var other = new AnimationChain { Name = "Other" };
+        list.Add(other);
+        sprite.PlayAnimation(other);
+
+        reload(WalkFile("<Loop>false</Loop>"));
+
+        sprite.IsLooping.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Loop_ChangedWithoutAReload_PlayingSpriteKeepsItsValue()
+    {
+        var (list, sprite, _) = PlayingOnScreen(screenLoader: false);
+
+        list[0].Loop = false;
+
+        sprite.IsLooping.ShouldBeTrue();
     }
 
     [Fact]
