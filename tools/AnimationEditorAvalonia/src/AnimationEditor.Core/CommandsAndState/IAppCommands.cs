@@ -473,6 +473,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void HandleApplicationClosing();
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY);
+
+        /// <summary>
+        /// Adds one frame to each of <paramref name="chains"/> as a single undo entry, skipping locked chains. Unlike the
+        /// one-chain overload it keeps the selection, so the same gesture can be repeated on the same chains.
+        /// </summary>
+        void AddFrameFromPixelBounds(IReadOnlyList<AnimationChainSave> chains, string textureName, int minX, int minY, int maxX, int maxY);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
         /// <summary>
