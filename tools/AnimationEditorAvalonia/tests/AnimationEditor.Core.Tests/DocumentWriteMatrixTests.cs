@@ -34,6 +34,8 @@ public class DocumentWriteMatrixTests
         // A sequence tab has no export to these formats, and no Untitled form to recover.
         DocAction.Export or DocAction.WriteRecovery => front != DocType.Seqj,
         DocAction.ConvertToAchj => front == DocType.Achx,
+        // Only an .achx or .achj has associated tilesets.
+        DocAction.PushFromBackground => background is DocType.Achx or DocType.Achj,
         DocAction.PushToTileset => front is DocType.Achx or DocType.Achj && background == DocType.Tsx,
         _ => true,
     };
@@ -154,6 +156,13 @@ public class DocumentWriteMatrixTests
                 foreach (string extension in new[] { ".achx", ".achj", ".tsx", ".seqj" }) written.Add("blocked" + extension);
                 break;
             case DocAction.SaveBackgroundDocument:
+            case DocAction.PushFromBackground:
+                string? tileset = null;
+                if (action == DocAction.PushFromBackground)
+                {
+                    tileset = Documents.Write(back.Folder, DocType.Tsx, Documents.FrontName);
+                    editor.Ctx.IoManager.AddAssociatedTiledTilesetPath(back.Path!, tileset);
+                }
                 var cell = Documents.NewCell(back.Name);
                 var frames = back.Tab!.CachedEditorModel!.AnimationChains[0].Frames;
                 frames.Add(new AnimationFrameSave
@@ -167,6 +176,10 @@ public class DocumentWriteMatrixTests
                 });
                 editor.Ctx.AppCommands.SaveDocument(back.Tab).ShouldBeTrue();
                 back.Expected.AddFrame(back.Name);
+                // Its own tiles, not those of what is in front, beside the tileset's animation.
+                if (tileset != null)
+                    Documents.TileAnimations(tileset).ShouldBe(["3: 0@100 1@250", "4: 4@200", "8: 8@100 9@250 10@100", "12: 12@200"]);
+                written.Add(tileset);
                 editor.ShouldBeAsExpected();
                 // What is in front is still itself: it saves as its own type, to its own tiles.
                 editor.Edit(current);

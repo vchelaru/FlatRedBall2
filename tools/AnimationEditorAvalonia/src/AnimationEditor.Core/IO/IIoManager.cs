@@ -37,7 +37,7 @@ namespace AnimationEditor.Core.IO
         /// <summary>
         /// Returns the absolute paths of every Tiled <c>.tsx</c> tileset associated with
         /// <paramref name="achxFile"/> via <see cref="AddAssociatedTiledTilesetPath"/> -- the
-        /// files <c>ProjectManager.SaveAnimationChainListAsync</c> should sync this project's
+        /// files a save should sync this document's
         /// animation chains into on save. Empty when no companion file exists or none are set.
         /// </summary>
         IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile);

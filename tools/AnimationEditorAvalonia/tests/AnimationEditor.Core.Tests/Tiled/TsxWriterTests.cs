@@ -17,7 +17,7 @@ public class TsxWriterTests
     // has already produced two: a wrong trailing gap for a brand-new last tile, and a double
     // leading space when the first tile gets edited) have somewhere to hide if reintroduced.
     // These fixtures write to the SAME path they read from, since that's the in-place-save
-    // pattern every real caller (ProjectManager.SaveTsxProject, TiledTilesetSyncRunner.SyncAll) uses.
+    // pattern every real caller (ProjectManager.SaveTsx, TiledTilesetSyncRunner.SyncAll) uses.
     private const string LegacyStyleFixtureXml =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
         "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +

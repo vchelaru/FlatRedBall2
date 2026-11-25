@@ -1,4 +1,5 @@
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Tests;
 using DotTiled;
 using DotTiled.Serialization;
@@ -321,6 +322,30 @@ public class AppCommandsTiledSyncTests
         ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
 
         order.ShouldBe(hasOtherTileset ? ["warned 0", "failed"] : ["warned 0"]);
+    }
+
+    [Theory]
+    [InlineData(false, false, new[] { 1 })]
+    [InlineData(true, false, new[] { 1 })]
+    [InlineData(true, true, new[] { 1, 0 })]
+    public void SaveDocument_ClearsTheOpenDocumentsWarning_OnlyWhenItsPushHasSomethingToSay(bool hasTileset, bool changesIt, int[] expected)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        ctx.ProjectManager.FileName = Path.Combine(dir.Path, "Hero.achx");
+        string tileset = WriteFixtureTileset(dir.Path);
+        ctx.AppCommands.AddAssociatedTiledTileset(tileset);
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("sub/Heroes.png"));
+        var raised = new List<int>();
+        ctx.AppCommands.TiledSyncWarned += warnings => raised.Add(warnings.Count);
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        var background = new TabEntry(new FilePath(Path.Combine(dir.Path, "Other.achx"))) { CachedEditorModel = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel } };
+        if (hasTileset) ctx.IoManager.AddAssociatedTiledTilesetPath(background.Path.FullPath, tileset);
+        if (changesIt) TestHelpers.MakeChain(background.CachedEditorModel, "Run").Frames.Add(Tile0Frame("Heroes.png"));
+
+        ctx.AppCommands.SaveDocument(background).ShouldBeTrue();
+
+        raised.ShouldBe(expected);
     }
 
     [Fact]

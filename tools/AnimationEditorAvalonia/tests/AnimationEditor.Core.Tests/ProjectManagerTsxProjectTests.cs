@@ -968,28 +968,6 @@ public class ProjectManagerTsxProjectTests : IDisposable
         Assert.Null(pm.TsxTileGrid);
     }
 
-    // SaveAnimationChainList(string) writes achx/achj-format content -- calling it on a native tsx project (whose
-    // AnimationChainListSave is a *view* over Tiled tileset data, not a real achx) would
-    // silently write malformed/misleading content instead of the real .tsx file.
-    // AppCommands.SaveCurrentAnimationChainList already branches on IsNativeTsxProject to route
-    // to SaveTsxProject instead, but that's the only gate today -- ProjectManager itself should
-    // refuse directly too, so a caller that bypasses AppCommands can't slip through unguarded.
-    [Fact]
-    public void SaveAnimationChainList_NativeTsxProjectLoaded_ThrowsInsteadOfWritingAchxFormatContent()
-    {
-        var pm = new ProjectManager();
-        var tsxPath = WriteFixture(PlainFixtureXml, "Heroes.tsx");
-        pm.LoadTsxProject(new FilePath(tsxPath));
-        // UV needs no texture-size resolution, so the only way this can throw is the guard under
-        // test -- not an incidental "missing PNG" failure from the Pixel-conversion path.
-        pm.OnDiskCoordinateType = TextureCoordinateType.UV;
-
-        var achxPath = Path.Combine(_dir.Path, "WrongFormat.achx");
-        var ex = Assert.Throws<InvalidOperationException>(() => pm.SaveAnimationChainList(achxPath));
-        Assert.Contains("SaveTsxProject", ex.Message);
-        Assert.False(File.Exists(achxPath));
-    }
-
     // A collision shape (or a flip, offset, color, non-looping chain) has no home in a .tsx. The
     // save still writes everything the format can hold, but must say what it dropped -- see
     // TsxLossyDataCheckTests for the full list.

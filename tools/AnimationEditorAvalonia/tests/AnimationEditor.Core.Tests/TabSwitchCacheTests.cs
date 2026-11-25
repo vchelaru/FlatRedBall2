@@ -316,6 +316,70 @@ public class TabSwitchCacheTests : IDisposable
         tab.SaveFailed.ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task SaveDocument_WhileTheOpenDocumentsSaveIsFailed_LeavesItFailedAndItsChangedFileAlone()
+    {
+        string path = WriteAchx("cut.achx", "Before"), open = WriteAchx("hero.achx", "Hero");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(open);
+        _ctx.UndoManager.MarkSaveFailed();
+        WriteAchx("hero.achx", "Outside");
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        _ctx.UndoManager.SaveState.ShouldBe(SaveState.Failed);
+        _ctx.AppCommands.SaveCurrentAnimationChainList().ShouldBeFalse();
+        AnimationChainListSave.FromFile(open).AnimationChains[0].Name.ShouldBe("Outside");
+    }
+
+    [Fact]
+    public async Task SaveDocument_OfAFileThatCouldNotBeReloaded_IsRefused()
+    {
+        string path = WriteAchx("cut.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        File.WriteAllText(path, "<<<<<<< not a document");
+        _ctx.AppCommands.ReloadAchxFromDisk(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(WriteAchx("hero.achx", "Hero"));
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
+
+        File.ReadAllText(path).ShouldBe("<<<<<<< not a document");
+        tab.SaveFailed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task SaveDocument_IsTheWatchersOwnSave()
+    {
+        var watcher = new AppCommandsHotReloadTests.SpyHotReloadWatcher();
+        _ctx.AppCommands.HotReloadWatcher = watcher;
+        string path = WriteAchx("cut.achx", "Before");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        watcher.OwnSaves.ShouldBe([tab.Path.FullPath]);
+    }
+
+    [Fact]
+    public void SaveDocument_OfATabThatIsNotLoaded_Fails()
+    {
+        var tab = new TabEntry(new FilePath(Path.Combine(_dir.Path, "cut.achx")));
+        var messages = new List<string>();
+        _ctx.AppCommands.SaveFailed += messages.Add;
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
+
+        tab.SaveFailed.ShouldBeTrue();
+        messages.ShouldHaveSingleItem().ShouldContain("cut.achx");
+        File.Exists(tab.Path.FullPath).ShouldBeFalse();
+    }
+
     // A failed Save As already moved the document to the new path; its retry is not an overwrite of an unseen edit.
     [Fact]
     public async Task SaveCurrentAnimationChainList_AfterASaveAsOverAnotherFileFailed_Retries()
@@ -413,7 +477,6 @@ public class TabSwitchCacheTests : IDisposable
         public AnimationEditor.Core.Tiled.TilesetAnimationInfo? TsxTileset => _inner.TsxTileset;
         public TileGrid? TsxTileGrid => _inner.TsxTileGrid;
         public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
-        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
         public bool MoveTsxProject(FilePath path) => _inner.MoveTsxProject(path);
         public bool TsxLacksOutsideChange => _inner.TsxLacksOutsideChange;
         public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => _inner.TsxChainsNotFullySaved;
@@ -437,9 +500,6 @@ public class TabSwitchCacheTests : IDisposable
             _inner.LoadAnimationChain(fileName, preParsed);
         }
 
-        public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
-        public void SaveAnimationChainList(string targetPath) =>
-            _inner.SaveAnimationChainList(targetPath);
 
         public string? ResolveFilesPanelRoot() => _inner.ResolveFilesPanelRoot();
 

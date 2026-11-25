@@ -35,25 +35,10 @@ namespace AnimationEditor.Core
         void LoadAnimationChain(
             FilePath fileName,
             AnimationChainListSave? preParsed = null);
-        void SaveAnimationChainList(string targetPath);
-
-        /// <summary>
-        /// Writes <paramref name="document"/>, which need not be the current one (a background
-        /// tab's model after a cross-document cut), to <paramref name="targetPath"/> in
-        /// <paramref name="diskFormat"/>. The in-memory document is left as it was.
-        /// </summary>
-        void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat);
 
         /// <summary>Opens <paramref name="fileName"/> as a native AnimationEditor project -- see
         /// <see cref="ProjectManager.LoadTsxProject"/>.</summary>
         void LoadTsxProject(FilePath fileName);
-
-        /// <summary>Saves back to the tsx opened by <see cref="LoadTsxProject"/>; no-op (returns
-        /// empty) if none is loaded. Returns every mapping warning from this save (e.g. a chain
-        /// whose frame geometry couldn't be written this time) so a caller can surface them --
-        /// the chain's previously-written tile is left untouched, not cleared, when this is
-        /// non-empty. See <see cref="ProjectManager.SaveTsxProject"/>.</summary>
-        IReadOnlyList<string> SaveTsxProject(string? targetPath = null);
 
         /// <summary>
         /// After Save As wrote the open tsx to <paramref name="path"/>, makes that its file. From another folder, the
@@ -63,13 +48,13 @@ namespace AnimationEditor.Core
         bool MoveTsxProject(FilePath path);
 
         /// <summary>
-        /// Whether a <see cref="SaveTsxProject"/> went into a change another program made to the file, which the open
+        /// Whether a save of the open tsx went into a change another program made to the file, which the open
         /// document does not have until it is reloaded.
         /// </summary>
         bool TsxLacksOutsideChange { get; }
 
-        /// <summary>The chains the last <see cref="SaveTsxProject"/> did not store in full.
-        /// See <see cref="ProjectManager.TsxChainsNotFullySaved"/>.</summary>
+        /// <summary>The chains the open tsx's last save did not store in full. See <see
+        /// cref="ProjectManager.TsxChainsNotFullySaved"/>.</summary>
         IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved { get; }
 
         /// <summary>Names of chains with a tsx validation issue; empty when no tsx project is
