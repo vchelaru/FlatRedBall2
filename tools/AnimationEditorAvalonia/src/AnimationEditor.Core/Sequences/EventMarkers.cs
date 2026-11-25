@@ -50,7 +50,12 @@ public static class EventMarkers
         if (count == 0 || played <= 0) return Array.Empty<EventOccurrence>();
         double forward = 0;
         foreach (var frame in frames) forward += Math.Max(0, frame.Duration);
-        if (forward <= 0) return Array.Empty<EventOccurrence>();
+        // No length: playback enters the frame it holds, once.
+        if (forward <= 0)
+        {
+            int held = PlaybackTimeline.Locate(frames, frame => frame.Duration, 0, pingPong, reverse).FrameIndex;
+            return frames[held].Names.Select(name => new EventOccurrence(name, held, 0, 0, false)).ToArray();
+        }
 
         double cycle = PlaybackTimeline.CycleLength(forward, pingPong);
         int visitsPerCycle = PlaybackTimeline.VisitCount(count, pingPong);

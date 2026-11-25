@@ -15,8 +15,8 @@ using Xunit;
 namespace AnimationEditor.Core.Tests.Sequences;
 
 /// <summary>
-/// #2137 on the sequence timeline: zero-length frames are skipped, an animation of no length plays nothing (as
-/// <see cref="SequenceTimeline"/> has it) and stays selectable, and nothing that repeats by a length loops forever: those
+/// #2137 on the sequence timeline: zero-length frames are skipped, an animation of no length holds its frame for its block's own
+/// Length (without one it plays nothing and stays selectable), and nothing that repeats by a length loops forever: those
 /// tests have a time limit, so a hang fails.
 /// </summary>
 public class ZeroLengthSequenceTests
@@ -43,14 +43,15 @@ public class ZeroLengthSequenceTests
         private readonly List<AnimationChainSave> _chains =
         [
             Chain("None", false, false, 0f, 0f), Chain("NonePingPong", true, true, 0f, 0f), Chain("Tiny", false, false, 0f, (float)Tiny, 0f),
-            Chain("TinyPingPong", true, false, 0f, (float)Tiny, 0f), Chain("Walk", false, false, 0.5f, 0f, 0.5f),
+            Chain("TinyPingPong", true, false, 0f, (float)Tiny, 0f), Chain("Walk", false, false, 0.5f, 0f, 0.5f), Chain("NoFrames", false, false),
+            new() { Name = "Once", Loop = false, Frames = { new() { TextureName = "Once.png" }, new() { TextureName = "Once.png" } } },
         ];
 
         public AnimationChainSave? FindChain(SequenceChainReferenceSave reference) => _chains.Find(c => c.Name == reference.Chain);
         public string? ResolveTexturePath(string source, AnimationFrameSave frame) => frame.TextureName;
         public FrameLengthUnit UnitOf(SequenceChainReferenceSave reference) => Sec;
 
-        public double? CycleLength(SequenceChainReferenceSave reference) => FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, Sec) : null;
+        public double? CycleLength(SequenceChainReferenceSave reference) => ChainClock.CycleLength(FindChain(reference), Sec);
     }
 
     private static SequenceSave Sequence(string name, params SequenceTrackSave[] tracks)
@@ -124,14 +125,12 @@ public class ZeroLengthSequenceTests
         TimelineSnapTargets.FrameBoundaries(Chain(0f, 0f), Sec).ShouldBeEmpty();
     }
 
-    // Set or not, a length does not make an animation of no length play; its block is drawn like an empty animation's.
-    [Theory]
-    [InlineData(null)]
-    [InlineData(2.0)]
-    public void Block_AnimationOfNoLength_PlaysNothingAndIsSelectable(double? length)
+    // Without its own Length its block is drawn like an empty animation's.
+    [Fact]
+    public void Block_AnimationOfNoLengthWithoutItsOwnLength_PlaysNothingAndIsSelectable()
     {
         var lookup = new Lookup();
-        var sequence = Sequence("S", Blocks("None", length));
+        var sequence = Sequence("S", Blocks("None"));
 
         var block = TimelineLayout.Blocks(sequence, lookup.CycleLength).ShouldHaveSingleItem();
         var viewport = new TimelineViewport();
@@ -140,10 +139,12 @@ public class ZeroLengthSequenceTests
         hit!.Value.Block.ShouldBe(block);
         hit.Value.Part.ShouldBe(TimelineHitPart.Body);
         block.IsMissing.ShouldBeFalse();
-        block.LabelSeconds.ShouldBe(0);
+        block.PlayedSeconds.ShouldBe(0);
+        block.CanResize.ShouldBeFalse();
         SequenceScene.At(sequence, 0, 0, lookup, [sequence]).ShouldBeEmpty();
         SequenceThumbnailScene.ChooseTime(sequence, lookup, [sequence]).ShouldBeNull();
-        FilmstripLayout.Cells(FilmstripLayout.FramesOf(lookup.FindChain(block.Reference)!, Sec, _ => true), false, false, block.Played, 100, 25).ShouldBeEmpty();
+        FilmstripLayout.Cells(FilmstripLayout.FramesOf(lookup.FindChain(block.Reference)!, Sec, _ => true), false, false, block.PlayedSeconds, 100, 25).ShouldBeEmpty();
+        EventMarkers.Occurrences(EventMarkers.FramesOf(lookup.FindChain(block.Reference)!, Sec), false, false, block.PlayedSeconds).ShouldBeEmpty();
     }
 
     [Fact]
@@ -161,6 +162,7 @@ public class ZeroLengthSequenceTests
     [InlineData("None", null)]
     [InlineData("None", 3600.0)]
     [InlineData("NonePingPong", 3600.0)]
+    [InlineData("Once", 3600.0)]
     [InlineData("Tiny", null)]
     [InlineData("Tiny", 3600.0)]
     [InlineData("TinyPingPong", 3600.0)]
@@ -178,7 +180,7 @@ public class ZeroLengthSequenceTests
                 List<SequenceSave> file = [leaf, middle, top];
                 foreach (var sequence in file)
                 {
-                    double total = SequenceTimeline.Length(file, sequence, r => lookup.CycleLength(r) ?? 0);
+                    double total = SequenceTimeline.Length(file, sequence, lookup.CycleLength);
                     var boundaries = PlayheadSteps.Boundaries(file, sequence, lookup.FindChain, lookup.UnitOf);
                     PlayheadSteps.Next(boundaries, 0);
                     PlayheadSteps.Previous(boundaries, total);
@@ -249,5 +251,113 @@ public class ZeroLengthSequenceTests
 
         clock.Time.ShouldBe(0);
         clock.IsPlaying.ShouldBe(loop);
+    }
+
+    // The frame a game shows for an animation of no length, held for the block's own Length.
+    [Theory]
+    [InlineData("None", 1)]
+    [InlineData("NonePingPong", 1)]
+    [InlineData("Once", 1)]
+    public void HeldBlock_ShowsTheFrameTheGameShows_ForItsOwnLength(string name, int frameShown)
+    {
+        var lookup = new Lookup();
+        var chain = lookup.FindChain(new SequenceChainReferenceSave { Chain = name })!;
+        var sequence = Sequence("S", Blocks(name, 2, start: 1));
+        List<SequenceSave> file = [sequence];
+
+        var block = TimelineLayout.Blocks(sequence, lookup.CycleLength).ShouldHaveSingleItem();
+
+        (block.Start, block.Played, block.Full, block.PlayedSeconds, block.CanResize, block.Cycles).ShouldBe((1, 2, 2, 2, true, 1));
+        SequenceTimeline.Length(file, sequence, lookup.CycleLength).ShouldBe(3);
+        SequenceScene.At(sequence, 0, 0.9, lookup, file).ShouldBeEmpty();
+        foreach (double time in new[] { 1, 1.5, 2.99 })
+            SequenceScene.At(sequence, 0, time, lookup, file).ShouldHaveSingleItem().FrameIndex.ShouldBe(frameShown);
+        SequenceScene.At(sequence, 0, 3, lookup, file).ShouldBeEmpty();
+        SequenceThumbnailScene.ChooseTime(sequence, lookup, file).ShouldBe(1);
+        PlayheadSteps.Boundaries(file, sequence, lookup.FindChain, lookup.UnitOf).ShouldBe([0, 1, 3]);
+        var cell = FilmstripLayout.Cells(FilmstripLayout.FramesOf(chain, Sec, _ => true), chain.PingPong, chain.Reverse, 2, 100, 25, chain.Loop).ShouldHaveSingleItem();
+        (cell.Frame, cell.X, cell.Width, cell.IsMerged, cell.Visits.Single().IsHold).ShouldBe((frameShown, 0, 200, false, true));
+
+        var runtime = new AnimationChain<Frame> { Name = "A", Loop = chain.Loop, PingPong = chain.PingPong, Reversed = chain.Reverse };
+        foreach (var from in chain.Frames)
+        {
+            var frame = new Frame { FrameLength = from.GetDuration(TimeMeasurementUnit.Second) };
+            frame.Events.AddRange(from.Events);
+            runtime.Add(frame);
+        }
+        var raised = new List<string>();
+        var player = new AnimationPlayer<Frame>(new AnimationChainList<Frame> { runtime });
+        player.FrameEventRaised += e => raised.Add(e.Name);
+        player.Play("A");
+        for (int i = 0; i < 100; i++) player.Update(TimeSpan.FromSeconds(0.02));
+        player.CurrentFrameIndex.ShouldBe(frameShown);
+        var marks = EventMarkers.Occurrences(EventMarkers.FramesOf(chain, Sec), chain.PingPong, chain.Reverse, 2, chain.Loop);
+        marks.Select(o => o.Name).ShouldBe(raised);
+        marks.ShouldAllBe(o => o.Time == 0);
+    }
+
+    // The next block cuts a held one, a second one is cut to a stand-in's place, and an animation without frames holds nothing.
+    [Fact]
+    public void HeldBlock_IsCutByTheNextBlock_AndAnAnimationWithoutFramesHoldsNothing()
+    {
+        var lookup = new Lookup();
+        var track = Blocks("None", 2);
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "a.achx", Chain = "NoFrames", Start = 0.5, Length = 2 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "a.achx", Chain = "Gone", Start = 1, Length = 2 });
+        var sequence = Sequence("S", track);
+
+        var blocks = TimelineLayout.Blocks(sequence, lookup.CycleLength, reference => lookup.FindChain(reference) is null);
+
+        blocks.Select(b => (b.PlayedSeconds, b.IsCut, b.IsMissing, b.CanResize)).ShouldBe([(0.5, true, false, true), (0, true, false, false), (0, false, true, false)]);
+        SequenceTimeline.Length([sequence], sequence, lookup.CycleLength).ShouldBe(1);
+        foreach (double time in new[] { 0.5, 1, 1.5 }) SequenceScene.At(sequence, 0, time, lookup, [sequence]).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void HeldBlock_InsideAClipTwoLevelsDeep_IsHeldForTheClip()
+    {
+        var lookup = new Lookup();
+        var leaf = Sequence("Leaf", Blocks("None", 1));
+        var middle = Sequence("Middle", Clip("Leaf"));
+        var top = Sequence("Top", Clip("Middle", 3));
+        List<SequenceSave> file = [leaf, middle, top];
+
+        SequenceTimeline.Length(file, top, lookup.CycleLength).ShouldBe(3);
+        foreach (double time in new[] { 0, 0.99, 1, 2.5 })
+            SequenceScene.At(top, 0, time, lookup, file).ShouldHaveSingleItem().FrameIndex.ShouldBe(1);
+        SequenceScene.At(top, 0, 3, lookup, file).ShouldBeEmpty();
+        ReferenceFilmstrip.PoseAt(new SequenceReferenceSave { Sequence = "Middle" }, middle, 0.5, lookup, file).ShouldNotBeNull();
+        TimelineReferences.For(top, file, lookup.CycleLength).ShouldHaveSingleItem().Cycles.ShouldBe(3);
+    }
+
+    [Fact]
+    public void HeldBlock_OfAContinuousTrack_HoldsTheSameFrameInEveryPass()
+    {
+        var lookup = new Lookup();
+        var sequence = Sequence("S", Blocks("None", 2, continuous: true));
+
+        foreach (int pass in new[] { 0, 1, 1000 })
+            SequenceScene.At(sequence, 0, 1, lookup, [sequence], pass).ShouldHaveSingleItem().FrameIndex.ShouldBe(1);
+    }
+
+    // The held frame's glides are where a game has them: at its start.
+    [Fact]
+    public void HeldBlock_OffsetAndShapes_AreTheHeldFramesOwn()
+    {
+        var lookup = new Lookup();
+        var chain = lookup.FindChain(new SequenceChainReferenceSave { Chain = "None" })!;
+        for (int i = 0; i < 2; i++)
+        {
+            chain.Frames[i].RelativeX = 10 + i;
+            chain.Frames[i].OffsetInterpolation = "Linear";
+            chain.Frames[i].ShapesSave = new ShapesSave();
+            chain.Frames[i].ShapesSave!.Add(new AARectSave { Name = "Hit", X = 20 + i, ScaleX = 1, ScaleY = 1, OffsetInterpolation = "Linear" });
+        }
+        var sequence = Sequence("S", Blocks("None", 2));
+
+        var sprite = SequenceScene.At(sequence, 0, 1.3, lookup, [sequence]).ShouldHaveSingleItem();
+
+        sprite.Sample().OffsetX.ShouldBe(11);
+        Keyframes.KeyframeSampler.SampleShape(chain, Sec, sprite.FrameIndex, sprite.ElapsedInFrame, (ShapeSave)chain.Frames[1].ShapesSave!.Shapes[0]).X.ShouldBe(21);
     }
 }

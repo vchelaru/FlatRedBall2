@@ -22,11 +22,14 @@ public sealed record TimelineBlock(
     /// <summary>How many cycles <see cref="Full"/> spans, for labels only; 1 when there is no cycle.</summary>
     public double Cycles => CycleLength > 0 ? Full / CycleLength : 1;
 
-    /// <summary>The seconds shown in labels: what plays, so 0 for an animation of no length, whose block is drawn a stand-in length.</summary>
-    public double LabelSeconds => CycleLength > 0 ? Played : 0;
+    /// <summary>Whether the block plays nothing and <see cref="Full"/> is only <see cref="TimelineLayout.MissingLength"/>: a missing or empty chain, or one of no length in a block without its own length.</summary>
+    public bool IsStandIn { get; init; } = IsMissing;
 
-    /// <summary>Whether dragging the right edge changes the length. A missing chain, or one with no length, draws a stand-in length, so it does not.</summary>
-    public bool CanResize => !IsMissing && CycleLength > 0;
+    /// <summary>The seconds that play: <see cref="Played"/>, or 0 for a stand-in.</summary>
+    public double PlayedSeconds => IsStandIn ? 0 : Played;
+
+    /// <summary>Whether dragging the right edge changes the length. A stand-in's length is not its own, so it does not.</summary>
+    public bool CanResize => !IsStandIn;
 }
 
 public enum TimelineHitPart { Body, Edge }
@@ -37,7 +40,7 @@ public readonly record struct TimelineHit(TimelineBlock Block, TimelineHitPart P
 public static class TimelineLayout
 {
     /// <summary>
-    /// Seconds a missing chain, or one with no length, is drawn. It never plays, so its length means nothing; the file stores none, and this
+    /// Seconds a block that plays nothing is drawn (<see cref="TimelineBlock.IsStandIn"/>). It never plays, so its length means nothing; the file stores none, and this
     /// only keeps the reference visible and grabbable.
     /// </summary>
     public const double MissingLength = 1;
@@ -111,9 +114,11 @@ public static class TimelineLayout
 
     /// <summary>
     /// Every chain on <paramref name="sequence"/>, track by track in playback order.
-    /// <paramref name="cycleLength"/> returns a reference's cycle in seconds, or null when its chain is missing.
+    /// <paramref name="cycleLength"/> returns a reference's cycle in seconds, or null when its chain is missing or has no frames;
+    /// <paramref name="isMissing"/> tells the two apart (null: every such chain is missing).
     /// </summary>
-    public static IReadOnlyList<TimelineBlock> Blocks(SequenceSave sequence, Func<SequenceChainReferenceSave, double?> cycleLength)
+    public static IReadOnlyList<TimelineBlock> Blocks(SequenceSave sequence, Func<SequenceChainReferenceSave, double?> cycleLength,
+        Func<SequenceChainReferenceSave, bool>? isMissing = null)
     {
         var blocks = new List<TimelineBlock>();
         for (int t = 0; t < sequence.Tracks.Count; t++)
@@ -124,10 +129,12 @@ public static class TimelineLayout
             {
                 var reference = ordered[i];
                 double? cycle = cycleLength(reference);
-                double full = cycle is > 0 ? SequenceTimeline.FullLength(reference.Length, cycle.Value) : MissingLength;
+                bool standIn = cycle is null || (cycle <= 0 && reference.Length is not > 0);
+                double full = standIn ? MissingLength : SequenceTimeline.ChainLength(reference.Length, cycle);
                 double? next = i + 1 < ordered.Count ? ordered[i + 1].Start : null;
                 double played = SequenceTimeline.PlayedLength(reference.Start, full, next);
-                blocks.Add(new TimelineBlock(t, track.Chains.IndexOf(reference), reference, played, full, cycle ?? 0, cycle is null));
+                blocks.Add(new TimelineBlock(t, track.Chains.IndexOf(reference), reference, played, full, cycle ?? 0,
+                    isMissing?.Invoke(reference) ?? cycle is null) { IsStandIn = standIn });
             }
         }
         return blocks;

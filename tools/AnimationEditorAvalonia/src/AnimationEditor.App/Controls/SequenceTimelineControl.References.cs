@@ -485,7 +485,7 @@ public sealed partial class SequenceTimelineControl
     private double GhostLength(string name)
     {
         if (_document is not { } document || SequenceReferences.Find(document.Save.Sequences, name) is not { } target) return TimelineLayout.MissingLength;
-        double length = SequenceTimeline.Length(document.Save.Sequences, target, reference => document.CycleLength(reference) ?? 0);
+        double length = SequenceTimeline.Length(document.Save.Sequences, target, document.CycleLength);
         return length > 0 ? length : TimelineLayout.MissingLength;
     }
 }

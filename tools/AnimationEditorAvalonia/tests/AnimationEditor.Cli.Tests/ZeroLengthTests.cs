@@ -107,4 +107,41 @@ public class ZeroLengthTests : IDisposable
         using var doc = JsonDocument.Parse(r.Out);
         doc.RootElement.GetProperty("issues").EnumerateArray().Select(i => i.GetProperty("code").GetString()).ShouldContain("zero-length-frame");
     }
+
+    // Null: the block has no length of its own, so it plays nothing.
+    [Theory(Timeout = TimeLimit)]
+    [InlineData("None", null, 0)]
+    [InlineData("None", 2.0, 2)]
+    [InlineData("NonePingPong", 2.0, 2)]
+    public async Task Sequence_BlockWithItsOwnLength_HoldsTheFrame(string chain, double? length, double end)
+    {
+        WriteChains();
+        var save = new SequenceListSave { Sources = { "zero.achx" } };
+        save.Sequences.Add(new SequenceSave { Name = "S", Tracks = { new SequenceTrackSave { Name = "B", Chains = { new SequenceChainReferenceSave { Source = "zero.achx", Chain = chain, Length = length } } } } });
+        var path = _w.PathOf("held.seqj");
+        save.Save(path);
+
+        var at = await _w.RunAsync("at", path, "--time", "0,1.5");
+        var render = await _w.RunAsync("render", path, "--at", "1.5", "--out", _w.PathOf("out"));
+        var describe = await _w.RunAsync("describe", path, "--json");
+        var check = await _w.RunAsync("check", path);
+
+        at.Out.Contains($"{chain} frame {(chain == "None" ? 1 : 0)}").ShouldBe(end > 0);
+        render.Code.ShouldBe(end > 0 ? 0 : 1);
+        using var doc = JsonDocument.Parse(describe.Out);
+        doc.RootElement.GetProperty("sequences")[0].GetProperty("length").GetDouble().ShouldBe(end);
+        check.Code.ShouldBe(0, check.Out);
+    }
+
+    [Fact]
+    public async Task Check_HeldBlockCutByTheNext_Warns()
+    {
+        WriteChains();
+        var save = new SequenceListSave { Sources = { "zero.achx" } };
+        save.Sequences.Add(new SequenceSave { Name = "S", Tracks = { new SequenceTrackSave { Name = "B", Chains = { new SequenceChainReferenceSave { Source = "zero.achx", Chain = "None", Length = 2 }, new SequenceChainReferenceSave { Source = "zero.achx", Chain = "Mix", Start = 1 } } } } });
+        var path = _w.PathOf("cut.seqj");
+        save.Save(path);
+
+        (await _w.RunAsync("check", path)).Out.ShouldContain("cut short: it plays 1 of 2 seconds");
+    }
 }

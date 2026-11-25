@@ -39,14 +39,14 @@ public static class PlayheadSteps
         Func<SequenceChainReferenceSave, AnimationChainSave?> chainOf, Func<SequenceChainReferenceSave, FrameLengthUnit> unitOf, List<SequenceSave> stack)
     {
         double? CycleLength(SequenceChainReferenceSave reference) =>
-            chainOf(reference) is { } chain ? ChainClock.TotalLength(chain, unitOf(reference)) : null;
-        double LengthOf(SequenceSave s) => SequenceTimeline.Length(file, s, reference => CycleLength(reference) ?? 0);
+            ChainClock.CycleLength(chainOf(reference), unitOf(reference));
+        double LengthOf(SequenceSave s) => SequenceTimeline.Length(file, s, CycleLength);
 
         double length = LengthOf(sequence);
         var times = new List<double> { 0, length };
         foreach (var block in TimelineLayout.Blocks(sequence, CycleLength))
         {
-            if (block.IsMissing || block.CycleLength <= 0) continue;
+            if (block.IsStandIn) continue;
             if (!sequence.Tracks[block.Track].Visible || chainOf(block.Reference) is not { } chain) continue;
             AddCycles(times, block.Start, block.Played, block.CycleLength, chain.Loop,
                 TimelineSnapTargets.FrameBoundaries(chain, unitOf(block.Reference)));
@@ -83,6 +83,7 @@ public static class PlayheadSteps
         double end = start + played;
         times.Add(start);
         times.Add(end);
+        if (cycleLength <= 0) return; // a held frame
         int cycles = loop ? (int)Math.Ceiling(played / cycleLength) : 1;
         int added = 0;
         for (int cycle = 0; cycle < cycles && added < MaxBoundariesPerChain; cycle++)

@@ -73,7 +73,7 @@ public class ZeroLengthScenarioTests
         editor.ClickAt(point);
 
         timeline.Selection.ShouldBe(new TimelineChainId(0, 0));
-        BlockLabel.Tooltip("Walk", timeline.Blocks[0].Cycles, timeline.Blocks[0].LabelSeconds).ShouldBe("Walk ×1 (0 s)");
+        BlockLabel.Tooltip("Walk", timeline.Blocks[0].Cycles, timeline.Blocks[0].PlayedSeconds).ShouldBe("Walk ×1 (0 s)");
         editor.ThrowIfErrorShown();
     }
 
@@ -125,6 +125,30 @@ public class ZeroLengthScenarioTests
         }
 
         Timeline(editor).Playhead.ShouldBe(0);
+        editor.ThrowIfErrorShown();
+    }
+
+    [AvaloniaFact]
+    public async Task BlockWithItsOwnLengthOfAnAnimationOfNoLength_HoldsItsFrame_AndItsEdgeResizesIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        WriteHero(editor, 0f);
+        string path = WriteSeqj(editor);
+        var save = SequenceListSave.FromFile(path);
+        save.Sequences[0].Tracks[0].Chains[0].Length = 2;
+        save.Save(path);
+        await editor.OpenAsync(path);
+        var timeline = Timeline(editor);
+        var sprite = editor.Control<PreviewControl>("SequencePreview").Composite!.Single(s => s.Chain.Name == "Walk");
+        sprite.FrameIndex.ShouldBe(1);
+        timeline.FilmstripCells(timeline.Blocks[0]).ShouldHaveSingleItem().Frame.ShouldBe(1);
+        double y = timeline.Viewport.LaneTop(0) + TimelineLayout.FilmTop + 5;
+
+        editor.Drag(editor.PointIn(timeline, timeline.Viewport.XAt(2) - 2, y), editor.PointIn(timeline, timeline.Viewport.XAt(3) - 2, y));
+
+        SequenceListSave.FromFile(path).Sequences[0].Tracks[0].Chains[0].Length!.Value.ShouldBe(3, 0.05);
+        timeline.Blocks[0].PlayedSeconds.ShouldBe(3, 0.05);
         editor.ThrowIfErrorShown();
     }
 }

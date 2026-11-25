@@ -24,6 +24,13 @@ public static class ChainClock
     }
 
     /// <summary>
+    /// <see cref="TotalLength"/> as <see cref="SequenceTimeline"/> takes it: null for a chain that is missing or has no frames,
+    /// which never plays, and 0 for one whose frames are all skipped.
+    /// </summary>
+    public static double? CycleLength(AnimationChainSave? chain, FrameLengthUnit unit) =>
+        chain is { Frames.Count: > 0 } ? TotalLength(chain, unit) : null;
+
+    /// <summary>
     /// The frame showing <paramref name="time"/> seconds after the chain starts, and the forward seconds into
     /// that frame to sample it at. A looping chain wraps; a non-looping chain holds its end.
     /// The chain must have at least one frame.
