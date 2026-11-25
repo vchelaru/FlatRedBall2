@@ -79,13 +79,7 @@ internal sealed class MoveFramesCommand : IUndoableCommand
         if (_frames.Count == 0) return false;
         _before = _chains.Select(c => c.Frames.ToArray()).ToArray();
 
-        // Removing the block from the target shifts the insert position left by however many of its frames sat ahead of it.
-        int insertAt = _insertIndex - _targetChain.Frames.Take(_insertIndex).Count(_frames.Contains);
-        foreach (var chain in _chains)
-            chain.Frames.RemoveAll(_frames.Contains);
-
-        insertAt = Math.Clamp(insertAt, 0, _targetChain.Frames.Count);
-        _targetChain.Frames.InsertRange(insertAt, _frames);
+        Arrange(_frames, _chains, _targetChain, _insertIndex);
 
         if (_chains.Zip(_before).All(x => x.First.Frames.SequenceEqual(x.Second)))
             return false; // the frames already were there — no undo entry
@@ -93,6 +87,18 @@ internal sealed class MoveFramesCommand : IUndoableCommand
         RaiseSideEffects();
         SelectMoved();
         return true;
+    }
+
+    internal static void Arrange(
+        IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<AnimationChainSave> chains, AnimationChainSave targetChain, int insertIndex)
+    {
+        // Removing the block from the target shifts the insert position left by however many of its frames sat ahead of it.
+        int insertAt = insertIndex - targetChain.Frames.Take(insertIndex).Count(frames.Contains);
+        foreach (var chain in chains)
+            chain.Frames.RemoveAll(frames.Contains);
+
+        insertAt = Math.Clamp(insertAt, 0, targetChain.Frames.Count);
+        targetChain.Frames.InsertRange(insertAt, frames);
     }
 
     public void Undo()
@@ -105,7 +111,7 @@ internal sealed class MoveFramesCommand : IUndoableCommand
 
     public void Redo() => Do();
 
-    private static void RestoreOrder(AnimationChainSave chain, AnimationFrameSave[] order)
+    internal static void RestoreOrder(AnimationChainSave chain, AnimationFrameSave[] order)
     {
         chain.Frames.Clear();
         foreach (var frame in order)

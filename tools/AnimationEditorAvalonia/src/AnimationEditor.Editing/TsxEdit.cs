@@ -34,6 +34,11 @@ public static class TsxEdit
     public static EditResult? CheckFrameSize(IProjectManager projectManager, AnimationChainSave chain, FrameRegion added) =>
         TsxFrameSize.Refusal(projectManager, chain, [added]) is { } reason ? Fail(EditErrorCode.NotSupportedInTsx, reason) : null;
 
+    /// <summary>The refusal when moving <paramref name="frames"/> into <paramref name="target"/> is an edit an open .tsx could not store.</summary>
+    public static EditResult? CheckFrameMove(
+        IProjectManager projectManager, AnimationChainSave target, IReadOnlyList<AnimationFrameSave> frames, int insertIndex) =>
+        TsxFrameMove.Refusal(projectManager, target, frames, insertIndex) is { } reason ? Fail(EditErrorCode.NotSupportedInTsx, reason) : null;
+
     /// <summary>
     /// Moves a native-.tsx chain's animation to <paramref name="tileId"/>. Fails with
     /// <see cref="EditErrorCode.InvalidValue"/> (the project's own reason) for a tile past the tileset or owned by
