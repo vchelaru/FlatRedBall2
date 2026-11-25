@@ -101,4 +101,33 @@ public class HotReloadMergeTests
 
         (player.IsLooping, player.IsReversed).ShouldBe((true, true));
     }
+
+    [Fact]
+    public void AnimationFinished_NonLoopingChainWithNoLength_IsRaised()
+    {
+        var list = new AnimationChainList<Frame> { new AnimationChain<Frame> { Name = "Hit", Loop = false } };
+        list[0].Add(new Frame());
+        var player = new AnimationPlayer<Frame>(list);
+        int finished = 0;
+        player.AnimationFinished += () => finished++;
+
+        player.Play("Hit");
+        player.Update(TimeSpan.FromSeconds(1));
+
+        finished.ShouldBe(1);
+    }
+
+    [Fact]
+    public void AnimationFinished_NonLoopingChainWithNoFrames_IsRaised()
+    {
+        var list = new AnimationChainList<Frame> { new AnimationChain<Frame> { Name = "Hit", Loop = false } };
+        var player = new AnimationPlayer<Frame>(list);
+        int finished = 0;
+        player.AnimationFinished += () => finished++;
+
+        player.Play("Hit");
+        player.Update(TimeSpan.FromSeconds(1));
+
+        finished.ShouldBe(1);
+    }
 }

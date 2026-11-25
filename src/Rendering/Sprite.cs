@@ -419,7 +419,7 @@ public class Sprite : IRenderable, IAttachable
     /// </summary>
     public AnimationFrame? CurrentFrame { get; private set; }
 
-    /// <summary>Fired when a non-looping animation reaches the end of its cycle (see <see cref="IsPingPong"/>).</summary>
+    /// <summary>Fired when a non-looping animation reaches the end of its cycle (see <see cref="IsPingPong"/>). One with no length reaches it on its first update.</summary>
     public event Action? AnimationFinished;
 
     /// <summary>
@@ -560,13 +560,11 @@ public class Sprite : IRenderable, IAttachable
         if (!Animate || _currentChainIndex < 0 || _animationChains == null) return;
 
         var chain = _animationChains[_currentChainIndex];
-        if (chain.Count == 0) return;
-
         _timeIntoAnimation += deltaSeconds * AnimationSpeed;
 
         // Convert TimeSpan totals to seconds once at the boundary; per-frame math stays in double.
         double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
-        if (totalLength <= 0) return;
+        if (totalLength <= 0 && IsLooping) return;
 
         int previousFrameIndex = _currentFrameIndex;
         int previousVisitIndex = _currentVisitIndex;

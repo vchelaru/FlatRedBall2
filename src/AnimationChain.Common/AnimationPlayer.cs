@@ -151,7 +151,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// <summary>Multiplier applied to frame time. 2.0 plays twice as fast; 0.5 plays half-speed.</summary>
     public float AnimationSpeed { get; set; } = 1f;
 
-    /// <summary>Raised once when a non-looping animation reaches the end of its cycle.</summary>
+    /// <summary>Raised once when a non-looping animation reaches the end of its cycle. One with no length reaches it on its first update.</summary>
     public event Action? AnimationFinished;
 
     /// <summary>
@@ -247,12 +247,10 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         if (!Animate || _currentChainIndex < 0) return;
 
         var chain = _chains[_currentChainIndex];
-        if (chain.Count == 0) return;
-
         _timeIntoAnimation += elapsed.TotalSeconds * AnimationSpeed;
 
         double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
-        if (totalLength <= 0) return;
+        if (totalLength <= 0 && IsLooping) return;
 
         int previousVisitIndex = _currentVisitIndex;
         int wraps = 0;
