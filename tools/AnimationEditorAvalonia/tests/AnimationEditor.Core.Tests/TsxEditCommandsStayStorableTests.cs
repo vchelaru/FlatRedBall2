@@ -73,7 +73,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
     {
         var acls = ctx.ProjectManager.AnimationChainListSave!;
         var found = acls.AnimationChains
-            .SelectMany(c => TsxLossyDataCheck.DroppedKinds(c, acls.TimeMeasurementUnit)).ToList();
+            .SelectMany(c => TsxLossyDataCheck.DroppedKinds(c, acls.TimeMeasurementUnit)).Select(k => k.ToString()).ToList();
         found.AddRange(acls.AnimationChains.SelectMany(c => c.Frames)
             .Where(f => f.TextureName != "Heroes.png").Select(f => $"texture '{f.TextureName}'"));
         return found;
