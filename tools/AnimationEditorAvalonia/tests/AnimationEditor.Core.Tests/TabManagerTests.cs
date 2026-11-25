@@ -553,18 +553,6 @@ public class TabManagerTests
     }
 
     [Fact]
-    public void RegisterBackground_RaisesTabsChanged()
-    {
-        var tm = new TabManager();
-        bool raised = false;
-        tm.TabsChanged += () => raised = true;
-
-        tm.RegisterBackground(P(@"C:\Games\existing.achx"));
-
-        Assert.True(raised);
-    }
-
-    [Fact]
     public void Rename_RaisesTabsChanged()
     {
         var tm = new TabManager();
@@ -587,90 +575,6 @@ public class TabManagerTests
         tm.RestoreFrom(new List<string> { @"C:\a.achx" }, activePath: null);
 
         Assert.True(raised);
-    }
-
-    // ── RegisterBackground ────────────────────────────────────────────────────
-
-    [Fact]
-    public void RegisterBackground_AddsTabAtPositionZero()
-    {
-        var tm = new TabManager();
-
-        tm.RegisterBackground(P(@"C:\Games\existing.achx"));
-
-        Assert.Single(tm.Tabs);
-        Assert.Equal(P(@"C:\Games\existing.achx"), tm.Tabs[0].Path);
-    }
-
-    [Fact]
-    public void RegisterBackground_DoesNotActivateTab()
-    {
-        var tm = new TabManager();
-
-        tm.RegisterBackground(P(@"C:\Games\existing.achx"));
-
-        Assert.Null(tm.ActiveTab);
-    }
-
-    [Fact]
-    public void RegisterBackground_DoesNotRaiseActiveChanged()
-    {
-        var tm = new TabManager();
-        bool raised = false;
-        tm.ActiveChanged += _ => raised = true;
-
-        tm.RegisterBackground(P(@"C:\Games\existing.achx"));
-
-        Assert.False(raised);
-    }
-
-    [Fact]
-    public void RegisterBackground_IsNoOpIfPathAlreadyPresent()
-    {
-        var tm = new TabManager();
-        tm.OpenOrFocus(P(@"C:\Games\existing.achx"));
-
-        tm.RegisterBackground(P(@"C:\Games\existing.achx"));
-
-        Assert.Single(tm.Tabs);
-    }
-
-    [Fact]
-    public void RegisterBackground_InsertsBeforeExistingTabs()
-    {
-        var tm = new TabManager();
-        tm.OpenOrFocus(P(@"C:\Games\second.achx"));
-
-        tm.RegisterBackground(P(@"C:\Games\first.achx"));
-
-        Assert.Equal(2, tm.Tabs.Count);
-        Assert.Equal(P(@"C:\Games\first.achx"), tm.Tabs[0].Path);
-        Assert.Equal(P(@"C:\Games\second.achx"), tm.Tabs[1].Path);
-    }
-
-    [Fact]
-    public void RegisterBackground_AfterRegister_OpenOrFocusActivatesNewFileButKeepsBoth()
-    {
-        var tm = new TabManager();
-        tm.RegisterBackground(P(@"C:\Games\existing.achx"));
-
-        tm.OpenOrFocus(P(@"C:\Games\new.achx"));
-
-        Assert.Equal(2, tm.Tabs.Count);
-        Assert.Equal(P(@"C:\Games\existing.achx"), tm.Tabs[0].Path);
-        Assert.Equal(P(@"C:\Games\new.achx"), tm.Tabs[1].Path);
-        Assert.Equal(P(@"C:\Games\new.achx"), tm.ActiveTab!.Path);
-    }
-
-    [Fact]
-    public void RegisterBackground_WithDisplayNameOverride_UsesOverrideInDisplayName()
-    {
-        var tm = new TabManager();
-
-        tm.RegisterBackground(P(@"C:\Games\existing.achx"), "My Custom Label");
-
-        Assert.Single(tm.Tabs);
-        Assert.Equal("My Custom Label", tm.Tabs[0].DisplayName);
     }
 
     // ── TabEntry.Kind (issue #604) ────────────────────────────────────────────
@@ -748,7 +652,7 @@ public class TabManagerTests
     [Fact]
     public void TabEntry_DisplayName_ReturnsUntitledWhenPathOriginalIsNullOrEmpty()
     {
-        // Construct via RegisterBackground with an empty-original FilePath sentinel.
+        // An empty-original FilePath sentinel.
         var entry = new TabEntry(new FilePath(null!));
 
         Assert.Equal("Untitled", entry.DisplayName);

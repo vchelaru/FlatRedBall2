@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,11 +8,11 @@ public static class NameGenerator
 {
     /// <summary>
     /// <paramref name="baseName"/> when free, else the first free "<paramref name="baseName"/> 2", "... 3", and so on.
-    /// Free ignores case, and a gap left by a deletion is filled.
+    /// A name differing only by case is free, as for .achx chain names, and a gap left by a deletion is filled.
     /// </summary>
     public static string Unique(IEnumerable<string> usedNames, string baseName)
     {
-        var used = usedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var used = usedNames.ToHashSet();
         return used.Contains(baseName) ? Numbered(used, baseName) : baseName;
     }
 
@@ -23,7 +22,7 @@ public static class NameGenerator
     /// </summary>
     public static string ForCopy(IEnumerable<string> usedNames, string name)
     {
-        var used = usedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var used = usedNames.ToHashSet();
         return used.Contains(name) ? Numbered(used, WithoutNumber(name)) : name;
     }
 

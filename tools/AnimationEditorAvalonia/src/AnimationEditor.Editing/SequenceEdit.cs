@@ -85,7 +85,8 @@ public static class SequenceEdit
 
     /// <summary>
     /// Inserts a deep copy of a sequence right after it, tracks, blocks and reference tracks included. A null name picks the
-    /// next free numbered one ("Run 2"); a given name must be unused. Reference tracks keep their targets.
+    /// next free numbered one ("Run 2"); a given name must be unused. Reference tracks keep
+    /// their targets, so a name one of them plays is refused.
     /// </summary>
     public static EditResult DuplicateSequence(SequenceDocument doc, IUndoManager undo, string sequence, string? name)
     {
@@ -100,7 +101,7 @@ public static class SequenceEdit
 
         undo.SealCoalescing();
         var made = doc.DuplicateSequences(undo, [at.Value!.Sequence], name is null ? null : [name]);
-        return Ok(made[0]);
+        return made.Errors.Count > 0 ? Fail(EditErrorCode.WouldCycle, made.Errors[0]) : Ok(made.Names[0]);
     }
 
     // ---- tracks ----

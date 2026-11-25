@@ -1805,7 +1805,15 @@ public class WireframeControl : TextureViewport
     /// </summary>
     private void OnTopLevelKeyDownForDragCancel(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape) return;
+        if (e.Key == Key.Escape && CancelDrag()) e.Handled = true;
+    }
+
+    /// <summary>
+    /// Ends the drag that is in progress as Escape does: nothing is created or moved, no undo entry is recorded, and the
+    /// release that follows does nothing. False when there is none.
+    /// </summary>
+    public bool CancelDrag()
+    {
         if (_addFrameDragAnchor is not null)
         {
             _addFrameDragAnchor = null;
@@ -1814,13 +1822,11 @@ public class WireframeControl : TextureViewport
             // Anchor is cleared first, so the capture-lost this raises cannot commit the add.
             pointer?.Capture(null);
             SetAddFrameGhost(null);
-            e.Handled = true;
+            return true;
         }
-        else if (IsDragging)
-        {
-            CancelActiveDrag();
-            e.Handled = true;
-        }
+        if (!IsDragging) return false;
+        CancelActiveDrag();
+        return true;
     }
 
     /// <summary>

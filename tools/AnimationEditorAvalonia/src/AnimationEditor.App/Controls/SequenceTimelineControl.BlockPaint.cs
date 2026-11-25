@@ -23,9 +23,8 @@ public sealed partial class SequenceTimelineControl
             return null;
 
         var marks = new List<double>();
-        if (block.CycleLength > 0)
-            for (int k = 1; k * block.CycleLength < block.Played - 1e-9; k++)
-                marks.Add(Snap(left + k * block.CycleLength * pps));
+        foreach (int k in TimelineCulling.VisibleCycles(Viewport, block.Start, block.Played, block.CycleLength, Bounds.Width))
+            if (k > 0) marks.Add(Snap(left + k * block.CycleLength * pps));
         return new BlockPaint(body, BlockCornerRadius, fill, film, background, outline, 1,
             mark, marks.ToArray(), film.Top, body.Bottom - 2);
     }

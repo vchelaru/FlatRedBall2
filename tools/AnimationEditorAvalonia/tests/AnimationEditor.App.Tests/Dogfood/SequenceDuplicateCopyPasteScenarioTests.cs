@@ -381,4 +381,21 @@ public class SequenceDuplicateCopyPasteScenarioTests
         editor.Control<MenuItem>("MenuCopy").IsEnabled.ShouldBeFalse();
         editor.Control<MenuItem>("MenuPaste").IsEnabled.ShouldBeFalse();
     }
+
+    [AvaloniaFact]
+    public async Task DuplicateSequence_CopyWouldPlayItself_SaysWhy()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string boss = editor.WriteSeqj("boss.seqj", "Combo");
+        var save = SequenceListSave.FromFile(boss);
+        save.Sequences[0].Tracks.Add(new SequenceTrackSave { Name = "R", References = [new SequenceReferenceSave { Sequence = "Combo 2" }] });
+        save.Save(boss);
+        await editor.OpenAsync(boss);
+
+        DuplicateFromRowMenu(editor, 0);
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Combo 2");
+        editor.SequenceNames.ShouldBe(new[] { "Combo" });
+        editor.UndoLabels.ShouldBeEmpty();
+    }
 }

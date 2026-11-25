@@ -1,5 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Tiled;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -21,8 +23,16 @@ public static class RenameEdit
         IProjectManager projectManager, IAppCommands commands, AnimationChainSave chain, string newName)
     {
         newName = newName.Trim();
+        bool NameTaken(string name) => projectManager.AnimationChainListSave?.HasOtherChainNamed(chain, name) == true;
+        EditResult Duplicate(string name) => Fail(EditErrorCode.DuplicateName, $"A chain named '{name}' already exists.");
+
         if (newName.Length == 0)
         {
+            // Two chains on the same tile, of which only one can be stored there, would get the same name.
+            if (!projectManager.IsChainNameAuto(chain) && projectManager.GetTsxOwnerTileId(chain) is { } tileId
+                && TiledAnimationToAchjMapper.SyntheticChainName(tileId) is var autoName && NameTaken(autoName))
+                return Duplicate(autoName);
+
             return commands.RenameChain(chain, newName)
                 ? Ok()
                 : Fail(EditErrorCode.EmptyName, "Chain name cannot be empty.");
@@ -31,9 +41,7 @@ public static class RenameEdit
         if (newName == chain.Name) return Ok();
         if (StorableText.Problem(newName) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
 
-        var acls = projectManager.AnimationChainListSave;
-        if (acls is not null && acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
-            return Fail(EditErrorCode.DuplicateName, $"A chain named '{newName}' already exists.");
+        if (NameTaken(newName)) return Duplicate(newName);
 
         return commands.RenameChain(chain, newName)
             ? Ok(newName)

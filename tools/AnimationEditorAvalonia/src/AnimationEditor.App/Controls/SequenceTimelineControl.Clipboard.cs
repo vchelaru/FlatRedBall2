@@ -56,7 +56,11 @@ public sealed partial class SequenceTimelineControl
         if (_model.Kind == TimelineSelectionKind.Chains)
             SelectChains(_document.DuplicateChains(_undo, _sequenceIndex, _model.Chains.ToList()).Chains);
         else if (_model.Kind == TimelineSelectionKind.Tracks)
-            SelectTracks(_document.DuplicateTracks(_undo, _sequenceIndex, _model.Tracks.ToList()).Tracks);
+        {
+            var result = _document.DuplicateTracks(_undo, _sequenceIndex, _model.Tracks.ToList());
+            if (result.Errors.Count > 0) ErrorRaised?.Invoke(string.Join(" ", result.Errors));
+            else SelectTracks(result.Tracks);
+        }
     }
 
     // The track a chains paste is anchored at: the selected header, else the track of the first selected chain (document order),

@@ -13,9 +13,9 @@ public class NameGeneratorTests
     }
 
     [Fact]
-    public void Unique_TakenName_GivesTheFirstFreeNumber_IgnoringCase()
+    public void Unique_TakenName_GivesTheFirstFreeNumber_MatchingCase()
     {
-        NameGenerator.Unique(new[] { "Idle", "idle 2", "Idle 4" }, "Idle").ShouldBe("Idle 3");
+        NameGenerator.Unique(new[] { "Idle", "idle 2", "Idle 4" }, "Idle").ShouldBe("Idle 2");
     }
 
     [Fact]

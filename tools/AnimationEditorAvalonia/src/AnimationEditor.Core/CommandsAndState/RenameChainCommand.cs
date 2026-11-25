@@ -5,9 +5,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// <summary>Renames a chain. Also marks it (via <see
     /// cref="IProjectManager.MarkChainNameExplicit"/>) as having a real name from now on, in a
     /// native-tsx project, so <see cref="IProjectManager.TrySetTsxOwnerTileId"/> never overwrites it
-    /// again -- and snapshots/restores the whole tsx state around that (same as <see
-    /// cref="SetChainTsxOwnerTileIdCommand"/>) so Undo puts the chain back in the synthetic-name set
-    /// if it started there. A <see langword="null"/> new name reverts a native-tsx chain to its
+    /// again (<see cref="UndoManager"/> undoes that). A <see langword="null"/> new name reverts a native-tsx chain to its
     /// synthetic auto name instead (<see cref="IProjectManager.MakeChainNameAuto"/>).</summary>
     internal sealed class RenameChainCommand : IUndoableCommand
     {
@@ -17,7 +15,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IProjectManager _pm;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
-        private object? _before;
+        private string? _afterName;
 
         public string Description { get; }
 
@@ -35,7 +33,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
-            _before = _pm.CaptureTsxState();
             if (_newName is null)
             {
                 if (!_pm.MakeChainNameAuto(_chain))
@@ -46,15 +43,25 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 _chain.Name = _newName;
                 _pm.MarkChainNameExplicit(_chain);
             }
-            _commands.RefreshTreeNode(_chain);
-            _events.RaiseAnimationChainsChanged();
+            _afterName = _chain.Name;
+            RaiseSideEffects();
             return true;
         }
 
         public void Undo()
         {
             _chain.Name = _oldName;
-            _pm.RestoreTsxState(_before);
+            RaiseSideEffects();
+        }
+
+        public void Redo()
+        {
+            _chain.Name = _afterName!;
+            RaiseSideEffects();
+        }
+
+        private void RaiseSideEffects()
+        {
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
         }

@@ -225,6 +225,22 @@ public partial class FlankerNumericField : UserControl
         ValueBox.Text = Format(Value);
     }
 
+    /// <summary>Whether the box holds text that was typed but not committed.</summary>
+    public bool HasTypedText => (ValueBox.Text ?? string.Empty) != Format(Value);
+
+    /// <summary>The text in the box, committed or not.</summary>
+    public string TypedText => ValueBox.Text ?? string.Empty;
+
+    /// <summary>Puts the box back to <see cref="Value"/>, dropping text that was typed but not committed.</summary>
+    public void DiscardTypedText() => ValueBox.Text = Format(Value);
+
+    /// <summary>Commits <paramref name="text"/> as if it had been typed and Enter pressed.</summary>
+    public void CommitText(string text)
+    {
+        ValueBox.Text = text;
+        Commit();
+    }
+
     private string Format(decimal? value) =>
         value?.ToString(FormatString, CultureInfo.InvariantCulture) ?? string.Empty;
 }

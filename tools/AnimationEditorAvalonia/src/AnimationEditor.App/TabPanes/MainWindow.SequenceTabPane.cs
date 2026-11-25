@@ -122,8 +122,7 @@ public partial class MainWindow
         public void StepPlayhead(int direction)
         {
             if (_document is not { } document || CurrentSequence is not { } sequence) return;
-            var blocks = TimelineLayout.Blocks(sequence, document.CycleLength);
-            var steps = PlayheadSteps.Boundaries(sequence, blocks, document.FindChain, document.UnitOf, _window.SequenceTimeline.SequenceLength);
+            var steps = PlayheadSteps.Boundaries(document.Save.Sequences, sequence, document.FindChain, document.UnitOf);
             double now = _window.SequenceTimeline.Playhead;
             SeekPrimary(direction > 0 ? PlayheadSteps.Next(steps, now) : PlayheadSteps.Previous(steps, now));
         }
@@ -335,8 +334,8 @@ public partial class MainWindow
 
         public void CaptureLeaving(TabEntry tab)
         {
-            // Before the snapshot, so the rename is in this tab's history.
-            CommitPendingRename();
+            // Before the snapshot, so the rename is in this tab's history, and a held drag cannot add to it once another tab's is shown.
+            SettlePendingInput();
             tab.UndoSnapshot = _window._undoManager.TakeSnapshot();
         }
 
@@ -524,7 +523,7 @@ public partial class MainWindow
 
         public void Closing(TabEntry tab)
         {
-            CommitPendingRename();
+            SettlePendingInput();
             if (_documents.TryGetValue(tab.Path, out var document) && document == _document)
                 Detach();
             if (document is not null) _guides.Remove(document);
@@ -813,7 +812,7 @@ public partial class MainWindow
             w.SequenceList.AddHandler(InputElement.PointerPressedEvent, OnSequenceListPressedTunnel, RoutingStrategies.Tunnel);
             w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
             _listDrag = new Controls.SequenceListDragController(w.SequenceList, () => _document?.SelectedIndices ?? Array.Empty<int>(),
-                CommitPendingRename, MoveSequences, w.ShowDropLine, w.RemoveDropLine,
+                SettlePendingInput, MoveSequences, w.ShowDropLine, w.RemoveDropLine,
                 point => w.SequenceList.TranslatePoint(point, w.DragOverlayCanvas),
                 SequenceDragOverTimeline, DropSequencesOnTimeline, () => w.SequenceTimeline.UpdateSequenceDrag(null, null));
             w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
@@ -837,11 +836,11 @@ public partial class MainWindow
             w.SequenceTimeline.ErrorRaised +=message => w.ShowProblem(message);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
-            w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceTimeline.GoToDefinitionRequested += reference => _ = _window.RunGuardedAsync(() => GoToDefinitionAsync(reference), "Go to Definition");
             w.SequenceTimeline.GoToSequenceRequested += GoToSequence;
             w.SequenceInspector.GoToSequenceRequested += GoToSequence;
             w.SequenceInspector.ErrorRaised += message => w.ShowProblem(message);
-            w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceInspector.GoToDefinitionRequested += reference => _ = _window.RunGuardedAsync(() => GoToDefinitionAsync(reference), "Go to Definition");
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
             {
                 w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e), e.KeyModifiers.HasFlag(KeyModifiers.Alt));
@@ -872,16 +871,16 @@ public partial class MainWindow
                 LoadThumbnails();
             };
             w.SequenceLibrary.FilesDropped += AddSources;
-            w.SequenceLibrary.AddSourceRequested += () => _ = AddSourcesFromPickerAsync();
+            w.SequenceLibrary.AddSourceRequested += () => _ = _window.RunGuardedAsync(() => AddSourcesFromPickerAsync(), "Add Source");
             w.SequenceLibrary.AddChipRequested += AddChip;
             w.SequenceLibrary.CanAddToSelectedTrack = () => w.SequenceTimeline.CanAddToSelectedTrack;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
-            w.SequenceLibrary.ReplaceSourceRequested += source => _ = ReplaceSourceAsync(source);
+            w.SequenceLibrary.ReplaceSourceRequested += source => _ = _window.RunGuardedAsync(() => ReplaceSourceAsync(source), "Replace Source");
             w.SequenceLibrary.SourceMoveRequested += MoveSource;
             w.SequenceLibrary.ConnectDropLine(w.ShowDropLine, w.RemoveDropLine,
                 point => w.SequenceLibrary.GroupsPanel.TranslatePoint(point, w.DragOverlayCanvas));
             w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
-            w.SequenceLibrary.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceLibrary.GoToDefinitionRequested += reference => _ = _window.RunGuardedAsync(() => GoToDefinitionAsync(reference), "Go to Definition");
 
             w.MenuEnableHotReload.Click += (_, _) => _watcher.IsEnabled = w.MenuEnableHotReload.IsChecked != false;
             // The watcher's timer and folder watchers are rooted by the runtime, so they must not outlive the window.
@@ -1168,20 +1167,24 @@ public partial class MainWindow
         private bool HasPendingRename => _items.Any(item => item.IsEditing) || _window.SequenceTimeline.IsRenamingTrack;
 
         /// <summary>
-        /// Applies the name typed into any open in-place rename (a sequence row or a track header), as Enter would. This
-        /// is the one path for every way of leaving a rename that Enter and Escape are not: another tab or file, closing
-        /// the tab or the window, undo and redo, Back and Forward, a hotkey, and a press that moves no focus. A name
-        /// that fails validation shows the banner and keeps the old name, as on a click-away. Does nothing when no
-        /// rename is open.
+        /// Applies the name typed into any open in-place rename (a sequence row or a track header), as Enter would, and
+        /// cancels a timeline or guide drag that is still held, as Escape would. This is the one path for every way of leaving a
+        /// rename that Enter and Escape are not: another tab or file, closing the tab or the window, undo and redo, Back
+        /// and Forward, a hotkey, and a press that moves no focus. A name that fails validation shows the banner and
+        /// keeps the old name, as on a click-away. Does nothing when no rename or drag is open.
         /// </summary>
-        public void CommitPendingRename()
+        public void SettlePendingInput()
         {
             if (_document is not { } document) return;
+            _window.SequenceTimeline.CancelDrag();
+            _window.SequencePreview.CancelDrag();
             for (int index = 0; index < _items.Count; index++)
             {
                 if (_items[index].IsEditing) CommitListRename(document, index);
             }
             _window.SequenceTimeline.CommitRename();
+            // As CommitPendingInspectorName does for the .achx Inspector.
+            _window.SequenceInspector.CommitTypedText();
         }
 
         private void CommitListRename(SequenceDocument document, int index)
@@ -1487,7 +1490,14 @@ public partial class MainWindow
         private void DuplicateSelected()
         {
             if (_document is not { } document || document.SelectedIndices.Count == 0) return;
-            var names = document.DuplicateSequences(_window._undoManager, document.SelectedIndices);
+            var result = document.DuplicateSequences(_window._undoManager, document.SelectedIndices);
+            if (result.Errors.Count > 0)
+            {
+                _window.ShowProblem(string.Join(" ", result.Errors));
+                RefocusListSoon();
+                return;
+            }
+            var names = result.Names;
             // The copies start from their beginning.
             StopPlayback();
             // Name a lone copy right away: its name is selected, so typing replaces it and Escape keeps it. Several copies

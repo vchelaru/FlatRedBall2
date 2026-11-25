@@ -25,9 +25,14 @@ public static class SeqjChainUsageScanner
     /// <paramref name="seqjPath"/>. Returns empty (never throws) for a missing, unreadable or malformed file.
     /// </summary>
     public static IReadOnlyList<SeqjChainMatch> FindMatches(
-        string seqjPath, string animationPath, IReadOnlyCollection<string> chains)
+        string seqjPath, string animationPath, IReadOnlyCollection<string> chains) =>
+        FindMatches(seqjPath, sequences => FindMatches(sequences, seqjPath, animationPath, chains));
+
+    /// <summary>What <paramref name="find"/> returns for the file at <paramref name="seqjPath"/>, or empty (never throws) for a missing, unreadable or malformed file.</summary>
+    public static IReadOnlyList<SeqjChainMatch> FindMatches(
+        string seqjPath, Func<SequenceListSave, IReadOnlyList<SeqjChainMatch>> find)
     {
-        try { return FindMatches(SequenceListSave.FromFile(seqjPath), seqjPath, animationPath, chains); }
+        try { return find(SequenceListSave.FromFile(seqjPath)); }
         catch { return []; }
     }
 

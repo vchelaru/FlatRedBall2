@@ -890,6 +890,11 @@ namespace AnimationEditor.Core.CommandsAndState
                 SaveAsRefused?.Invoke(SaveTarget.OpenInAnotherTabMessage(path));
                 return false;
             }
+            if (_pm.IsNativeTsxProject && TiledSyncAssociationScanner.FindAssociationsTargeting(path) is [var owner, ..])
+            {
+                SaveAsRefused?.Invoke(SaveTarget.AssociatedTilesetMessage(path, owner));
+                return false;
+            }
 
             bool toAnotherFile = string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path);
             if (!SaveOpenDocument(path, toAnotherFile)) return false;
@@ -913,7 +918,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Show a file picker and export the current animation chain list in <paramref name="format"/>.
         /// Does nothing if there is no project or the user cancels, and refuses another type's extension
         /// (<see cref="SaveTarget.IsAnotherType"/>) through <see cref="SaveAsRefused"/>. Copies the referenced textures
-        /// next to the export and fires <see cref="ExportCompleted"/> with the path and any
+        /// next to the export, asking before one replaces a different image, and fires <see cref="ExportCompleted"/> with the path and any
         /// non-fatal warnings (data the format can't carry, textures that couldn't be copied).
         /// </summary>
         public async Task ExportAsync(Export.ExportFormat format)
@@ -931,7 +936,6 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             var result = format.Export(acls, _pm.GetTextureSizeInPixels);
-            System.IO.File.WriteAllText(path, result.Text);
 
             // Every format references textures relative to the exported file, so when exporting
             // elsewhere the textures must travel with it. Copy each relative texture (preserving
@@ -940,7 +944,9 @@ namespace AnimationEditor.Core.CommandsAndState
             var sourceDir = string.IsNullOrEmpty(_pm.FileName)
                 ? string.Empty
                 : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
-            var copyWarnings = CopyReferencedTextures(result.ReferencedTextures, sourceDir, exportDir);
+            // The export is written last, so one that names textures it could not bring along is never left behind.
+            var copyWarnings = await CopyReferencedTexturesAsync(result.ReferencedTextures, sourceDir, exportDir);
+            System.IO.File.WriteAllText(path, result.Text);
 
             ExportCompleted?.Invoke(path, result.Warnings.Concat(copyWarnings).ToList());
         }
@@ -949,10 +955,11 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Copies each relative texture in <paramref name="textureNames"/> from
         /// <paramref name="sourceDir"/> to <paramref name="exportDir"/>, preserving any
         /// subdirectory. No-op when the directories are the same or the source is unknown
-        /// (unsaved project). Rooted (absolute) texture names are left in place. Returns a
-        /// warning per texture that could not be found at the source.
+        /// (unsaved project). Rooted (absolute) texture names are left in place. Asks once before
+        /// replacing different images; on No they stay. Returns a warning per texture that could
+        /// not be found at the source, and throws when one cannot be copied.
         /// </summary>
-        private static IReadOnlyList<string> CopyReferencedTextures(
+        private async Task<IReadOnlyList<string>> CopyReferencedTexturesAsync(
             IReadOnlyList<string> textureNames, string sourceDir, string exportDir)
         {
             var warnings = new List<string>();
@@ -963,6 +970,7 @@ namespace AnimationEditor.Core.CommandsAndState
                               StringComparison.OrdinalIgnoreCase))
                 return warnings;
 
+            var plans = new List<IO.TextureCopyPlan>();
             foreach (var name in textureNames)
             {
                 if (string.IsNullOrEmpty(name) || System.IO.Path.IsPathRooted(name)) continue;
@@ -974,14 +982,30 @@ namespace AnimationEditor.Core.CommandsAndState
                     continue;
                 }
 
-                var dest = System.IO.Path.Combine(exportDir, name);
-                var destDir = System.IO.Path.GetDirectoryName(dest);
-                if (!string.IsNullOrEmpty(destDir)) System.IO.Directory.CreateDirectory(destDir);
-                System.IO.File.Copy(src, dest, overwrite: true);
+                var dest = System.IO.Path.GetFullPath(System.IO.Path.Combine(exportDir, name));
+                plans.Add(IO.TextureCopyDecider.PlanCopy(src, System.IO.Path.GetDirectoryName(dest)!));
+            }
+
+            var different = plans.Where(plan => plan.Conflict == IO.TextureCopyConflict.DifferentFileExists).ToList();
+            bool overwrite = different.Count == 0 || await ConfirmAsync(
+                $"The export would overwrite {(different.Count == 1 ? "a different image" : $"{different.Count} different images")}: " +
+                $"{string.Join(", ", different.Take(MaxListedOverwrites).Select(plan => plan.DestinationPath))}" +
+                (different.Count > MaxListedOverwrites ? $" and {different.Count - MaxListedOverwrites} more" : "") +
+                $". Overwrite {(different.Count == 1 ? "it? (No exports without copying it.)" : "them? (No exports without copying them.)")}",
+                "Overwrite Texture");
+
+            foreach (var plan in plans)
+            {
+                if (plan.Conflict == IO.TextureCopyConflict.IdenticalFileExists) continue;
+                if (plan.Conflict == IO.TextureCopyConflict.DifferentFileExists && !overwrite) continue;
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(plan.DestinationPath)!);
+                IO.TextureCopyDecider.Apply(plan, IO.TextureCopyChoice.Overwrite);
             }
 
             return warnings;
         }
+
+        private const int MaxListedOverwrites = 5;
 
         public void DeleteAnimationChains(List<AnimationChainSave> animationChains)
         {
@@ -1309,19 +1333,17 @@ namespace AnimationEditor.Core.CommandsAndState
         public bool RenameChain(AnimationChainSave chain, string newName)
         {
             newName = newName.Trim();
+            bool NameTaken(string name) => _pm.AnimationChainListSave?.HasOtherChainNamed(chain, name) == true;
+
             if (newName.Length == 0)
             {
                 if (_pm.IsChainNameAuto(chain)) return true;
-                if (_pm.GetTsxOwnerTileId(chain) is null) return false;
+                if (_pm.GetTsxOwnerTileId(chain) is not { } tileId || NameTaken(TiledAnimationToAchjMapper.SyntheticChainName(tileId))) return false;
                 Rename(null);
                 return true;
             }
             if (chain.Name == newName) return true;
-
-            var acls = _pm.AnimationChainListSave;
-            if (acls is not null &&
-                acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
-                return false;
+            if (NameTaken(newName)) return false;
 
             Rename(newName);
             return true;
@@ -2992,6 +3014,40 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? $"Cut {ShapeUndoLabel.Format(sourcesToRemove.Count > 0 ? sourcesToRemove[0] : clones[0])}"
                 : $"Cut {clones.Count} Shapes";
             _undoManager.Execute(new CompositeCommand(cmds, desc));
+        }
+
+        /// <inheritdoc cref="IAppCommands.CutFromBackgroundTab"/>
+        public bool CutFromBackgroundTab(TabEntry tab, IPendingCutState cut)
+        {
+            var acls = tab.CachedEditorModel!;
+            var deletes = new List<IDeleteCommand>();
+            string desc;
+            switch (cut.Kind)
+            {
+                case CopySelectionKind.Chain:
+                    deletes.Add(new DeleteChainsCommand(cut.Chains, acls, this, _events, _selectedState));
+                    desc = cut.Chains.Count == 1 ? $"Cut Animation '{cut.Chains[0].Name}'" : $"Cut {cut.Chains.Count} Animations";
+                    break;
+
+                case CopySelectionKind.Frame:
+                    var frames = cut.Frames.Select(f => (Frame: f, Chain: PendingCutState.ChainContaining(acls, f)!)).ToList();
+                    foreach (var group in frames.Where(x => !IsChainLocked(x.Chain)).GroupBy(x => x.Chain))
+                        deletes.Add(new DeleteFramesCommand(group.Select(x => x.Frame).ToList(), group.Key, this, _events, _selectedState));
+                    desc = frames.Count == 1 ? $"Cut Frame in '{frames[0].Chain.Name}'" : $"Cut {frames.Count} Frames";
+                    break;
+
+                default:
+                    foreach (var shape in cut.Shapes.OfType<ShapeSave>())
+                        if (PendingCutState.FrameContaining(acls, shape) is { } frame && !IsChainLocked(PendingCutState.ChainContaining(acls, frame)!))
+                            deletes.Add(new DeleteShapeCommand(shape, frame, this, _events, _selectedState));
+                    desc = cut.Shapes.Count == 1 ? $"Cut {ShapeUndoLabel.Format(cut.Shapes[0])}" : $"Cut {cut.Shapes.Count} Shapes";
+                    break;
+            }
+            if (CompositeCommand.Removed(deletes, desc) is not { } command) return false;
+
+            tab.UndoSnapshot = new UndoSnapshot(
+                [.. tab.UndoSnapshot?.UndoStack ?? [], new UndoEntry(command, tab.CachedTsxState)], []);
+            return true;
         }
 
         private List<object> BuildShapeClones(AnimationFrameSave frame, IReadOnlyList<object> shapes)

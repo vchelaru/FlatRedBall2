@@ -19,7 +19,7 @@ public enum CutCompletion
 
     /// <summary>
     /// The cut's sources are in a different, still-open document (a cross-tab cut, #1026) --
-    /// paste into the active document, then remove the sources from the other document directly.
+    /// paste into the active document, then remove the sources from the other document.
     /// </summary>
     CrossDocument,
 
@@ -62,16 +62,6 @@ public interface IPendingCutState
 
     /// <summary>True when every pending-cut source still lives in <paramref name="acls"/>.</summary>
     bool SourcesBelongToProject(AnimationChainListSave? acls);
-
-    /// <summary>
-    /// Directly removes the pending cut's source chains/frames/shapes from <paramref name="acls"/>,
-    /// bypassing the undo manager entirely (#1026). Use only when <paramref name="acls"/> is a
-    /// document other than the currently active one -- the undo stack only ever tracks the active
-    /// document, so a cross-document delete can never be made undoable the normal way.
-    /// Frames and shapes in a locked chain stay, as in a same-document cut.
-    /// </summary>
-    /// <returns>False when nothing was removed.</returns>
-    bool RemoveSourcesFrom(AnimationChainListSave acls);
 
     /// <summary>
     /// Classifies how a paste against <paramref name="activeAcls"/> should treat this pending cut.
@@ -140,38 +130,6 @@ public sealed class PendingCutState : IPendingCutState
         };
     }
 
-    public bool RemoveSourcesFrom(AnimationChainListSave acls)
-    {
-        if (_payload is null) return false;
-        switch (_payload.Kind)
-        {
-            case CopySelectionKind.Chain:
-                return acls.AnimationChains.RemoveAll(_payload.Chains.Contains) > 0;
-
-            case CopySelectionKind.Frame:
-                bool removedAnyFrame = false;
-                foreach (var frame in _payload.Frames)
-                {
-                    if (ChainContaining(acls, frame) is { IsLocked: false } chain && chain.Frames.Remove(frame))
-                        removedAnyFrame = true;
-                }
-                return removedAnyFrame;
-
-            case CopySelectionKind.Shape:
-                bool removedAnyShape = false;
-                foreach (var shape in _payload.Shapes)
-                {
-                    if (FrameContaining(acls, shape) is { ShapesSave: { } shapes } frame &&
-                        ChainContaining(acls, frame)?.IsLocked != true && shapes.Remove(shape))
-                        removedAnyShape = true;
-                }
-                return removedAnyShape;
-
-            default:
-                return false;
-        }
-    }
-
     public CutCompletion ResolveCompletion(AnimationChainListSave? activeAcls)
     {
         if (_payload is null) return CutCompletion.None;
@@ -181,10 +139,10 @@ public sealed class PendingCutState : IPendingCutState
         return CutCompletion.Stale;
     }
 
-    private static AnimationChainSave? ChainContaining(AnimationChainListSave acls, AnimationFrameSave frame) =>
+    internal static AnimationChainSave? ChainContaining(AnimationChainListSave acls, AnimationFrameSave frame) =>
         acls.AnimationChains.FirstOrDefault(c => c.Frames.Contains(frame));
 
-    private static AnimationFrameSave? FrameContaining(AnimationChainListSave acls, object shape) =>
+    internal static AnimationFrameSave? FrameContaining(AnimationChainListSave acls, object shape) =>
         acls.AnimationChains
             .SelectMany(c => c.Frames)
             .FirstOrDefault(f => f.ShapesSave?.Shapes.Contains(shape) == true);

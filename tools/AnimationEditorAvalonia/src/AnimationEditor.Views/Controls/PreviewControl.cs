@@ -4,6 +4,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Input;
+using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Keyframes;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Sequences;
@@ -2162,7 +2163,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (string.IsNullOrEmpty(achxFile)) return textureName;
 
         var achxDir = new FilePath(achxFile).GetDirectoryContainingThis();
-        return new FilePath(achxDir.FullPath + textureName).FullPath;
+        return new FilePath(TexturePathHelper.IsAbsolute(textureName) ? textureName : achxDir.FullPath + textureName).FullPath;
     }
 
     /// <summary>
@@ -2944,12 +2945,12 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// </summary>
     private void OnTopLevelKeyDownForDragCancel(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape || !CancelActiveDrag()) return;
+        if (e.Key != Key.Escape || !CancelDrag()) return;
         e.Handled = true;
     }
 
     /// <summary>Restores the in-progress drag's start state and ends it; false when no drag is active.</summary>
-    private bool CancelActiveDrag()
+    public bool CancelDrag()
     {
         if (_draggingVertexPolygon is { } polygon)
         {
