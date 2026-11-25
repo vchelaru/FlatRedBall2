@@ -5972,8 +5972,7 @@ public partial class MainWindow : Window
 
     private void WirePropertyPanel()
     {
-        PropChainName.LostFocus  += (_, _) => ApplyChainName();
-        PropChainName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyChainName(); };
+        CommitNameOnLeave(PropChainName);
         PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
         PropChainLoop.IsCheckedChanged += (_, _) => ApplyChainLoop();
         PropChainPingPong.IsCheckedChanged += (_, _) => ApplyChainPlaybackMode(PropChainPingPong, _appCommands.SetChainsPingPong);
@@ -5983,9 +5982,8 @@ public partial class MainWindow : Window
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipV.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipD.IsCheckedChanged += (_, _) => ApplyFrameFlip();
-        PropFrameLen.ValueChanged  += (_, _) => ApplyFrameLen();
-        PropRelX.ValueChanged      += (_, _) => ApplyFrameRelative();
-        PropRelY.ValueChanged      += (_, _) => ApplyFrameRelative();
+        CommitLive(ApplyFrameLen, PropFrameLen);
+        CommitLive(ApplyFrameRelative, PropRelX, PropRelY);
         PropTransformKeyframe.KeyframeToggled += isKeyframe => ApplyKeyframeToggled(KeyframeGroup.Offset, isKeyframe);
         PropTransformKeyframe.CurveChosen     += curve => ApplyKeyframeCurve(KeyframeGroup.Offset, curve);
         PropColorKeyframe.KeyframeToggled     += isKeyframe => ApplyKeyframeToggled(KeyframeGroup.Color, isKeyframe);
@@ -5998,13 +5996,8 @@ public partial class MainWindow : Window
         WireShapeKeyframe(PropPolygonPointsKeyframe, ShapeKeyframeGroup.Points, () => InspectorShapes(_selectedState.SelectedPolygons));
         // Color/alpha channels commit one undo entry on edit completion (focus loss / Enter), not
         // per keystroke — NumericUpDown raises ValueChanged on every keypress while typing (#445).
-        foreach (var channel in new[] { PropRed, PropGreen, PropBlue })
-        {
-            channel.LostFocus += (_, _) => ApplyFrameColor(channel);
-            channel.KeyDown   += (_, e) => { if (e.Key == Key.Enter) ApplyFrameColor(channel); };
-        }
-        PropAlpha.LostFocus        += (_, _) => ApplyFrameAlpha();
-        PropAlpha.KeyDown          += (_, e) => { if (e.Key == Key.Enter) ApplyFrameAlpha(); };
+        CommitOnLeave(ApplyFrameColor, PropRed, PropGreen, PropBlue);
+        CommitOnLeave(ApplyFrameAlpha, PropAlpha);
         PropColorMode.SelectionChanged += (_, _) => ApplyFrameColorOperation();
         // Delete/Backspace clears the mode back to inherited, as deleting a color channel's text does.
         PropColorMode.KeyDown += (_, e) =>
@@ -6013,37 +6006,19 @@ public partial class MainWindow : Window
             ApplyFrameColorOperation(null);
             e.Handled = true;
         };
-        PropPixelX.ValueChanged    += (_, _) => ApplyFramePixelCoords();
-        PropPixelY.ValueChanged    += (_, _) => ApplyFramePixelCoords();
-        PropPixelW.ValueChanged    += (_, _) => ApplyFramePixelCoords();
-        PropPixelH.ValueChanged    += (_, _) => ApplyFramePixelCoords();
-        PropRectName.LostFocus     += (_, _) => ApplyRectProps();
-        PropRectName.KeyDown       += (_, e) => { if (e.Key == Key.Enter) ApplyRectProps(); };
-        PropRectX.ValueChanged     += (_, _) => ApplyRectProps();
-        PropRectY.ValueChanged     += (_, _) => ApplyRectProps();
-        PropRectScaleX.ValueChanged += (_, _) => ApplyRectProps();
-        PropRectScaleY.ValueChanged += (_, _) => ApplyRectProps();
-
-        PropCircleName.LostFocus   += (_, _) => ApplyCircleProps();
-        PropCircleName.KeyDown     += (_, e) => { if (e.Key == Key.Enter) ApplyCircleProps(); };
-        PropCircleX.ValueChanged   += (_, _) => ApplyCircleProps();
-        PropCircleY.ValueChanged   += (_, _) => ApplyCircleProps();
-        PropCircleRadius.ValueChanged += (_, _) => ApplyCircleProps();
-
-        PropShapesName.LostFocus   += (_, _) => ApplyMixedShapeProps();
-        PropShapesName.KeyDown     += (_, e) => { if (e.Key == Key.Enter) ApplyMixedShapeProps(); };
-        PropShapesX.ValueChanged   += (_, _) => ApplyMixedShapeProps();
-        PropShapesY.ValueChanged   += (_, _) => ApplyMixedShapeProps();
+        CommitLive(ApplyFramePixelCoords, PropPixelX, PropPixelY, PropPixelW, PropPixelH);
+        CommitNameOnLeave(PropRectName);
+        CommitLive(ApplyRectProps, PropRectX, PropRectY, PropRectScaleX, PropRectScaleY);
+        CommitNameOnLeave(PropCircleName);
+        CommitLive(ApplyCircleProps, PropCircleX, PropCircleY, PropCircleRadius);
+        CommitNameOnLeave(PropShapesName);
+        CommitLive(ApplyMixedShapeProps, PropShapesX, PropShapesY);
         WireShapeKeyframe(PropShapesOffsetKeyframe, ShapeKeyframeGroup.Offset, () => InspectorMixedShapes());
-
-        PropPolygonName.LostFocus  += (_, _) => ApplyPolygonProps();
-        PropPolygonName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyPolygonProps(); };
-        PropPolygonX.ValueChanged  += (_, _) => ApplyPolygonProps();
-        PropPolygonY.ValueChanged  += (_, _) => ApplyPolygonProps();
+        CommitNameOnLeave(PropPolygonName);
+        CommitLive(ApplyPolygonProps, PropPolygonX, PropPolygonY);
         PropPolygonAddVertex.Click += (_, _) => AddPolygonVertexFromInspector();
 
-        PropTextureName.LostFocus  += (_, _) => ApplyTextureName();
-        PropTextureName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyTextureName(); };
+        CommitNameOnLeave(PropTextureName);
         PropTextureBrowseBtn.Click += (_, _) => _ = RunGuardedAsync(BrowseForFrameTexture, "Select Texture");
 
         // #897: every field above commits on ValueChanged so the wireframe/preview updates live as
@@ -6051,47 +6026,88 @@ public partial class MainWindow : Window
         // same field group into a single undo entry (see IUndoableCommand.CoalesceGroup), until LostFocus
         // or Enter ends that entry so the next edit, even to the same field, starts a fresh one.
         InspectorUndoSteps.Wire(AchxInspector, _appCommands.SealPendingEdits);
-
-        // #1325: "+ 4" typed over a "(mixed)" field edits each selected item's own value.
-        ApplyRelativeEditsWith(ApplyFrameLen, PropFrameLen);
-        ApplyRelativeEditsWith(ApplyFrameRelative, PropRelX, PropRelY);
-        ApplyRelativeEditsWith(ApplyFramePixelCoords, PropPixelX, PropPixelY, PropPixelW, PropPixelH);
-        ApplyRelativeEditsWith(ApplyRectProps, PropRectX, PropRectY, PropRectScaleX, PropRectScaleY);
-        ApplyRelativeEditsWith(ApplyCircleProps, PropCircleX, PropCircleY, PropCircleRadius);
-        ApplyRelativeEditsWith(ApplyPolygonProps, PropPolygonX, PropPolygonY);
-        ApplyRelativeEditsWith(ApplyMixedShapeProps, PropShapesX, PropShapesY);
-        ApplyRelativeEditsWith(() => ApplyFrameColor(PropRed), PropRed);
-        ApplyRelativeEditsWith(() => ApplyFrameColor(PropGreen), PropGreen);
-        ApplyRelativeEditsWith(() => ApplyFrameColor(PropBlue), PropBlue);
-        ApplyRelativeEditsWith(ApplyFrameAlpha, PropAlpha);
     }
 
-    // The relative edit being applied, visible to the field's Apply method through EditOf.
-    private (Control Field, NumericEdit Edit)? _relativeEdit;
+    // The field whose edit is being committed, with the relative edit when it is one. The Apply methods read the fields
+    // through EditOf and NameOf, so a commit never sends a value that another field of the group merely shows.
+    private (Control Field, NumericEdit? Relative)? _committing;
 
-    private void ApplyRelativeEditsWith(Action apply, params Control[] fields)
+    private void CommitField(Control field, Action apply, NumericEdit? relative = null)
+    {
+        var outer = _committing;
+        _committing = (field, relative);
+        try { apply(); }
+        finally { _committing = outer; }
+    }
+
+    // Commits as the value changes, so the canvas follows the typing.
+    private void CommitLive(Action apply, params Control[] fields)
+    {
+        foreach (var field in fields)
+        {
+            if (field is FlankerNumericField flanker) flanker.ValueChanged += (_, _) => CommitField(field, apply);
+            else ((NumericUpDown)field).ValueChanged += (_, _) => CommitField(field, apply);
+        }
+        CommitRelativeEdits(apply, fields);
+    }
+
+    private void CommitOnLeave(Action apply, params NumericUpDown[] fields)
+    {
+        foreach (var field in fields)
+        {
+            field.LostFocus += (_, _) => CommitField(field, apply);
+            field.KeyDown   += (_, e) => { if (e.Key == Key.Enter) CommitField(field, apply); };
+        }
+        CommitRelativeEdits(apply, fields);
+    }
+
+    // #1325: "+ 4" typed over a "(mixed)" field edits each selected item's own value.
+    private void CommitRelativeEdits(Action apply, params Control[] fields)
     {
         foreach (var field in fields)
         {
             field.AddHandler(NumericExpressionInput.RelativeEditCommittedEvent, (_, e) =>
             {
                 e.Handled = true;
-                _relativeEdit = (field, e.Edit);
-                try { apply(); }
-                finally { _relativeEdit = null; }
+                CommitField(field, apply, e.Edit);
                 _appCommands.SealPendingEdits();
             });
         }
     }
 
-    /// <summary>The edit a field asks for: the relative edit being applied to it, else its value,
-    /// else null ("(mixed)" and untouched, so leave each item alone).</summary>
+    private void CommitNameOnLeave(TextBox box)
+    {
+        box.LostFocus += (_, _) => CommitName(box);
+        box.KeyDown   += (_, e) => { if (e.Key == Key.Enter) CommitName(box); };
+    }
+
+    // A box still holding the text it was given commits nothing.
+    private void CommitName(TextBox box)
+    {
+        if (Equals(box.Text, box.Tag)) return;
+        CommitField(box,
+            ReferenceEquals(box, PropChainName) ? ApplyChainName
+            : ReferenceEquals(box, PropRectName) ? ApplyRectProps
+            : ReferenceEquals(box, PropCircleName) ? ApplyCircleProps
+            : ReferenceEquals(box, PropPolygonName) ? ApplyPolygonProps
+            : ReferenceEquals(box, PropShapesName) ? ApplyMixedShapeProps
+            : ApplyTextureName);
+    }
+
+    private static void ShowName(TextBox box, string? text) => box.Tag = box.Text = text;
+
+    /// <summary>The edit being committed to <paramref name="field"/>, or null when it is another field's, or the field
+    /// is blank: leave each item alone.</summary>
     private NumericEdit? EditOf(Control field, decimal? value) =>
-        _relativeEdit is { } r && ReferenceEquals(r.Field, field) ? r.Edit
+        _committing is not { } commit || !ReferenceEquals(commit.Field, field) ? null
+        : commit.Relative is { } relative ? relative
         : value is { } v ? v
         : null;
 
     private NumericEdit? EditOf(NumericUpDown field) => EditOf(field, field.Value);
+
+    /// <summary>The name being committed in <paramref name="box"/>, or null when the edit is another field's.</summary>
+    private string? NameOf(TextBox box) => _committing is { } commit && ReferenceEquals(commit.Field, box) ? box.Text : null;
 
     private void ApplyTextureName()
     {
@@ -6251,7 +6267,7 @@ public partial class MainWindow : Window
         if (disableForCollision)
         {
             control.IsEnabled = false;
-            control.Text = null;
+            ShowName(control, null);
             control.PlaceholderText = "(multiple — same frame)";
             return;
         }
@@ -6259,12 +6275,12 @@ public partial class MainWindow : Window
         control.IsEnabled = true;
         if (names.Distinct().Count() == 1)
         {
-            control.Text = names[0];
+            ShowName(control, names[0]);
             control.PlaceholderText = null;
         }
         else
         {
-            control.Text = null;
+            ShowName(control, null);
             control.PlaceholderText = "(mixed)";
         }
     }
@@ -6319,10 +6335,10 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var shapes = InspectorMixedShapes();
         if (shapes.Count == 0) return;
-        // Same null-means-"not edited" rule as ApplyRectProps; the Name box is disabled when two shapes share a frame.
+        // Same null-means-"not edited" rule as ApplyRectProps.
         NumericEdit? x = EditOf(PropShapesX);
         NumericEdit? y = EditOf(PropShapesY);
-        string? name = PropShapesName.Text;
+        string? name = NameOf(PropShapesName);
         if (RefuseUnstorable(name, shapes[0].Name)) return;
         if (name != null) _appCommands.SetShapePropsBulk(shapes, name, null, null);
         if (x != null || y != null)
@@ -6469,13 +6485,13 @@ public partial class MainWindow : Window
                 PropFlipD.IsChecked = flipDMixed ? null : shownFrame.FlipDiagonal;
 
                 ApplyFrameLengthUnitToInspector();
-                SetValueOrMixed(PropFrameLen, frames.Select(f => (decimal)f.FrameLength).ToList());
+                SetValueOrMixed(PropFrameLen, frames.Select(f => NumericEdit.ToDecimal(f.FrameLength)).ToList());
                 // Keyframe off: the fields read-only and showing the value in effect at the frame's start.
                 var offsetState = KeyframeInspectorState.For(KeyframeGroup.Offset, frames, _objectFinder.GetAnimationChainContaining);
                 PropTransformKeyframe.Show(offsetState);
                 var offsets = frames.Select(f => KeyframeInspectorState.DisplayOffset(f, _objectFinder.GetAnimationChainContaining(f), CurrentFrameLengthUnit)).ToList();
-                SetValueOrMixed(PropRelX, offsets.Select(o => (decimal)o.X).ToList());
-                SetValueOrMixed(PropRelY, offsets.Select(o => (decimal)o.Y).ToList());
+                SetValueOrMixed(PropRelX, offsets.Select(o => NumericEdit.ToDecimal(o.X)).ToList());
+                SetValueOrMixed(PropRelY, offsets.Select(o => NumericEdit.ToDecimal(o.Y)).ToList());
                 SetComputedLook(offsetState.FieldsEditable, PropRelX, PropRelY);
 
                 var colorState = KeyframeInspectorState.For(KeyframeGroup.Color, frames, _objectFinder.GetAnimationChainContaining);
@@ -6622,8 +6638,8 @@ public partial class MainWindow : Window
             RebuildPolygonVertexRows(polygon, count, editable);
         for (int i = 0; i < count; i++)
         {
-            _polygonVertexRows[i].X.Value = (decimal)shown[i].X;
-            _polygonVertexRows[i].Y.Value = (decimal)shown[i].Y;
+            _polygonVertexRows[i].X.Value = NumericEdit.ToDecimal(shown[i].X);
+            _polygonVertexRows[i].Y.Value = NumericEdit.ToDecimal(shown[i].Y);
         }
         PropPolygonAddVertex.IsEnabled = !IsShapeLocked(polygon) && editable;
     }
@@ -6667,8 +6683,7 @@ public partial class MainWindow : Window
             Grid.SetColumn(remove, 5);
             row.Children.Add(remove);
 
-            x.ValueChanged += (_, _) => ApplyPolygonVertex(index);
-            y.ValueChanged += (_, _) => ApplyPolygonVertex(index);
+            CommitLive(() => ApplyPolygonVertex(index), x, y);
             foreach (var input in new[] { x, y })
             {
                 input.GotFocus += (_, _) => PreviewCtrl.InspectorVertexIndex = index;
@@ -6728,8 +6743,11 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh || !_polygonRowsEditable || _polygonRowsFor is not { } polygon) return;
         var (xInput, yInput) = _polygonVertexRows[index];
-        if (xInput.Value is not { } x || yInput.Value is not { } y) return;
-        _appCommands.MovePolygonVertex(polygon, index, (float)x, (float)y);
+        NumericEdit? x = EditOf(xInput);
+        NumericEdit? y = EditOf(yInput);
+        if (x is null && y is null) return;
+        var (oldX, oldY) = PolygonVertices.Get(polygon, index);
+        _appCommands.MovePolygonVertex(polygon, index, x?.Apply(oldX) ?? oldX, y?.Apply(oldY) ?? oldY);
     }
 
     private void AddPolygonVertexFromInspector()
@@ -6746,31 +6764,26 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh || _selectedState.SelectedPolygon is not { } polygon) return;
         var polygons = InspectorShapes(_selectedState.SelectedPolygons);
-        if (RefuseUnstorable(PropPolygonName.Text, polygon.Name)) return;
+        // A null component means "not edited" -- see ApplyRectProps.
+        NumericEdit? x = EditOf(PropPolygonX);
+        NumericEdit? y = EditOf(PropPolygonY);
+        string? name = NameOf(PropPolygonName);
+        if (RefuseUnstorable(name, polygon.Name)) return;
+        name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
 
-        if (_selectedState.SelectedPolygons.Count > 1)
+        if (_selectedState.SelectedPolygons.Count <= 1
+            && KeyframeInspectorState.IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, polygon, ChainOfShape(polygon)))
         {
-            // A null component means "showing (mixed)/disabled, not edited" -- see ApplyRectProps.
-            NumericEdit? bx = EditOf(PropPolygonX);
-            NumericEdit? by = EditOf(PropPolygonY);
-            string? bname = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? null : PropPolygonName.Text.Trim();
-            if (bname != null) _appCommands.SetPolygonPropsBulk(polygons, bname, null, null);
-            if (bx != null || by != null)
-                _appCommands.SetPolygonPropsBulk(ShapeKeyframes(polygons, ShapeKeyframeGroup.Offset), null, bx, by);
+            if (name is null && x is null && y is null) return;
+            _appCommands.SetPolygonProps(_objectFinder.GetAnimationFrameContaining(polygon), polygon, name ?? polygon.Name,
+                x?.Apply(polygon.X) ?? polygon.X, y?.Apply(polygon.Y) ?? polygon.Y);
             return;
         }
 
-        if (!KeyframeInspectorState.IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, polygon, ChainOfShape(polygon)))
-        {
-            // Offset keyframe off: X/Y show a computed value, so only the name can be edited.
-            if (!string.IsNullOrWhiteSpace(PropPolygonName.Text))
-                _appCommands.SetPolygonPropsBulk(new[] { polygon }, PropPolygonName.Text.Trim(), null, null);
-            return;
-        }
-
-        if (PropPolygonX.Value is not { } x || PropPolygonY.Value is not { } y) return;
-        var name = string.IsNullOrWhiteSpace(PropPolygonName.Text) ? polygon.Name : PropPolygonName.Text.Trim();
-        _appCommands.SetPolygonProps(_objectFinder.GetAnimationFrameContaining(polygon), polygon, name, (float)x, (float)y);
+        // With the Offset keyframe off X/Y show a computed value, so only the name can be edited.
+        if (name != null) _appCommands.SetPolygonPropsBulk(polygons, name, null, null);
+        if (x != null || y != null)
+            _appCommands.SetPolygonPropsBulk(ShapeKeyframes(polygons, ShapeKeyframeGroup.Offset), null, x, y);
     }
 
     // ── Property apply methods ────────────────────────────────────────────────
@@ -6783,12 +6796,12 @@ public partial class MainWindow : Window
         PropChainName.IsEnabled = !multiple;
         if (multiple)
         {
-            PropChainName.Text = string.Empty;
+            ShowName(PropChainName, string.Empty);
             PropChainName.PlaceholderText = "(multiple — same file)";
             return;
         }
         var isAuto = _projectManager.IsChainNameAuto(chain);
-        PropChainName.Text = isAuto ? string.Empty : chain.Name;
+        ShowName(PropChainName, isAuto ? string.Empty : chain.Name);
         PropChainName.PlaceholderText = _projectManager.GetTsxOwnerTileId(chain) is { } tileId
             ? $"Auto name: ID {tileId}"
             : null;
@@ -6932,18 +6945,18 @@ public partial class MainWindow : Window
         var offsetState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Offset, shapes, ChainOfShape);
         offsetControl.Show(offsetState);
         var offsets = shapes.Select(s => KeyframeInspectorState.DisplayShapeOffset(s, ChainOfShape(s), CurrentFrameLengthUnit)).ToList();
-        SetValueOrMixed(x, offsets.Select(o => (decimal)o.X).ToList());
-        SetValueOrMixed(y, offsets.Select(o => (decimal)o.Y).ToList());
+        SetValueOrMixed(x, offsets.Select(o => NumericEdit.ToDecimal(o.X)).ToList());
+        SetValueOrMixed(y, offsets.Select(o => NumericEdit.ToDecimal(o.Y)).ToList());
         SetComputedLook(offsetState.FieldsEditable, x, y);
 
         if (sizeControl is null || sizeX is null) return;
         var sizeState = KeyframeInspectorState.ForShapes(ShapeKeyframeGroup.Size, shapes, ChainOfShape);
         sizeControl.Show(sizeState);
         var sizes = shapes.Select(s => KeyframeInspectorState.DisplayShapeSize(s, ChainOfShape(s), CurrentFrameLengthUnit)).ToList();
-        SetValueOrMixed(sizeX, sizes.Select(v => (decimal)v.SizeX).ToList());
+        SetValueOrMixed(sizeX, sizes.Select(v => NumericEdit.ToDecimal(v.SizeX)).ToList());
         SetComputedLook(sizeState.FieldsEditable, sizeX);
         if (sizeY is null) return;
-        SetValueOrMixed(sizeY, sizes.Select(v => (decimal)v.SizeY).ToList());
+        SetValueOrMixed(sizeY, sizes.Select(v => NumericEdit.ToDecimal(v.SizeY)).ToList());
         SetComputedLook(sizeState.FieldsEditable, sizeY);
     }
 
@@ -6997,27 +7010,24 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frames = InspectorKeyframeFrames(KeyframeGroup.Offset);
         if (frames.Count == 0) return;
-        // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
-        // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
-        // leave the other axis alone per-frame (see SetFrameRelative for why this is unambiguous).
+        // A null axis is one the user did not edit (see EditOf): SetFrameRelative leaves it alone per-frame.
         NumericEdit? relX = EditOf(PropRelX);
         NumericEdit? relY = EditOf(PropRelY);
         if (relX is null && relY is null) return;
         _appCommands.SetFrameRelative(frames, relX, relY);
     }
 
-    /// <summary>Commits one color field. Only that channel changes, so committing Red never
-    /// touches a Green that is showing "(mixed)".</summary>
-    private void ApplyFrameColor(NumericUpDown field)
+    private void ApplyFrameColor()
     {
         if (_suppressPropRefresh) return;
         var frames = InspectorKeyframeFrames(KeyframeGroup.Color);
         if (frames.Count == 0) return;
         // "(mixed)" is judged on what the fields display, which includes frames whose keyframe is off.
         var shown = InspectorColors(InspectorFrames());
-        ChannelEdit Edit(NumericUpDown channel, Func<KeyframeColor, int?> value) =>
-            ReferenceEquals(field, channel) ? ChannelEditOf(channel, shown.Select(value)) : ChannelEdit.Keep;
-        _appCommands.SetFrameColor(frames, Edit(PropRed, c => c.Red), Edit(PropGreen, c => c.Green), Edit(PropBlue, c => c.Blue));
+        _appCommands.SetFrameColor(frames,
+            ChannelEditOf(PropRed, shown.Select(c => c.Red)),
+            ChannelEditOf(PropGreen, shown.Select(c => c.Green)),
+            ChannelEditOf(PropBlue, shown.Select(c => c.Blue)));
     }
 
     private void ApplyFrameAlpha()
@@ -7028,13 +7038,17 @@ public partial class MainWindow : Window
         _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha, InspectorColors(InspectorFrames()).Select(c => c.Alpha)));
     }
 
-    /// <summary>A blank color field clears the channel (omitted from the .achx, so it inherits),
-    /// except when it is blank because the selection is "(mixed)": that leaves each frame alone, so
-    /// moving focus through a mixed field changes nothing (#1330).</summary>
-    private ChannelEdit ChannelEditOf(NumericUpDown field, IEnumerable<int?> selectedValues) =>
-        EditOf(field) is NumericEdit edit ? ChannelEdit.Edit(edit)
-        : selectedValues.Distinct().Count() > 1 ? ChannelEdit.Keep
-        : ChannelEdit.Clear;
+    /// <summary>The channel edit being committed to <paramref name="field"/>. A blank field clears the channel (omitted
+    /// from the .achx, so it inherits), except when it is blank because the selection is "(mixed)" (#1330), and a field
+    /// left at the value it shows changes nothing, even a stored value out of the channel's range.</summary>
+    private ChannelEdit ChannelEditOf(NumericUpDown field, IEnumerable<int?> selectedValues)
+    {
+        if (_committing is not { } commit || !ReferenceEquals(commit.Field, field)) return ChannelEdit.Keep;
+        if (commit.Relative is { } relative) return ChannelEdit.Edit(relative);
+        var values = selectedValues.Distinct().ToList();
+        if (field.Value is not { } value) return values.Count > 1 ? ChannelEdit.Keep : ChannelEdit.Clear;
+        return values.Count == 1 && values[0] == value ? ChannelEdit.Keep : ChannelEdit.Edit(value);
+    }
 
     private void ApplyFrameColorOperation()
     {
@@ -7069,9 +7083,7 @@ public partial class MainWindow : Window
         if (frames.Count == 0) return;
         var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
         if (bmpW <= 0 || bmpH <= 0) return;
-        // A null component here only ever means "still showing (mixed), not edited" — the pixel
-        // region has no legitimate null/cleared state — so it's safe to apply just the component(s)
-        // the user touched and leave the rest alone per-frame (see SetFramePixelRegion).
+        // A null component is one the user did not edit (see EditOf): SetFramePixelRegion leaves it alone per-frame.
         NumericEdit? x = EditOf(PropPixelX);
         NumericEdit? y = EditOf(PropPixelY);
         NumericEdit? w = EditOf(PropPixelW);
@@ -7088,16 +7100,14 @@ public partial class MainWindow : Window
         var rects = InspectorShapes(_selectedState.SelectedRectangles);
         if (rects.Count == 0) return;
 
-        // A null component here means "still showing (mixed)/disabled, not edited" — leave that
-        // field alone per-rect. PropRectName.Text is null exactly when RefreshPropertyPanel just
-        // showed "(mixed)" or disabled the field for a same-frame collision (SetNameOrMixed); once
-        // the user types, Text becomes non-null and applies to every selected rect (safe as long as
-        // no two share a frame — SetNameOrMixed disables the field for that case).
+        // A null component means "not the field being committed" (see EditOf and NameOf): leave it alone
+        // per-rect. A name applies to every selected rect, which is safe as long as no two share a frame
+        // (SetNameOrMixed disables the box for that case).
         NumericEdit? x = EditOf(PropRectX);
         NumericEdit? y = EditOf(PropRectY);
         NumericEdit? scaleX = EditOf(PropRectScaleX);
         NumericEdit? scaleY = EditOf(PropRectScaleY);
-        string? name = PropRectName.Text;
+        string? name = NameOf(PropRectName);
         if (RefuseUnstorable(name, rects[0].Name)) return;
 
         // Offset and size edits reach only the rectangles whose keyframe for that group is on (#1478): a
@@ -7119,7 +7129,7 @@ public partial class MainWindow : Window
         NumericEdit? x = EditOf(PropCircleX);
         NumericEdit? y = EditOf(PropCircleY);
         NumericEdit? radius = EditOf(PropCircleRadius);
-        string? name = PropCircleName.Text;
+        string? name = NameOf(PropCircleName);
         if (RefuseUnstorable(name, circles[0].Name)) return;
 
         // See ApplyRectProps: offset and size edits reach only shapes whose keyframe for that group is on.
@@ -8885,12 +8895,8 @@ public partial class MainWindow : Window
     private void CommitPendingInspectorName()
     {
         object? focused = FocusManager?.GetFocusedElement();
-        if (ReferenceEquals(focused, PropChainName)) ApplyChainName();
-        else if (ReferenceEquals(focused, PropRectName)) ApplyRectProps();
-        else if (ReferenceEquals(focused, PropCircleName)) ApplyCircleProps();
-        else if (ReferenceEquals(focused, PropPolygonName)) ApplyPolygonProps();
-        else if (ReferenceEquals(focused, PropShapesName)) ApplyMixedShapeProps();
-        else if (ReferenceEquals(focused, PropTextureName)) ApplyTextureName();
+        if (focused is TextBox box && new[] { PropChainName, PropRectName, PropCircleName, PropPolygonName, PropShapesName, PropTextureName }.Contains(box))
+            CommitName(box);
     }
 
     /// <summary>The ANIMATIONS tree nodes whose in-place rename box is open.</summary>

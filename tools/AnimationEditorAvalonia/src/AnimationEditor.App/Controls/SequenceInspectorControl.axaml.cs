@@ -612,7 +612,11 @@ public partial class SequenceInspectorControl : UserControl
 
     private void CommitOnEnterOrFocusLost(TextBox box, Func<SequenceDocument, string, string?> rename)
     {
-        void CommitText() => Commit(document => rename(document, box.Text ?? string.Empty));
+        void CommitText()
+        {
+            // A box still holding the text it was given commits nothing.
+            if (!Equals(box.Tag, box.Text)) Commit(document => rename(document, box.Text ?? string.Empty));
+        }
         box.LostFocus += (_, _) => CommitText();
         box.KeyDown += (_, e) =>
         {
