@@ -22,7 +22,10 @@ public sealed record TimelineBlock(
     /// <summary>How many cycles <see cref="Full"/> spans, for labels only; 1 when there is no cycle.</summary>
     public double Cycles => CycleLength > 0 ? Full / CycleLength : 1;
 
-    /// <summary>Whether dragging the right edge changes the length. A missing or empty chain draws a stand-in length, so it does not.</summary>
+    /// <summary>The seconds shown in labels: what plays, so 0 for an animation of no length, whose block is drawn a stand-in length.</summary>
+    public double LabelSeconds => CycleLength > 0 ? Played : 0;
+
+    /// <summary>Whether dragging the right edge changes the length. A missing chain, or one with no length, draws a stand-in length, so it does not.</summary>
     public bool CanResize => !IsMissing && CycleLength > 0;
 }
 
@@ -34,7 +37,7 @@ public readonly record struct TimelineHit(TimelineBlock Block, TimelineHitPart P
 public static class TimelineLayout
 {
     /// <summary>
-    /// Seconds a missing chain is drawn. It never plays, so its length means nothing; the file stores none, and this
+    /// Seconds a missing chain, or one with no length, is drawn. It never plays, so its length means nothing; the file stores none, and this
     /// only keeps the reference visible and grabbable.
     /// </summary>
     public const double MissingLength = 1;

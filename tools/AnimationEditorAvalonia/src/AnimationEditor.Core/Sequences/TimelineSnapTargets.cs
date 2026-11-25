@@ -73,9 +73,11 @@ public static class TimelineSnapTargets
         for (int v = 0; v < visits; v++)
         {
             int frame = PlaybackTimeline.FrameOfVisit(v, count, chain.PingPong, chain.Reverse);
+            double seconds = PlaybackController.FrameSeconds(chain.Frames[frame], unit);
+            if (seconds <= 0) continue;
             // A ping-pong shows its end frames twice in a row; there is no boundary between the two showings.
-            if (v > 0 && frame != previous) offsets.Add(time);
-            time += PlaybackController.FrameSeconds(chain.Frames[frame], unit);
+            if (previous >= 0 && frame != previous) offsets.Add(time);
+            time += seconds;
             previous = frame;
         }
         return offsets;

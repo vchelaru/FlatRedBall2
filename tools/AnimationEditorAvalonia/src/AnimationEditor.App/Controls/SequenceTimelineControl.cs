@@ -1722,7 +1722,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         double labelWidth = Math.Max(1, body.Width - 12);
         string label = block.IsMissing
             ? $"⚠ {block.Reference.Chain} (missing)"
-            : BlockLabel.Fit(block.Reference.Chain, block.Cycles, block.Played, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
+            : BlockLabel.Fit(block.Reference.Chain, block.Cycles, block.LabelSeconds, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
             var text = TrimmedText(label, 11, Brush("Ink"), FontWeight.Normal, labelWidth);

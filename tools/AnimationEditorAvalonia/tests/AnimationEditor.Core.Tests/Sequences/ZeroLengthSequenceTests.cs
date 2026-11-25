@@ -140,7 +140,7 @@ public class ZeroLengthSequenceTests
         hit!.Value.Block.ShouldBe(block);
         hit.Value.Part.ShouldBe(TimelineHitPart.Body);
         block.IsMissing.ShouldBeFalse();
-        //LABEL
+        block.LabelSeconds.ShouldBe(0);
         SequenceScene.At(sequence, 0, 0, lookup, [sequence]).ShouldBeEmpty();
         SequenceThumbnailScene.ChooseTime(sequence, lookup, [sequence]).ShouldBeNull();
         FilmstripLayout.Cells(FilmstripLayout.FramesOf(lookup.FindChain(block.Reference)!, Sec, _ => true), false, false, block.Played, 100, 25).ShouldBeEmpty();

@@ -209,7 +209,8 @@ public class PlaybackController
         if (chain is null || chain.Frames.Count <= 1) return;
 
         double totalTime = CycleLength(chain);
-        if (totalTime <= 0) return;
+        // No length: a looping chain has nothing to advance through, one that does not loop is at its end.
+        if (totalTime <= 0 && Loop) return;
 
         _animTime += deltaSeconds * SpeedMultiplier;
 
@@ -248,7 +249,7 @@ public class PlaybackController
 
     private double CycleLength(AnimationChainSave chain) => PlaybackTimeline.CycleLength(ForwardLength(chain), chain.PingPong);
 
-    // A frame's playing time in seconds. Zero/negative authored lengths fall back to 100 ms so playback still steps through them.
+    // A frame's playing time in seconds; 0 for a frame that is skipped.
     internal static double FrameSeconds(AnimationFrameSave frame, FrameLengthUnit unit) =>
         unit.PlaybackSeconds(frame.FrameLength);
 }

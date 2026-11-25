@@ -32,7 +32,7 @@ public sealed partial class SequenceTimelineControl
                 key = block.Reference;
                 text = block.IsMissing
                     ? $"⚠ {block.Reference.Chain} (missing)"
-                    : BlockLabel.Tooltip(block.Reference.Chain, block.Cycles, block.Played);
+                    : BlockLabel.Tooltip(block.Reference.Chain, block.Cycles, block.LabelSeconds);
             }
             // A clip that plays nothing has no filmstrip to hover, so its tooltip says why, as a missing chain's does.
             else if (TimelineReferences.HitTest(Viewport, _references, sequence.Tracks.Count, point.X, point.Y)?.Reference is { IsBroken: true } clip)

@@ -24,7 +24,8 @@ public sealed record EventMarker(double X, double Time, IReadOnlyList<EventOccur
 /// returns. A frame event fires when playback enters its frame, so a flag sits at the start of each showing that enters
 /// one (<see cref="PlaybackTimeline.EntersNewFrame"/>): every loop cycle, mirrored on a ping-pong return half or a reverse
 /// chain, and nothing for a ping-pong's turnaround or loop point. A showing that would start at or after the played end
-/// (the cut tail, the rest of a partial last cycle) never plays, so it fires nothing.
+/// (the cut tail, the rest of a partial last cycle) never plays, so it fires nothing. A frame of no length is passed, not shown,
+/// so it fires where playback passes it, but not before the first frame shown: playback starts on that one.
 /// </summary>
 public static class EventMarkers
 {
@@ -54,9 +55,10 @@ public static class EventMarkers
         double cycle = PlaybackTimeline.CycleLength(forward, pingPong);
         int visitsPerCycle = PlaybackTimeline.VisitCount(count, pingPong);
         // A chain that does not loop plays one cycle, then holds its last frame: the hold enters no frame, so it fires nothing.
-        int cycles = loop ? (int)Math.Ceiling(played / cycle - 1e-9) : 1;
+        int cycles = loop ? (int)Math.Min(MaxOccurrences, Math.Ceiling(played / cycle - 1e-9)) : 1;
 
         var result = new List<EventOccurrence>();
+        bool started = false;
         for (int k = 0; k < cycles && result.Count < MaxOccurrences; k++)
         {
             double start = k * cycle;
@@ -65,8 +67,10 @@ public static class EventMarkers
                 if (start >= played - 1e-9) break;
                 int frame = PlaybackTimeline.FrameOfVisit(v, count, pingPong, reverse);
                 double end = start + Math.Max(0, frames[frame].Duration);
+                if (!started && frames[frame].Duration <= 0) continue;
                 // Playback enters the first showing at once; after that only a changed frame fires.
-                bool enters = (k == 0 && v == 0) || PlaybackTimeline.EntersNewFrame(v, count, pingPong, reverse);
+                bool enters = !started || PlaybackTimeline.EntersNewFrame(v, count, pingPong, reverse);
+                started = true;
                 if (enters)
                 {
                     bool isReturn = pingPong && (v >= count ^ reverse);

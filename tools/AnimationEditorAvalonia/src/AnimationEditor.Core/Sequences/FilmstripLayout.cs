@@ -94,7 +94,7 @@ public static class FilmstripLayout
 
         double cycle = PlaybackTimeline.CycleLength(forward, pingPong);
         int visitsPerCycle = PlaybackTimeline.VisitCount(count, pingPong);
-        int cycles = loop ? (int)Math.Ceiling(played / cycle - 1e-9) : 1;
+        int cycles = loop ? (int)Math.Min(MaxUnits, Math.Ceiling(played / cycle - 1e-9)) : 1;
 
         var units = new List<Unit>();
         for (int k = 0; k < cycles && units.Count < MaxUnits; k++)
@@ -103,7 +103,8 @@ public static class FilmstripLayout
             for (int v = 0; v < visitsPerCycle && units.Count < MaxUnits; v++)
             {
                 int frame = PlaybackTimeline.FrameOfVisit(v, count, pingPong, reverse);
-                double end = start + Math.Max(0, frames[frame].Duration);
+                if (frames[frame].Duration <= 0) continue; // skipped
+                double end = start + frames[frame].Duration;
                 if (start >= played - 1e-9) break;
                 var visit = new FilmstripVisit(frame, start, Math.Min(end, played), k, pingPong && (v >= count ^ reverse));
                 if (pingPong && units.Count > 0 && units[^1].Frame == frame)

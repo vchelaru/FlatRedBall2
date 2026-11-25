@@ -76,12 +76,12 @@ public static class ReferenceFilmstrip
         // One cell early, so rounding never loses the first visible one.
         for (long n = Math.Max(0, (long)(fromX / (cellSeconds * pixelsPerSecond)) - 1); cells.Count < MaxCells; n++)
         {
-            int cycle = (int)(n / perCycle);
+            long cycle = n / perCycle;
             double start = cycle * targetLength + n % perCycle * cellSeconds;
             if (start >= clipSeconds - 1e-9 || start * pixelsPerSecond > toX) break;
             double visible = Math.Min(cellSeconds, clipSeconds - start);
             if ((start + visible) * pixelsPerSecond < fromX) continue;
-            cells.Add(new ReferenceCell(cycle, start * pixelsPerSecond, visible * pixelsPerSecond, cellSeconds * pixelsPerSecond,
+            cells.Add(new ReferenceCell((int)cycle, start * pixelsPerSecond, visible * pixelsPerSecond, cellSeconds * pixelsPerSecond,
                 start + visible / 2));
         }
         return cells;

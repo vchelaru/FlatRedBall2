@@ -12,7 +12,7 @@ namespace AnimationEditor.Core.Rendering;
 public static class ChainClock
 {
     /// <summary>
-    /// Length of one cycle in seconds (unset lengths count as 0.1s): the sum of the chain's frames, or twice that under
+    /// Length of one cycle in seconds (0 when every frame is skipped): the sum of the chain's frames, or twice that under
     /// <see cref="AnimationChainSave.PingPong"/>.
     /// </summary>
     public static double TotalLength(AnimationChainSave chain, FrameLengthUnit unit)
