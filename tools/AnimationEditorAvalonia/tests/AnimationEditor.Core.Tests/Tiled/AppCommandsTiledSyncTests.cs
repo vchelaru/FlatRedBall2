@@ -25,13 +25,8 @@ public class AppCommandsTiledSyncTests
 {
     private static string WriteFixtureTileset(string tempDir)
     {
-        var tileset = new Tileset
-        {
-            Name = "Heroes", TileWidth = 16, TileHeight = 16, TileCount = 64, Columns = 4,
-            Image = new Image { Source = "Heroes.png", Width = 64, Height = 16 },
-        };
         var path = Path.Combine(tempDir, "Heroes.tsx");
-        AnimationEditor.Core.Tiled.TsxWriter.Write(tileset, path);
+        File.WriteAllText(path, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><tileset name=\"Heroes\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"4\"><image source=\"Heroes.png\" width=\"64\" height=\"16\"/></tileset>");
         return path;
     }
 

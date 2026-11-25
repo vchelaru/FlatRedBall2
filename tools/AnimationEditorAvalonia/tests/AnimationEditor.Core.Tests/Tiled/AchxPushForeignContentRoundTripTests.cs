@@ -99,7 +99,8 @@ public class AchxPushForeignContentRoundTripTests : IDisposable
         // TsxLoader, not the raw DotTiled loader: an untouched 1.9 tile keeps its original
         // `class="..."` text verbatim in the patch path, which only TsxLoader reads.
         var reloaded = TsxLoader.LoadTileset(path);
-        Assert.Equal((2, -3), (reloaded.TileOffset.Value.X, reloaded.TileOffset.Value.Y));
+        var offset = DotTiled.Serialization.Loader.Default().LoadTileset(path).TileOffset.Value;
+        Assert.Equal((2, -3), (offset.X, offset.Y));
         // The hand-authored animation and the class-only tile are not the push's to touch.
         var water = reloaded.Tiles.Single(t => t.ID == 5);
         Assert.Equal("Water", water.Type);

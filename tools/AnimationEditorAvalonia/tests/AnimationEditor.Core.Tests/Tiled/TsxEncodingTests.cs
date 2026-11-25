@@ -123,9 +123,8 @@ public sealed class TsxEncodingTests : IDisposable
 
             pm.SaveTsxProject();
 
-            // The byte order mark is not written back; a BOM-less UTF-8 file means the same.
-            var expected = Tsx(declaration).Replace("duration=\"200\"/>", "duration=\"300\" />");
-            File.ReadAllBytes(path).ShouldBe(Encoding.UTF8.GetBytes(expected));
+            var expected = Tsx(declaration).Replace("duration=\"200\"/>", "duration=\"300\"/>");
+            File.ReadAllBytes(path).ShouldBe(Encode(expected, Encoding.UTF8, bom));
         }
     }
 

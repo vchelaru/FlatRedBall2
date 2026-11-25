@@ -76,6 +76,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -131,6 +132,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -190,6 +192,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -263,6 +266,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -338,6 +342,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -397,6 +402,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -462,6 +468,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -539,6 +546,7 @@ public class NativeTsxProjectRoundTripTests
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
+        File.Copy(fixturePath, outputPath);
         TsxWriter.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
@@ -560,11 +568,7 @@ public class NativeTsxProjectRoundTripTests
     public void LoadRenameChainToNameWithXmlSpecialCharacters_SaveInPlacePatchMode_EscapesCorrectlyAndReloadsExactValue()
     {
         // A chain Name containing XML-special characters ('&', '<', '>', '"') is a perfectly
-        // reasonable thing for a user to type (e.g. "Fire & Ice"). Saving in place exercises the
-        // patch-mode path (TryWritePatchedCore), which only regenerates the *changed* tile's
-        // fragment via RenderTileFragment -> WriteTile -> XmlWriter.WriteAttributeString -- this
-        // pins that patch mode doesn't do any naive string manipulation of its own on the value
-        // (e.g. slicing/concatenation) that could bypass XmlWriter's escaping.
+        // reasonable thing for a user to type (e.g. "Fire & Ice").
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         var fixturePath = Path.Combine(tempDir, "Heroes.tsx");
         File.WriteAllText(fixturePath, FixtureXml);
@@ -588,8 +592,6 @@ public class NativeTsxProjectRoundTripTests
         var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain);
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
-        // Write back to the SAME path just loaded from -- goes through patch mode, not a full
-        // rewrite, since tile 0's Name property is the only thing that changed.
         TsxWriter.Write(tileset, fixturePath);
         var reloaded = Loader.Default().LoadTileset(fixturePath);
 
