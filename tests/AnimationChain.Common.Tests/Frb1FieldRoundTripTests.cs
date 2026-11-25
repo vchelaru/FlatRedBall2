@@ -6,7 +6,7 @@ using Xunit;
 
 namespace AnimationEditorCommon.Tests;
 
-/// <summary>FRB1 leaves a null field out and writes a chain's ParentFile; saving an unedited file must not change that.</summary>
+/// <summary>FRB1 leaves a null field out and writes fields FRB2 does not model; saving an unedited file must not change that.</summary>
 public class Frb1FieldRoundTripTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.achx");
@@ -40,9 +40,11 @@ public class Frb1FieldRoundTripTests : IDisposable
     [InlineData("    <ParentFile>walk.gif</ParentFile>\n", "      <TextureName>a.png</TextureName>\n", "")]
     [InlineData("", "      <TextureName />\n", "")]
     [InlineData("    <ParentFile />\n", "      <TextureName></TextureName>\n", "")]
+    [InlineData("    <ColorKey>0</ColorKey>\n", "      <TextureName>a.png</TextureName>\n", "")]
+    [InlineData("    <ColorKey>4278190080</ColorKey>\n    <ParentFile>walk.gif</ParentFile>\n", "", "")]
     [InlineData("", "", "")]
     [InlineData("", "      <TextureName>a.png</TextureName>\n", Shape)]
-    public void Save_UneditedFrb1File_IsByteIdentical(string parentFile, string texture, string shapes)
+    public void Save_UneditedFrb1File_IsByteIdentical(string chainFields, string texture, string shapes)
     {
         string text = $"""
             <?xml version="1.0" encoding="utf-8"?>
@@ -52,7 +54,7 @@ public class Frb1FieldRoundTripTests : IDisposable
               <CoordinateType>UV</CoordinateType>
               <AnimationChain>
                 <Name>Walk</Name>
-            {parentFile}    <Frame>
+            {chainFields}    <Frame>
             {texture}      <FrameLength>0.1</FrameLength>
                   <LeftCoordinate>0</LeftCoordinate>
                   <RightCoordinate>1</RightCoordinate>
@@ -143,6 +145,7 @@ public class Frb1FieldRoundTripTests : IDisposable
                   </Events>
                 </Frame>
               </AnimationChain>
+              <FileName>C:/Game/Content/Walk.achx</FileName>
               <ProjectFile />
             </AnimationChainArraySave>
             """.Replace("\r\n", "\n");
