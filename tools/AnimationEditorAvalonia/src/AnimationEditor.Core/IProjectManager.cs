@@ -25,6 +25,9 @@ namespace AnimationEditor.Core
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         bool IsNativeTsxProject { get; }
 
+        /// <summary>The open <c>.tsx</c>'s grid and image, or <see langword="null"/> for an achx/achj project.</summary>
+        Tiled.TilesetAnimationInfo? TsxTileset { get; }
+
         /// <summary>The tsx's own fixed tile size, or <see langword="null"/> for an achx/achj
         /// project. Not user-configurable for a native tsx project (issue #1140).</summary>
         TileGrid? TsxTileGrid { get; }
