@@ -225,6 +225,9 @@ public partial class FlankerNumericField : UserControl
         ValueBox.Text = Format(Value);
     }
 
+    /// <summary>Puts the box back to <see cref="Value"/>, dropping text that was typed but not committed.</summary>
+    public void DiscardTypedText() => ValueBox.Text = Format(Value);
+
     private string Format(decimal? value) =>
         value?.ToString(FormatString, CultureInfo.InvariantCulture) ?? string.Empty;
 }

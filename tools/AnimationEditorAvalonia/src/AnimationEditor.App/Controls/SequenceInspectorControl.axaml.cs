@@ -21,7 +21,8 @@ namespace AnimationEditor.App.Controls;
 /// Go to Definition are for one item. Every commit is one edit on the <see cref="SequenceDocument"/>, so one undo
 /// entry; a refused value (an empty or taken name, a length of 0) goes out through <see cref="ErrorRaised"/> and the field
 /// goes back to the document's value. The host calls <see cref="Show"/> whenever the selection or the document changes
-/// (including each step of a drag), which rewrites every field except the one being typed in.
+/// (including each step of a drag), which rewrites every field except the one being typed in. Showing another item (one
+/// put in its place by a change outside the editor included) drops the typed text: it only ever applies to what it was typed for.
 /// </summary>
 public partial class SequenceInspectorControl : UserControl
 {
@@ -35,6 +36,7 @@ public partial class SequenceInspectorControl : UserControl
     private IReadOnlyList<int> _tracks = Array.Empty<int>();
     private bool _canRenameSequence = true;
     private bool _refreshing;
+    private List<object> _shown = new();
 
     // The relative edit ("+ 4") being applied to a mixed field, which EditOf hands to that field's commit.
     private (Control Field, NumericEdit Edit)? _relativeEdit;
@@ -157,6 +159,7 @@ public partial class SequenceInspectorControl : UserControl
     public void Show(SequenceDocument? document, int sequence, IUndoManager? undo, TimelineChainId? chain, int? track,
         IReadOnlyList<TimelineChainId>? chains = null, IReadOnlyList<int>? tracks = null, bool canRenameSequence = true)
     {
+        bool sameDocument = ReferenceEquals(document, _document) || document?.Path == _document?.Path;
         _chains = chains ?? Array.Empty<TimelineChainId>();
         _tracks = tracks ?? Array.Empty<int>();
         _canRenameSequence = canRenameSequence;
@@ -165,7 +168,48 @@ public partial class SequenceInspectorControl : UserControl
         _undo = undo;
         _chain = chain;
         _track = track;
+        var shown = ShownItems();
+        if (!sameDocument || !shown.SequenceEqual(_shown)) DiscardTypedText();
+        _shown = shown;
         Refresh(force: false);
+    }
+
+    // What the fields edit, told apart by content: after a change outside the editor an index can hold another item.
+    private List<object> ShownItems()
+    {
+        var items = new List<object>();
+        if (CurrentSequence is not { } sequence) return items;
+        items.Add(sequence.Name);
+        foreach (int index in _tracks.Append(_track ?? -1).Distinct().Where(index => index >= 0 && index < sequence.Tracks.Count))
+        {
+            var track = sequence.Tracks[index];
+            items.Add((index, track.Name));
+            if (SequenceTimeline.OrderedClips(track).FirstOrDefault() is { } clip)
+                items.Add((clip.Sequence, clip.Start, clip.Length));
+        }
+        foreach (var id in (_chain is { } chain ? _chains.Append(chain) : _chains).Distinct())
+        {
+            if (id.Track >= sequence.Tracks.Count || id.Chain >= sequence.Tracks[id.Track].Chains.Count) continue;
+            var block = sequence.Tracks[id.Track].Chains[id.Chain];
+            items.Add((id, sequence.Tracks[id.Track].Name, block.Source, block.Chain, block.Start, block.Length));
+        }
+        return items;
+    }
+
+    private void DiscardTypedText()
+    {
+        _refreshing = true;
+        try
+        {
+            SequenceNameBox.Text = SequenceNameBox.Tag as string;
+            TrackNameBox.Text = TrackNameBox.Tag as string;
+            foreach (var field in new[] { ChainStartField, ChainLengthField, ReferenceStartField, ReferenceLengthField })
+                field.DiscardTypedText();
+        }
+        finally
+        {
+            _refreshing = false;
+        }
     }
 
     /// <summary>
@@ -185,6 +229,8 @@ public partial class SequenceInspectorControl : UserControl
             TrackPanel.IsVisible = sequence is not null && reference is null && track is not null;
             SequencePanel.IsVisible = sequence is not null && !ChainPanel.IsVisible && !TrackPanel.IsVisible;
 
+            // Also while its section is hidden: a box losing the focus late still commits its text to the sequence shown.
+            if (sequence is not null) Put(SequenceNameBox, sequence.Name, force);
             if (SequencePanel.IsVisible)
                 ShowSequence(sequence!, force);
             else if (TrackPanel.IsVisible)
@@ -201,7 +247,6 @@ public partial class SequenceInspectorControl : UserControl
     private void ShowSequence(SequenceSave sequence, bool force)
     {
         var document = _document!;
-        Put(SequenceNameBox, sequence.Name, force);
         SequenceNameBox.IsEnabled = _canRenameSequence;
         SequenceLoopBox.IsChecked = sequence.Loop;
         SequenceLengthText.Text = Seconds(SequenceTimeline.Length(document.Save.Sequences, sequence, reference => document.CycleLength(reference) ?? 0));
