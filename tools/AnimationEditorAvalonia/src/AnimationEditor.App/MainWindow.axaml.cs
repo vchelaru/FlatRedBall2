@@ -4436,10 +4436,10 @@ public partial class MainWindow : Window
         if (tvi?.DataContext is not TreeNodeVm vm)
             return (null, FrameRowHalf.Upper, null);
 
-        // Frame rows are leaves, so the container height is the row height. The half only
-        // matters for frame targets; chain targets always append regardless.
+        // An expanded item's container also spans its child rows; the halves are those of its own row.
         var topLeft = Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), AnimTree) ?? posInTree;
-        double rowHeight = tvi.Bounds.Height;
+        Control row = tvi.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_LayoutRoot") ?? tvi;
+        double rowHeight = row.Bounds.Height;
         var half = (posInTree.Y - topLeft.Y) < rowHeight / 2 ? FrameRowHalf.Upper : FrameRowHalf.Lower;
         return (vm.Data, half, tvi);
     }

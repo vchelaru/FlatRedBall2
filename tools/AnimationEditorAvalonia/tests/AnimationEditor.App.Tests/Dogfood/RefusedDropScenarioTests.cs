@@ -191,4 +191,55 @@ public class RefusedDropScenarioTests : IDisposable
         File.Exists(Path.Combine(editor.ProjectFolder, "new.png")).ShouldBeFalse();
         editor.ProblemText.ShouldNotBeNull().ShouldContain("locked");
     }
+
+    [AvaloniaFact]
+    public async Task AFrameDrop_OnTheLowerHalfOfARowWithItsShapesShown_LandsAfterThatFrame()
+    {
+        using var editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        var chain = AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16), (16, 0, 16, 16), (32, 0, 16, 16));
+        chain.Frames[1].ShapesSave = new ShapesSave();
+        chain.Frames[1].ShapesSave!.Add(new AARectSave { Name = "A", ScaleX = 4, ScaleY = 4 });
+        chain.Frames[1].ShapesSave!.Add(new AARectSave { Name = "B", ScaleX = 4, ScaleY = 4 });
+        await editor.OpenAsync(editor.WriteAchx("hero.achx", chain));
+        var walk = editor.ChainNamed("Walk");
+        editor.Expand(walk);
+        editor.Expand(walk.Frames[1]);
+        var moved = walk.Frames[0];
+        var target = walk.Frames[1];
+
+        var header = editor.RowHeaderPoint(target);
+        Point inTree = editor.Window.TranslatePoint(new Point(header.X, header.Y + 6), editor.AnimTree)!.Value;
+        typeof(MainWindow).GetField("_pendingFrameDrag", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor.Window,
+            new AnimationEditor.Core.DragDrop.FrameDragSource(new[] { moved }, walk, AnimationEditor.Core.DragDrop.FrameDragValidity.Valid));
+        var format = typeof(MainWindow).GetField("FrameDragDataFormat", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create((DataFormat<string>)format, "frame"));
+        editor.AnimTree.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, data, editor.AnimTree, inTree, KeyModifiers.None));
+        editor.Layout();
+
+        walk.Frames.IndexOf(moved).ShouldBe(1);
+        walk.Frames.IndexOf(target).ShouldBe(0);
+    }
+
+    [AvaloniaFact]
+    public async Task AnAnimationDrop_OnTheLowerHalfOfAnExpandedAnimationsRow_LandsAfterThatAnimation()
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        var walk = editor.ChainNamed("Walk");
+        var run = editor.ChainNamed("Run");
+        editor.Expand(run);
+        var header = editor.RowHeaderPoint(run);
+        Point inTree = editor.Window.TranslatePoint(new Point(header.X, header.Y + 6), editor.AnimTree)!.Value;
+        typeof(MainWindow).GetField("_pendingChainDrag", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor.Window,
+            new AnimationEditor.Core.DragDrop.ChainDragSource(new[] { walk }, AnimationEditor.Core.DragDrop.ChainDragValidity.Valid));
+        var format = typeof(MainWindow).GetField("ChainDragDataFormat", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create((DataFormat<string>)format, "chain"));
+        editor.AnimTree.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, data, editor.AnimTree, inTree, KeyModifiers.None));
+        editor.Layout();
+
+        editor.Project.AnimationChains.Select(c => c.Name).ShouldBe(["Run", "Walk"]);
+    }
 }
