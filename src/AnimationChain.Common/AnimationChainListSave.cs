@@ -71,6 +71,8 @@ public class AnimationChainListSave
     /// </summary>
     public string? ProjectFile { get; set; }
 
+    internal EmptyTextForms EmptyText;
+
     /// <summary>
     /// Loads a .achx file directly from disk via <see cref="File.OpenRead(string)"/>. Intended
     /// for tooling (file pickers in the AnimationEditor) where the caller has an absolute path
@@ -78,6 +80,7 @@ public class AnimationChainListSave
     /// should call <c>ContentLoader.LoadAnimationChainList</c> or pass a <c>streamProvider</c>
     /// to the other overload.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromFile(string path)
         => FromFile(path, File.OpenRead!);
 
@@ -94,12 +97,13 @@ public class AnimationChainListSave
     /// <param name="streamProvider">Byte source. Callers must supply one — there is no default — so this
     /// method has no IL-level reference to <c>TitleContainer</c> and tools that don't ship MonoGame.Framework
     /// (e.g. AnimationEditor on Avalonia) can call it without triggering an assembly load.</param>
+    /// <exception cref="InvalidDataException">The text is not XML/JSON, is not an animation file (another root element, no
+    /// <c>animationChains</c> array), or holds a value that does not parse. Every reader of this type throws only this for
+    /// bad content; errors opening or reading the stream come through as they are.</exception>
     public static AnimationChainListSave FromFile(string filePath, Func<string, Stream> streamProvider)
     {
         using var stream = streamProvider(filePath);
-        var result = IsJsonPath(filePath)
-            ? ParseJson(JsonNode.Parse(stream)!.AsObject())
-            : ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
+        var result = IsJsonPath(filePath) ? ReadJson(stream) : ReadXml(stream);
         result.FileName = filePath;
         return result;
     }
@@ -117,6 +121,7 @@ public class AnimationChainListSave
     /// is <c>true</c>, texture paths in the file are passed through as-is with no directory prefix
     /// prepended. The caller retains ownership of <paramref name="stream"/> and is responsible for disposing it.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromStream(Stream stream)
     {
         string text;
@@ -131,13 +136,14 @@ public class AnimationChainListSave
     /// <see cref="string.Empty"/>; if <see cref="FileRelativeTextures"/> is <c>true</c>, texture
     /// paths in the file are passed through as-is with no directory prefix prepended.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromString(string text)
         => LooksLikeJson(text) ? FromJsonString(text) : FromXmlString(text);
 
     private static AnimationChainListSave FromXmlString(string xml)
     {
         using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(xml));
-        return ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
+        return ReadXml(stream);
     }
 
     // A leading UTF-8 BOM (0xEF 0xBB 0xBF) decodes to the single char U+FEFF. StreamReader/
@@ -155,6 +161,7 @@ public class AnimationChainListSave
     /// Loads a .achj file directly from disk via <see cref="File.OpenRead(string)"/>. JSON
     /// counterpart of <see cref="FromFile(string)"/>.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonFile(string path)
         => FromJsonFile(path, File.OpenRead!);
 
@@ -163,21 +170,24 @@ public class AnimationChainListSave
     /// <see cref="FromFile(string, Func{string, Stream})"/> — see that overload for why
     /// <paramref name="streamProvider"/> has no default.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonFile(string filePath, Func<string, Stream> streamProvider)
     {
         using var stream = streamProvider(filePath);
-        var result = ParseJson(JsonNode.Parse(stream)!.AsObject());
+        var result = ReadJson(stream);
         result.FileName = filePath;
         return result;
     }
 
     /// <summary>Parses .achj JSON from an already-open <paramref name="stream"/>, same contract as <see cref="FromStream(Stream)"/>.</summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonStream(Stream stream)
-        => ParseJson(JsonNode.Parse(stream)!.AsObject());
+        => ReadJson(stream);
 
     /// <summary>Parses .achj JSON from an in-memory string, same contract as <see cref="FromString(string)"/>.</summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonString(string json)
-        => ParseJson(JsonNode.Parse(StripLeadingBom(json))!.AsObject());
+        => ParseJson(() => JsonNode.Parse(StripLeadingBom(json)));
 
     // Unlike JsonNode.Parse(Stream) (which treats a UTF-8 BOM as transport-level framing and
     // skips it automatically), JsonNode.Parse(string) re-encodes the string to UTF-8 bytes and
@@ -188,14 +198,32 @@ public class AnimationChainListSave
     private static string StripLeadingBom(string text) =>
         text.Length > 0 && text[0] == '\uFEFF' ? text.Substring(1) : text;
 
+    private static AnimationChainListSave ReadXml(Stream stream)
+    {
+        try
+        {
+            return ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
+        }
+        catch (XmlException ex)
+        {
+            throw new InvalidDataException(ex.Message, ex);
+        }
+    }
+
+    private static AnimationChainListSave ReadJson(Stream stream) => ParseJson(() => JsonNode.Parse(stream));
+
     private static AnimationChainListSave ParseXml(XDocument doc)
     {
         var root = doc.Root!;
+        if (root.Name != "AnimationChainArraySave")
+            throw new InvalidDataException($"This is not an animation file: its root element is <{root.Name.LocalName}>"
+                + (root.Name.Namespace == XNamespace.None ? "" : $" in namespace '{root.Name.NamespaceName}'")
+                + ", and an .achx has <AnimationChainArraySave> in no namespace.");
         var result = new AnimationChainListSave();
 
         var frt = root.Element("FileRelativeTextures");
         if (frt != null)
-            result.FileRelativeTextures = bool.Parse(frt.Value);
+            result.FileRelativeTextures = ParseBool(frt);
 
         var tmu = root.Element("TimeMeasurementUnit");
         if (tmu != null)
@@ -209,12 +237,13 @@ public class AnimationChainListSave
         {
             var chain = new AnimationChainSave
             {
-                Name = (string?)chainEl.Element("Name") ?? string.Empty,
                 IsLocked = BoolEl(chainEl, "Locked"),
                 Loop = BoolEl(chainEl, "Loop", true),
                 PingPong = BoolEl(chainEl, "PingPong"),
                 Reverse = BoolEl(chainEl, "Reverse"),
             };
+            chain.Name = chain.EmptyText.Read(chainEl, "Name");
+            chain.ParentFile = chain.EmptyText.ReadOptional(chainEl, "ParentFile");
 
             foreach (var frameEl in chainEl.Elements("Frame"))
                 chain.Frames.Add(ParseFrame(frameEl, $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
@@ -222,8 +251,7 @@ public class AnimationChainListSave
             result.AnimationChains.Add(chain);
         }
 
-        var projectFileEl = root.Element("ProjectFile");
-        if (projectFileEl != null) result.ProjectFile = projectFileEl.Value;
+        result.ProjectFile = result.EmptyText.ReadOptional(root, "ProjectFile");
 
         return result;
     }
@@ -249,8 +277,8 @@ public class AnimationChainListSave
     /// Frame <see cref="AnimationFrameSave.Events"/> (an FRB2 extension) are written last in the frame as
     /// <c>&lt;Events&gt;&lt;Event&gt;&lt;Name/&gt;&lt;Data/&gt;&lt;/Event&gt;&lt;/Events&gt;</c>, only when the frame has any;
     /// <c>Data</c> is omitted when <c>null</c>.
-    /// AxisAlignedCubeSaves and SphereSaves are FRB1 3D placeholders FRB2 does not model — always
-    /// emitted empty for dialect parity.
+    /// FRB1 fields FRB2 does not model (a chain's ParentFile, a shape's Parent, a polygon's RotationZ, cubes and spheres)
+    /// are carried as read, and text that reads as empty keeps its form: left out, self-closed or an empty pair of tags.
     /// </remarks>
     public void Save(string path)
     {
@@ -487,7 +515,8 @@ public class AnimationChainListSave
         foreach (var chain in AnimationChains)
         {
             var chainEl = new XElement("AnimationChain",
-                new XElement("Name", chain.Name));
+                chain.EmptyText.Write("Name", chain.Name),
+                chain.EmptyText.Write("ParentFile", chain.ParentFile));
             // Tooling-only, written only when true so an unlocked/legacy chain round-trips
             // byte-identical (same convention as the frame writer's optional fields below).
             if (chain.IsLocked)
@@ -506,8 +535,7 @@ public class AnimationChainListSave
             root.Add(chainEl);
         }
 
-        if (ProjectFile != null)
-            root.Add(new XElement("ProjectFile", ProjectFile));
+        root.Add(EmptyText.Write("ProjectFile", ProjectFile));
 
         ThrowIfUnstorable(root);
         return new XDocument(new XDeclaration("1.0", "utf-8", null), root);
@@ -534,7 +562,7 @@ public class AnimationChainListSave
         if (frame.FlipHorizontal) el.Add(new XElement("FlipHorizontal", "true"));
         if (frame.FlipVertical) el.Add(new XElement("FlipVertical", "true"));
         if (frame.FlipDiagonal) el.Add(new XElement("FlipDiagonal", "true"));
-        el.Add(new XElement("TextureName", frame.TextureName));
+        el.Add(frame.EmptyText.Write("TextureName", frame.TextureName));
         el.Add(new XElement("FrameLength", FloatStr(frame.FrameLength)));
         el.Add(new XElement("LeftCoordinate", FloatStr(frame.LeftCoordinate)));
         el.Add(new XElement("RightCoordinate", FloatStr(frame.RightCoordinate)));
@@ -556,10 +584,10 @@ public class AnimationChainListSave
         // written back exactly as read, including ones this version does not understand.
         if (frame.SkipOffsetKeyframe) el.Add(new XElement("SkipOffsetKeyframe", "true"));
         if (frame.SkipColorKeyframe) el.Add(new XElement("SkipColorKeyframe", "true"));
-        if (frame.OffsetInterpolation != null) el.Add(new XElement("OffsetInterpolation", frame.OffsetInterpolation));
-        if (frame.OffsetEasing != null) el.Add(new XElement("OffsetEasing", frame.OffsetEasing));
-        if (frame.ColorInterpolation != null) el.Add(new XElement("ColorInterpolation", frame.ColorInterpolation));
-        if (frame.ColorEasing != null) el.Add(new XElement("ColorEasing", frame.ColorEasing));
+        el.Add(frame.EmptyText.Write("OffsetInterpolation", frame.OffsetInterpolation));
+        el.Add(frame.EmptyText.Write("OffsetEasing", frame.OffsetEasing));
+        el.Add(frame.EmptyText.Write("ColorInterpolation", frame.ColorInterpolation));
+        el.Add(frame.EmptyText.Write("ColorEasing", frame.ColorEasing));
 
         // Preserve wrapper presence so every FRB1 file round-trips byte-identical: the loader sets
         // ShapesSave non-null iff the frame had a <ShapeCollectionSave> element. Some FRB1 files
@@ -575,9 +603,9 @@ public class AnimationChainListSave
             var eventsEl = new XElement("Events");
             foreach (var frameEvent in frame.Events)
             {
-                var eventEl = new XElement("Event", new XElement("Name", frameEvent.Name));
-                if (frameEvent.Data != null) eventEl.Add(new XElement("Data", frameEvent.Data));
-                eventsEl.Add(eventEl);
+                eventsEl.Add(new XElement("Event",
+                    frameEvent.EmptyText.Write("Name", frameEvent.Name),
+                    frameEvent.EmptyText.Write("Data", frameEvent.Data)));
             }
             el.Add(eventsEl);
         }
@@ -588,7 +616,7 @@ public class AnimationChainListSave
     {
         // FRB1 groups shapes into typed lists (not one ordered list), in this exact element
         // order: rectangles, cubes, polygons, circles, spheres. Cubes and spheres are FRB1-era
-        // 3D placeholders FRB2 does not model — emitted as empty elements for dialect parity.
+        // 3D placeholders FRB2 does not model — carried as read, and empty elements otherwise.
         var rectsEl = new XElement("AxisAlignedRectangleSaves");
         foreach (var r in shapes.AARectSaves)
             rectsEl.Add(new XElement("AxisAlignedRectangleSave",
@@ -597,7 +625,8 @@ public class AnimationChainListSave
                 new XElement("Z", FloatStr(r.Z)),
                 new XElement("ScaleX", FloatStr(r.ScaleX)),
                 new XElement("ScaleY", FloatStr(r.ScaleY)),
-                new XElement("Name", r.Name),
+                r.EmptyText.Write("Name", r.Name),
+                r.EmptyText.Write("Parent", r.Parent),
                 WriteColor(r), WriteShapeKeyframes(r)));
 
         var polysEl = new XElement("PolygonSaves");
@@ -608,12 +637,15 @@ public class AnimationChainListSave
                 pointsEl.Add(new XElement("Point",
                     new XElement("X", FloatStr(v.X)),
                     new XElement("Y", FloatStr(v.Y))));
+            var nameEl = p.EmptyText.Write("Name", p.Name);
             polysEl.Add(new XElement("PolygonSave",
-                new XElement("Name", p.Name),
+                p.NameAfterPoints ? null : nameEl,
                 new XElement("X", FloatStr(p.X)),
                 new XElement("Y", FloatStr(p.Y)),
                 new XElement("Z", FloatStr(p.Z)),
+                p.EmptyText.Write("RotationZ", p.RotationZ),
                 pointsEl,
+                p.NameAfterPoints ? nameEl : null,
                 WriteColor(p), WriteShapeKeyframes(p)));
         }
 
@@ -624,15 +656,16 @@ public class AnimationChainListSave
                 new XElement("Y", FloatStr(c.Y)),
                 new XElement("Z", FloatStr(c.Z)),
                 new XElement("Radius", FloatStr(c.Radius)),
-                new XElement("Name", c.Name),
+                c.EmptyText.Write("Name", c.Name),
+                c.EmptyText.Write("Parent", c.Parent),
                 WriteColor(c), WriteShapeKeyframes(c)));
 
         return new XElement("ShapeCollectionSave",
             rectsEl,
-            new XElement("AxisAlignedCubeSaves"),
+            new XElement(shapes.CubeSaves ?? new XElement("AxisAlignedCubeSaves")),
             polysEl,
             circlesEl,
-            new XElement("SphereSaves"));
+            new XElement(shapes.SphereSaves ?? new XElement("SphereSaves")));
     }
 
     // Shape keyframe interpolation (#1478), an FRB2 extension: written only when set, so existing files stay
@@ -641,37 +674,41 @@ public class AnimationChainListSave
     private static IEnumerable<XElement> WriteShapeKeyframes(ShapeSave shape)
     {
         if (shape.SkipOffsetKeyframe) yield return new XElement("SkipOffsetKeyframe", "true");
-        if (shape.OffsetInterpolation != null) yield return new XElement("OffsetInterpolation", shape.OffsetInterpolation);
-        if (shape.OffsetEasing != null) yield return new XElement("OffsetEasing", shape.OffsetEasing);
+        if (shape.EmptyText.Write("OffsetInterpolation", shape.OffsetInterpolation) is { } elOffsetInterpolation) yield return elOffsetInterpolation;
+        if (shape.EmptyText.Write("OffsetEasing", shape.OffsetEasing) is { } elOffsetEasing) yield return elOffsetEasing;
         if (shape is PolygonSave poly)
         {
             if (poly.SkipPointsKeyframe) yield return new XElement("SkipPointsKeyframe", "true");
-            if (poly.PointsInterpolation != null) yield return new XElement("PointsInterpolation", poly.PointsInterpolation);
-            if (poly.PointsEasing != null) yield return new XElement("PointsEasing", poly.PointsEasing);
+            if (poly.EmptyText.Write("PointsInterpolation", poly.PointsInterpolation) is { } elPointsInterpolation) yield return elPointsInterpolation;
+            if (poly.EmptyText.Write("PointsEasing", poly.PointsEasing) is { } elPointsEasing) yield return elPointsEasing;
             yield break;
         }
         if (shape is not SizedShapeSave sized) yield break;
         if (sized.SkipSizeKeyframe) yield return new XElement("SkipSizeKeyframe", "true");
-        if (sized.SizeInterpolation != null) yield return new XElement("SizeInterpolation", sized.SizeInterpolation);
-        if (sized.SizeEasing != null) yield return new XElement("SizeEasing", sized.SizeEasing);
+        if (sized.EmptyText.Write("SizeInterpolation", sized.SizeInterpolation) is { } elSizeInterpolation) yield return elSizeInterpolation;
+        if (sized.EmptyText.Write("SizeEasing", sized.SizeEasing) is { } elSizeEasing) yield return elSizeEasing;
     }
 
-    private static void ReadShapeKeyframes(XElement el, ShapeSave target)
+    private static void ReadShapeFields(XElement el, ShapeSave target)
     {
+        target.Name = target.EmptyText.Read(el, "Name");
         target.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
-        target.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
-        target.OffsetEasing = (string?)el.Element("OffsetEasing");
+        target.OffsetInterpolation = target.EmptyText.ReadOptional(el, "OffsetInterpolation");
+        target.OffsetEasing = target.EmptyText.ReadOptional(el, "OffsetEasing");
         if (target is PolygonSave poly)
         {
+            poly.RotationZ = poly.EmptyText.ReadOptional(el, "RotationZ");
+            poly.NameAfterPoints = el.Element("Name")?.ElementsBeforeSelf("Points").Any() == true;
             poly.SkipPointsKeyframe = BoolEl(el, "SkipPointsKeyframe");
-            poly.PointsInterpolation = (string?)el.Element("PointsInterpolation");
-            poly.PointsEasing = (string?)el.Element("PointsEasing");
+            poly.PointsInterpolation = poly.EmptyText.ReadOptional(el, "PointsInterpolation");
+            poly.PointsEasing = poly.EmptyText.ReadOptional(el, "PointsEasing");
             return;
         }
         if (target is not SizedShapeSave sized) return;
+        sized.Parent = sized.EmptyText.ReadOptional(el, "Parent");
         sized.SkipSizeKeyframe = BoolEl(el, "SkipSizeKeyframe");
-        sized.SizeInterpolation = (string?)el.Element("SizeInterpolation");
-        sized.SizeEasing = (string?)el.Element("SizeEasing");
+        sized.SizeInterpolation = sized.EmptyText.ReadOptional(el, "SizeInterpolation");
+        sized.SizeEasing = sized.EmptyText.ReadOptional(el, "SizeEasing");
     }
 
     private static void WriteShapeKeyframesJson(JsonObject obj, ShapeSave shape)
@@ -731,7 +768,7 @@ public class AnimationChainListSave
     private static AnimationFrameSave ParseFrame(XElement el, string location)
     {
         var frame = new AnimationFrameSave();
-        frame.TextureName = (string?)el.Element("TextureName") ?? string.Empty;
+        frame.TextureName = frame.EmptyText.Read(el, "TextureName");
         frame.FrameLength = FloatEl(el, "FrameLength");
         frame.LeftCoordinate = FloatEl(el, "LeftCoordinate");
         frame.RightCoordinate = FloatEl(el, "RightCoordinate", 1f);
@@ -749,10 +786,10 @@ public class AnimationChainListSave
         frame.ColorOperation = ColorOperationEl(el, "ColorOperation", location);
         frame.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
         frame.SkipColorKeyframe = BoolEl(el, "SkipColorKeyframe");
-        frame.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
-        frame.OffsetEasing = (string?)el.Element("OffsetEasing");
-        frame.ColorInterpolation = (string?)el.Element("ColorInterpolation");
-        frame.ColorEasing = (string?)el.Element("ColorEasing");
+        frame.OffsetInterpolation = frame.EmptyText.ReadOptional(el, "OffsetInterpolation");
+        frame.OffsetEasing = frame.EmptyText.ReadOptional(el, "OffsetEasing");
+        frame.ColorInterpolation = frame.EmptyText.ReadOptional(el, "ColorInterpolation");
+        frame.ColorEasing = frame.EmptyText.ReadOptional(el, "ColorEasing");
         // Frame <Name>/<HasCustomName> in legacy .achx are intentionally ignored: a frame's
         // identity is its index, so the editor always shows a positional "Frame N" label.
 
@@ -765,11 +802,12 @@ public class AnimationChainListSave
         var eventsEl = el.Element("Events");
         if (eventsEl != null)
             foreach (var eventEl in eventsEl.Elements("Event"))
-                frame.Events.Add(new AnimationFrameEvent
-                {
-                    Name = (string?)eventEl.Element("Name") ?? string.Empty,
-                    Data = (string?)eventEl.Element("Data"),
-                });
+            {
+                var frameEvent = new AnimationFrameEvent();
+                frameEvent.Name = frameEvent.EmptyText.Read(eventEl, "Name");
+                frameEvent.Data = frameEvent.EmptyText.ReadOptional(eventEl, "Data");
+                frame.Events.Add(frameEvent);
+            }
 
         return frame;
     }
@@ -786,6 +824,9 @@ public class AnimationChainListSave
         if (nestedShapesEl != null)
             return ParseNestedShapesDialect(nestedShapesEl);
 
+        shapes.CubeSaves = CarriedEl(el, "AxisAlignedCubeSaves");
+        shapes.SphereSaves = CarriedEl(el, "SphereSaves");
+
         // FRB1 dialect: separate typed containers. Read in write order (rects, polygons, circles)
         // so the round-trip is stable; WriteShapes re-groups by type regardless of list order.
         var rectsEl = el.Element("AxisAlignedRectangleSaves");
@@ -795,14 +836,13 @@ public class AnimationChainListSave
             {
                 var rect = new AARectSave
                 {
-                    Name = (string?)r.Element("Name") ?? string.Empty,
                     X = FloatEl(r, "X"),
                     Y = FloatEl(r, "Y"),
                     ScaleX = FloatEl(r, "ScaleX", 16f),
                     ScaleY = FloatEl(r, "ScaleY", 16f),
                 };
                 ReadColor(r, rect);
-                ReadShapeKeyframes(r, rect);
+                ReadShapeFields(r, rect);
                 shapes.Add(rect);
             }
         }
@@ -814,7 +854,6 @@ public class AnimationChainListSave
             {
                 var poly = new PolygonSave
                 {
-                    Name = (string?)p.Element("Name") ?? string.Empty,
                     X = FloatEl(p, "X"),
                     Y = FloatEl(p, "Y"),
                 };
@@ -825,7 +864,7 @@ public class AnimationChainListSave
                         poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                 }
                 ReadColor(p, poly);
-                ReadShapeKeyframes(p, poly);
+                ReadShapeFields(p, poly);
                 shapes.Add(poly);
             }
         }
@@ -837,13 +876,12 @@ public class AnimationChainListSave
             {
                 var circle = new CircleSave
                 {
-                    Name = (string?)c.Element("Name") ?? string.Empty,
                     X = FloatEl(c, "X"),
                     Y = FloatEl(c, "Y"),
                     Radius = FloatEl(c, "Radius", 16f),
                 };
                 ReadColor(c, circle);
-                ReadShapeKeyframes(c, circle);
+                ReadShapeFields(c, circle);
                 shapes.Add(circle);
             }
         }
@@ -866,32 +904,29 @@ public class AnimationChainListSave
                 case "AxisAlignedRectangleSave":
                     var rect = new AARectSave
                     {
-                        Name = (string?)child.Element("Name") ?? string.Empty,
                         X = FloatEl(child, "X"),
                         Y = FloatEl(child, "Y"),
                         ScaleX = FloatEl(child, "ScaleX", 16f),
                         ScaleY = FloatEl(child, "ScaleY", 16f),
                     };
                     ReadColor(child, rect);
-                    ReadShapeKeyframes(child, rect);
+                    ReadShapeFields(child, rect);
                     shapes.Add(rect);
                     break;
                 case "CircleSave":
                     var circle = new CircleSave
                     {
-                        Name = (string?)child.Element("Name") ?? string.Empty,
                         X = FloatEl(child, "X"),
                         Y = FloatEl(child, "Y"),
                         Radius = FloatEl(child, "Radius", 16f),
                     };
                     ReadColor(child, circle);
-                    ReadShapeKeyframes(child, circle);
+                    ReadShapeFields(child, circle);
                     shapes.Add(circle);
                     break;
                 case "PolygonSave":
                     var poly = new PolygonSave
                     {
-                        Name = (string?)child.Element("Name") ?? string.Empty,
                         X = FloatEl(child, "X"),
                         Y = FloatEl(child, "Y"),
                     };
@@ -900,11 +935,15 @@ public class AnimationChainListSave
                         foreach (var v in pointsEl.Elements("Vector2Save"))
                             poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                     ReadColor(child, poly);
-                    ReadShapeKeyframes(child, poly);
+                    ReadShapeFields(child, poly);
                     shapes.Add(poly);
                     break;
             }
         }
+
+        // Saving rewrites this dialect into FRB1's, so there is no form or order of it to keep.
+        foreach (var shape in shapes.Shapes.OfType<ShapeSave>()) shape.EmptyText = default;
+        foreach (var poly in shapes.PolygonSaves) poly.NameAfterPoints = false;
 
         return shapes;
     }
@@ -919,22 +958,37 @@ public class AnimationChainListSave
         target.Blue = FloatEl(el, "Blue", 1f);
     }
 
+    // A copy, so it does not keep the whole document it was read from.
+    private static XElement? CarriedEl(XElement parent, string name) =>
+        parent.Element(name) is { HasElements: true } el ? new XElement(el) : null;
+
     private static float FloatEl(XElement parent, string name, float defaultValue = 0f)
     {
         var el = parent.Element(name);
-        return el != null ? float.Parse(el.Value, CultureInfo.InvariantCulture) : defaultValue;
+        if (el == null) return defaultValue;
+        return float.TryParse(el.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : throw Wrong(el, "a number");
     }
 
     private static bool BoolEl(XElement parent, string name, bool defaultValue = false)
     {
         var el = parent.Element(name);
-        return el != null ? bool.Parse(el.Value) : defaultValue;
+        return el != null ? ParseBool(el) : defaultValue;
     }
 
     private static int? IntElNullable(XElement parent, string name)
     {
         var el = parent.Element(name);
-        return el != null ? int.Parse(el.Value, CultureInfo.InvariantCulture) : null;
+        if (el == null) return null;
+        return int.TryParse(el.Value, CultureInfo.InvariantCulture, out var value) ? value : throw Wrong(el, "a whole number");
+    }
+
+    private static bool ParseBool(XElement el) =>
+        bool.TryParse(el.Value, out var value) ? value : throw Wrong(el, "true or false");
+
+    private static InvalidDataException Wrong(XElement el, string expected)
+    {
+        var context = XmlContext(el, null);
+        return new InvalidDataException($"{(context == null ? "" : context + ": ")}{el.Name.LocalName} '{el.Value}' must be {expected}.");
     }
 
     private static ColorOperation? ColorOperationEl(XElement parent, string name, string location)
@@ -966,43 +1020,64 @@ public class AnimationChainListSave
         throw new InvalidDataException($"{prefix}{propertyName} '{value}' isn't valid (expected {expected}).");
     }
 
-    private static AnimationChainListSave ParseJson(JsonObject root)
+    private static AnimationChainListSave ParseJson(Func<JsonNode?> read)
     {
-        var result = new AnimationChainListSave();
-
-        if (root["fileRelativeTextures"] is JsonValue frt)
-            result.FileRelativeTextures = frt.GetValue<bool>();
-
-        if (root["timeMeasurementUnit"] is JsonValue tmu)
-            result.TimeMeasurementUnit = ParseEnum<TimeMeasurementUnit>(tmu.GetValue<string>()!, "TimeMeasurementUnit", null);
-
-        if (root["coordinateType"] is JsonValue ct)
-            result.CoordinateType = ParseEnum<TextureCoordinateType>(ct.GetValue<string>()!, "CoordinateType", null);
-
-        if (root["animationChains"] is JsonArray chainsArray)
+        JsonNode? root;
+        try
         {
-            foreach (var chainNode in chainsArray)
-            {
-                var chainObj = chainNode!.AsObject();
-                var chain = new AnimationChainSave
-                {
-                    Name = chainObj["name"]?.GetValue<string>() ?? string.Empty,
-                    IsLocked = BoolProp(chainObj, "locked"),
-                    Loop = BoolProp(chainObj, "loop", true),
-                    PingPong = BoolProp(chainObj, "pingPong"),
-                    Reverse = BoolProp(chainObj, "reverse"),
-                };
-
-                if (chainObj["frames"] is JsonArray framesArray)
-                    foreach (var frameNode in framesArray)
-                        chain.Frames.Add(ParseFrameJson(frameNode!.AsObject(), $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
-
-                result.AnimationChains.Add(chain);
-            }
+            root = read();
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException(ex.Message, ex);
         }
 
-        if (root["projectFile"] is JsonValue pf)
-            result.ProjectFile = pf.GetValue<string>();
+        try
+        {
+            return ParseJson(root as JsonObject ?? throw new InvalidDataException("This is not an animation file: an .achj holds a JSON object."));
+        }
+        // A JsonObject throws these only when it is read: a repeated property, and a string that is not valid UTF-16.
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            throw new InvalidDataException(ex.Message, ex);
+        }
+    }
+
+    private static AnimationChainListSave ParseJson(JsonObject root)
+    {
+        var result = new AnimationChainListSave
+        {
+            FileRelativeTextures = BoolProp(root, "fileRelativeTextures", true),
+        };
+
+        if (StringProp(root, "timeMeasurementUnit") is { } tmu)
+            result.TimeMeasurementUnit = ParseEnum<TimeMeasurementUnit>(tmu, "TimeMeasurementUnit", null);
+
+        if (StringProp(root, "coordinateType") is { } ct)
+            result.CoordinateType = ParseEnum<TextureCoordinateType>(ct, "CoordinateType", null);
+
+        // Every .achj has the array, so a file without it is some other JSON, and opening it as empty would lose it on save.
+        if (root["animationChains"] is null)
+            throw new InvalidDataException("This is not an animation file: it has no \"animationChains\" array.");
+
+        foreach (var chainObj in ObjectsProp(root, "animationChains"))
+        {
+            var chain = new AnimationChainSave
+            {
+                Name = StringProp(chainObj, "name") ?? string.Empty,
+                IsLocked = BoolProp(chainObj, "locked"),
+                Loop = BoolProp(chainObj, "loop", true),
+                PingPong = BoolProp(chainObj, "pingPong"),
+                Reverse = BoolProp(chainObj, "reverse"),
+            };
+
+            foreach (var frameObj in ObjectsProp(chainObj, "frames"))
+                chain.Frames.Add(ParseFrameJson(frameObj, $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
+
+            result.AnimationChains.Add(chain);
+        }
+
+        result.ProjectFile = StringProp(root, "projectFile");
 
         return result;
     }
@@ -1011,7 +1086,7 @@ public class AnimationChainListSave
     {
         var frame = new AnimationFrameSave
         {
-            TextureName = el["textureName"]?.GetValue<string>() ?? string.Empty,
+            TextureName = StringProp(el, "textureName") ?? string.Empty,
             FrameLength = FloatProp(el, "frameLength"),
             LeftCoordinate = FloatProp(el, "leftCoordinate"),
             RightCoordinate = FloatProp(el, "rightCoordinate", 1f),
@@ -1035,17 +1110,15 @@ public class AnimationChainListSave
             ColorEasing = StringProp(el, "colorEasing"),
         };
 
-        if (el["shapes"] is JsonObject shapesObj)
-            frame.ShapesSave = ParseShapesJson(shapesObj);
+        if (el["shapes"] is { } shapes)
+            frame.ShapesSave = ParseShapesJson(shapes as JsonObject ?? throw Wrong(shapes, "an object"));
 
-        if (el["events"] is JsonArray eventsArray)
-            foreach (var eventNode in eventsArray)
-                if (eventNode is JsonObject eventObj)
-                    frame.Events.Add(new AnimationFrameEvent
-                    {
-                        Name = eventObj["name"]?.GetValue<string>() ?? string.Empty,
-                        Data = eventObj["data"]?.GetValue<string>(),
-                    });
+        foreach (var eventObj in ObjectsProp(el, "events", skipNulls: true))
+            frame.Events.Add(new AnimationFrameEvent
+            {
+                Name = StringProp(eventObj, "name") ?? string.Empty,
+                Data = StringProp(eventObj, "data"),
+            });
 
         return frame;
     }
@@ -1054,64 +1127,48 @@ public class AnimationChainListSave
     {
         var shapes = new ShapesSave();
 
-        if (el["rectangles"] is JsonArray rectsArray)
+        foreach (var r in ObjectsProp(el, "rectangles"))
         {
-            foreach (var node in rectsArray)
+            var rect = new AARectSave
             {
-                var r = node!.AsObject();
-                var rect = new AARectSave
-                {
-                    Name = r["name"]?.GetValue<string>() ?? string.Empty,
-                    X = FloatProp(r, "x"),
-                    Y = FloatProp(r, "y"),
-                    ScaleX = FloatProp(r, "scaleX", 16f),
-                    ScaleY = FloatProp(r, "scaleY", 16f),
-                };
-                ReadColorJson(r, rect);
-                ReadShapeKeyframesJson(r, rect);
-                shapes.Add(rect);
-            }
+                Name = StringProp(r, "name") ?? string.Empty,
+                X = FloatProp(r, "x"),
+                Y = FloatProp(r, "y"),
+                ScaleX = FloatProp(r, "scaleX", 16f),
+                ScaleY = FloatProp(r, "scaleY", 16f),
+            };
+            ReadColorJson(r, rect);
+            ReadShapeKeyframesJson(r, rect);
+            shapes.Add(rect);
         }
 
-        if (el["circles"] is JsonArray circlesArray)
+        foreach (var c in ObjectsProp(el, "circles"))
         {
-            foreach (var node in circlesArray)
+            var circle = new CircleSave
             {
-                var c = node!.AsObject();
-                var circle = new CircleSave
-                {
-                    Name = c["name"]?.GetValue<string>() ?? string.Empty,
-                    X = FloatProp(c, "x"),
-                    Y = FloatProp(c, "y"),
-                    Radius = FloatProp(c, "radius", 16f),
-                };
-                ReadColorJson(c, circle);
-                ReadShapeKeyframesJson(c, circle);
-                shapes.Add(circle);
-            }
+                Name = StringProp(c, "name") ?? string.Empty,
+                X = FloatProp(c, "x"),
+                Y = FloatProp(c, "y"),
+                Radius = FloatProp(c, "radius", 16f),
+            };
+            ReadColorJson(c, circle);
+            ReadShapeKeyframesJson(c, circle);
+            shapes.Add(circle);
         }
 
-        if (el["polygons"] is JsonArray polysArray)
+        foreach (var p in ObjectsProp(el, "polygons"))
         {
-            foreach (var node in polysArray)
+            var poly = new PolygonSave
             {
-                var p = node!.AsObject();
-                var poly = new PolygonSave
-                {
-                    Name = p["name"]?.GetValue<string>() ?? string.Empty,
-                    X = FloatProp(p, "x"),
-                    Y = FloatProp(p, "y"),
-                };
-                if (p["points"] is JsonArray pointsArray)
-                    foreach (var ptNode in pointsArray)
-                    {
-                        var pt = ptNode!.AsObject();
-                        poly.Points.Add(new Vector2Save { X = FloatProp(pt, "x"), Y = FloatProp(pt, "y") });
-                    }
-                ReadColorJson(p, poly);
-                ReadShapeKeyframesJson(p, poly);
-                shapes.Add(poly);
-            }
+                Name = StringProp(p, "name") ?? string.Empty,
+                X = FloatProp(p, "x"),
+                Y = FloatProp(p, "y"),
+            };
+            foreach (var pt in ObjectsProp(p, "points"))
+                poly.Points.Add(new Vector2Save { X = FloatProp(pt, "x"), Y = FloatProp(pt, "y") });
+            ReadColorJson(p, poly);
+            ReadShapeKeyframesJson(p, poly);
+            shapes.Add(poly);
         }
 
         return shapes;
@@ -1129,17 +1186,45 @@ public class AnimationChainListSave
     }
 
     private static float FloatProp(JsonObject parent, string name, float defaultValue = 0f) =>
-        parent[name] is JsonValue v ? v.GetValue<float>() : defaultValue;
+        TryProp(parent, name, "a number", out float value) ? value : defaultValue;
 
     private static bool BoolProp(JsonObject parent, string name, bool defaultValue = false) =>
-        parent[name] is JsonValue v ? v.GetValue<bool>() : defaultValue;
+        TryProp(parent, name, "true or false", out bool value) ? value : defaultValue;
 
     private static string? StringProp(JsonObject parent, string name) =>
-        parent[name] is JsonValue v ? v.GetValue<string>() : null;
+        TryProp(parent, name, "a string", out string value) ? value : null;
 
     private static int? IntPropNullable(JsonObject parent, string name) =>
-        parent[name] is JsonValue v ? v.GetValue<int>() : null;
+        TryProp(parent, name, "a whole number", out int value) ? value : null;
 
     private static ColorOperation? ColorOperationProp(JsonObject parent, string name, string location) =>
-        parent[name] is JsonValue v ? ParseEnum<ColorOperation>(v.GetValue<string>()!, "ColorOperation", location) : null;
+        StringProp(parent, name) is { } value ? ParseEnum<ColorOperation>(value, "ColorOperation", location) : null;
+
+    // False for an absent property or JSON null; any other kind than the expected one is refused.
+    private static bool TryProp<T>(JsonObject parent, string name, string expected, out T value) where T : notnull
+    {
+        value = default!;
+        if (parent[name] is not { } node) return false;
+        if (node is JsonValue json && json.TryGetValue<T>(out var read))
+        {
+            value = read;
+            return true;
+        }
+        throw Wrong(node, expected);
+    }
+
+    // The objects of an array property; none for an absent property or JSON null.
+    private static IEnumerable<JsonObject> ObjectsProp(JsonObject parent, string name, bool skipNulls = false)
+    {
+        if (parent[name] is not { } node) yield break;
+        var array = node as JsonArray ?? throw Wrong(node, "an array");
+        for (int i = 0; i < array.Count; i++)
+            if (array[i] is not null || !skipNulls)
+                yield return array[i] as JsonObject ?? throw new InvalidDataException($"{PathOf(array)}[{i}] must be an object.");
+    }
+
+    private static InvalidDataException Wrong(JsonNode node, string expected) => new($"{PathOf(node)} must be {expected}.");
+
+    // GetPath starts at the root, as "$."
+    private static string PathOf(JsonNode node) => node.GetPath()[2..];
 }

@@ -125,7 +125,7 @@ public static class EditOps
             new("chain", "string", true, "Chain name."),
             new("texture", "string", true, "Texture path, relative to the animation file or absolute."),
             new("region", "string", false, "Pixel rectangle of the texture to show, as x,y,width,height. PNG textures only."),
-            new("length", "number", false, "Frame length in the file's own time unit (see describe). Default: that unit's default length."),
+            new("length", "number", false, "Frame length in the file's own time unit (see describe), in set-frame-length's range. Default: that unit's default length."),
             new("copy", "string", false, CopyDescription, CopyValues),
         ]),
         new("add-frames-grid", "Appends one frame per cell of a sprite sheet grid, row by row from the top-left. The texture must be an existing PNG and the whole grid must lie inside it. On a .tsx the cells follow the tileset's margin and spacing.",
@@ -138,7 +138,7 @@ public static class EditOps
             new("rows", "integer", true, "Number of rows, greater than 0."),
             new("start", "integer", false, "First cell to add, numbered row by row from 0. Default 0."),
             new("count", "integer", false, "How many cells to add from start. Default: through the last cell."),
-            new("frameLength", "number", false, "Length of each frame in the file's own time unit. Default: that unit's default length."),
+            new("frameLength", "number", false, "Length of each frame in the file's own time unit, in set-frame-length's range. Default: that unit's default length."),
             new("copy", "string", false, CopyDescription, CopyValues),
         ]),
         new("delete-frame", "Deletes one frame.",
@@ -597,7 +597,7 @@ public static class EditOps
         decimal value = 0;
         EditResult Take(float current)
         {
-            value = (decimal)current;
+            value = NumericEdit.ToDecimal(current);
             return new EditResult([], [], []);
         }
 

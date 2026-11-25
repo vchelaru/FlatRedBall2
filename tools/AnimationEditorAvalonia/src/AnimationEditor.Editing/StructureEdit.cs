@@ -148,7 +148,8 @@ public static class StructureEdit
     /// Appends a frame showing <paramref name="absoluteTexture"/>, stored relative to the .achx. The file must
     /// exist and pass <paramref name="probe"/>. Without <paramref name="region"/> the frame shows the whole texture, whose
     /// size must be readable; a region needs the texture's size, which is only known for PNG files. Without <paramref name="length"/> the
-    /// frame gets the default length of the file's own time unit; a given length is in that unit.
+    /// frame gets the default length of the file's own time unit; a given length is in that unit and
+    /// in <see cref="PropertyEdit.SetFrameLength"/>'s range.
     /// </summary>
     public static EditResult AddFrame(
         IProjectManager projectManager, IAppCommands commands, AnimationChainSave chain,
@@ -159,10 +160,9 @@ public static class StructureEdit
             return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absoluteTexture}");
         if (!probe.CanDecode(absoluteTexture))
             return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absoluteTexture}");
-        if (length is { } l && !(l > 0f))
-            return Fail(EditErrorCode.InvalidValue, "A frame length must be greater than zero.");
-        if (length is { } given && !NumberFields.InRange(given))
-            return Fail(EditErrorCode.InvalidValue, $"A frame length must be at most {NumberFields.Max}.");
+        if (length is { } given && PropertyEdit.CheckLength(
+                FrameLengthUnit.Of(projectManager.AnimationChainListSave), given, $"{chain.Name}/{chain.Frames.Count}") is { } bad)
+            return bad;
 
         if (region is { } r)
         {
