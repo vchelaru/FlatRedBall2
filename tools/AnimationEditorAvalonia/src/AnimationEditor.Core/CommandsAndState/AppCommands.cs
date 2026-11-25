@@ -2120,18 +2120,21 @@ namespace AnimationEditor.Core.CommandsAndState
 
         // ── A17: Scale Frame Times ────────────────────────────────────────────
 
-        /// <summary>
-        /// Scales all frame lengths so the total duration of <paramref name="chain"/>
-        /// equals <paramref name="targetTotalDuration"/>, keeping ratios proportional.
-        /// </summary>
+        /// <inheritdoc cref="IAppCommands.ScaleFrameTimesProportional"/>
         public void ScaleFrameTimesProportional(
             AnimationChainSave chain,
-            float targetTotalDuration)
+            float targetTotalDuration,
+            IReadOnlyList<float>? fromLengths = null)
         {
             if (IsChainLocked(chain)) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
-                () => FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration),
+                () =>
+                {
+                    for (int i = 0; i < fromLengths?.Count; i++)
+                        chain.Frames[i].FrameLength = fromLengths[i];
+                    FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration);
+                },
                 this, _events, refreshWireframe: false,
                 "Scale Frame Times", coalesceKind: "ScaleFrameTimes"));
         }
@@ -2840,7 +2843,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.DiscardPendingEdits"/>
         public void DiscardPendingEdits()
         {
-            if (_undoManager.CanUndo)
+            if (_undoManager.HasOpenCoalescedEdit)
                 _undoManager.Undo();
         }
 
