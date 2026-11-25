@@ -1357,6 +1357,7 @@ public partial class MainWindow : Window
         _events.AchxDeletedOnDisk += path =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowInfo($"'{System.IO.Path.GetFileName(path)}' was deleted from disk."));
+        _events.AchxReloadedFromDisk += _ => CancelAchxDrags();
         _events.AchxReloadedFromDisk += path =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowInfo($"Reloaded {System.IO.Path.GetFileName(path)}"));
@@ -8064,7 +8065,7 @@ public partial class MainWindow : Window
 
             e.Handled = true;
             // A command that runs while an in-place rename is open (Ctrl+S, Undo, Back) applies the typed name first, and one
-            // that runs during a sequence timeline drag cancels the drag first, so it acts on the document as saved.
+            // that runs during a drag cancels the drag first, so it acts on the document as saved.
             SettlePendingInput();
             match.Action();
         }), RoutingStrategies.Tunnel);

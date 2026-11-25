@@ -38,8 +38,8 @@ public partial class MainWindow
 
         public void CaptureLeaving(TabEntry tab)
         {
-            // Before the snapshot, so the rename is in this tab's history.
-            _window.CommitPendingTreeRename();
+            // Before the snapshot, so the rename is in this tab's history, and a held drag cannot add to the next tab's.
+            _window.SettlePendingAchxInput();
             _window._tabController.CaptureLeavingTab(tab);
             _window.SaveCompanionFile();
         }
