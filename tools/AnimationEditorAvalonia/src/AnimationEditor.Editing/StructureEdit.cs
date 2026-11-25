@@ -115,9 +115,6 @@ public static class StructureEdit
 
         // Only the chains that come along need their textures to convert a UV file.
         source.AnimationChains = chains;
-        // An .achj can hold text XML cannot store.
-        try { source.ToXmlString(); }
-        catch (InvalidDataException ex) { return Fail(EditErrorCode.InvalidValue, $"{sourceName}: {ex.Message}"); }
         try { AnimationFileLoader.ConvertToEditorCoordinates(source, new FilePath(sourcePath)); }
         catch (InvalidOperationException ex) { return Fail(EditErrorCode.UnsupportedFile, $"{sourceName}: {ex.Message}"); }
 
@@ -166,7 +163,6 @@ public static class StructureEdit
             return Fail(EditErrorCode.InvalidValue, "A frame length must be greater than zero.");
         if (length is { } given && !NumberFields.InRange(given))
             return Fail(EditErrorCode.InvalidValue, $"A frame length must be at most {NumberFields.Max}.");
-        if (StorableText.Problem(absoluteTexture) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
 
         if (region is { } r)
         {

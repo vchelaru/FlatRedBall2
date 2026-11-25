@@ -50,6 +50,14 @@ public class StorableTextTests
         return new AnimationChainListSave { AnimationChains = [chain] };
     }
 
+    [Fact]
+    public void Problem_ShowsEveryBadCharacterMasked()
+    {
+        string text = "a\u0001b\u0002\uD83D\uDE00" + (char)0xD83D;
+
+        StorableText.Problem(text).ShouldBe("\"a\uFFFDb\uFFFD\uD83D\uDE00\uFFFD\" contains the character U+0001, which XML cannot store.");
+    }
+
     [Theory]
     [InlineData("chain")]
     [InlineData("texture")]

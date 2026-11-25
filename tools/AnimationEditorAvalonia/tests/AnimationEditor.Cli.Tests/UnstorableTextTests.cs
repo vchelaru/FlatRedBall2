@@ -30,27 +30,6 @@ public class UnstorableTextTests : InlineBatchTests
         (await Fails("hero.achj", "InvalidValue",
             "add-shape Walk/0 type=rect name=New", "add-frame-event Walk/0 name=Step", op.Replace("BAD", Bad))).ShouldContain("U+0001");
 
-    [Theory]
-    [InlineData("set-frame-texture Walk/0 texture=")]
-    [InlineData("add-frame Walk region=0,0,8,8 texture=")]
-    [InlineData("add-frame Walk texture=")]
-    public async Task TextureOp_WithAFileNameXmlCannotStore_IsRefused(string op)
-    {
-        string name = "sheet" + (char)0xFFFF + ".png";
-        File.Copy(PathOf("sheet.png"), PathOf(name));
-
-        (await Fails("hero.achj", "InvalidValue", op + name)).ShouldContain("U+FFFF");
-    }
-
-    [Fact]
-    public async Task ImportChain_OfAChainHoldingTextXmlCannotStore_IsRefusedUnlessRenamed()
-    {
-        WriteBadAchj();
-
-        (await Fails("hero.achj", "InvalidValue", $"import-chain * from={PathOf("bad.achj")}")).ShouldContain("U+0001");
-        (await Ok("hero.achj", $"import-chain {Bad} name=Good from={PathOf("bad.achj")}")).ShouldContain("Good");
-    }
-
     [Fact]
     public async Task RenameChain_AwayFromANameXmlCannotStore_Works()
     {

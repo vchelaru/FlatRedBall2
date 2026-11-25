@@ -5855,8 +5855,8 @@ public partial class MainWindow : Window
         PropFrameEvents.EditCommitted += (index, name, data) =>
         {
             if (_selectedState.SelectedFrame is not { } frame) return;
-            var stored = frame.Events.Select(e => e.Name).Concat(frame.Events.Select(e => e.Data));
-            if (RefuseUnstorable(name, stored) || RefuseUnstorable(data, stored)) return;
+            var current = frame.Events[index];
+            if (RefuseUnstorable(name, current.Name) || RefuseUnstorable(data, current.Data)) return;
             _appCommands.SetFrameEvent(frame, index, name, data);
         };
         PropFrameEvents.RemoveRequested += index =>
@@ -6213,13 +6213,10 @@ public partial class MainWindow : Window
         return InspectorShapes(all);
     }
 
-    /// <summary>
-    /// Reports text XML cannot store and puts the Inspector back to the stored values; false when the text can be
-    /// stored, or is <paramref name="stored"/> already (a loaded .achj can hold it, and its other fields stay editable).
-    /// </summary>
-    private bool RefuseUnstorable(string? text, IEnumerable<string?> stored)
+    /// <summary>Reports a change from <paramref name="current"/> to text XML cannot store and puts the Inspector back; false for any other.</summary>
+    private bool RefuseUnstorable(string? text, string? current)
     {
-        if (StorableText.Problem(text) is not { } problem || stored.Contains(text)) return false;
+        if (text == current || StorableText.Problem(text) is not { } problem) return false;
         ShowProblem(problem);
         RefreshPropertyPanel();
         return true;
@@ -6234,7 +6231,7 @@ public partial class MainWindow : Window
         NumericEdit? x = EditOf(PropShapesX);
         NumericEdit? y = EditOf(PropShapesY);
         string? name = PropShapesName.Text;
-        if (RefuseUnstorable(name, shapes.Select(s => s.Name))) return;
+        if (RefuseUnstorable(name, shapes[0].Name)) return;
         if (name != null) _appCommands.SetShapePropsBulk(shapes, name, null, null);
         if (x != null || y != null)
             _appCommands.SetShapePropsBulk(ShapeKeyframes(shapes, ShapeKeyframeGroup.Offset), null, x, y);
@@ -6656,7 +6653,7 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh || _selectedState.SelectedPolygon is not { } polygon) return;
         var polygons = InspectorShapes(_selectedState.SelectedPolygons);
-        if (RefuseUnstorable(PropPolygonName.Text, polygons.Select(p => p.Name))) return;
+        if (RefuseUnstorable(PropPolygonName.Text, polygon.Name)) return;
 
         if (_selectedState.SelectedPolygons.Count > 1)
         {
@@ -7008,7 +7005,7 @@ public partial class MainWindow : Window
         NumericEdit? scaleX = EditOf(PropRectScaleX);
         NumericEdit? scaleY = EditOf(PropRectScaleY);
         string? name = PropRectName.Text;
-        if (RefuseUnstorable(name, rects.Select(r => r.Name))) return;
+        if (RefuseUnstorable(name, rects[0].Name)) return;
 
         // Offset and size edits reach only the rectangles whose keyframe for that group is on (#1478): a
         // skipped rectangle shows a computed value that must not be written back as its own.
@@ -7030,7 +7027,7 @@ public partial class MainWindow : Window
         NumericEdit? y = EditOf(PropCircleY);
         NumericEdit? radius = EditOf(PropCircleRadius);
         string? name = PropCircleName.Text;
-        if (RefuseUnstorable(name, circles.Select(c => c.Name))) return;
+        if (RefuseUnstorable(name, circles[0].Name)) return;
 
         // See ApplyRectProps: offset and size edits reach only shapes whose keyframe for that group is on.
         if (name != null) _appCommands.SetCirclePropsBulk(circles, name, null, null, null);

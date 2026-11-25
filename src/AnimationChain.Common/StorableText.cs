@@ -1,9 +1,10 @@
+using System.Linq;
 using System.Xml;
 
 namespace FlatRedBall2.AnimationEditorCommon;
 
 /// <summary>Whether a name or other text can be stored in an XML animation file (.achx, .tsx).</summary>
-public static class StorableText
+internal static class StorableText
 {
     /// <summary>
     /// Why <paramref name="text"/> cannot be stored, naming its first bad character as <c>U+0001</c>; null when it can.
@@ -20,7 +21,9 @@ public static class StorableText
                 i++;
                 continue;
             }
-            return $"\"{text.Replace(c, '\uFFFD')}\" contains the character U+{(int)c:X4}, which XML cannot store.";
+            // EnumerateRunes already turns half a surrogate pair into U+FFFD.
+            string shown = string.Concat(text.EnumerateRunes().Select(r => r.IsBmp && !XmlConvert.IsXmlChar((char)r.Value) ? "\uFFFD" : r.ToString()));
+            return $"\"{shown}\" contains the character U+{(int)c:X4}, which XML cannot store.";
         }
         return null;
     }
