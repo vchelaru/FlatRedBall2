@@ -35,7 +35,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         {
             if (_currentChainIndex < 0) return null;
             var chain = _chains[_currentChainIndex];
-            return chain.Count > 0 ? chain[_currentFrameIndex] : null;
+            return chain.Count > 0 ? chain[CurrentFrameIndex] : null;
         }
     }
 
@@ -46,7 +46,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public (float X, float Y) CurrentOffset =>
         CurrentChain is { Count: > 0 } chain
-            ? KeyframeEvaluator.EvaluateOffset(chain, GlidesAcrossLoop, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            ? KeyframeEvaluator.EvaluateOffset(chain, GlidesAcrossLoop, CurrentFrameIndex, ElapsedInCurrentFrame(chain))
             : (0f, 0f);
 
     /// <summary>
@@ -56,7 +56,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public KeyframeColor CurrentColor =>
         CurrentChain is { Count: > 0 } chain
-            ? KeyframeEvaluator.EvaluateColor(chain, GlidesAcrossLoop, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            ? KeyframeEvaluator.EvaluateColor(chain, GlidesAcrossLoop, CurrentFrameIndex, ElapsedInCurrentFrame(chain))
             : default;
 
     /// <summary>The currently playing <see cref="AnimationChain{TFrame}"/>, or <c>null</c> if none.</summary>
@@ -76,7 +76,8 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// <exception cref="ArgumentOutOfRangeException">Value is outside the current chain's frame range.</exception>
     public int CurrentFrameIndex
     {
-        get => _currentFrameIndex;
+        // A hot reload can shorten the chain under a player that is not updating.
+        get => Math.Clamp(_currentFrameIndex, 0, Math.Max(0, (CurrentChain?.Count ?? 0) - 1));
         set
         {
             var chain = RequireCurrentPlayableChain();
@@ -367,7 +368,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     private double ElapsedInCurrentFrame(AnimationChain<TFrame> chain)
     {
         double forward = PlaybackTimeline.Map(_timeIntoAnimation, chain.TotalLength.TotalSeconds, IsPingPong, IsReversed).ForwardTime;
-        return Math.Clamp(forward - GetTimeAtFrameStart(chain, _currentFrameIndex), 0, chain[_currentFrameIndex].FrameLength.TotalSeconds);
+        return Math.Clamp(forward - GetTimeAtFrameStart(chain, CurrentFrameIndex), 0, chain[CurrentFrameIndex].FrameLength.TotalSeconds);
     }
 
     private static double GetTimeAtFrameStart(AnimationChain<TFrame> chain, int frameIndex)

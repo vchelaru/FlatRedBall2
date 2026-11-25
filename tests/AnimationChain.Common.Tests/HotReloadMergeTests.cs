@@ -59,6 +59,22 @@ public class HotReloadMergeTests
     }
 
     [Fact]
+    public void TryReloadFrom_FewerFramesWhilePaused_CurrentFrameDoesNotThrow()
+    {
+        var list = Load(Achx(Chain("Walk", "", "1", "1", "1")));
+        var player = new AnimationPlayer<Frame>(list);
+        player.Play("Walk");
+        player.Update(TimeSpan.FromSeconds(2.5));
+        player.Pause();
+
+        Reload(list, Achx(Chain("Walk", "", "1"))).ShouldBeTrue();
+
+        player.CurrentFrame.ShouldBe(list[0][0]);
+        player.CurrentFrameIndex.ShouldBe(0);
+        Should.NotThrow(() => (player.CurrentOffset, player.CurrentColor));
+    }
+
+    [Fact]
     public void TryReloadFrom_LoopTurnedOffWhilePlaying_PlayerFinishes()
     {
         var list = Load(Achx(Chain("Walk", "", "1")));
