@@ -817,36 +817,36 @@ public class WireframeControl : TextureViewport
 
     private void OnPngDragOver(object? sender, DragEventArgs e)
     {
-        var firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
-
-        var wouldApply = !string.IsNullOrEmpty(firstFile) &&
-            TextureDropProcessor.ComputePngDrop(
-                _selectedState?.SelectedChain,
-                _selectedState?.SelectedFrame,
-                firstFile,
-                _projectManager?.FileName,
-                e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
-            != TextureDropResult.NotApplied;
-
-        e.DragEffects = wouldApply ? DragDropEffects.Copy : DragDropEffects.None;
+        e.DragEffects = PngDropHasTarget(e) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
+
+    private bool PngDropHasTarget(DragEventArgs e) =>
+        DragDropFileResolver.GetFirstDroppedFilePath(e) is { Length: > 0 } firstFile &&
+        TextureDropProcessor.ComputePngDrop(
+            _selectedState?.SelectedChain,
+            _selectedState?.SelectedFrame,
+            firstFile,
+            _projectManager?.FileName,
+            e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
+        != TextureDropResult.NotApplied;
 
     private async void OnPngDrop(object? sender, DragEventArgs e)
     {
         var firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
-        if (string.IsNullOrEmpty(firstFile) || HandlePngDrop is null)
+        if (string.IsNullOrEmpty(firstFile) || HandlePngDrop is null || !PngDropHasTarget(e))
             return;
+
+        // Set before the await: the event goes on to the window, which would open an animation file dropped along
+        // with the image under the copy question.
+        e.Handled = true;
 
         // SelectedFrame's setter keeps SelectedChain in sync with its parent, so this already
         // falls back to the selected chain (whole-chain retexture/create-first-frame) the same
         // way SyncTextureCombo's texture-preview lookup does when no frame is selected.
-        var applied = await HandlePngDrop(
+        await HandlePngDrop(
             _selectedState?.SelectedChain, _selectedState?.SelectedFrame,
             firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
-
-        if (applied)
-            e.Handled = true;
     }
 
     // ── Drag auto-pan (#540) ────────────────────────────────────────────────────
