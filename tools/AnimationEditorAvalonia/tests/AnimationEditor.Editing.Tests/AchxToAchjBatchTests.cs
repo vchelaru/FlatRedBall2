@@ -73,6 +73,24 @@ public class AchxToAchjBatchTests : IDisposable
         File.Exists(bad).ShouldBeTrue();
     }
 
+    // What one file holds says nothing about another that uses the same element.
+    [Theory]
+    [InlineData("text.achx", "shapes.achx")]
+    [InlineData("shapes.achx", "text.achx")]
+    public void Convert_ShapesElementThatHoldsTextInOneFile_IsJudgedPerFile(string first, string second)
+    {
+        File.WriteAllText(Path.Combine(_root, "text.achx"), WithShapes("hello"));
+        File.WriteAllText(Path.Combine(_root, "shapes.achx"), WithShapes("<CircleSave><Radius>2</Radius></CircleSave>"));
+
+        var batch = AchxToAchjBatch.Convert([Path.Combine(_root, first), Path.Combine(_root, second)]);
+
+        batch.Converted.Select(f => f.SourcePath).ShouldBe([Path.Combine(_root, "shapes.achx")]);
+        batch.Failed.Select(f => f.SourcePath).ShouldBe([Path.Combine(_root, "text.achx")]);
+    }
+
+    private static string WithShapes(string shapes) =>
+        $"<AnimationChainArraySave><AnimationChain><Name>Walk</Name><Frame><TextureName>a.png</TextureName><FrameLength>1</FrameLength><ShapeCollectionSave><Shapes>{shapes}</Shapes></ShapeCollectionSave></Frame></AnimationChain></AnimationChainArraySave>";
+
     [Fact]
     public void Convert_AllConverted_IsSuccessWithNoWarnings()
     {

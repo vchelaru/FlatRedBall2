@@ -72,6 +72,13 @@ public class ConvertCommandTests : IDisposable
     [InlineData("", "<FlipVertical by=\"me\">false</FlipVertical>", "the attribute by")]
     [InlineData("", "<ShapeCollectionSave><Shapes><CircleSave><Radius>2</Radius><Custom>5</Custom></CircleSave></Shapes></ShapeCollectionSave>", "<Custom>")]
     [InlineData("", "<ShapeCollectionSave><Shapes><CircleSave><Radius>2</Radius></CircleSave><SphereSave><Radius>2</Radius></SphereSave></Shapes></ShapeCollectionSave>", "<SphereSave>")]
+    [InlineData("", "<ShapeCollectionSave><Shapes><PolygonSave><Points><Vector2Save><X>1</X></Vector2Save></Points><Points><Vector2Save><X>5</X></Vector2Save></Points></PolygonSave></Shapes></ShapeCollectionSave>", "<Points>")]
+    [InlineData("", "<ShapeCollectionSave><Shapes><CircleSave><Radius>2</Radius><Radius>9</Radius></CircleSave></Shapes></ShapeCollectionSave>", "<Radius>")]
+    [InlineData("", "<ShapeCollectionSave><Shapes>hello<CircleSave><Radius>2</Radius></CircleSave></Shapes></ShapeCollectionSave>", "the text in <Shapes>")]
+    [InlineData("", "<ShapeCollectionSave><Shapes><CircleSave><Radius>2</Radius></CircleSave></Shapes><Shapes><CircleSave><Radius>2</Radius></CircleSave></Shapes></ShapeCollectionSave>", "<Shapes>")]
+    [InlineData("", "<ShapeCollectionSave><Shapes><CircleSave><Radius>2</Radius></CircleSave></Shapes><CircleSaves><CircleSave><Radius>9</Radius></CircleSave></CircleSaves></ShapeCollectionSave>", "<CircleSaves>")]
+    [InlineData("", "<ShapeCollectionSave><Shapes>hello</Shapes></ShapeCollectionSave>", "<Shapes>")]
+    [InlineData("", "<FlipVertical>false</FlipVertical><FlipVertical>true</FlipVertical>", "<FlipVertical>")]
     public async Task AchxToAchj_WouldLoseSomething_IsRefusedNamingIt(string inChain, string inFrame, string names)
     {
         _w.Write("a.achx", $"<AnimationChainArraySave><AnimationChain><Name>Walk</Name>{inChain}<Frame><TextureName>sheet.png</TextureName>{inFrame}<FrameLength>1</FrameLength></Frame></AnimationChain></AnimationChainArraySave>");
