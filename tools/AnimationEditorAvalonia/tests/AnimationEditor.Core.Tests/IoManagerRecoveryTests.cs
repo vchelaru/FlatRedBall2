@@ -108,6 +108,19 @@ public class IoManagerRecoveryTests : IDisposable
     // ── DeleteRecoveryFile ────────────────────────────────────────────────────
 
     [Fact]
+    public void DeleteRecoveryFile_WhenInUse_IsTriedAgainByDeleteRecoveryFiles()
+    {
+        var document = new AnimationChainListSave();
+        ctx.IoManager.WriteRecoveryFile(document);
+
+        using (new FileStream(ctx.IoManager.RecoveryFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.Null(Record.Exception(() => ctx.IoManager.DeleteRecoveryFile(document)));
+        ctx.IoManager.DeleteRecoveryFiles();
+
+        Assert.False(ctx.IoManager.RecoveryFileExists());
+    }
+
+    [Fact]
     public void DeleteRecoveryFile_WhenFileExists_RemovesFile()
     {
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();

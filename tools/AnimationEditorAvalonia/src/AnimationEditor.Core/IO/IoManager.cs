@@ -209,8 +209,21 @@ namespace AnimationEditor.Core.IO
         /// <inheritdoc/>
         public void DeleteRecoveryFile(AnimationChainListSave? document)
         {
-            if (document != null && _recoveryFiles.Remove(document, out var path))
+            if (document != null && _recoveryFiles.TryGetValue(document, out var path) && TryDelete(path))
+                _recoveryFiles.Remove(document);
+        }
+
+        private static bool TryDelete(string path)
+        {
+            try
+            {
                 File.Delete(path);
+                return true;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         /// <inheritdoc/>
@@ -243,9 +256,9 @@ namespace AnimationEditor.Core.IO
                 _recoveryFiles[recovered] = path;
                 return recovered;
             }
-            catch
+            catch (Exception e) when (e is not (IOException or UnauthorizedAccessException))
             {
-                File.Delete(path);
+                TryDelete(path);
                 return null;
             }
         }

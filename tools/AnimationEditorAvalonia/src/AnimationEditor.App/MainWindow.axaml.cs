@@ -1100,14 +1100,15 @@ public partial class MainWindow : Window
             Environment.Exit(0);
         }
 
+        // Each step is guarded on its own: one that fails says so and the rest still run (#2085).
         var args = Environment.GetCommandLineArgs();
         if (args.Length >= 2 && File.Exists(args[1]))
         {
-            await LoadAnimationFileAsync(args[1]);
+            await RunGuardedAsync(() => LoadAnimationFileAsync(args[1]), "Open");
         }
         else if (_appSettings.OpenTabPaths.Count > 0)
         {
-            await RestoreTabsAsync();
+            await RunGuardedAsync(RestoreTabsAsync, "Restoring the open tabs");
         }
         else
         {
@@ -1116,12 +1117,12 @@ public partial class MainWindow : Window
 
         // After the branches above, awaited, so nothing is still in flight to clobber a recovered document, and a recovery
         // never replaces the tabs the session had open (#1020).
-        RestoreRecoveredDocuments();
+        await RestoreRecoveredDocumentsAsync();
 
         // Independent of which branch above ran -- the Project tab tree isn't tied to which
         // document tab is open (#772).
         if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
-            await LoadAndPersistProjectFolderAsync(lastProjectFolder, selectSidebarTab: false);
+            await RunGuardedAsync(() => LoadAndPersistProjectFolderAsync(lastProjectFolder, selectSidebarTab: false), "Open Project Folder");
 
         // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, the
         // recovered document, or none of them) did so directly rather than through
@@ -1139,16 +1140,19 @@ public partial class MainWindow : Window
     /// document, the one edited last in front. There is deliberately no "delete permanently?" prompt: the old modal made
     /// that call from memory, before the user could see what was in the file (#1020). Closing the tab discards it.
     /// </summary>
-    private void RestoreRecoveredDocuments()
+    private async Task RestoreRecoveredDocumentsAsync()
     {
         foreach (string path in _ioManager.FindRecoveryFiles())
-        {
-            if (_ioManager.TryReadRecoveryFile(path) is not { } recovered) continue;
-            CaptureLeavingActiveTab();
-            OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
-            _tabManager.ActiveTab!.IsRecoveredDocument = true;
-        }
+            await RunGuardedAsync(() => { RestoreRecoveredDocument(path); return Task.CompletedTask; }, "Recovering an unsaved document");
         UpdateRecoveredDocumentBanner();
+    }
+
+    private void RestoreRecoveredDocument(string recoveryFile)
+    {
+        if (_ioManager.TryReadRecoveryFile(recoveryFile) is not { } recovered) return;
+        CaptureLeavingActiveTab();
+        OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
+        _tabManager.ActiveTab!.IsRecoveredDocument = true;
     }
 
     // ── Recovered-document banner ─────────────────────────────────────────────
