@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Paths;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,6 +26,14 @@ namespace AnimationEditor.Core.HotReload
         // Directory path → watcher
         private readonly Dictionary<string, FileSystemWatcher> _watchers =
             new(StringComparer.OrdinalIgnoreCase);
+
+        // Directory path → watcher of the folders in it: the existing folders above each one that holds
+        // a watched file, up to the first that holds the main file too. A watcher stays with the folder
+        // it was opened on, so only the folder above reports that one created, deleted or replaced.
+        private readonly Dictionary<string, FileSystemWatcher> _parentWatchers =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly ConcurrentQueue<string> _changedFolders = new();
 
         private string? _achxPath;
         private readonly HashSet<string> _watchedPngPaths =
@@ -110,29 +119,89 @@ namespace AnimationEditor.Core.HotReload
             }
         }
 
-        // Caller holds _lock. Watches exactly the folders of the main file, the PNGs and the sources:
-        // adds the missing ones and drops the ones nothing needs any more.
+        // Caller holds _lock. Watches exactly the folders of the main file, the PNGs and the sources,
+        // and the folders above each: adds the missing ones and drops the ones nothing needs any more.
         private void SyncWatchersLocked()
         {
-            var needed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            void Need(string? file)
+            var needed = NeededFoldersLocked();
+            while (true)
             {
-                var dir = string.IsNullOrEmpty(file) ? null : Path.GetDirectoryName(file);
-                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) needed.Add(dir);
+                foreach (var dir in needed.Folders) AddWatcher(_watchers, dir, CreateFileWatcher);
+                foreach (var dir in needed.Parents) AddWatcher(_parentWatchers, dir, CreateFolderWatcher);
+
+                // A folder created before the one above it was watched raised no event.
+                var now = NeededFoldersLocked();
+                if (now.Folders.SetEquals(needed.Folders) && now.Parents.SetEquals(needed.Parents)) break;
+                needed = now;
             }
 
-            Need(_achxPath);
-            foreach (var p in _watchedPngPaths) Need(p);
-            foreach (var p in _watchedSourcePaths) Need(p);
+            Drop(_watchers, dir => !needed.Folders.Contains(dir));
+            Drop(_parentWatchers, dir => !needed.Parents.Contains(dir));
+        }
 
-            foreach (var dir in needed)
-                AddWatcher(dir);
+        // Caller holds _lock.
+        private IEnumerable<string> WatchedFilesLocked() =>
+            _watchedPngPaths.Concat(_watchedSourcePaths).Concat(string.IsNullOrEmpty(_achxPath) ? [] : [_achxPath]);
 
-            foreach (var d in _watchers.Keys.Where(d => !needed.Contains(d)).ToList())
+        // Caller holds _lock.
+        private (HashSet<string> Folders, HashSet<string> Parents) NeededFoldersLocked()
+        {
+            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in WatchedFilesLocked())
             {
-                _watchers[d].Dispose();
-                _watchers.Remove(d);
+                var dir = Path.GetDirectoryName(file);
+                if (string.IsNullOrEmpty(dir)) continue;
+                if (Directory.Exists(dir)) folders.Add(dir);
+                for (var parent = Path.GetDirectoryName(dir); !string.IsNullOrEmpty(parent); parent = Path.GetDirectoryName(parent))
+                {
+                    if (!Directory.Exists(parent)) continue;
+                    parents.Add(parent);
+                    if (_achxPath?.StartsWith(Norm(parent).TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase) == true) break;
+                }
             }
+            return (folders, parents);
+        }
+
+        private static void Drop(Dictionary<string, FileSystemWatcher> watchers, Func<string, bool> drop)
+        {
+            foreach (var dir in watchers.Keys.Where(drop).ToList())
+            {
+                watchers[dir].Dispose();
+                watchers.Remove(dir);
+            }
+        }
+
+        /// <summary>Watches the folders that were created, deleted or replaced since the last flush as they are now,
+        /// and reports their files, whose own events the new watchers were too late for.</summary>
+        private void FollowChangedFolders()
+        {
+            var changed = new List<string>();
+            while (_changedFolders.TryDequeue(out var folder)) changed.Add(folder + "/");
+            if (changed.Count == 0) return;
+
+            bool IsIn(string path) => changed.Any(folder => path.StartsWith(folder, StringComparison.OrdinalIgnoreCase));
+            bool IsChanged(string dir) => IsIn(Norm(dir) + "/");
+            var reports = new List<(string Path, WatcherChangeType Type)>();
+            lock (_lock)
+            {
+                var files = WatchedFilesLocked().Where(IsIn).ToList();
+                if (files.Count == 0) return;
+
+                Drop(_watchers, IsChanged);
+                Drop(_parentWatchers, IsChanged);
+                SyncWatchersLocked();
+
+                foreach (var file in files)
+                {
+                    if (File.Exists(file)) reports.Add((file, WatcherChangeType.Created));
+                    else if (_seenHashes.ContainsKey(file)) reports.Add((file, WatcherChangeType.Deleted));
+                }
+            }
+            if (!IsEnabled) return;
+            // Outside _lock: the coalescer takes its own lock first.
+            foreach (var (file, type) in reports)
+                _coalescer.Record(file, type, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
 
         public void StopWatching()
@@ -141,8 +210,8 @@ namespace AnimationEditor.Core.HotReload
 
             lock (_lock)
             {
-                foreach (var w in _watchers.Values) w.Dispose();
-                _watchers.Clear();
+                Drop(_watchers, _ => true);
+                Drop(_parentWatchers, _ => true);
                 _achxPath = null;
                 _watchedPngPaths.Clear();
                 _watchedSourcePaths.Clear();
@@ -262,19 +331,51 @@ namespace AnimationEditor.Core.HotReload
             catch (InvalidOperationException) { return path.Replace('\\', '/'); }
         }
 
-        private void AddWatcher(string directory)
+        private static void AddWatcher(
+            Dictionary<string, FileSystemWatcher> watchers, string directory, Func<string, FileSystemWatcher> create)
         {
-            if (_watchers.ContainsKey(directory)) return;
+            if (watchers.ContainsKey(directory)) return;
 
+            FileSystemWatcher? fsw = null;
+            try
+            {
+                fsw = create(directory);
+                fsw.EnableRaisingEvents = true;
+                watchers[directory] = fsw;
+            }
+            // Deleted since it was found to exist, or a folder the user may not list.
+            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+            {
+                fsw?.Dispose();
+            }
+        }
+
+        private static string Norm(string path) => path.Replace('\\', '/');
+
+        private FileSystemWatcher CreateFolderWatcher(string directory)
+        {
+            var fsw = new FileSystemWatcher(directory) { NotifyFilter = NotifyFilters.DirectoryName };
+            fsw.Created += (_, e) => _changedFolders.Enqueue(Norm(e.FullPath));
+            fsw.Deleted += (_, e) => _changedFolders.Enqueue(Norm(e.FullPath));
+            fsw.Renamed += (_, e) =>
+            {
+                _changedFolders.Enqueue(Norm(e.OldFullPath));
+                _changedFolders.Enqueue(Norm(e.FullPath));
+            };
+            // Raised when this folder itself is gone, on the platforms that say so.
+            fsw.Error += (_, _) => _changedFolders.Enqueue(Norm(directory));
+            return fsw;
+        }
+
+        private FileSystemWatcher CreateFileWatcher(string directory)
+        {
             var fsw = new FileSystemWatcher(directory)
             {
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
-                EnableRaisingEvents = true,
                 IncludeSubdirectories = false,
             };
 
             long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            static string Norm(string p) => p.Replace('\\', '/');
 
             fsw.Changed += (_, e) =>
             {
@@ -299,11 +400,12 @@ namespace AnimationEditor.Core.HotReload
                 _coalescer.Record(Norm(e.FullPath), WatcherChangeType.Created, Now());
             };
 
-            _watchers[directory] = fsw;
+            return fsw;
         }
 
         private void FlushCoalescer()
         {
+            FollowChangedFolders();
             if (!IsEnabled) return;
 
             string? achxPath;
@@ -360,12 +462,8 @@ namespace AnimationEditor.Core.HotReload
 
         public void Dispose()
         {
+            StopWatching();
             _flushTimer.Dispose();
-            lock (_lock)
-            {
-                foreach (var w in _watchers.Values) w.Dispose();
-                _watchers.Clear();
-            }
         }
     }
 }

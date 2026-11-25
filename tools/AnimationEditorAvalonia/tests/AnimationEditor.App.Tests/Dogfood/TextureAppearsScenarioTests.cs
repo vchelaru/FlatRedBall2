@@ -105,6 +105,7 @@ public class TextureAppearsScenarioTests
     }
 
     [AvaloniaTheory]
+    [InlineData("art")]
     [InlineData("")]
     public async Task MissingTexture_ThatAppearsLater_IsShown(string folder)
     {
@@ -120,5 +121,9 @@ public class TextureAppearsScenarioTests
         await editor.WaitUntilAsync(() => editor.Wireframe.BitmapSize == (64, 64), TimeSpan.FromSeconds(2));
 
         editor.Wireframe.BitmapSize.ShouldBe((64, 64));
+        var shown = editor.Wireframe.CameraState;
+        editor.Wireframe.CameraMemory = new();
+        editor.Wireframe.RefreshAll();
+        shown.ShouldBe(editor.Wireframe.CameraState, "centered, as a texture that is there when the file opens");
     }
 }

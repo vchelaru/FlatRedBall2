@@ -307,6 +307,9 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     private TextureCameraMemory _cameraMemory = new();
     private bool _memoryRebound;
 
+    // The texture (lowercased) the live camera was set for: the last one that was actually shown.
+    private string? _cameraTexturePath;
+
     /// <summary>
     /// Where this viewport remembers its camera per texture. The host binds it to the active tab's memory, so the
     /// camera for a document is decided in one place. Binding a different memory makes the next texture load
@@ -334,6 +337,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     private void ApplyRememberedCamera(string norm)
     {
         _memoryRebound = false;
+        _cameraTexturePath = norm;
         if (_cameraMemory.Take(norm, out bool fromSeed) is not { } cam)
         {
             CenterTexture();
@@ -780,7 +784,10 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         // would find no entry and fall through to CenterTexture(), resetting pan/zoom (#584).
         var savedCamera = (_panX, _panY, _zoom);
         _loadedTexturePath = null;   // clear identity so LoadTexture doesn't short-circuit
+        bool hasCamera = _cameraTexturePath == new FilePath(path).Standardized;
         LoadTexture(path);
+        // A texture that was missing or unreadable until now has no camera to keep; the load just gave it its first.
+        if (!hasCamera) return;
         (_panX, _panY, _zoom) = savedCamera;
         ClampCamera();
         RaiseViewChanged();
