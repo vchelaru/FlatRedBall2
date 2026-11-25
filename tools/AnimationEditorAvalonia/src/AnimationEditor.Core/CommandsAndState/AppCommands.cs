@@ -693,8 +693,12 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 HotReloadWatcher.RunOwnSave(path, () =>
                 {
-                    if (tab.CachedTsxState != null)
-                        tsxWarnings = SaveTsxDocument(tab, path);
+                    if (tab.CachedTsxState is ProjectManager.TsxState tsx)
+                    {
+                        var saved = ProjectManager.SaveTsx(tab.CachedEditorModel!, tsx, tab.Path);
+                        tab.CachedTsxState = saved.State;
+                        tsxWarnings = saved.Warnings;
+                    }
                     else
                         _pm.SaveAnimationChainList(tab.CachedEditorModel!, path, tab.CachedOnDiskCoordinateType);
                 });
@@ -715,26 +719,6 @@ namespace AnimationEditor.Core.CommandsAndState
         public bool LastSaveStored(IEnumerable<AnimationChainSave> chains) =>
             _undoManager.SaveState != SaveState.Failed
             && !(_pm.IsNativeTsxProject && chains.Any(_pm.TsxChainsNotFullySaved.Contains));
-
-        /// <summary>SaveTsxProject writes the current document, so the tab's document stands in for it meanwhile.</summary>
-        private IReadOnlyList<string> SaveTsxDocument(TabEntry tab, string path)
-        {
-            var currentModel = _pm.AnimationChainListSave;
-            var currentTsxState = _pm.CaptureTsxState();
-            try
-            {
-                _pm.AnimationChainListSave = tab.CachedEditorModel;
-                _pm.RestoreTsxState(tab.CachedTsxState);
-                var warnings = _pm.SaveTsxProject(path);
-                tab.CachedTsxState = _pm.CaptureTsxState();
-                return warnings;
-            }
-            finally
-            {
-                _pm.AnimationChainListSave = currentModel;
-                _pm.RestoreTsxState(currentTsxState);
-            }
-        }
 
         /// <inheritdoc/>
         public event Action<string, Exception>? TiledSyncFailed;

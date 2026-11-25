@@ -21,13 +21,13 @@ public class DocumentWriteGuardTests
         ["AppCommands.WriteDocument"] = [DocAction.Save, DocAction.Autosave, DocAction.WriteRecovery, DocAction.SaveAs, DocAction.FailedSaveAs,
             DocAction.SaveAsOntoAnotherFormat, DocAction.SaveAsOntoOpenTab],
         ["AppCommands.SaveDocument"] = [DocAction.SaveBackgroundDocument, DocAction.CutChain, DocAction.CutFrame, DocAction.CutShape],
-        ["AppCommands.SaveTsxDocument"] = [DocAction.SaveBackgroundDocument, DocAction.CutChain, DocAction.CutFrame],
         ["AppCommands.SyncAssociatedTiledTilesets"] = [DocAction.PushToTileset],
         ["TiledTilesetSyncRunner.SyncAll"] = [DocAction.PushToTileset],
         ["AppCommands.ExportAsync"] = [DocAction.Export],
         ["AppCommands.CopyReferencedTextures"] = [DocAction.Export],
         ["ProjectManager.SaveAnimationChainList"] = [DocAction.Save, DocAction.SaveBackgroundDocument],
-        ["ProjectManager.SaveTsxProject"] = [DocAction.Save, DocAction.SaveBackgroundDocument],
+        ["ProjectManager.SaveTsxProject"] = [DocAction.Save],
+        ["ProjectManager.SaveTsx"] = [DocAction.Save, DocAction.SaveBackgroundDocument, DocAction.CutChain, DocAction.CutFrame],
         ["IoManager.WriteRecoveryFile"] = [DocAction.WriteRecovery, DocAction.RecoverAtStartup],
         ["AchxToAchjConverter.Convert"] = [DocAction.ConvertToAchj, DocAction.ConvertOpenTabToAchj],
         ["TsxFile.Save"] = [DocAction.Save, DocAction.SaveBackgroundDocument, DocAction.SaveAsToAnotherFolder],
@@ -88,7 +88,7 @@ public class DocumentWriteGuardTests
     private static readonly Regex Write = new(
         @"\bFile\.(Write\w+|Append\w+|Move|Copy|Replace|Create\w*|Open|OpenWrite)\(|\bnew (StreamWriter|FileStream)\(|\.(MoveTo|OpenWrite|CreateText|AppendText)\("
         + @"|\bnew FileInfo\([^)]*\)\.\w+To\(|\bAtomicFile\.Write\(|\bTsxWriter\.\w+\(|\.Save(Json|As)?\([^)\s]"
-        + @"|(?<!void |Task |bool |bool> |string> )\b(SaveCurrentAnimationChainList(Async)?|WriteDocument|SaveDocument|SaveTsxProject|SaveTsxDocument|SaveAnimationChainList|SaveToDisk"
+        + @"|(?<!void |Task |bool |bool> |string> )\b(SaveCurrentAnimationChainList(Async)?|WriteDocument|SaveDocument|SaveTsxProject|SaveTsx|SaveAnimationChainList|SaveToDisk"
         + @"|WriteRecoveryFile|SyncAssociatedTiledTilesets)\(|\bTiledTilesetSyncRunner\.\w+\(|\bAchxToAchj\w+\.Convert\(|\bDeleteToRecycleBin\(",
         RegexOptions.Compiled);
 
