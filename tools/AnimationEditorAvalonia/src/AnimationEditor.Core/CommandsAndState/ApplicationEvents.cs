@@ -29,8 +29,31 @@ namespace AnimationEditor.Core.CommandsAndState
         public void RaiseAfterCircleChanged(CircleSave circle) =>
             AfterCircleChanged?.Invoke(circle);
 
-        public void RaiseAnimationChainsChanged() =>
-            AnimationChainsChanged?.Invoke();
+        private int _heldDepth;
+        private bool _raisedWhileHeld;
+
+        public void RaiseAnimationChainsChanged()
+        {
+            if (_heldDepth > 0) _raisedWhileHeld = true;
+            else AnimationChainsChanged?.Invoke();
+        }
+
+        public void RaiseAnimationChainsChangedOnce(Action edits)
+        {
+            _heldDepth++;
+            try
+            {
+                edits();
+            }
+            finally
+            {
+                if (--_heldDepth == 0 && _raisedWhileHeld)
+                {
+                    _raisedWhileHeld = false;
+                    AnimationChainsChanged?.Invoke();
+                }
+            }
+        }
 
         public void CallAchxLoaded(string newFileName) =>
             AchxLoaded?.Invoke(newFileName);

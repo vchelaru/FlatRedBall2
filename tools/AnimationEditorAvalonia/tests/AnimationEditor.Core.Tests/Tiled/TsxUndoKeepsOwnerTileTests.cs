@@ -184,4 +184,27 @@ public class TsxUndoKeepsOwnerTileTests : IDisposable
         _ctx.AppCommands.AddFrameFromPixelBounds(waiting, "Heroes.png", 16, 0, 32, 16);
         return (path, wide);
     }
+
+    // #2142: a save between the two halves of the undo would give Idle-front's tile to its copy.
+    [Theory]
+    [InlineData("Walk-front#0,Idle-front#0")]
+    [InlineData("Idle-front#0,Walk-front#0")]
+    public void DeleteFrames_OfTwoAnimationsOneOfThemCopied_UndoAndRedoBringTheFileBack(string deleted)
+    {
+        string path = Documents.Write(_dir.Path, DocType.Tsx, "front"); // "Walk-front" of 2 frames, "Idle-front" of 1
+        _ctx.ProjectManager.LoadTsxProject(new(path));
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
+        var chains = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains;
+        _ctx.AppCommands.DuplicateChains([chains.Single(c => c.Name == "Idle-front")]);
+        string before = File.ReadAllText(path);
+        _ctx.AppCommands.DeleteFrames(deleted.Split(',').Select(d => d.Split('#'))
+            .Select(d => chains.Single(c => c.Name == d[0]).Frames[int.Parse(d[1])]).ToList());
+        string after = File.ReadAllText(path);
+
+        _ctx.UndoManager.Undo();
+        File.ReadAllText(path).ShouldBe(before);
+
+        _ctx.UndoManager.Redo();
+        File.ReadAllText(path).ShouldBe(after);
+    }
 }
