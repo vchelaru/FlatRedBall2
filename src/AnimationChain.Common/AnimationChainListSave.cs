@@ -78,6 +78,7 @@ public class AnimationChainListSave
     /// should call <c>ContentLoader.LoadAnimationChainList</c> or pass a <c>streamProvider</c>
     /// to the other overload.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromFile(string path)
         => FromFile(path, File.OpenRead!);
 
@@ -94,12 +95,13 @@ public class AnimationChainListSave
     /// <param name="streamProvider">Byte source. Callers must supply one — there is no default — so this
     /// method has no IL-level reference to <c>TitleContainer</c> and tools that don't ship MonoGame.Framework
     /// (e.g. AnimationEditor on Avalonia) can call it without triggering an assembly load.</param>
+    /// <exception cref="InvalidDataException">The text is not XML/JSON, is not an animation file (another root element, no
+    /// <c>animationChains</c> array), or holds a value that does not parse. Every reader of this type throws only this for
+    /// bad content; errors opening or reading the stream come through as they are.</exception>
     public static AnimationChainListSave FromFile(string filePath, Func<string, Stream> streamProvider)
     {
         using var stream = streamProvider(filePath);
-        var result = IsJsonPath(filePath)
-            ? ParseJson(JsonNode.Parse(stream)!.AsObject())
-            : ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
+        var result = IsJsonPath(filePath) ? ReadJson(stream) : ReadXml(stream);
         result.FileName = filePath;
         return result;
     }
@@ -117,6 +119,7 @@ public class AnimationChainListSave
     /// is <c>true</c>, texture paths in the file are passed through as-is with no directory prefix
     /// prepended. The caller retains ownership of <paramref name="stream"/> and is responsible for disposing it.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromStream(Stream stream)
     {
         string text;
@@ -131,13 +134,14 @@ public class AnimationChainListSave
     /// <see cref="string.Empty"/>; if <see cref="FileRelativeTextures"/> is <c>true</c>, texture
     /// paths in the file are passed through as-is with no directory prefix prepended.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromString(string text)
         => LooksLikeJson(text) ? FromJsonString(text) : FromXmlString(text);
 
     private static AnimationChainListSave FromXmlString(string xml)
     {
         using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(xml));
-        return ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
+        return ReadXml(stream);
     }
 
     // A leading UTF-8 BOM (0xEF 0xBB 0xBF) decodes to the single char U+FEFF. StreamReader/
@@ -155,6 +159,7 @@ public class AnimationChainListSave
     /// Loads a .achj file directly from disk via <see cref="File.OpenRead(string)"/>. JSON
     /// counterpart of <see cref="FromFile(string)"/>.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonFile(string path)
         => FromJsonFile(path, File.OpenRead!);
 
@@ -163,21 +168,24 @@ public class AnimationChainListSave
     /// <see cref="FromFile(string, Func{string, Stream})"/> — see that overload for why
     /// <paramref name="streamProvider"/> has no default.
     /// </summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonFile(string filePath, Func<string, Stream> streamProvider)
     {
         using var stream = streamProvider(filePath);
-        var result = ParseJson(JsonNode.Parse(stream)!.AsObject());
+        var result = ReadJson(stream);
         result.FileName = filePath;
         return result;
     }
 
     /// <summary>Parses .achj JSON from an already-open <paramref name="stream"/>, same contract as <see cref="FromStream(Stream)"/>.</summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonStream(Stream stream)
-        => ParseJson(JsonNode.Parse(stream)!.AsObject());
+        => ReadJson(stream);
 
     /// <summary>Parses .achj JSON from an in-memory string, same contract as <see cref="FromString(string)"/>.</summary>
+    /// <exception cref="InvalidDataException">As <see cref="FromFile(string, Func{string, Stream})"/>.</exception>
     public static AnimationChainListSave FromJsonString(string json)
-        => ParseJson(JsonNode.Parse(StripLeadingBom(json))!.AsObject());
+        => ParseJson(() => JsonNode.Parse(StripLeadingBom(json)));
 
     // Unlike JsonNode.Parse(Stream) (which treats a UTF-8 BOM as transport-level framing and
     // skips it automatically), JsonNode.Parse(string) re-encodes the string to UTF-8 bytes and
@@ -188,14 +196,32 @@ public class AnimationChainListSave
     private static string StripLeadingBom(string text) =>
         text.Length > 0 && text[0] == '\uFEFF' ? text.Substring(1) : text;
 
+    private static AnimationChainListSave ReadXml(Stream stream)
+    {
+        try
+        {
+            return ParseXml(XDocument.Load(stream, LoadOptions.SetLineInfo));
+        }
+        catch (XmlException ex)
+        {
+            throw new InvalidDataException(ex.Message, ex);
+        }
+    }
+
+    private static AnimationChainListSave ReadJson(Stream stream) => ParseJson(() => JsonNode.Parse(stream));
+
     private static AnimationChainListSave ParseXml(XDocument doc)
     {
         var root = doc.Root!;
+        if (root.Name != "AnimationChainArraySave")
+            throw new InvalidDataException($"This is not an animation file: its root element is <{root.Name.LocalName}>"
+                + (root.Name.Namespace == XNamespace.None ? "" : $" in namespace '{root.Name.NamespaceName}'")
+                + ", and an .achx has <AnimationChainArraySave> in no namespace.");
         var result = new AnimationChainListSave();
 
         var frt = root.Element("FileRelativeTextures");
         if (frt != null)
-            result.FileRelativeTextures = bool.Parse(frt.Value);
+            result.FileRelativeTextures = ParseBool(frt);
 
         var tmu = root.Element("TimeMeasurementUnit");
         if (tmu != null)
@@ -922,19 +948,30 @@ public class AnimationChainListSave
     private static float FloatEl(XElement parent, string name, float defaultValue = 0f)
     {
         var el = parent.Element(name);
-        return el != null ? float.Parse(el.Value, CultureInfo.InvariantCulture) : defaultValue;
+        if (el == null) return defaultValue;
+        return float.TryParse(el.Value, CultureInfo.InvariantCulture, out var value) ? value : throw Wrong(el, "a number");
     }
 
     private static bool BoolEl(XElement parent, string name, bool defaultValue = false)
     {
         var el = parent.Element(name);
-        return el != null ? bool.Parse(el.Value) : defaultValue;
+        return el != null ? ParseBool(el) : defaultValue;
     }
 
     private static int? IntElNullable(XElement parent, string name)
     {
         var el = parent.Element(name);
-        return el != null ? int.Parse(el.Value, CultureInfo.InvariantCulture) : null;
+        if (el == null) return null;
+        return int.TryParse(el.Value, CultureInfo.InvariantCulture, out var value) ? value : throw Wrong(el, "a whole number");
+    }
+
+    private static bool ParseBool(XElement el) =>
+        bool.TryParse(el.Value, out var value) ? value : throw Wrong(el, "true or false");
+
+    private static InvalidDataException Wrong(XElement el, string expected)
+    {
+        var context = XmlContext(el, null);
+        return new InvalidDataException($"{(context == null ? "" : context + ": ")}{el.Name.LocalName} '{el.Value}' must be {expected}.");
     }
 
     private static ColorOperation? ColorOperationEl(XElement parent, string name, string location)
@@ -966,43 +1003,64 @@ public class AnimationChainListSave
         throw new InvalidDataException($"{prefix}{propertyName} '{value}' isn't valid (expected {expected}).");
     }
 
-    private static AnimationChainListSave ParseJson(JsonObject root)
+    private static AnimationChainListSave ParseJson(Func<JsonNode?> read)
     {
-        var result = new AnimationChainListSave();
-
-        if (root["fileRelativeTextures"] is JsonValue frt)
-            result.FileRelativeTextures = frt.GetValue<bool>();
-
-        if (root["timeMeasurementUnit"] is JsonValue tmu)
-            result.TimeMeasurementUnit = ParseEnum<TimeMeasurementUnit>(tmu.GetValue<string>()!, "TimeMeasurementUnit", null);
-
-        if (root["coordinateType"] is JsonValue ct)
-            result.CoordinateType = ParseEnum<TextureCoordinateType>(ct.GetValue<string>()!, "CoordinateType", null);
-
-        if (root["animationChains"] is JsonArray chainsArray)
+        JsonNode? root;
+        try
         {
-            foreach (var chainNode in chainsArray)
-            {
-                var chainObj = chainNode!.AsObject();
-                var chain = new AnimationChainSave
-                {
-                    Name = chainObj["name"]?.GetValue<string>() ?? string.Empty,
-                    IsLocked = BoolProp(chainObj, "locked"),
-                    Loop = BoolProp(chainObj, "loop", true),
-                    PingPong = BoolProp(chainObj, "pingPong"),
-                    Reverse = BoolProp(chainObj, "reverse"),
-                };
-
-                if (chainObj["frames"] is JsonArray framesArray)
-                    foreach (var frameNode in framesArray)
-                        chain.Frames.Add(ParseFrameJson(frameNode!.AsObject(), $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
-
-                result.AnimationChains.Add(chain);
-            }
+            root = read();
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException(ex.Message, ex);
         }
 
-        if (root["projectFile"] is JsonValue pf)
-            result.ProjectFile = pf.GetValue<string>();
+        try
+        {
+            return ParseJson(root as JsonObject ?? throw new InvalidDataException("This is not an animation file: an .achj holds a JSON object."));
+        }
+        // A JsonObject throws these only when it is read: a repeated property, and a string that is not valid UTF-16.
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            throw new InvalidDataException(ex.Message, ex);
+        }
+    }
+
+    private static AnimationChainListSave ParseJson(JsonObject root)
+    {
+        var result = new AnimationChainListSave
+        {
+            FileRelativeTextures = BoolProp(root, "fileRelativeTextures", true),
+        };
+
+        if (StringProp(root, "timeMeasurementUnit") is { } tmu)
+            result.TimeMeasurementUnit = ParseEnum<TimeMeasurementUnit>(tmu, "TimeMeasurementUnit", null);
+
+        if (StringProp(root, "coordinateType") is { } ct)
+            result.CoordinateType = ParseEnum<TextureCoordinateType>(ct, "CoordinateType", null);
+
+        // Every .achj has the array, so a file without it is some other JSON, and opening it as empty would lose it on save.
+        if (root["animationChains"] is null)
+            throw new InvalidDataException("This is not an animation file: it has no \"animationChains\" array.");
+
+        foreach (var chainObj in ObjectsProp(root, "animationChains"))
+        {
+            var chain = new AnimationChainSave
+            {
+                Name = StringProp(chainObj, "name") ?? string.Empty,
+                IsLocked = BoolProp(chainObj, "locked"),
+                Loop = BoolProp(chainObj, "loop", true),
+                PingPong = BoolProp(chainObj, "pingPong"),
+                Reverse = BoolProp(chainObj, "reverse"),
+            };
+
+            foreach (var frameObj in ObjectsProp(chainObj, "frames"))
+                chain.Frames.Add(ParseFrameJson(frameObj, $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
+
+            result.AnimationChains.Add(chain);
+        }
+
+        result.ProjectFile = StringProp(root, "projectFile");
 
         return result;
     }
@@ -1011,7 +1069,7 @@ public class AnimationChainListSave
     {
         var frame = new AnimationFrameSave
         {
-            TextureName = el["textureName"]?.GetValue<string>() ?? string.Empty,
+            TextureName = StringProp(el, "textureName") ?? string.Empty,
             FrameLength = FloatProp(el, "frameLength"),
             LeftCoordinate = FloatProp(el, "leftCoordinate"),
             RightCoordinate = FloatProp(el, "rightCoordinate", 1f),
@@ -1035,17 +1093,15 @@ public class AnimationChainListSave
             ColorEasing = StringProp(el, "colorEasing"),
         };
 
-        if (el["shapes"] is JsonObject shapesObj)
-            frame.ShapesSave = ParseShapesJson(shapesObj);
+        if (el["shapes"] is { } shapes)
+            frame.ShapesSave = ParseShapesJson(shapes as JsonObject ?? throw Wrong(shapes, "an object"));
 
-        if (el["events"] is JsonArray eventsArray)
-            foreach (var eventNode in eventsArray)
-                if (eventNode is JsonObject eventObj)
-                    frame.Events.Add(new AnimationFrameEvent
-                    {
-                        Name = eventObj["name"]?.GetValue<string>() ?? string.Empty,
-                        Data = eventObj["data"]?.GetValue<string>(),
-                    });
+        foreach (var eventObj in ObjectsProp(el, "events"))
+            frame.Events.Add(new AnimationFrameEvent
+            {
+                Name = StringProp(eventObj, "name") ?? string.Empty,
+                Data = StringProp(eventObj, "data"),
+            });
 
         return frame;
     }
@@ -1054,64 +1110,48 @@ public class AnimationChainListSave
     {
         var shapes = new ShapesSave();
 
-        if (el["rectangles"] is JsonArray rectsArray)
+        foreach (var r in ObjectsProp(el, "rectangles"))
         {
-            foreach (var node in rectsArray)
+            var rect = new AARectSave
             {
-                var r = node!.AsObject();
-                var rect = new AARectSave
-                {
-                    Name = r["name"]?.GetValue<string>() ?? string.Empty,
-                    X = FloatProp(r, "x"),
-                    Y = FloatProp(r, "y"),
-                    ScaleX = FloatProp(r, "scaleX", 16f),
-                    ScaleY = FloatProp(r, "scaleY", 16f),
-                };
-                ReadColorJson(r, rect);
-                ReadShapeKeyframesJson(r, rect);
-                shapes.Add(rect);
-            }
+                Name = StringProp(r, "name") ?? string.Empty,
+                X = FloatProp(r, "x"),
+                Y = FloatProp(r, "y"),
+                ScaleX = FloatProp(r, "scaleX", 16f),
+                ScaleY = FloatProp(r, "scaleY", 16f),
+            };
+            ReadColorJson(r, rect);
+            ReadShapeKeyframesJson(r, rect);
+            shapes.Add(rect);
         }
 
-        if (el["circles"] is JsonArray circlesArray)
+        foreach (var c in ObjectsProp(el, "circles"))
         {
-            foreach (var node in circlesArray)
+            var circle = new CircleSave
             {
-                var c = node!.AsObject();
-                var circle = new CircleSave
-                {
-                    Name = c["name"]?.GetValue<string>() ?? string.Empty,
-                    X = FloatProp(c, "x"),
-                    Y = FloatProp(c, "y"),
-                    Radius = FloatProp(c, "radius", 16f),
-                };
-                ReadColorJson(c, circle);
-                ReadShapeKeyframesJson(c, circle);
-                shapes.Add(circle);
-            }
+                Name = StringProp(c, "name") ?? string.Empty,
+                X = FloatProp(c, "x"),
+                Y = FloatProp(c, "y"),
+                Radius = FloatProp(c, "radius", 16f),
+            };
+            ReadColorJson(c, circle);
+            ReadShapeKeyframesJson(c, circle);
+            shapes.Add(circle);
         }
 
-        if (el["polygons"] is JsonArray polysArray)
+        foreach (var p in ObjectsProp(el, "polygons"))
         {
-            foreach (var node in polysArray)
+            var poly = new PolygonSave
             {
-                var p = node!.AsObject();
-                var poly = new PolygonSave
-                {
-                    Name = p["name"]?.GetValue<string>() ?? string.Empty,
-                    X = FloatProp(p, "x"),
-                    Y = FloatProp(p, "y"),
-                };
-                if (p["points"] is JsonArray pointsArray)
-                    foreach (var ptNode in pointsArray)
-                    {
-                        var pt = ptNode!.AsObject();
-                        poly.Points.Add(new Vector2Save { X = FloatProp(pt, "x"), Y = FloatProp(pt, "y") });
-                    }
-                ReadColorJson(p, poly);
-                ReadShapeKeyframesJson(p, poly);
-                shapes.Add(poly);
-            }
+                Name = StringProp(p, "name") ?? string.Empty,
+                X = FloatProp(p, "x"),
+                Y = FloatProp(p, "y"),
+            };
+            foreach (var pt in ObjectsProp(p, "points"))
+                poly.Points.Add(new Vector2Save { X = FloatProp(pt, "x"), Y = FloatProp(pt, "y") });
+            ReadColorJson(p, poly);
+            ReadShapeKeyframesJson(p, poly);
+            shapes.Add(poly);
         }
 
         return shapes;
@@ -1129,17 +1169,44 @@ public class AnimationChainListSave
     }
 
     private static float FloatProp(JsonObject parent, string name, float defaultValue = 0f) =>
-        parent[name] is JsonValue v ? v.GetValue<float>() : defaultValue;
+        TryProp(parent, name, "a number", out float value) ? value : defaultValue;
 
     private static bool BoolProp(JsonObject parent, string name, bool defaultValue = false) =>
-        parent[name] is JsonValue v ? v.GetValue<bool>() : defaultValue;
+        TryProp(parent, name, "true or false", out bool value) ? value : defaultValue;
 
     private static string? StringProp(JsonObject parent, string name) =>
-        parent[name] is JsonValue v ? v.GetValue<string>() : null;
+        TryProp(parent, name, "a string", out string value) ? value : null;
 
     private static int? IntPropNullable(JsonObject parent, string name) =>
-        parent[name] is JsonValue v ? v.GetValue<int>() : null;
+        TryProp(parent, name, "a whole number", out int value) ? value : null;
 
     private static ColorOperation? ColorOperationProp(JsonObject parent, string name, string location) =>
-        parent[name] is JsonValue v ? ParseEnum<ColorOperation>(v.GetValue<string>()!, "ColorOperation", location) : null;
+        StringProp(parent, name) is { } value ? ParseEnum<ColorOperation>(value, "ColorOperation", location) : null;
+
+    // False for an absent property or JSON null; any other kind than the expected one is refused.
+    private static bool TryProp<T>(JsonObject parent, string name, string expected, out T value) where T : notnull
+    {
+        value = default!;
+        if (parent[name] is not { } node) return false;
+        if (node is JsonValue json && json.TryGetValue<T>(out var read))
+        {
+            value = read;
+            return true;
+        }
+        throw Wrong(node, expected);
+    }
+
+    // The objects of an array property; none for an absent property or JSON null.
+    private static IEnumerable<JsonObject> ObjectsProp(JsonObject parent, string name)
+    {
+        if (parent[name] is not { } node) yield break;
+        var array = node as JsonArray ?? throw Wrong(node, "an array");
+        for (int i = 0; i < array.Count; i++)
+            yield return array[i] as JsonObject ?? throw new InvalidDataException($"{PathOf(array)}[{i}] must be an object.");
+    }
+
+    private static InvalidDataException Wrong(JsonNode node, string expected) => new($"{PathOf(node)} must be {expected}.");
+
+    // GetPath starts at the root, as "$."
+    private static string PathOf(JsonNode node) => node.GetPath()[2..];
 }
