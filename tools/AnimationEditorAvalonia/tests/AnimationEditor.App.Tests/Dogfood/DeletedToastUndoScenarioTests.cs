@@ -31,6 +31,7 @@ public class DeletedToastUndoScenarioTests
     [InlineData("reload")]
     [InlineData("another edit")]
     [InlineData("undo")]
+    [InlineData("save as to another folder")] // which clears the undo history
     public async Task WhenTheDeletionIsNotTheLastStepInFront_TheToastIsGone(string since)
     {
         using var editor = new AnimationEditorHarness();
@@ -46,6 +47,11 @@ public class DeletedToastUndoScenarioTests
                 (await editor.WaitUntilAsync(() => editor.Project.AnimationChains[0].Name == "Stroll", TimeSpan.FromSeconds(3))).ShouldBeTrue();
                 break;
             case "another edit": editor.Services.AppCommands.AddAnimationChainWithName("Second"); break;
+            case "save as to another folder":
+                editor.Dialogs.AnswerNextSaveFile(Path.Combine(Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "moved")).FullName, "hero.achx"));
+                editor.ClickMenu("MenuSaveAs");
+                await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+                break;
             case "undo": editor.Press(Key.Z, RawInputModifiers.Control); break;
         }
         editor.Layout();
@@ -53,15 +59,12 @@ public class DeletedToastUndoScenarioTests
         editor.DeletedToastText.ShouldBeNull();
     }
 
-    [AvaloniaTheory]
-    [InlineData("hero2.achx")]
-    [InlineData("moved/hero.achx")]
-    public async Task AfterSaveAs_TheToastStays_AndUndoesTheDeletion(string savedAs)
+    [AvaloniaFact]
+    public async Task AfterSaveAs_TheToastStays_AndUndoesTheDeletion()
     {
         using var editor = new AnimationEditorHarness();
         await OpenAndDeleteRunAsync(editor);
-        string path = Path.Combine(editor.ProjectFolder, savedAs);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        string path = Path.Combine(editor.ProjectFolder, "hero2.achx");
 
         editor.Dialogs.AnswerNextSaveFile(path);
         editor.ClickMenu("MenuSaveAs");
