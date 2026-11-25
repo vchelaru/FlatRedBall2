@@ -354,6 +354,24 @@ public sealed class TsxInPlaceSaveTests : IDisposable
         new FilePath(ctx.ProjectManager.FileName!).ShouldBe(new FilePath(target));
     }
 
+    [Fact]
+    public async Task SaveAs_RealWatcher_NoOutsideChange_ReportsNothing()
+    {
+        var target = Path.Combine(_dir.Path, "Copy.tsx");
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var watcher = new HotReloadWatcher();
+        var reports = 0;
+        watcher.AchxChangedOnDisk += _ => System.Threading.Interlocked.Increment(ref reports);
+        ctx.AppCommands.HotReloadWatcher = watcher;
+        await ctx.AppCommands.OpenTsxWorkflowAsync(Write(Xml));
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        await Task.Delay(1000);
+        reports.ShouldBe(0);
+    }
+
     [Theory]
     [InlineData("./Heroes.png")]
     [InlineData("../a/Heroes.png")]
@@ -429,11 +447,12 @@ public sealed class TsxInPlaceSaveTests : IDisposable
     }
 
     [Fact]
-    public void Rebase_AnotherDrive_LeavesThePath()
+    public void Rebase_AnotherDriveOrShare_ReturnsTheAbsolutePath()
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        TexturePathHelper.Rebase("art/Heroes.png", new FilePath("C:/a/"), new FilePath("D:/a/")).ShouldBe("art/Heroes.png");
+        TexturePathHelper.Rebase("art/Heroes.png", new FilePath("C:/a/"), new FilePath("D:/a/")).ShouldBe("C:/a/art/Heroes.png");
+        TexturePathHelper.Rebase("art/Heroes.png", new FilePath("C:/a/"), new FilePath("//server/share/a/")).ShouldBe("C:/a/art/Heroes.png");
         TexturePathHelper.Rebase("art/Heroes.png", new FilePath("C:/a/"), new FilePath("C:/b/")).ShouldBe("../a/art/Heroes.png");
     }
 }

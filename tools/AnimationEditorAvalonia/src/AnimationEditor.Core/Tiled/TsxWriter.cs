@@ -335,7 +335,7 @@ public sealed class TsxWriter
 
     /// <summary>
     /// Makes every path that Tiled resolves against the file's folder reach the same file from another folder.
-    /// A path that cannot be relative to it (another drive) is left as it is.
+    /// A path that cannot be relative to it (another drive) becomes absolute.
     /// </summary>
     private static string RebasePaths(string text, FilePath fromFolder, FilePath toFolder)
     {
