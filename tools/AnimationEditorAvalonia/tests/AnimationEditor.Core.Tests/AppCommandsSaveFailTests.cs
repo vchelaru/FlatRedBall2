@@ -1,13 +1,6 @@
-using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
-using AnimationEditor.Core.Data;
-using AnimationEditor.Core.Rendering;
-using AnimationEditor.Core.IO;
-using AnimationEditor.Core.Paths;
-using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.IO;
-using System.Collections.Generic;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -21,22 +14,13 @@ public class AppCommandsSaveFailTests
     [Fact]
     public void SaveCurrentAnimationChainList_SetsFailedState_WhenSaveThrows()
     {
-        var throwingPm = new ThrowingProjectManager();
-        throwingPm.FileName = "/some/file.achx";
-        throwingPm.AnimationChainListSave = new AnimationChainListSave();
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        ctx.ProjectManager.FileName = Path.Combine(dir.Path, "missing", "file.achx");
 
-        var events     = new ApplicationEvents();
-        var selected   = new SelectedState(throwingPm);
-        var appState   = new AppState(events, selected);
-        var io         = new IoManager(appState, Path.Combine(Path.GetTempPath(), "AnimationEditorCoreTests", $"recovery_{Guid.NewGuid():N}.achx"));
-        var finder     = new ObjectFinder(throwingPm);
-        var undo       = new UndoManager();
-        var commands   = new AppCommands(throwingPm, selected, events, io, finder, undo);
-        commands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppCommands.SaveCurrentAnimationChainList();
 
-        commands.SaveCurrentAnimationChainList();
-
-        Assert.Equal(SaveState.Failed, undo.SaveState);
+        Assert.Equal(SaveState.Failed, ctx.UndoManager.SaveState);
     }
 
     [Fact]
@@ -59,50 +43,5 @@ public class AppCommandsSaveFailTests
             if (System.IO.File.Exists(tmpPath))
                 System.IO.File.Delete(tmpPath);
         }
-    }
-
-    // ── Stub ──────────────────────────────────────────────────────────────────
-
-    private sealed class ThrowingProjectManager : IProjectManager
-    {
-        public AnimationChainListSave? AnimationChainListSave { get; set; }
-        public TileMapInformationList TileMapInformationList { get; set; } = new();
-        public FilePath[] ReferencedPngs { get; set; } = Array.Empty<FilePath>();
-        public string? FileName { get; set; }
-        public string? ProjectFolderPath { get; set; }
-        public TextureCoordinateType OnDiskCoordinateType { get; set; }
-        public bool IsNativeTsxProject => false;
-        public TileGrid? TsxTileGrid => null;
-        public void LoadTsxProject(FilePath fileName) { }
-        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => [];
-        public bool MoveTsxProject(FilePath path) => false;
-        public bool TsxLacksOutsideChange => false;
-        public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => new HashSet<AnimationChainSave>();
-        public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
-        public uint? GetTsxOwnerTileId(AnimationChainSave chain) => null;
-        public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId) => "not a tsx project";
-        public bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId) => false;
-        public bool MarkChainNameExplicit(AnimationChainSave chain) => false;
-        public bool IsChainNameAuto(AnimationChainSave chain) => false;
-        public bool MakeChainNameAuto(AnimationChainSave chain) => false;
-        public uint? ComputeFrameTileId(AnimationFrameSave frame) => null;
-        public object? CaptureTsxState() => null;
-        public void RestoreTsxState(object? state) { }
-        public void ResetToBlankDocument() { }
-
-        public void LoadAnimationChain(
-            FilePath fileName,
-            AnimationChainListSave? preParsed = null) { }
-
-        public string? ResolveFilesPanelRoot() => null;
-
-        public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
-        public void SaveAnimationChainList(string targetPath)
-            => throw new InvalidOperationException("Simulated save failure");
-
-        public IReadOnlyList<string> FindMissingTextures(AnimationChainListSave acls, string achxDirectory)
-            => Array.Empty<string>();
-
-        public (int Width, int Height)? GetTextureSizeInPixels(string textureName) => null;
     }
 }

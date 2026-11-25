@@ -37,7 +37,7 @@ public static class TexturePathHelper
     /// against <paramref name="achxFolder"/>, so a texture path that was written absolute (or
     /// with OS-native backslashes) before the project had a folder to relativize against gets
     /// healed into a forward-slash, folder-relative path once one is known. Call this on every
-    /// save (see <see cref="ProjectManager.SaveAnimationChainList(string)"/>), not just the
+    /// save (see <see cref="ProjectManager.WriteDocument"/>), not just the
     /// first -- old files can carry either flavor of stale path.
     /// </summary>
     /// <param name="textureName">The stored path -- may already be relative (forward- or

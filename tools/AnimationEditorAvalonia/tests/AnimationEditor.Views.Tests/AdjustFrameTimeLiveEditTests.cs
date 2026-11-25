@@ -35,7 +35,6 @@ public class AdjustFrameTimeLiveEditTests
         public bool IsNativeTsxProject => false;
         public TileGrid? TsxTileGrid => null;
         public void LoadTsxProject(FilePath fileName) { }
-        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => [];
         public bool MoveTsxProject(FilePath path) => false;
         public bool TsxLacksOutsideChange => false;
         public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => new HashSet<AnimationChainSave>();
@@ -55,8 +54,6 @@ public class AdjustFrameTimeLiveEditTests
             FilePath fileName,
             AnimationChainListSave? preParsed = null) { }
 
-        public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
-        public void SaveAnimationChainList(string targetPath) { }
         public string? ResolveFilesPanelRoot() => null;
         public (int Width, int Height)? GetTextureSizeInPixels(string textureName) => null;
 

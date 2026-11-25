@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
@@ -45,7 +46,7 @@ namespace AnimationEditor.Core
         {
             /// <summary>Each native-tsx chain's own tile id, keyed by chain object reference (survives
             /// a rename, unlike keying by name) -- populated on <see cref="LoadTsxProject"/> from what
-            /// the file already said, and kept current after every <see cref="SaveTsxProject"/> so a
+            /// the file already said, and kept current after every save so a
             /// brand-new chain's first-save id keeps being reused on every later save instead of being
             /// recomputed (and potentially drifting) from geometry each time. See <see
             /// cref="Tiled.MultiTileToTiledAnimationMapper"/>'s <c>knownEntryTileIds</c> parameter.</summary>
@@ -78,7 +79,7 @@ namespace AnimationEditor.Core
             /// from non-empty to empty (see <see cref="DormantHintsByChain"/>).</summary>
             public required IReadOnlyDictionary<AnimationChainSave, IReadOnlyList<AnimationFrameSave>> LastNonEmptyFramesByChain { get; init; }
 
-            /// <summary>A chain's tile-identity hint, held onto after <see cref="SaveTsxProject"/> sees
+            /// <summary>A chain's tile-identity hint, held onto after a save sees
             /// its <see cref="AnimationChainSave.Frames"/> go empty, so a later save can tell apart two
             /// scenarios that otherwise look identical (chain still present in <see
             /// cref="AnimationChainListSave"/>, entry tile id null on the intervening save):
@@ -91,6 +92,9 @@ namespace AnimationEditor.Core
             /// DormantTsxHint.Frames"/> by object reference (not value) is a reliable "is this the same
             /// Undo?" test.</summary>
             public required IReadOnlyDictionary<AnimationChainSave, DormantTsxHint> DormantHintsByChain { get; init; }
+
+            /// <summary>See <see cref="TsxChainsNotFullySaved"/>.</summary>
+            public required IReadOnlySet<AnimationChainSave> ChainsNotFullySaved { get; init; }
         }
 
         /// <summary>See <see cref="TsxState.DormantHintsByChain"/>.</summary>
@@ -102,18 +106,6 @@ namespace AnimationEditor.Core
         /// <summary>Whether the currently loaded project is a native <c>.tsx</c> project (see
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         public bool IsNativeTsxProject => _tsx != null;
-
-        /// <summary>Guards the achx/achj-format save (<see cref="SaveAnimationChainList(string)"/>)
-        /// against being called on a native tsx project --
-        /// defense-in-depth alongside <c>AppCommands.SaveCurrentAnimationChainList</c>'s own branch
-        /// on <see cref="IsNativeTsxProject"/>, for any caller that reaches <see
-        /// cref="ProjectManager"/> directly instead.</summary>
-        private void ThrowIfNativeTsxProject()
-        {
-            if (IsNativeTsxProject)
-                throw new InvalidOperationException(
-                    "Cannot save a native tsx project via SaveAnimationChainList -- use SaveTsxProject instead.");
-        }
 
         /// <summary>The tsx's own tile grid (tile size, margin, spacing), or <see langword="null"/>
         /// for an achx/achj project. A native tsx project's wireframe grid is always this -- it is
@@ -156,8 +148,7 @@ namespace AnimationEditor.Core
             // This ProjectManager instance is reused across File > Open calls (one instance per
             // app window/tab-set, not recreated per file -- see TabSwitchCacheTests), so a prior
             // LoadTsxProject's tileset/identity-tracking state must not leak into a now-plain achx
-            // project: IsNativeTsxProject must go false, or SaveCurrentAnimationChainList would
-            // route this achx's save through SaveTsxProject against the stale tileset.
+            // project: IsNativeTsxProject must go false, or this achx would be saved as that tileset.
             _tsx = null;
 
             // Same reused-instance hazard as the tsx state just above: ReferencedPngs is driven
@@ -170,33 +161,29 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
-        /// Save the current animation chain list to <paramref name="targetPath"/>, as .achj
-        /// (JSON) or .achx (XML) depending on <paramref name="targetPath"/>'s extension, in the
-        /// coordinate format specified by <see cref="OnDiskCoordinateType"/>. The in-memory document
-        /// holds pixels, so only a UV write converts, and the in-memory document is left as it was.
+        /// The one writer of a document, the open one or another tab's: writes it to <paramref name="target"/> as the
+        /// .tsx it is, or as the .achj (JSON) or .achx (XML) that <paramref name="target"/>'s extension says. Nothing about
+        /// <paramref name="document"/> changes when it throws.
         /// </summary>
-        /// <exception cref="InvalidOperationException"><see cref="IsNativeTsxProject"/> is true --
-        /// <see cref="AnimationChainListSave"/> is a view over Tiled tileset data for a native tsx
-        /// project, not a real achx/achj document, so writing it through this method would produce
-        /// malformed/misleading content. Use <see cref="SaveTsxProject"/> instead.</exception>
-        public void SaveAnimationChainList(string targetPath)
+        /// <returns>What a .tsx save warns of; see <see cref="SaveTsx"/>.</returns>
+        internal static IReadOnlyList<string> WriteDocument(TabEntry document, string target)
         {
-            ThrowIfNativeTsxProject();
-
-            var acls = AnimationChainListSave;
-            if (acls == null) return;
-            SaveAnimationChainList(acls, string.IsNullOrEmpty(FileName) ? targetPath : FileName, targetPath, OnDiskCoordinateType);
+            if (document.CachedEditorModel is not { } model) return [];
+            if (document.CachedTsxState is not TsxState tsx)
+            {
+                SaveAnimationChainList(model, document.Path, target, document.CachedOnDiskCoordinateType);
+                return [];
+            }
+            document.CachedTsxState = SaveTsx(model, tsx, new FilePath(target), out var warnings);
+            return warnings;
         }
 
-        /// <inheritdoc cref="IProjectManager.SaveAnimationChainList(AnimationChainListSave, string, TextureCoordinateType)"/>
-        public void SaveAnimationChainList(AnimationChainListSave acls, string targetPath, TextureCoordinateType diskFormat) =>
-            SaveAnimationChainList(acls, targetPath, targetPath, diskFormat);
-
-        // ownPath: the file whose folder the document's relative paths are relative to so far.
+        // The document holds pixels, so only a UV write converts, and it is left as it was. ownFile: the file whose folder
+        // its relative paths are relative to so far.
         private static void SaveAnimationChainList(
-            AnimationChainListSave acls, string ownPath, string targetPath, TextureCoordinateType diskFormat)
+            AnimationChainListSave acls, FilePath ownFile, string targetPath, TextureCoordinateType diskFormat)
         {
-            var (from, to) = (new FilePath(ownPath).GetDirectoryContainingThis(), new FilePath(targetPath).GetDirectoryContainingThis());
+            var (from, to) = (ownFile.GetDirectoryContainingThis(), new FilePath(targetPath).GetDirectoryContainingThis());
             var achxDirectory = System.IO.Path.GetDirectoryName(targetPath) ?? string.Empty;
             var textureNames = acls.AnimationChains.SelectMany(chain => chain.Frames)
                 .Select(frame => (Frame: frame, frame.TextureName)).ToList();
@@ -470,6 +457,7 @@ namespace AnimationEditor.Core
                 SyntheticNamedChains = new HashSet<AnimationChainSave>(syntheticNamedChains, ReferenceEqualityComparer.Instance),
                 LastNonEmptyFramesByChain = loadedFramesByChain,
                 DormantHintsByChain = new Dictionary<AnimationChainSave, DormantTsxHint>(ReferenceEqualityComparer.Instance),
+                ChainsNotFullySaved = new HashSet<AnimationChainSave>(),
             };
             AnimationChainListSave = acls;
             FileName = fileName.FullPath;
@@ -523,17 +511,15 @@ namespace AnimationEditor.Core
         public bool TsxLacksOutsideChange => _tsx?.File.LacksOutsideChange == true;
 
         /// <summary>
-        /// The chains the last <see cref="SaveTsxProject"/> did not store in full: not written at all (a mapping
+        /// The chains the open tsx's last save did not store in full: not written at all (a mapping
         /// warning, or no frames), or written without data the format can't hold.
         /// </summary>
-        public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved { get; private set; } = new HashSet<AnimationChainSave>();
+        public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => _tsx?.ChainsNotFullySaved ?? new HashSet<AnimationChainSave>();
 
         /// <summary>
-        /// Saves the current <see cref="AnimationChainListSave"/> back to the tsx opened by <see
-        /// cref="LoadTsxProject"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and <see
-        /// cref="Tiled.NativeTsxAnimationSync"/>. No-op (returns an empty list) if no tsx project is
-        /// loaded. Returns every chain's mapping warning from this save -- a chain that couldn't be
-        /// mapped (bad geometry, wrong texture, etc.) keeps whatever it last wrote to its tile
+        /// Writes a tsx document to <paramref name="target"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and
+        /// <see cref="Tiled.NativeTsxAnimationSync"/>. Returns its state after the save. <paramref name="warnings"/>: every chain's mapping warning -- a
+        /// chain that couldn't be mapped (bad geometry, wrong texture, etc.) keeps whatever it last wrote to its tile
         /// untouched rather than being cleared -- plus one per chain carrying data the format
         /// can't hold (<see cref="Tiled.TsxLossyDataCheck"/>; that chain IS written, minus that
         /// data). A caller should surface these to the user instead of assuming the save fully
@@ -541,31 +527,12 @@ namespace AnimationEditor.Core
         /// </summary>
         /// <remarks>Same all-or-nothing invariant as <see cref="LoadTsxProject"/>: <see
         /// cref="Tiled.NativeTsxAnimationSync.Apply"/> runs against a working copy (<see
-        /// cref="Tiled.NativeTsxAnimationSync.CloneForSave"/>), and this instance only adopts it
+        /// cref="Tiled.NativeTsxAnimationSync.CloneForSave"/>), which is in the returned state only
         /// after <see cref="Tiled.TsxWriter"/> has actually
         /// succeeded -- so a write failure (a disk/permissions error)
         /// can't leave the in-memory tileset reflecting computed-but-never-persisted state.</remarks>
-        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null)
-        {
-            if (_tsx == null || AnimationChainListSave == null)
-                return [];
-
-            var saved = SaveTsx(AnimationChainListSave, _tsx, new FilePath(targetPath ?? FileName!));
-            _tsx = saved.State;
-            TsxChainsNotFullySaved = saved.ChainsNotFullySaved;
-            return saved.Warnings;
-        }
-
-        /// <param name="State">The document's state after the save.</param>
-        /// <param name="ChainsNotFullySaved">See <see cref="TsxChainsNotFullySaved"/>.</param>
-        internal sealed record TsxSave(
-            TsxState State, IReadOnlyList<string> Warnings, IReadOnlySet<AnimationChainSave> ChainsNotFullySaved);
-
-        /// <summary>
-        /// Writes a tsx document, the open one or another tab's, to <paramref name="target"/>. See
-        /// <see cref="SaveTsxProject"/>.
-        /// </summary>
-        internal static TsxSave SaveTsx(AnimationChainListSave acls, TsxState state, FilePath target)
+        private static TsxState SaveTsx(
+            AnimationChainListSave acls, TsxState state, FilePath target, out IReadOnlyList<string> warnings)
         {
             // Revives a dormant hint for this save's Map() call, but only for a chain whose
             // current Frames are reference-sequence-identical to the ones captured when that hint
@@ -736,6 +703,12 @@ namespace AnimationEditor.Core
                     updatedDormant[chain] = stillDormantThroughAbort;
                 }
             }
+
+            var notFullySaved = mapped
+                .Where(r => r.Warnings.Count > 0 || r.EntryTileId == null
+                    || Tiled.TsxLossyDataCheck.DroppedKinds(r.SourceChain, acls.TimeMeasurementUnit).Count > 0)
+                .Select(r => r.SourceChain).ToHashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
+
             var updatedState = state with
             {
                 Tileset = workingTileset,
@@ -743,17 +716,13 @@ namespace AnimationEditor.Core
                 SatelliteTileIdsByChain = updatedSatellites,
                 LastNonEmptyFramesByChain = updatedLastFrames,
                 DormantHintsByChain = updatedDormant,
+                ChainsNotFullySaved = notFullySaved,
             };
 
-            var notFullySaved = mapped
-                .Where(r => r.Warnings.Count > 0 || r.EntryTileId == null
-                    || Tiled.TsxLossyDataCheck.DroppedKinds(r.SourceChain, acls.TimeMeasurementUnit).Count > 0)
-                .Select(r => r.SourceChain).ToHashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
-
-            var warnings = mapped.SelectMany(r => r.Warnings)
+            warnings = mapped.SelectMany(r => r.Warnings)
                 .Concat(Tiled.TsxLossyDataCheck.Warnings(acls))
                 .ToList();
-            return new TsxSave(updatedState, warnings, notFullySaved);
+            return updatedState;
         }
 
         /// <inheritdoc/>
@@ -1015,7 +984,7 @@ namespace AnimationEditor.Core
         /// issues back to chain names by re-running <see cref="Tiled.MultiTileToTiledAnimationMapper"/>
         /// on the current in-memory chains and matching each chain's own computed entry tile id
         /// against either an issue's <c>AnchorTileId</c> or its <c>TileId</c> -- the same id math
-        /// <see cref="SaveTsxProject"/> uses, so this always reflects the chains as they'd actually
+        /// a save uses, so this always reflects the chains as they'd actually
         /// be written, not just as they were on load.
         /// </summary>
         /// <remarks>
@@ -1053,7 +1022,7 @@ namespace AnimationEditor.Core
 
         /// <summary>
         /// Builds a <see cref="Tiled.TilesetAnimationInfo"/> from <paramref name="state"/>, which
-        /// both <see cref="SaveTsxProject"/> and <see cref="GetChainNamesWithTsxIssues"/> need.
+        /// both a save and <see cref="GetChainNamesWithTsxIssues"/> need.
         /// </summary>
         private static Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(TsxState state)
         {

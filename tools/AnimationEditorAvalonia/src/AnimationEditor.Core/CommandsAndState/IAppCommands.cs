@@ -55,7 +55,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Raised after <see cref="SaveCurrentAnimationChainList"/> or <see cref="SaveDocument"/> saves a native tsx project
         /// (<see cref="ProjectManager.IsNativeTsxProject"/>) with one or more chains whose mapping
         /// failed this save (bad geometry, wrong texture, etc. -- see <see
-        /// cref="ProjectManager.SaveTsxProject"/>). The chain's previously-written tile is left
+        /// cref="ProjectManager.WriteDocument"/>). The chain's previously-written tile is left
         /// untouched rather than cleared, but the edit that caused the failure was NOT written; the
         /// app layer should surface these as a toast so the user knows the save didn't fully apply.
         /// Never raised for an achx/achj save or a tsx save with no warnings. The first argument is the tsx path.
@@ -215,7 +215,7 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string>? SaveAsRefused;
 
         /// <summary>
-        /// Writes a background tab's cached document to its own file, in that file's disk format: a cross-document cut removes chains from a background tab's model, and unless
+        /// Writes a background tab's cached document to its own file, in that file's disk format, and pushes it to its associated tilesets: a cross-document cut removes chains from a background tab's model, and unless
         /// that model reaches disk the chain comes back from the file on the next load or reload.
         /// A failure, or a file that changed since the document was read or saved, is reported through <see
         /// cref="SaveFailed"/> and returns false. Sets <see cref="TabEntry.SaveFailed"/> either way.

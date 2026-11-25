@@ -624,94 +624,76 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc/>
-        public bool SaveCurrentAnimationChainList(string? fileName = null) => WriteDocument(fileName ?? _pm.FileName);
+        public bool SaveCurrentAnimationChainList(string? fileName = null) => SaveOpenDocument(fileName ?? _pm.FileName);
 
-        // toAnotherFile: Save As. A failure there says nothing about the document's own file, which is as saved as it was.
-        private bool WriteDocument(string? target, bool toAnotherFile = false)
+        private bool SaveOpenDocument(string? target, bool toAnotherFile = false)
         {
-            if (!string.IsNullOrEmpty(target))
-            {
-                // Only after a failed save: otherwise the live reload takes the file's change.
-                if (RefuseIfStale(target, toAnotherFile)
-                    || (_undoManager.SaveState == SaveState.Failed && RefuseIfChangedOnDisk(target, _diskState)))
-                {
-                    if (!toAnotherFile) _undoManager.MarkSaveFailed();
-                    return false;
-                }
-
-                try
-                {
-                    IReadOnlyList<string>? tsxWarnings = null;
-                    HotReloadWatcher.RunOwnSave(target, () =>
-                    {
-                        if (_pm.IsNativeTsxProject)
-                            tsxWarnings = _pm.SaveTsxProject(target);
-                        else
-                            _pm.SaveAnimationChainList(target);
-                    });
-                    if (_pm.TsxLacksOutsideChange)
-                        HotReloadWatcher.ReportChange(target);
-                    else
-                        _diskState = ReadDiskState(target);
-                    if (tsxWarnings is { Count: > 0 })
-                        TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
-                    _undoManager.MarkSaved();
-                    EditorProjectModelChanged?.Invoke(target);
-                }
-                catch (Exception ex)
-                {
-                    if (toAnotherFile)
-                    {
-                        SaveAsRefused?.Invoke($"Could not save {new FilePath(target).NoPath}: {ex.Message}");
-                        return false;
-                    }
-                    _undoManager.MarkSaveFailed();
-                    SaveFailed?.Invoke(ex.Message);
-                    return false;
-                }
-
-                // A native tsx project has no achx to push from -- the achj-push feature
-                // (issue #1133) doesn't apply to it.
-                if (!_pm.IsNativeTsxProject)
-                    SyncAssociatedTiledTilesets(target);
-            }
-            else
+            if (string.IsNullOrEmpty(target))
             {
                 _ioManager.WriteRecoveryFile(_pm.AnimationChainListSave);
+                return true;
             }
-            return true;
+            var document = TabEditorCache.FromProject(_pm, target);
+            document.CachedDiskState = _diskState;
+            return WriteDocument(document, target, isOpen: true, toAnotherFile);
         }
 
         /// <inheritdoc cref="IAppCommands.SaveDocument"/>
-        public bool SaveDocument(TabEntry tab)
+        public bool SaveDocument(TabEntry tab) => WriteDocument(tab, tab.Path.FullPath, isOpen: false);
+
+        /// <summary>The one save of a document, the open one (as a tab) or a background tab's. Reports what went wrong.</summary>
+        /// <param name="toAnotherFile">Save As. A failure there says nothing about the document's own file, which is as saved as it was.</param>
+        private bool WriteDocument(TabEntry document, string target, bool isOpen, bool toAnotherFile = false)
         {
-            string path = tab.Path.FullPath;
-            tab.SaveFailed = true;
-            if (RefuseIfStale(path) || RefuseIfChangedOnDisk(path, tab.CachedDiskState)) return false;
+            void MarkFailed()
+            {
+                if (toAnotherFile) return;
+                if (isOpen) _undoManager.MarkSaveFailed();
+                else document.SaveFailed = true;
+            }
+
+            // The open one only after a failed save: otherwise the live reload takes the file's change.
+            bool checkDisk = !isOpen || _undoManager.SaveState == SaveState.Failed;
+            if (RefuseIfStale(target, toAnotherFile) || (checkDisk && RefuseIfChangedOnDisk(target, document.CachedDiskState)))
+            {
+                MarkFailed();
+                return false;
+            }
+
             IReadOnlyList<string> tsxWarnings = [];
             try
             {
-                HotReloadWatcher.RunOwnSave(path, () =>
-                {
-                    if (tab.CachedTsxState is ProjectManager.TsxState tsx)
-                    {
-                        var saved = ProjectManager.SaveTsx(tab.CachedEditorModel!, tsx, tab.Path);
-                        tab.CachedTsxState = saved.State;
-                        tsxWarnings = saved.Warnings;
-                    }
-                    else
-                        _pm.SaveAnimationChainList(tab.CachedEditorModel!, path, tab.CachedOnDiskCoordinateType);
-                });
+                HotReloadWatcher.RunOwnSave(target, () => tsxWarnings = ProjectManager.WriteDocument(document, target));
             }
             catch (Exception ex)
             {
-                SaveFailed?.Invoke($"\"{tab.Path.NoPath}\": {ex.Message}");
+                MarkFailed();
+                if (toAnotherFile) SaveAsRefused?.Invoke($"Could not save {new FilePath(target).NoPath}: {ex.Message}");
+                else SaveFailed?.Invoke(isOpen ? ex.Message : $"\"{document.Path.NoPath}\": {ex.Message}");
                 return false;
             }
-            tab.CachedDiskState = ReadDiskState(path);
-            tab.SaveFailed = false;
+
+            if (document.CachedTsxState is ProjectManager.TsxState { File.LacksOutsideChange: true })
+                HotReloadWatcher.ReportChange(target);
+            else
+                document.CachedDiskState = ReadDiskState(target);
+            if (isOpen)
+            {
+                _pm.RestoreTsxState(document.CachedTsxState);
+                _diskState = document.CachedDiskState;
+                _undoManager.MarkSaved();
+            }
+            else
+                document.SaveFailed = false;
+
             if (tsxWarnings.Count > 0)
-                TsxSaveCompletedWithWarnings?.Invoke(path, tsxWarnings);
+                TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
+            if (isOpen)
+                EditorProjectModelChanged?.Invoke(target);
+            // A native tsx project has no achx to push from -- the achj-push feature
+            // (issue #1133) doesn't apply to it.
+            if (document.CachedTsxState == null)
+                SyncAssociatedTiledTilesets(document.CachedEditorModel, target, isOpen);
             return true;
         }
 
@@ -780,15 +762,17 @@ namespace AnimationEditor.Core.CommandsAndState
         /// task against a project model the user may keep editing while it runs. A failure for one
         /// .tsx never rolls back or retries the .achx save, which has already succeeded by this point.
         /// </summary>
-        private void SyncAssociatedTiledTilesets(string achxPath)
+        private void SyncAssociatedTiledTilesets(AnimationChainListSave? acls, string achxPath, bool isOpen)
         {
-            if (_tiledSyncWarned)
+            void ClearWarning()
             {
+                if (!_tiledSyncWarned) return;
                 _tiledSyncWarned = false;
                 TiledSyncWarned?.Invoke([]);
             }
 
-            var acls = _pm.AnimationChainListSave;
+            // A background document without tilesets says nothing about the open one's.
+            if (isOpen) ClearWarning();
             if (acls == null) return;
 
             IReadOnlyList<string> tsxPaths;
@@ -802,6 +786,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
             if (tsxPaths.Count == 0) return;
+            ClearWarning();
 
             // Snapshot rather than hand the live model to the mapper: defensive even though this
             // runs synchronously today, so this stays safe if a future change backgrounds it.
@@ -857,7 +842,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 : new FilePath(_pm.FileName).Extension;
             var defaultExtension = string.IsNullOrEmpty(currentExtension) ? "achj" : currentExtension;
 
-            // A native tsx project's Save As must offer only its own format -- SaveTsxProject
+            // A native tsx project's Save As must offer only its own format -- a save
             // always writes Tiled tileset XML regardless of the target path's extension (see
             // SaveCurrentAnimationChainList below), so letting the achj/achx choices through here
             // would let the user save tsx content under a misleading .achx/.achj name.
@@ -887,7 +872,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             bool toAnotherFile = string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path);
-            if (!WriteDocument(path, toAnotherFile)) return false;
+            if (!SaveOpenDocument(path, toAnotherFile)) return false;
             _pm.MoveTsxProject(new FilePath(path));
             if (!string.IsNullOrEmpty(_pm.FileName)
                 && new FilePath(_pm.FileName).GetDirectoryContainingThis() != new FilePath(path).GetDirectoryContainingThis())

@@ -184,7 +184,7 @@ public static class NativeTsxAnimationSync
 
     /// <summary>
     /// Clones what <see cref="TsxLoader"/> reads, deeply where <see cref="Apply"/> changes it, so a caller can run
-    /// <see cref="Apply"/> on a working copy and adopt it once it is written (see <see cref="ProjectManager.SaveTsxProject"/>).
+    /// <see cref="Apply"/> on a working copy and adopt it once it is written (see <see cref="ProjectManager.WriteDocument"/>).
     /// </summary>
     internal static Tileset CloneForSave(Tileset tileset) => new()
     {

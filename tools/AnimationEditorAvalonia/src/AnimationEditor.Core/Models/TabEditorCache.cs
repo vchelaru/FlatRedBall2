@@ -1,3 +1,5 @@
+using AnimationEditor.Core.Paths;
+
 namespace AnimationEditor.Core.Models
 {
     /// <summary>
@@ -16,6 +18,14 @@ namespace AnimationEditor.Core.Models
             tab.CachedOnDiskCoordinateType = pm.OnDiskCoordinateType;
             tab.CachedTsxState = pm.CaptureTsxState();
             tab.CachedReferencedPngs = pm.ReferencedPngs;
+        }
+
+        /// <summary>The open document as a tab. Without a file yet, it is at <paramref name="target"/>.</summary>
+        internal static TabEntry FromProject(IProjectManager pm, string target)
+        {
+            var document = new TabEntry(new FilePath(string.IsNullOrEmpty(pm.FileName) ? target : pm.FileName));
+            CaptureFromProject(document, pm);
+            return document;
         }
 
         /// <summary>

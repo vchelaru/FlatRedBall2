@@ -412,7 +412,6 @@ public class TabSwitchCacheTests : IDisposable
         public bool IsNativeTsxProject => _inner.IsNativeTsxProject;
         public TileGrid? TsxTileGrid => _inner.TsxTileGrid;
         public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
-        public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
         public bool MoveTsxProject(FilePath path) => _inner.MoveTsxProject(path);
         public bool TsxLacksOutsideChange => _inner.TsxLacksOutsideChange;
         public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => _inner.TsxChainsNotFullySaved;
@@ -436,9 +435,6 @@ public class TabSwitchCacheTests : IDisposable
             _inner.LoadAnimationChain(fileName, preParsed);
         }
 
-        public void SaveAnimationChainList(AnimationChainListSave document, string targetPath, TextureCoordinateType diskFormat) { }
-        public void SaveAnimationChainList(string targetPath) =>
-            _inner.SaveAnimationChainList(targetPath);
 
         public string? ResolveFilesPanelRoot() => _inner.ResolveFilesPanelRoot();
 
