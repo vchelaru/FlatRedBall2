@@ -30,10 +30,8 @@ public class TestAppBuilder
 }
 
 /// <summary>
-/// Names the cause when the shared headless session dies mid-run: every later test then fails with only
-/// "Cannot get KeyValueStorage on the idle test context", which hides the exception that ended it. Each unhandled
-/// UI-thread, background-thread or unobserved-task exception goes to stderr and to <see cref="FilePath"/>, which CI
-/// prints when the test step fails.
+/// Each unhandled UI-thread, background-thread or unobserved-task exception goes to stderr and to
+/// <see cref="FilePath"/>, which CI prints when the test step fails.
 /// </summary>
 internal static class UnhandledExceptionLog
 {
@@ -44,8 +42,9 @@ internal static class UnhandledExceptionLog
 
     internal static void Install()
     {
-        if (System.Threading.Interlocked.Exchange(ref _installed, 1) == 1) return;
+        // Every test has a dispatcher of its own.
         Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) => Write("UI thread", e.Exception);
+        if (System.Threading.Interlocked.Exchange(ref _installed, 1) == 1) return;
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Write("AppDomain", e.ExceptionObject as Exception);
         System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => Write("Unobserved task", e.Exception);
     }
