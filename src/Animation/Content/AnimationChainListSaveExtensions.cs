@@ -48,7 +48,6 @@ public static class AnimationChainListSaveExtensions
     // Shared chain-building logic; loadTexture maps a save frame to its Texture2D (or null).
     private static AnimationChainList BuildList(AnimationChainListSave save, Func<AnimationFrameSave, Texture2D?> loadTexture)
     {
-        float frameLengthDivisor = save.TimeMeasurementUnit == TimeMeasurementUnit.Millisecond ? 1000f : 1f;
         var list = new AnimationChainList { Name = save.FileName };
 
         foreach (var chainSave in save.AnimationChains)
@@ -63,7 +62,7 @@ public static class AnimationChainListSaveExtensions
                 var frame = new AnimationFrame
                 {
                     TextureName = frameSave.TextureName,
-                    FrameLength = TimeSpan.FromSeconds(frameSave.FrameLength / frameLengthDivisor),
+                    FrameLength = frameSave.GetDuration(save.TimeMeasurementUnit),
                     FlipHorizontal = frameSave.FlipHorizontal,
                     FlipVertical = frameSave.FlipVertical,
                     FlipDiagonal = frameSave.FlipDiagonal,

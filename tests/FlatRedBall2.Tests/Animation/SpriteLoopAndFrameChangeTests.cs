@@ -47,6 +47,21 @@ public class SpriteLoopAndFrameChangeTests
         looped.ShouldBe(1);
     }
 
+    [Fact]
+    public void AnimateSelf_StepOfOneFrame_EntersAFrameEachTimeAndLoopsOnTheBoundary()
+    {
+        var sprite = MakeSprite("Walk", 10);
+        int looped = 0;
+        sprite.AnimationLooped += () => looped++;
+
+        for (int step = 1; step <= 100; step++)
+        {
+            sprite.AnimateSelf(0.1);
+            sprite.CurrentAnimation!.IndexOf(sprite.CurrentFrame!).ShouldBe(step % 10, $"step {step}");
+            looped.ShouldBe(step / 10);
+        }
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]

@@ -575,4 +575,16 @@ public class AchxLoaderTests
 
         Assert.Null(stream);
     }
+
+    [Fact]
+    public void ToAnimationChainList_LongFrameLength_IsTheDecimalTheFileHolds()
+    {
+        // 10.1f widens to 10.1000003815, ticks past the 10.1 the file holds.
+        var chain = new AnimationChainSave { Name = "a" };
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 10.1f });
+
+        var list = new AnimationChainListSave { AnimationChains = { chain } }.ToAnimationChainList(_ => null);
+
+        Assert.Equal(101_000_000, list[0][0].FrameLength.Ticks);
+    }
 }

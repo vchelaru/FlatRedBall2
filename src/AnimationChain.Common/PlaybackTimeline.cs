@@ -37,18 +37,26 @@ public readonly record struct PlaybackPosition(int FrameIndex, double ElapsedInF
 /// </summary>
 public static class PlaybackTimeline
 {
+    /// <summary>
+    /// How far before a frame boundary or a cycle's end, in seconds, a time already counts as on it. Times add up
+    /// inexactly (0.1 + 0.1 + 0.1 is past 0.3, eight steps of 0.1 fall short of 0.8). Far below one update; a frame
+    /// shorter than this may not be shown.
+    /// </summary>
+    public const double BoundaryTolerance = 1e-6;
+
     /// <summary>Length of one cycle: T, or 2T for a ping-pong. A looping player wraps here; a non-looping one stops here.</summary>
     public static double CycleLength(double forwardLength, bool pingPong) => pingPong ? 2 * forwardLength : forwardLength;
 
     /// <summary>
     /// Brings <paramref name="time"/> into a cycle of <paramref name="cycleLength"/> seconds: a looping player wraps, a
-    /// non-looping one holds the end. Takes the same time however many cycles that is.
+    /// non-looping one holds the end. Within <see cref="BoundaryTolerance"/> before the end is the end. Takes the same
+    /// time however many cycles that is.
     /// </summary>
     public static CyclePoint Wrap(double time, double cycleLength, bool loop)
     {
-        if (time < cycleLength) return new(time, 0, false);
+        if (time < cycleLength - BoundaryTolerance) return new(time, 0, false);
         if (!loop || cycleLength <= 0) return new(cycleLength, 0, !loop);
-        double wraps = Math.Floor(time / cycleLength);
+        double wraps = Math.Floor((time + BoundaryTolerance) / cycleLength);
         return new(Math.Max(0, time - wraps * cycleLength), (int)Math.Min(wraps, int.MaxValue), false);
     }
 
@@ -78,7 +86,8 @@ public static class PlaybackTimeline
 
     /// <summary>
     /// <see cref="Map"/> plus the frame shown. A time exactly on a frame boundary shows the frame playback enters, in
-    /// playback order (forward: the later frame; backward: the earlier one), matching FRB1.
+    /// playback order (forward: the later frame; backward: the earlier one), matching FRB1. Within
+    /// <see cref="BoundaryTolerance"/> before a boundary is on it.
     /// </summary>
     public static PlaybackPosition Locate<TFrame>(IReadOnlyList<TFrame> frames, Func<TFrame, double> length,
         double cycleTime, bool pingPong, bool reverse)
@@ -97,7 +106,7 @@ public static class PlaybackTimeline
         for (int i = 0; i < n; i++)
         {
             double end = start + length(frames[i]);
-            if (backward ? f <= end : f < end)
+            if (backward ? f <= end + BoundaryTolerance : f < end - BoundaryTolerance)
             {
                 frame = i;
                 break;

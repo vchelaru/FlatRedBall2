@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2.Animation;
 
 namespace FlatRedBall2.AnimationEditorCommon;
@@ -12,6 +13,25 @@ public class AnimationFrameSave
 
     /// <summary>Frame display time. Units depend on <see cref="AnimationChainListSave.TimeMeasurementUnit"/>.</summary>
     public float FrameLength;
+
+    /// <summary>
+    /// <see cref="FrameLength"/> as a time, for a file in <paramref name="unit"/>. It is the decimal the file holds: 10.1 is
+    /// 10.1 s, not the 10.1000004 s the float widens to.
+    /// </summary>
+    public TimeSpan GetDuration(TimeMeasurementUnit unit)
+    {
+        double seconds = AsWritten(FrameLength) / (unit == TimeMeasurementUnit.Millisecond ? 1000.0 : 1.0);
+        return TimeSpan.FromTicks(checked((long)Math.Round(seconds * TimeSpan.TicksPerSecond)));
+    }
+
+    // The number the file holds: 0.1, not the 0.10000000149 that 0.1f widens to, which drifts as cycles add up. The cast
+    // to decimal keeps 7 digits, so a length with more (1/60f) stays the float, and it throws past 7.9e28.
+    internal static double AsWritten(float length)
+    {
+        if (length > 1e28f) return length;
+        decimal written = (decimal)length;
+        return (float)written == length ? (double)written : length;
+    }
 
     /// <summary>Left texture coordinate. UV (0–1) or pixel, depending on <see cref="AnimationChainListSave.CoordinateType"/>.</summary>
     public float LeftCoordinate;
