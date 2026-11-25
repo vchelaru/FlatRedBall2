@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
-using System.Xml;
 
 namespace FlatRedBall2.AnimationEditorCommon;
 
@@ -83,8 +81,7 @@ public class AnimationChainList<TFrame> : List<AnimationChain<TFrame>> where TFr
             save = AnimationChainListSave.FromFile(achxPath, streamProvider);
         }
         catch (IOException) { return false; }
-        catch (XmlException) { return false; }
-        catch (JsonException) { return false; }
+        catch (InvalidDataException) { return false; }
 
         var fresh = new AnimationChainList<TFrame> { Name = save.FileName };
         foreach (var chainSave in save.AnimationChains)

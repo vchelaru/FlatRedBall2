@@ -27,8 +27,15 @@ public readonly struct NumericEdit
     public static NumericEdit Set(decimal value) => new('\0', value);
 
     public static implicit operator NumericEdit(decimal value) => Set(value);
-    public static implicit operator NumericEdit(float value) => Set((decimal)value);
+    public static implicit operator NumericEdit(float value) => Set(ToDecimal(value));
     public static implicit operator NumericEdit(int value) => Set(value);
+
+    /// <summary>The number as the file writes it. A cast keeps only 7 digits, so it can be another float.</summary>
+    /// <exception cref="OverflowException">The value does not fit a decimal.</exception>
+    public static decimal ToDecimal(float value) =>
+        decimal.TryParse(value.ToString("R", CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out var exact)
+            ? exact
+            : throw new OverflowException($"{value} does not fit a decimal.");
 
     /// <summary>The edited value of an item whose value is currently <paramref name="current"/>.
     /// An edit that overflows leaves the value unchanged.</summary>
@@ -61,7 +68,7 @@ public readonly struct NumericEdit
         if (!IsRelative) return (float)_operand;
         try
         {
-            return (float)Apply((decimal)current);
+            return (float)Apply(ToDecimal(current));
         }
         catch (OverflowException) // current does not fit a decimal
         {

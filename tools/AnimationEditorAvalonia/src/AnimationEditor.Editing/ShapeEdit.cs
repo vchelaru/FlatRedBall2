@@ -193,8 +193,8 @@ public static class ShapeEdit
         if ((x is null || x == shape.X) && (y is null || y == shape.Y)) return Ok();
 
         commands.SetShapePropsBulk([shape], null,
-            x is { } nx ? NumericEdit.Set((decimal)nx) : null,
-            y is { } ny ? NumericEdit.Set((decimal)ny) : null);
+            x is { } nx ? (NumericEdit)nx : null,
+            y is { } ny ? (NumericEdit)ny : null);
         return Ok(Address(owner.Chain!, owner.Frame!, EditAddress.TypeName(shape), shape.Name));
     }
 
