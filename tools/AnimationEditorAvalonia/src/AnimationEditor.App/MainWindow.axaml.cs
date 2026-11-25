@@ -5979,11 +5979,9 @@ public partial class MainWindow : Window
 
         // #897: every field above commits on ValueChanged so the wireframe/preview updates live as
         // the user types or scrolls the wheel; each commit coalesces with the previous one for the
-        // same field group into a single undo entry (see IUndoableCommand.CoalesceGroup). LostFocus
-        // and Enter seal that entry so the next edit — even to the same field — starts a fresh one.
-        SealOnCommit(PropFrameLen, PropRelX, PropRelY, PropPixelX, PropPixelY, PropPixelW, PropPixelH,
-            PropRectX, PropRectY, PropRectScaleX, PropRectScaleY,
-            PropCircleX, PropCircleY, PropCircleRadius, PropPolygonX, PropPolygonY, PropShapesX, PropShapesY);
+        // same field group into a single undo entry (see IUndoableCommand.CoalesceGroup), until LostFocus
+        // or Enter ends that entry so the next edit, even to the same field, starts a fresh one.
+        InspectorUndoSteps.Wire(AchxInspector, _appCommands.SealPendingEdits);
 
         // #1325: "+ 4" typed over a "(mixed)" field edits each selected item's own value.
         ApplyRelativeEditsWith(ApplyFrameLen, PropFrameLen);
@@ -6025,21 +6023,6 @@ public partial class MainWindow : Window
         : null;
 
     private NumericEdit? EditOf(NumericUpDown field) => EditOf(field, field.Value);
-
-    private void SealOnCommit(params InputElement[] inputs)
-    {
-        foreach (var input in inputs)
-        {
-            input.LostFocus += (_, _) => _appCommands.SealPendingEdits();
-            // Enter commits a NumericUpDown's text and the control marks the key handled, so listen
-            // after it: without this, "10 Enter, 20 Enter, Ctrl+Z" jumps back past both values
-            // because focus never left the box and nothing sealed the entry in between.
-            input.AddHandler(KeyDownEvent, (_, e) =>
-            {
-                if (e.Key == Key.Enter) _appCommands.SealPendingEdits();
-            }, RoutingStrategies.Bubble, handledEventsToo: true);
-        }
-    }
 
     private void ApplyTextureName()
     {
@@ -6614,7 +6597,6 @@ public partial class MainWindow : Window
                         PreviewCtrl.InspectorVertexIndex = -1;
                 });
             }
-            SealOnCommit(x, y);
             SetComputedLook(editable, x, y);
             _polygonVertexRows.Add((x, y));
             _polygonVertexCells.Add((xCell, yCell));

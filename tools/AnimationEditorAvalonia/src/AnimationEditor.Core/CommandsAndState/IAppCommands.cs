@@ -663,7 +663,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Ends the current edit session for the coalescing NumericUpDown fields (rect/circle
         /// props, frame length/offset/pixel-region/color/alpha — see <see cref="SetRectProps"/> and
         /// siblings) so the next edit records a fresh undo entry instead of merging into the last
-        /// one. Call on focus loss of the editing control (see
+        /// one. Called on Enter and focus loss in the Inspector, and on a selection change (see
         /// <see cref="Commands.IUndoManager.SealCoalescing"/> for why this boundary matters).
         /// </summary>
         void SealPendingEdits();

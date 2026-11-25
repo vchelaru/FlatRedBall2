@@ -57,7 +57,7 @@ public partial class SequenceInspectorControl : UserControl
         ChainStartField.ValueChanged += (_, _) => CommitChainStart();
         ChainLengthField.ValueChanged += (_, _) => CommitChainLength();
         // Number fields commit as they change, as in the .achx Inspector; Enter or leaving a field ends that edit's undo entry.
-        SealOnCommit(ChainStartField, ChainLengthField, ReferenceStartField, ReferenceLengthField);
+        InspectorUndoSteps.Wire(this, () => _undo?.SealCoalescing());
         ReferenceStartField.ValueChanged += (_, _) => CommitReference(start: true);
         ReferenceLengthField.ValueChanged += (_, _) => CommitReference(start: false);
         ApplyRelativeEditsWith(CommitChainStart, ChainStartField);
@@ -524,19 +524,6 @@ public partial class SequenceInspectorControl : UserControl
         _relativeEdit is { } r && ReferenceEquals(r.Field, field) ? r.Edit
         : value is { } v ? v
         : null;
-
-    // As MainWindow.SealOnCommit does for the .achx Inspector. Enter is handled by the field, so listen after it.
-    private void SealOnCommit(params InputElement[] fields)
-    {
-        foreach (var field in fields)
-        {
-            field.LostFocus += (_, _) => _undo?.SealCoalescing();
-            field.AddHandler(KeyDownEvent, (_, e) =>
-            {
-                if (e.Key == Key.Enter) _undo?.SealCoalescing();
-            }, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
-        }
-    }
 
     /// <summary>
     /// Runs an edit on the document. An edit that returns a reason was refused. Either way every field is rewritten

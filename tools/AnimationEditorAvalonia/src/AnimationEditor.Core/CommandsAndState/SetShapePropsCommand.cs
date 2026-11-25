@@ -19,7 +19,8 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
     /// Keyed on the edited shape's own identity, so consecutive edits to the same rect/circle
     /// (e.g. one call per keystroke while typing in the X field) coalesce into a single undo entry
     /// -- see <see cref="IUndoableCommand.CoalesceGroup"/>. Edits to a different shape never share
-    /// a key, since <see cref="RuntimeHelpers.GetHashCode"/> is per-instance.
+    /// a key, since <see cref="RuntimeHelpers.GetHashCode"/> is per-instance. Null for a rename: it is
+    /// committed once, not live, so it is always its own undo entry.
     /// </summary>
     public string? CoalesceGroup { get; }
 
@@ -67,7 +68,7 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
         _newX = newX; _newY = newY; _newP1 = newP1; _newP2 = newP2;
         _commands = commands; _events = events;
         Description = description;
-        CoalesceGroup = $"ShapeProps:{RuntimeHelpers.GetHashCode(shape)}";
+        CoalesceGroup = oldName == newName ? $"ShapeProps:{RuntimeHelpers.GetHashCode(shape)}" : null;
     }
 
     private bool ChangesNothing =>
