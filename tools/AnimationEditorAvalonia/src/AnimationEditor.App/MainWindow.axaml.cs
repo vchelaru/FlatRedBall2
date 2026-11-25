@@ -1382,7 +1382,7 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowProblem($"Saved {new FilePath(path).NoPath}, but not every change applied — {string.Join(" ", warnings)}"));
         _appCommands.IsPathOpenInAnotherTab = path => IsOpenInTabOtherThan(_tabManager.ActiveTab, path);
-        _appCommands.IsDocumentTabInFront = () => _tabManager.ActiveTab?.Kind is null or TabKind.Achx;
+        _appCommands.IsDocumentTabInFront = IsDocumentTabInFront;
         _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));
         _appCommands.SaveFailed += message =>
             Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"{AutoSaveFailedPrefix}{message}"));
@@ -3057,11 +3057,36 @@ public partial class MainWindow : Window
     /// Closes the Open Project Folder (issues #948, #1360): closes the tabs whose file lives under
     /// the folder, clears the folder scope, and, when no tab is left, resets the editor to the same
     /// blank state as a fresh app launch (<see cref="IAppCommands.CloseProject"/>). Tabs for files
-    /// opened from elsewhere and Untitled tabs are not part of the project and stay open, so nothing
-    /// prompts: a saved tab is already persisted by the autosave-on-edit path (see the
-    /// <see cref="AppCommands"/> constructor comment) and an Untitled tab is never closed here.
+    /// opened from elsewhere and Untitled tabs are not part of the project and stay open. A tab with
+    /// edits its file lacks (a failed save) asks first, as closing it does; Cancel, or a save that fails
+    /// again, leaves the project and every tab open.
     /// </summary>
-    internal void CloseProjectFolder() => CloseProject(closeAllTabs: false);
+    internal void CloseProjectFolder() => _ = RunGuardedAsync(() => CloseProjectFolderAsync(), "Close Project Folder");
+
+    private async Task CloseProjectFolderAsync()
+    {
+        // Content made with no tab open is an Untitled document: it stays, with its recovery file.
+        if (_tabManager.ActiveTab is null)
+            _tabController.EnsureCurrentDocumentHasTab(_projectManager);
+        if (_projectManager.ProjectFolderPath is { } folder)
+        {
+            if (_confirmingClose) return;
+            _confirmingClose = true;
+            try
+            {
+                var inFolder = _tabManager.Tabs.Where(tab => tab.IsInsideFolder(new FilePath(folder))).ToList();
+                foreach (var tab in inFolder)
+                    if (await PrepareCloseAsync(tab) is null) return;
+                foreach (var tab in inFolder)
+                    PaneFor(tab).Closing(tab);
+            }
+            finally
+            {
+                _confirmingClose = false;
+            }
+        }
+        CloseProject(closeAllTabs: false);
+    }
 
     /// <summary>
     /// Like <see cref="CloseProjectFolder"/> but also closes every other tab, with no prompt. For
@@ -4234,15 +4259,15 @@ public partial class MainWindow : Window
         if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
             return false;
 
+        var target = TextureTargetOf(targetFrame is null ? targetChain : null, targetFrame is null ? [] : [targetFrame]);
         // Before the copy question, whose copy would be left behind.
-        var editedChain = targetFrame is null ? targetChain : _objectFinder.GetAnimationChainContaining(targetFrame);
-        if (editedChain is { IsLocked: true })
+        if (LockedChainOf(target) is { } locked)
         {
-            ShowLocked(editedChain);
+            ShowLocked(locked);
             return false;
         }
 
-        string? resolvedFilePath = await ResolveTextureForProjectAsync(droppedFilePath,
+        string? resolvedFilePath = await ResolveTextureForProjectAsync(droppedFilePath, target,
             retried => ApplyResolvedPngDrop(targetChain, targetFrame, retried, createFrameOnCtrl));
         return resolvedFilePath is not null
             && ApplyResolvedPngDrop(targetChain, targetFrame, resolvedFilePath, createFrameOnCtrl);
@@ -6255,7 +6280,7 @@ public partial class MainWindow : Window
         var frames = InspectorFrames();
         if (frames.Count == 0) return;
 
-        string? resolvedAbsPath = await ResolveTextureForProjectAsync(pickedPath,
+        string? resolvedAbsPath = await ResolveTextureForProjectAsync(pickedPath, TextureTargetOf(null, frames),
             retried => CommitPickedTexture(frames, retried));
         if (resolvedAbsPath is not null)
             CommitPickedTexture(frames, resolvedAbsPath);
@@ -6264,14 +6289,55 @@ public partial class MainWindow : Window
     private void CommitPickedTexture(IReadOnlyList<AnimationFrameSave> frames, string absolutePath) =>
         ReportTextureResult(FrameTextureEdit.SetResolved(_projectManager, _appCommands, frames, absolutePath, _textureProbe));
 
+    /// <summary>False when a .png or .seqj tab is in front.</summary>
+    private bool IsDocumentTabInFront() => _tabManager.ActiveTab?.Kind is null or TabKind.Achx;
+
+    /// <summary>
+    /// What a texture was dropped on or picked for: the document open at the time, and the animation or the frames in it.
+    /// Not its tab, which Save As replaces for the same document.
+    /// </summary>
+    private sealed record TextureTarget(
+        AnimationChainListSave? Document, string DocumentName, AnimationChainSave? Chain, IReadOnlyList<AnimationFrameSave> Frames);
+
+    private TextureTarget TextureTargetOf(AnimationChainSave? chain, IReadOnlyList<AnimationFrameSave> frames) =>
+        new(_projectManager.AnimationChainListSave, Path.GetFileName(_projectManager.FileName) ?? string.Empty, chain, frames);
+
+    private AnimationChainSave? LockedChainOf(TextureTarget target) =>
+        target.Frames.Select(_objectFinder.GetAnimationChainContaining).Append(target.Chain).FirstOrDefault(c => c is { IsLocked: true });
+
+    /// <summary>
+    /// Says why <paramref name="texturePath"/> can no longer go to <paramref name="target"/> (#2177): another document is in
+    /// front, it was reloaded, the frame or animation is gone, or the animation is locked. False when nothing changed.
+    /// </summary>
+    private bool RefuseChangedTarget(TextureTarget target, string texturePath)
+    {
+        string? reason =
+            !IsDocumentTabInFront() || target.Document != _projectManager.AnimationChainListSave
+                ? $"{target.DocumentName} was left or reloaded."
+            : target.Frames.Any(f => _objectFinder.GetAnimationChainContaining(f) is null)
+                ? "its frame is gone."
+            : target.Chain is { } chain && target.Document?.AnimationChains.Contains(chain) != true
+                ? "its animation is gone."
+            : null;
+        if (reason is not null)
+        {
+            ShowProblem($"⚠ {Path.GetFileName(texturePath)} was not used: {reason}");
+            return true;
+        }
+        if (LockedChainOf(target) is not { } locked) return false;
+        ShowLocked(locked);
+        return true;
+    }
+
     /// <summary>
     /// The one "bring a user's texture into the project" step shared by Browse… and every PNG drop.
     /// Asks the copy prompt through <see cref="FrameTextureEdit.ResolveForProjectAsync"/> and returns the
     /// absolute path to reference, or null when cancelled or the copy failed; a failed copy shows a banner whose
     /// Retry re-runs the same choice (or asks, when it failed before asking) and hands the result to
-    /// <paramref name="applyAfterRetry"/>.
+    /// <paramref name="applyAfterRetry"/>. When <paramref name="target"/> changed before the answer or the Retry, nothing is
+    /// copied and the reason is shown (<see cref="RefuseChangedTarget"/>).
     /// </summary>
-    private async Task<string?> ResolveTextureForProjectAsync(string texturePath, Action<string> applyAfterRetry)
+    private async Task<string?> ResolveTextureForProjectAsync(string texturePath, TextureTarget target, Action<string> applyAfterRetry)
     {
         TextureCopyChoice? choice = null;
         var resolved = await FrameTextureEdit.ResolveForProjectAsync(_projectManager, texturePath,
@@ -6284,6 +6350,8 @@ public partial class MainWindow : Window
                     return TextureCopyChoice.Cancel;
                 }
                 var answer = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan);
+                // The document can be reloaded under the question.
+                if (answer is not TextureCopyChoice.Cancel && RefuseChangedTarget(target, texturePath)) return TextureCopyChoice.Cancel;
                 choice = answer;
                 return answer;
             });
@@ -6292,11 +6360,12 @@ public partial class MainWindow : Window
 
         ShowProblem(resolved.Result.Errors[0], retry: () =>
         {
+            if (RefuseChangedTarget(target, texturePath)) return;
             if (choice is not { } chosen)
             {
                 _ = RunGuardedAsync(async () =>
                 {
-                    if (await ResolveTextureForProjectAsync(texturePath, applyAfterRetry) is { } asked) applyAfterRetry(asked);
+                    if (await ResolveTextureForProjectAsync(texturePath, target, applyAfterRetry) is { } asked) applyAfterRetry(asked);
                 }, "Add texture");
                 return;
             }
