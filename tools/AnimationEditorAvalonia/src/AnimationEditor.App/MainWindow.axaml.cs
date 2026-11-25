@@ -1543,10 +1543,11 @@ public partial class MainWindow : Window
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
         // "Add Frame" (menu/button, no explicit texture) falls back to whatever the canvas is
-        // currently showing when the document has nothing else to offer.
+        // currently showing when the document has nothing else to offer. A missing texture shows
+        // nothing and has no size, so a frame given it would be one pixel once its file appears.
         _appCommands.CanvasDefaultTexturePath = () =>
         {
-            var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;
+            var texPath = WireframeCtrl.BitmapSize == (0, 0) ? null : WireframeCtrl.LoadedTexturePathCasePreserved;
             return string.IsNullOrEmpty(texPath) ? null : RelativizeTexturePath(texPath);
         };
         _appCommands.DecodedTextureSize = SkiaFileDecoder.ReadSize;

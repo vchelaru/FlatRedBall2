@@ -85,6 +85,25 @@ public class TextureAppearsScenarioTests
         editor.Wireframe.BitmapSize.ShouldBe((128, 32));
     }
 
+    // Nothing is left to inherit a frame from, and the canvas shows no image to take the whole of.
+    [AvaloniaFact]
+    public async Task AddFrame_WhileTheCanvasTextureIsMissing_DoesNotBecomeOnePixelOfIt()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (8, 8, 16, 16)));
+        await editor.OpenAsync(hero);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        editor.Services.AppCommands.DeleteFrames(walk.Frames.ToList());
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+
+        editor.Services.AppCommands.AddFrame(walk);
+        editor.WritePng("sheet.png", 64, 64);
+        editor.Services.AppCommands.SetFrameTextureName([walk.Frames[0]], "sheet.png");
+
+        AnimationFrameSave saved = AnimationEditorHarness.ReadSaved(hero).AnimationChains.Single().Frames.Single();
+        (saved.LeftCoordinate, saved.TopCoordinate, saved.RightCoordinate, saved.BottomCoordinate).ShouldBe((0f, 0f, 64f, 64f));
+    }
+
     [AvaloniaTheory]
     [InlineData("")]
     public async Task MissingTexture_ThatAppearsLater_IsShown(string folder)
