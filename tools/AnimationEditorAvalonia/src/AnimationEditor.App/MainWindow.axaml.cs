@@ -7181,8 +7181,10 @@ public partial class MainWindow : Window
                 // may still be displaying a different tab's content (e.g. user was on tab 1
                 // and re-opened tab 2's file via File > Open).  Load the file to ensure the
                 // panels and previews reflect the focused tab.
-                // Behind a .seqj tab the document is still loaded, but the undo stack is the .seqj's.
-                bool alreadyShown = documentInFront && (FilePath?)_projectManager.FileName == filePath;
+                // Behind a .seqj tab the document is still loaded, but the undo stack is the .seqj's. A file changed
+                // outside is loaded again: with hot reload off, the next autosave would overwrite the change.
+                bool alreadyShown = documentInFront && (FilePath?)_projectManager.FileName == filePath
+                    && arrivedTab?.CachedDiskState?.HasChanged(filePath) != true;
                 if (!alreadyShown)
                 {
                     bool activated = await _appCommands.ActivateTabContentAsync(arrivedTab!);

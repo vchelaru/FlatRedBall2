@@ -67,4 +67,38 @@ public class ProjectOpenRowScenarioTests
         editor.Tabs.ActiveTab!.DisplayName.ShouldBe("hero.achx");
         editor.UndoLabels.ShouldBe(history);
     }
+
+    // With the watcher off, re-opening is how an outside change arrives; missing it, the next autosave overwrites it.
+    [AvaloniaTheory]
+    [InlineData("menu")]
+    [InlineData("second instance")]
+    [InlineData("row")]
+    public async Task HotReloadOff_ReopeningTheFileInFront_TakesAnOutsideChange(string how)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(hero);
+        editor.ClickMenu("MenuEnableHotReload");
+        editor.Services.AppCommands.HotReloadWatcher.IsEnabled.ShouldBeFalse();
+        editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)),
+            AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)));
+
+        if (how == "menu")
+        {
+            editor.Dialogs.AnswerNextOpenFile(hero);
+            editor.ClickMenu("MenuLoad");
+        }
+        else if (how == "second instance")
+            await editor.OpenAsync(hero);
+        else
+            editor.Click(PanelsScenarioTests.RowFor(editor, editor.Control<ProjectPanelControl>("ProjectPanel"), "hero.achx"));
+        editor.Wait(TimeSpan.FromMilliseconds(150));
+        editor.Services.AppCommands.AddAnimationChainWithName("Idle");
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+
+        AnimationEditorHarness.ReadSaved(hero).AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Walk", "Run", "Idle" });
+    }
 }
