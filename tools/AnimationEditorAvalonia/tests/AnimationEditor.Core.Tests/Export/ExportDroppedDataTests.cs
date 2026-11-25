@@ -95,8 +95,8 @@ public class ExportDroppedDataTests
     }
 
     [Theory]
-    [InlineData("PixiJS", "flip, sprite offset, color, collision shape, event, keyframe, frame length, loop off, ping-pong, reverse can't be stored in a PixiJS spritesheet and was not exported.")]
-    [InlineData("Godot", "flip, sprite offset, color, collision shape, event, keyframe, ping-pong, reverse can't be stored in a Godot SpriteFrames and was not exported. Flip the AnimatedSprite2D (flip_h/flip_v) instead.")]
+    [InlineData("PixiJS", "Flip, sprite offset, color, collision shape, event, keyframe, frame length, loop off, ping-pong, reverse can't be stored in a PixiJS spritesheet and were not exported.")]
+    [InlineData("Godot", "Flip, sprite offset, color, collision shape, event, keyframe, ping-pong, reverse can't be stored in a Godot SpriteFrames and were not exported. Flip the AnimatedSprite2D (flip_h/flip_v) instead.")]
     public void Export_EverythingNonDefaultInTwoChains_NamesEachDroppedKindOnce(string format, string expected)
     {
         int counter = 100;
@@ -105,6 +105,33 @@ public class ExportDroppedDataTests
         second.Frames[0].TextureName = first.Frames[0].TextureName;
 
         Export(format, first, second).Warnings.ShouldBe([expected]);
+    }
+
+    [Theory]
+    [InlineData("PixiJS", "Reverse can't be stored in a PixiJS spritesheet and was not exported.")]
+    [InlineData("Godot", "Reverse can't be stored in a Godot SpriteFrames and was not exported.")]
+    public void Export_OneOfTwoChainsReversed_NamesOnlyReverse(string format, string expected)
+    {
+        var plain = OneFrameChain();
+        plain.Name = "Idle";
+        var reversed = OneFrameChain();
+        reversed.Reverse = true;
+
+        Export(format, plain, reversed).Warnings.Where(w => w.Contains("can't be stored")).ShouldBe([expected]);
+    }
+
+    [Theory]
+    [InlineData("PixiJS", TextureCoordinateType.UV, "missing.png")]
+    [InlineData("Godot", TextureCoordinateType.UV, "missing.png")]
+    [InlineData("Godot", TextureCoordinateType.Pixel, "")]
+    public void Export_SkippedFrame_ItsDataIsNotCounted(string format, TextureCoordinateType coordinates, string texture)
+    {
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = texture, FlipHorizontal = true, RelativeX = 3f, FrameLength = 0.1f });
+        var acls = new AnimationChainListSave { CoordinateType = coordinates };
+        acls.AnimationChains.Add(chain);
+
+        Formats[format].Export(acls, _ => null).Warnings.ShouldHaveSingleItem().ShouldContain("was skipped");
     }
 
     [Fact]

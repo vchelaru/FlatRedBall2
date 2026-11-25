@@ -48,6 +48,7 @@ public static class GodotSpriteFramesExporter
         var warnings = new List<string>();
         var textureIds = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var orderedTextures = new List<string>();
+        var skipped = new HashSet<AnimationFrameSave>();
         var subResources = new StringBuilder();
         var animations = new List<string>();
         var animationNames = new List<string>();
@@ -70,6 +71,7 @@ public static class GodotSpriteFramesExporter
                 if (string.IsNullOrEmpty(frame.TextureName))
                 {
                     warnings.Add($"Frame {i} of '{chain.Name}' was skipped: it has no texture.");
+                    skipped.Add(frame);
                     continue;
                 }
                 if (!textureIds.ContainsKey(frame.TextureName))
@@ -81,6 +83,7 @@ public static class GodotSpriteFramesExporter
                 {
                     warnings.Add($"Frame {i} of '{chain.Name}' was skipped: texture " +
                                  $"'{frame.TextureName}' could not be read to convert UV coordinates to pixels.");
+                    skipped.Add(frame);
                     continue;
                 }
 
@@ -110,10 +113,10 @@ public static class GodotSpriteFramesExporter
                            "}");
         }
 
-        var dropped = ChainData.Dropped(acls.AnimationChains, acls.TimeMeasurementUnit,
+        var dropped = ChainData.Dropped(acls.AnimationChains, acls.TimeMeasurementUnit, skipped,
             ChainDataKind.FrameLength, ChainDataKind.FrameLengthUnderAMillisecond, ChainDataKind.LoopOff);
         if (dropped.Count > 0)
-            warnings.Add($"{ChainData.Describe(dropped)} can't be stored in a Godot SpriteFrames and was not exported." +
+            warnings.Add(ExportWarning.Dropped(dropped, "a Godot SpriteFrames") +
                          (dropped.Contains(ChainDataKind.Flip) ? " Flip the AnimatedSprite2D (flip_h/flip_v) instead." : ""));
         if (anyZeroLength)
             warnings.Add($"Some frames have zero duration; they were exported with Godot's minimum relative duration ({Number(MinimumDuration)}).");

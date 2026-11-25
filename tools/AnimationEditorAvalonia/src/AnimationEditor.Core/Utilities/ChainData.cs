@@ -28,7 +28,7 @@ public enum ChainDataKind
 /// </summary>
 public static class ChainData
 {
-    private static readonly (ChainDataKind Kind, string Message, Func<AnimationChainSave, FrameLengthUnit, bool> IsIn)[] Kinds =
+    private static readonly (ChainDataKind Kind, string Message, Carries IsIn)[] Kinds =
     [
         (ChainDataKind.Flip, "flip", AnyFrame(f => f.FlipHorizontal || f.FlipVertical || f.FlipDiagonal)),
         (ChainDataKind.SpriteOffset, "sprite offset", AnyFrame(f => f.RelativeX != 0f || f.RelativeY != 0f)),
@@ -41,19 +41,25 @@ public static class ChainData
             || f.ColorInterpolation is not null || f.ColorEasing is not null)),
         (ChainDataKind.FrameLength, "frame length", AnyFrame(f => f.FrameLength != 0f)),
         (ChainDataKind.FrameLengthUnderAMillisecond, "frame length under a millisecond",
-            (chain, unit) => chain.Frames.Any(f => f.FrameLength != 0f && unit.ToMilliseconds(f.FrameLength) == 0)),
-        (ChainDataKind.LoopOff, "loop off", (chain, _) => !chain.Loop),
-        (ChainDataKind.PingPong, "ping-pong", (chain, _) => chain.PingPong),
-        (ChainDataKind.Reverse, "reverse", (chain, _) => chain.Reverse),
+            (_, frames, unit) => frames.Any(f => f.FrameLength != 0f && unit.ToMilliseconds(f.FrameLength) == 0)),
+        (ChainDataKind.LoopOff, "loop off", (chain, _, _) => !chain.Loop),
+        (ChainDataKind.PingPong, "ping-pong", (chain, _, _) => chain.PingPong),
+        (ChainDataKind.Reverse, "reverse", (chain, _, _) => chain.Reverse),
     ];
 
-    private static Func<AnimationChainSave, FrameLengthUnit, bool> AnyFrame(Func<AnimationFrameSave, bool> carries) =>
-        (chain, _) => chain.Frames.Any(carries);
+    private delegate bool Carries(AnimationChainSave chain, IEnumerable<AnimationFrameSave> frames, FrameLengthUnit unit);
 
-    /// <summary>What <paramref name="chains"/> carry that a format storing only <paramref name="stored"/> drops, each kind once.</summary>
+    private static Carries AnyFrame(Func<AnimationFrameSave, bool> carries) => (_, frames, _) => frames.Any(carries);
+
+    /// <summary>
+    /// What <paramref name="chains"/> carry that a format storing only <paramref name="stored"/> drops, each kind once.
+    /// <paramref name="skipped"/> frames, which the format left out and reported whole, do not count.
+    /// </summary>
     public static IReadOnlyList<ChainDataKind> Dropped(
-        IReadOnlyList<AnimationChainSave> chains, TimeMeasurementUnit unit, params ChainDataKind[] stored) =>
-        Kinds.Where(k => !stored.Contains(k.Kind) && chains.Any(c => k.IsIn(c, new FrameLengthUnit(unit))))
+        IReadOnlyList<AnimationChainSave> chains, TimeMeasurementUnit unit, IReadOnlySet<AnimationFrameSave> skipped,
+        params ChainDataKind[] stored) =>
+        Kinds.Where(k => !stored.Contains(k.Kind)
+                && chains.Any(c => k.IsIn(c, c.Frames.Where(f => !skipped.Contains(f)), new FrameLengthUnit(unit))))
             .Select(k => k.Kind).ToList();
 
     /// <summary>The kinds as a warning names them: <c>flip, sprite offset</c>.</summary>

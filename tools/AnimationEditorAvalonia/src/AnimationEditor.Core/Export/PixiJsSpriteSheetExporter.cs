@@ -38,6 +38,7 @@ public static class PixiJsSpriteSheetExporter
         var warnings = new List<string>();
         var distinctTextures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var orderedTextures = new List<string>();
+        var skipped = new HashSet<AnimationFrameSave>();
 
         foreach (var chain in acls.AnimationChains)
         {
@@ -58,6 +59,7 @@ public static class PixiJsSpriteSheetExporter
                 {
                     warnings.Add($"Frame {i} of '{chain.Name}' was skipped: texture " +
                                  $"'{frame.TextureName}' could not be read to convert UV coordinates to pixels.");
+                    skipped.Add(frame);
                     continue;
                 }
 
@@ -82,9 +84,9 @@ public static class PixiJsSpriteSheetExporter
             warnings.Add($"This .achx references {orderedTextures.Count} textures, but a PixiJS " +
                          $"spritesheet is a single sheet; meta.image was set to '{firstTexture}'.");
         // A length under a millisecond is already reported as a frame length.
-        var dropped = ChainData.Dropped(acls.AnimationChains, acls.TimeMeasurementUnit, ChainDataKind.FrameLengthUnderAMillisecond);
+        var dropped = ChainData.Dropped(acls.AnimationChains, acls.TimeMeasurementUnit, skipped, ChainDataKind.FrameLengthUnderAMillisecond);
         if (dropped.Count > 0)
-            warnings.Add($"{ChainData.Describe(dropped)} can't be stored in a PixiJS spritesheet and was not exported.");
+            warnings.Add(ExportWarning.Dropped(dropped, "a PixiJS spritesheet"));
 
         return new ExportResult(
             JsonSerializer.Serialize(sheet, PixiJsJsonContext.Default.PixiJsSpriteSheet), warnings, orderedTextures);

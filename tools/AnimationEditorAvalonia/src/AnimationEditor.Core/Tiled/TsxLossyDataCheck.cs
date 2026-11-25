@@ -30,5 +30,5 @@ public static class TsxLossyDataCheck
 
     /// <summary>The kinds of data <paramref name="chain"/> carries that the tsx can't hold; empty when it is stored in full.</summary>
     public static IReadOnlyList<ChainDataKind> DroppedKinds(AnimationChainSave chain, TimeMeasurementUnit unit) =>
-        ChainData.Dropped([chain], unit, ChainDataKind.FrameLength);
+        ChainData.Dropped([chain], unit, new HashSet<AnimationFrameSave>(), ChainDataKind.FrameLength);
 }
