@@ -625,7 +625,7 @@ public static class EditOps
         decimal value = 0;
         EditResult Take(float current)
         {
-            value = (decimal)current;
+            value = NumericEdit.ToDecimal(current);
             return new EditResult([], [], []);
         }
 

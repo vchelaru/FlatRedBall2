@@ -34,4 +34,36 @@ public class SplashFormatTests : IDisposable
         File.ReadAllText(path).ShouldBe(text);
         r.Code.ShouldBe(1, r.Out + r.Err);
     }
+
+    [Theory]
+    [InlineData("set-rect A/0/rect/H x=1234.5678", "1234.5678")]
+    [InlineData("set-shape-common A/0/rect/H x=1234.5678", "1234.5678")]
+    [InlineData("set-frame-offset A/0 x=1234.5678", "1234.5678")]
+    [InlineData("set-frame-length A/0 length=0.016666667", "0.016666667")]
+    public async Task Edit_NumberWithMoreThanSevenDigits_IsStoredAsGiven(string op, string number)
+    {
+        var path = Achx(Shape("AxisAlignedRectangleSave", "<Name>H</Name>"));
+
+        var r = await _w.RunAsync("edit", path, "--op", op);
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var stored = float.Parse(number, CultureInfo.InvariantCulture).ToString("R", CultureInfo.InvariantCulture);
+        File.ReadAllText(path).ShouldContain($">{stored}<");
+        (await _w.RunAsync("edit", path, "--op", op)).Out.ShouldContain("No changes");
+    }
+
+    [Theory]
+    [InlineData("set-rect A/0/rect/H", "X")]
+    [InlineData("set-frame-offset A/0", "RelativeX")]
+    public async Task Edit_RelativeToNumberWithMoreThanSevenDigits_KeepsItsDigits(string op, string element)
+    {
+        var path = Achx(Shape("AxisAlignedRectangleSave", "<Name>H</Name>"));
+        (await _w.RunAsync("edit", path, "--op", $"{op} x=1234.5678")).Code.ShouldBe(0);
+
+        var r = await _w.RunAsync("edit", path, "--op", $"{op} x=+2");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        var stored = (1234.5678f + 2f).ToString("R", CultureInfo.InvariantCulture);
+        File.ReadAllText(path).ShouldContain($"<{element}>{stored}</{element}>");
+    }
 }
