@@ -9,9 +9,8 @@ namespace AnimationEditor.Core.Tiled;
 
 /// <summary>
 /// Maps a Tiled <see cref="Tileset"/>'s per-tile animations onto an <see
-/// cref="AnimationChainListSave"/> — the reverse of <see cref="AchjToTiledAnimationMapper"/>, used
-/// to open a <c>.tsx</c> as a native AnimationEditor project (issue #1140) instead of pushing an
-/// achx/achj onto an associated tileset.
+/// cref="AnimationChainListSave"/> — the reverse of <see cref="MultiTileToTiledAnimationMapper"/>, used
+/// to open a <c>.tsx</c> as a native AnimationEditor project (issue #1140).
 /// </summary>
 /// <remarks>
 /// One animated tile with no <see cref="ParentIdPropertyName"/> property becomes one chain (an
@@ -33,13 +32,15 @@ namespace AnimationEditor.Core.Tiled;
 /// every satellite in that group is treated as its own independent anchor instead, since taking
 /// the bounding box at face value would silently claim the missing cell's tile on the next save.
 /// A chain's name is the tile's
-/// <see cref="NamePropertyName"/> property when present, otherwise a synthetic <c>"ID:{tileId}"</c>
-/// label.
+/// <see cref="NamePropertyName"/> property when present, otherwise its <see cref="DefaultChainName"/>.
 /// </remarks>
 public static class TiledAnimationToAchjMapper
 {
     /// <summary>Custom tile property AnimationEditor writes/reads for a user-assigned animation name.</summary>
     public const string NamePropertyName = "Name";
+
+    /// <summary>Tile property with the name of an animation that an editor before #2136 pushed here from an .achx. Only read.</summary>
+    private const string PushedNamePropertyName = "achjAnimationName";
 
     /// <summary>Custom tile property marking a tile as a multi-tile-group satellite, valued with its anchor tile's id.</summary>
     public const string ParentIdPropertyName = "ParentId";
@@ -90,19 +91,8 @@ public static class TiledAnimationToAchjMapper
         var satelliteTileIds = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
         var syntheticNamedChains = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
 
-        // A tile carrying TilesetAnimationSync.SourceFilePropertyName ("achjSourceFile") was
-        // written by the achx-push feature (issue #1133) -- a completely separate save pipeline
-        // that never touches Name/ParentId and independently re-syncs this tile from its own
-        // achx/achj, regardless of whether this same .tsx is also open as a native project.
-        // Folding it into this project's own editable model (as it used to be, since any animated
-        // tile qualified) would let a user rename/move/delete an animation this project doesn't
-        // own, and would leave its achjSourceFile/achjAnimationName tracking properties orphaned
-        // -- or fought over -- the next time either feature saves. Excluded entirely rather than
-        // surfaced as a chain, unlike every other "not a real anchor" case in this method: those
-        // are all broken references to a tile this project *does* own, whereas this tile belongs
-        // to a different owner outright.
         var animatedTiles = tileset.Tiles
-            .Where(t => t.Animation.Count > 0 && !IsAchxPushOwned(t))
+            .Where(t => t.Animation.Count > 0)
             .ToList();
         var parentIdByTileId = new Dictionary<uint, uint?>();
         foreach (var tile in animatedTiles)
@@ -255,21 +245,23 @@ public static class TiledAnimationToAchjMapper
         return (tileset.Columns * tileset.TileWidth, rows * tileset.TileHeight);
     }
 
-    /// <summary>Whether the achx-push feature (issue #1133) -- not this native-tsx project --
-    /// currently owns this tile's animation, per <see cref="TilesetAnimationSync.SourceFilePropertyName"/>.</summary>
-    private static bool IsAchxPushOwned(Tile tile) =>
-        tile.Properties.OfType<StringProperty>().Any(p => p.Name == TilesetAnimationSync.SourceFilePropertyName);
-
     /// <summary>A tile's chain name plus whether that name is the synthetic <c>"ID:{tileId}"</c>
-    /// placeholder (no explicit <see cref="NamePropertyName"/> property present) or a real one read
+    /// placeholder (no property with a name present) or a real one read
     /// from disk. The synthetic flag is provenance -- was the property present, at all -- never a
     /// guess from the resulting string's shape, so a real explicit name that happens to look like
     /// <c>"ID:N"</c> is still correctly reported as not synthetic.</summary>
     private static (string Name, bool IsSynthetic) ChainNameInfo(Tile tile)
     {
         var name = FindNameProperty(tile)?.Value;
-        return string.IsNullOrEmpty(name) ? (SyntheticChainName(tile.ID), true) : (name, false);
+        if (string.IsNullOrEmpty(name)) name = FindPushedName(tile);
+        return name is null ? (SyntheticChainName(tile.ID), true) : (name, false);
     }
+
+    /// <summary>The name of a chain on a tile without a <see cref="NamePropertyName"/> property.</summary>
+    internal static string DefaultChainName(Tile tile) => FindPushedName(tile) ?? SyntheticChainName(tile.ID);
+
+    private static string? FindPushedName(Tile tile) =>
+        tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == PushedNamePropertyName)?.Value is { Length: > 0 } name ? name : null;
 
     /// <summary>The <c>Name</c> property the editor reads: the first string one.</summary>
     internal static StringProperty? FindNameProperty(Tile tile) =>

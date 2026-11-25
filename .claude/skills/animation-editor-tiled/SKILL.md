@@ -10,9 +10,6 @@ The editor opens a Tiled `.tsx` as a native project (`ProjectManager.LoadTsxProj
 into the `.tsx` (`NativeTsxAnimationSync`, `TsxWriter`). Code lives in `AnimationEditor.Core/Tiled/`.
 General editor layout is in the `animation-editor` skill.
 
-The older achx→tsx push sync (`.tiledsync` files, `TilesetAnimationSync`) is not recommended.
-Don't build on it or document it.
-
 ## Landmines
 
 - **A tile animation stores only rects and durations.** Flips, offsets, color, collision shapes, events, keyframe data and Loop=off are dropped on save. `TsxLossyDataCheck` reports what was dropped. Don't rely on the inspector hiding those controls, because other entry points (paste, context menu) can still create them.

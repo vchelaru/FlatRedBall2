@@ -30,10 +30,6 @@ namespace AnimationEditor.Core
 
         public string? FileName { get; set; }
 
-        /// <summary>Why a tileset cannot be associated while <see cref="IsNativeTsxProject"/>.</summary>
-        public const string NativeTsxAssociationRefusal =
-            "Associating a tileset applies to an .achx/.achj; a .tsx cannot be a native project and an association target at once.";
-
         /// <summary>The open native <c>.tsx</c> project's state (issue #1140), or <see langword="null"/> for an achx/achj project.</summary>
         private TsxState? _tsx;
 
@@ -424,11 +420,7 @@ namespace AnimationEditor.Core
         /// tileset feature) that would be lost on the first save -- see <see cref="Tiled.TsxCompatibilityChecker"/>.</exception>
         /// <exception cref="InvalidOperationException">The tsx is corrupt in a way <see
         /// cref="Tiled.TiledAnimationToAchjMapper.Map"/> can't tolerate (e.g. <c>Columns &lt;= 0</c>
-        /// or a duplicate tile id) -- or some achx/achj already has a <c>.tiledsync</c> association
-        /// (see <see cref="IO.IoManager.AddAssociatedTiledTilesetPath"/>) pointing achx-push at this
-        /// same tsx (issue #1147): a tsx can't be both a native-tsx project and an achx-push target
-        /// at the same time, since the two features' save paths would silently fight over the same
-        /// file.</exception>
+        /// or a duplicate tile id).</exception>
         /// <remarks>The project is left unchanged when either exception is thrown -- <see
         /// cref="AnimationChainListSave"/> is mapped into local variables first and only committed
         /// to this instance's fields after every step that can throw has already succeeded, so a
@@ -436,14 +428,6 @@ namespace AnimationEditor.Core
         /// no matching chain data.</remarks>
         public void LoadTsxProject(FilePath fileName)
         {
-            var conflictingOwners = Tiled.TiledSyncAssociationScanner.FindAssociationsTargeting(fileName.FullPath);
-            if (conflictingOwners.Count > 0)
-                throw new InvalidOperationException(
-                    $"Cannot open \"{fileName.FullPath}\" as a native AnimationEditor project -- " +
-                    $"it is already associated as a Tiled sync target from \"{conflictingOwners[0]}\" " +
-                    "(Associate Tiled Tileset). A .tsx cannot be both a native-tsx project and an " +
-                    "achx-push target at the same time.");
-
             var (source, tileset) = ReadTsx(fileName);
 
             var acls = Tiled.TiledAnimationToAchjMapper.Map(
@@ -952,7 +936,7 @@ namespace AnimationEditor.Core
                 foreach (var taken in ClaimedTiles(other).Where(claimed.Contains))
                     return $"Tile {taken} is already used by \"{other.ChainName}\".";
 
-            // The save refuses a tile achx-push owns or the user put a property on that it would overwrite.
+            // The save refuses a tile the user put a property on that it would overwrite.
             var name = _tsx.SyntheticNamedChains.Contains(chain) ? Tiled.TiledAnimationToAchjMapper.SyntheticChainName(tileId) : chain.Name;
             if (name != chain.Name && AnimationChainListSave.HasOtherChainNamed(chain, name))
                 return $"A chain named '{name}' already exists.";
@@ -1026,7 +1010,7 @@ namespace AnimationEditor.Core
             if (_tsx == null || AnimationChainListSave == null)
                 return null;
 
-            return Tiled.AchjToTiledAnimationMapper.TryGetTileId(
+            return Tiled.TiledFrameGeometry.TryGetTileId(
                 frame, AnimationChainListSave.CoordinateType, BuildTsxTilesetInfo(_tsx));
         }
 

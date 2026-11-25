@@ -23,13 +23,6 @@ public sealed class TsxWriter
 
     private TsxWriter(TsxSource source) => _source = source;
 
-    /// <summary>Writes the tiles of <paramref name="tileset"/> that differ from the file at <paramref name="path"/>.</summary>
-    public static void Write(Tileset tileset, string path)
-    {
-        var source = TsxSource.Load(path);
-        Write(source, Render(source, TsxLoader.ReadTileset(source), tileset), source.Path);
-    }
-
     /// <summary>Writes the source's text, as <see cref="Render"/> changed it, to a path that may be another file's.</summary>
     /// <returns>What was written.</returns>
     internal static string Write(TsxSource source, string text, FilePath path)

@@ -143,7 +143,6 @@ public class SequenceTabScenarioTests
         {
             "MenuExportPixiJs", "MenuExportGodot", "MenuExportGif", "MenuExportWebp",
             // Copy, Cut, Paste and Duplicate are the pane's, not the scope's: a sequence tab takes them once its list or timeline was touched.
-            "MenuAssociateTiledTileset",
             "MenuWireframeZoomIn", "MenuWireframeZoomOut",
         };
         // Preview Zoom In/Out drive the sequence preview here, so they are document items now.

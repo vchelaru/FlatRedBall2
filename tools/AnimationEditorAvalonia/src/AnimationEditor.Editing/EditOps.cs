@@ -328,10 +328,6 @@ public static class EditOps
             new("alpha", "boolean", false, "true to clear alpha."),
             new("operation", "boolean", false, "true to clear the color operation."),
         ]),
-        new("associate-tileset", "Records a Tiled .tsx as a sync target of this .achx/.achj (the editor's Associate Tiled Tileset): the batch's save then pushes the file's animations onto that tileset, and so does every later save. Writes the companion .tiledsync file; not undoable. A .tsx that is an association target cannot be opened as a native project. Not for a .tsx.",
-        [
-            new("path", "string", true, "Tileset path, relative to the animation file or absolute."),
-        ]),
         new("set-chain-owner-tile", "Native .tsx only: chooses which tile carries a chain's animation in the Tiled file. Give tile, or clear to return to the tile of the chain's first frame. A tile past the tileset or owned by another chain fails.",
         [
             new("chain", "string", true, "Chain name (a glob works with clear)."),
@@ -520,7 +516,6 @@ public static class EditOps
             warnings.Add($"The file already had {before.Errors.Count()} check error(s) before the edit.");
 
         var tsxBefore = session.IsNativeTsx ? TsxOpPolicy.Take(session) : null;
-        var associations = new List<(EditOp Op, string TsxPath)>();
         var chainsBefore = BrokenSequenceBlocks.ChainsAtRisk(session.Document, ops);
 
         foreach (var op in ops)
@@ -534,20 +529,6 @@ public static class EditOps
                 return new EditRunResult(
                     new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {refused.Errors[0]}"], warnings, refused.ErrorCodes),
                     [op.Index]);
-
-            if (op.Spec.Name == "associate-tileset")
-            {
-                // Writes a companion file, so it waits until every other op and check has passed.
-                var tsxPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(session.Path) ?? string.Empty, op.Values["path"]));
-                var check = TsxEdit.CheckAssociation(session.ProjectManager, tsxPath);
-                if (!check.Success)
-                    return new EditRunResult(
-                        new EditResult([], [$"op {op.Index} ({op.Spec.Name}): {check.Errors[0]}"], warnings, check.ErrorCodes),
-                        [op.Index]);
-                associations.Add((op, tsxPath));
-                changed.Add(tsxPath);
-                continue;
-            }
 
             var expansion = SelectorExpander.Expand(session.Document, op);
             if (expansion.Ops is null)
@@ -591,14 +572,6 @@ public static class EditOps
         if (changed.Count == 0)
             return new EditRunResult(new EditResult([], [], warnings), []);
 
-        foreach (var (op, tsxPath) in associations)
-        {
-            try { session.Rollback.Remember(Path.ChangeExtension(session.Path, ".tiledsync")); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // in use: the association reports it
-            var associated = TsxEdit.AssociateTileset(session.Commands, session.ProjectManager, tsxPath);
-            if (!associated.Success) return FailedOp(warnings, op, "", associated);
-        }
-
         var save = session.Save();
         if (!save.Success)
             return new EditRunResult(new EditResult([], save.Errors, warnings, save.ErrorCodes), save.Errors.Select(_ => (int?)null).ToList());
@@ -608,8 +581,7 @@ public static class EditOps
         if (!session.IsNativeTsx) warnings.AddRange(CheckReport.RaisedWarnings(before, after));
         if (chainsBefore is not null)
             warnings.AddRange(BrokenSequenceBlocks.Warnings(session.Document, session.Path, chainsBefore));
-        var written = changed.Concat(save.ChangedItems.Where(p => p != session.Path)).Distinct().ToList();
-        return new EditRunResult(new EditResult(written, [], warnings.Concat(save.Warnings).ToList()), []);
+        return new EditRunResult(new EditResult(changed.Distinct().ToList(), [], warnings.Concat(save.Warnings).ToList()), []);
     }
 
     /// <summary>The run's result when an op failed: each error prefixed with the op and <paramref name="where"/>.</summary>

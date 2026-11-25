@@ -32,7 +32,6 @@ public class UndoFuzzTests
     [InlineData(DocType.Achx, false)]
     [InlineData(DocType.Achj, false)]
     [InlineData(DocType.Tsx, false)]
-    [InlineData(DocType.Achj, true)]
     [InlineData(DocType.Tsx, true)]
     public void RandomEdits_UndoAndRedo_BringBackTheDocumentAndItsFile(DocType type, bool withTiledContent)
     {
@@ -53,24 +52,14 @@ public class UndoFuzzTests
         private readonly DocType _type;
         private readonly string _path;
         private readonly List<string> _log = new();
-        private readonly List<(string Model, string? File, string? Pushed)> _states = new();
+        private readonly List<(string Model, string? File)> _states = new();
         private readonly int _seed;
 
         public Run(DocType type, bool withTiledContent, int seed, string folder)
         {
             (_type, _seed, _random) = (type, seed, new Random(seed));
             _path = Documents.Write(folder, type, "front");
-            if (withTiledContent)
-            {
-                string tileset = type == DocType.Tsx ? _path : Path.Combine(folder, "pushed.tsx");
-                File.WriteAllText(tileset, TilesetOfTheUser);
-                if (type != DocType.Tsx)
-                {
-                    _pushed = tileset;
-                    _ctx.IoManager.AddAssociatedTiledTilesetPath(_path, tileset);
-                    _ctx.AppCommands.TiledSyncFailed += (_, _) => _pushRefused = true;
-                }
-            }
+            if (withTiledContent) File.WriteAllText(_path, TilesetOfTheUser);
             if (type == DocType.Tsx) _ctx.ProjectManager.LoadTsxProject(new FilePath(_path));
             else _ctx.ProjectManager.LoadAnimationChain(new FilePath(_path));
             _ctx.AppCommands.SaveCurrentAnimationChainList();
@@ -79,11 +68,11 @@ public class UndoFuzzTests
 
         private AnimationChainListSave Acls => _ctx.ProjectManager.AnimationChainListSave!;
 
-        private (string Model, string? File, string? Pushed) State()
+        private (string Model, string? File) State()
         {
             bool saved = !_unwritable && _ctx.UndoManager.SaveState != SaveState.Failed;
             string model = Acls.ToJsonString();
-            return (model, saved ? File.ReadAllText(_path) : null, saved && _pushed is not null ? File.ReadAllText(_pushed) : null);
+            return (model, saved ? File.ReadAllText(_path) : null);
         }
 
         // Two animations (one a 2x1 tile footprint) beside what Tiled itself keeps on tiles.
@@ -138,9 +127,7 @@ public class UndoFuzzTests
             </tileset>
             """;
 
-        private string? _pushed;
         private bool _unwritable;
-        private bool _pushRefused; // until #2100, undo does not bring back a tile a refused push left to another animation
 
         public string? Go()
         {
@@ -215,12 +202,11 @@ public class UndoFuzzTests
             return Common();
         }
 
-        private string? Compare(string what, (string Model, string? File, string? Pushed) expected)
+        private string? Compare(string what, (string Model, string? File) expected)
         {
             var actual = State();
             if (actual.Model != expected.Model) return $"{what}: document differs" + Diff(expected.Model, actual.Model);
             if (actual.File != expected.File && actual.File is not null && expected.File is not null) return $"{what}: file differs" + Diff(expected.File, actual.File);
-            if (!_pushRefused && actual.Pushed != expected.Pushed && actual.Pushed is not null && expected.Pushed is not null) return $"{what}: pushed tileset differs" + Diff(expected.Pushed, actual.Pushed);
             return null;
         }
 

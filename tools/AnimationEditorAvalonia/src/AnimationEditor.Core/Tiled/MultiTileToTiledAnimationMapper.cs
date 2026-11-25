@@ -35,18 +35,14 @@ public sealed record MultiTileMappingResult
     /// which must never be silently discarded.
     /// </summary>
     public bool EntryTileIdIsFreshlyComputed { get; init; }
-    /// <summary>Empty for a single-cell (1x1) chain -- see <see cref="AchjToTiledAnimationMapper"/>
-    /// remarks for why that case needs no group at all.</summary>
+    /// <summary>Empty for a single-cell (1x1) chain.</summary>
     public required IReadOnlyList<TiledSatelliteMapping> Satellites { get; init; }
     public required IReadOnlyList<string> Warnings { get; init; }
 }
 
 /// <summary>
-/// Maps an achx/achj <see cref="AnimationChainListSave"/> onto Tiled tile animations the same way
-/// <see cref="AchjToTiledAnimationMapper"/> does, but also accepts frames whose rect spans an NxM
-/// whole-tile footprint (not just a single cell). Used by the native <c>.tsx</c> project save path
-/// (issue #1140) -- deliberately kept separate from <see cref="AchjToTiledAnimationMapper"/>, which
-/// stays single-cell-only and unchanged for the existing achj-push feature.
+/// Maps an <see cref="AnimationChainListSave"/> onto Tiled tile animations, for saving a native
+/// <c>.tsx</c> project (issue #1140). A frame's rect spans one cell or an NxM whole-tile footprint.
 /// </summary>
 /// <remarks>
 /// A multi-cell frame is represented in Tiled as a group of individually-animated tiles: the
@@ -59,7 +55,7 @@ public sealed record MultiTileMappingResult
 /// </remarks>
 public static class MultiTileToTiledAnimationMapper
 {
-    private const float Epsilon = 0.001f;
+    private const float Epsilon = TiledFrameGeometry.Epsilon;
 
     /// <summary>How many cells a rect of this size spans, gaps included; the caller validates the
     /// exact size, this only picks the nearest candidate.</summary>
@@ -139,7 +135,7 @@ public static class MultiTileToTiledAnimationMapper
         // cells (TileGrid.SpanWidth), so on a spaced sheet a 2x1 footprint is 2*tw + spacing wide,
         // never 2*tw.
         var grid = tilesetInfo.Grid;
-        var firstRect = AchjToTiledAnimationMapper.FrameRectPixels(chain.Frames[0], coordinateType, tilesetInfo);
+        var firstRect = TiledFrameGeometry.FrameRectPixels(chain.Frames[0], coordinateType, tilesetInfo);
         var (footprintColumns, footprintRows) = FootprintSize(grid, firstRect.Width, firstRect.Height);
 
         if (footprintColumns < 1 || footprintRows < 1
@@ -157,7 +153,7 @@ public static class MultiTileToTiledAnimationMapper
             if (!tilesetInfo.IsImage(frame.TextureName))
                 return Empty($"chain \"{chain.Name}\": references a different texture (\"{frame.TextureName}\") than the open tileset (\"{tilesetInfo.ImageFileName}\") - skipped.");
 
-            var rect = AchjToTiledAnimationMapper.FrameRectPixels(frame, coordinateType, tilesetInfo);
+            var rect = TiledFrameGeometry.FrameRectPixels(frame, coordinateType, tilesetInfo);
 
             if (Math.Abs(rect.Width - grid.SpanWidth(footprintColumns)) > Epsilon
                 || Math.Abs(rect.Height - grid.SpanHeight(footprintRows)) > Epsilon)
@@ -167,7 +163,7 @@ public static class MultiTileToTiledAnimationMapper
             if (grid.TryLocate(rect.Left, rect.Top, rect.Width, rect.Height, Epsilon) is not { } footprint)
                 return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) is not aligned to the tile grid - skipped.");
 
-            var duration = AchjToTiledAnimationMapper.FrameDurationMs(frame.FrameLength, timeUnit);
+            var duration = new FrameLengthUnit(timeUnit).ToMilliseconds(frame.FrameLength);
             var (originColumn, originRow, _, _) = footprint;
 
             // An exact negative multiple of the cell stride (e.g. -16 with a 16px tile) passes the

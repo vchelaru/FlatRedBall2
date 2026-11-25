@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Threading.Tasks;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -8,7 +7,6 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using FlatRedBall2.AnimationEditorCommon;
 using Xunit;
-using Ellipse = Avalonia.Controls.Shapes.Ellipse;
 
 namespace AnimationEditor.App.Tests;
 
@@ -287,144 +285,4 @@ public class StatusBarTests
         }
         finally { window.Close(); }
     }
-
-    // ── Tiled sync status (issue #1139) ───────────────────────────────────────
-
-    private static string WriteFixtureTileset(string dir)
-    {
-        // Width/height let the mapper convert the achx's UV frame coordinates back to
-        // pixels -- ProjectManager.AnimationChainListSave is always UV in memory.
-        var path = Path.Combine(dir, "Heroes.tsx");
-        File.WriteAllText(path, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><tileset name=\"Heroes\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"4\"><image source=\"Heroes.png\" width=\"64\" height=\"16\"/></tileset>");
-        return path;
-    }
-
-    [AvaloniaFact]
-    public void TiledSyncStatus_HiddenInitially()
-    {
-        var (window, _) = CreateWindow();
-        try
-        {
-            var panel = window.FindControl<StackPanel>("TiledSyncStatusPanel")!;
-            Assert.False(panel.IsVisible);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void TiledSyncStatus_ShowsFailureDetail_AfterAssociatedTsxMissingFromDisk()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        var (window, ctx) = CreateWindow();
-        try
-        {
-            var achxPath = WriteAchx(dir, "Walk");
-            ctx.AppCommands.LoadAnimationChain(achxPath);
-            Dispatcher.UIThread.RunJobs();
-
-            var missingTsxPath = Path.Combine(dir, "DoesNotExist.tsx");
-            ctx.AppCommands.AddAssociatedTiledTileset(missingTsxPath);
-            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-            Dispatcher.UIThread.RunJobs();
-
-            var panel = window.FindControl<StackPanel>("TiledSyncStatusPanel")!;
-            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
-            Assert.True(panel.IsVisible);
-            Assert.Contains("failed", label.Text, System.StringComparison.OrdinalIgnoreCase);
-            var tip = ToolTip.GetTip(window.FindControl<Ellipse>("TiledSyncDot")!) as string;
-            Assert.Contains("DoesNotExist.tsx", tip);
-        }
-        finally
-        {
-            window.Close();
-            Directory.Delete(dir, true);
-        }
-    }
-
-    [AvaloniaFact]
-    public void TiledSyncStatus_ShowsOk_AfterAssociatedTsxSyncsSuccessfully()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        var (window, ctx) = CreateWindow();
-        try
-        {
-            var tsxPath = WriteFixtureTileset(dir);
-            var achxPath = Path.Combine(dir, "Hero.achx");
-            ctx.ProjectManager.FileName = achxPath;
-            ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
-
-            // Tile 0 occupies pixels [0,16)x[0,16) of the 64x16 fixture texture.
-            var chain = new AnimationChainSave { Name = "Walk" };
-            chain.Frames.Add(new AnimationFrameSave
-            {
-                TextureName = "Heroes.png", FrameLength = 0.1f,
-                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 16f, BottomCoordinate = 16f,
-            });
-            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
-
-            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-            Dispatcher.UIThread.RunJobs();
-
-            var panel = window.FindControl<StackPanel>("TiledSyncStatusPanel")!;
-            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
-            Assert.True(panel.IsVisible);
-            Assert.DoesNotContain("failed", label.Text, System.StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            window.Close();
-            Directory.Delete(dir, true);
-        }
-    }
-
-    [AvaloniaFact]
-    public void TiledSyncStatus_ShowsWarning_WhileAChainIsLeftOutOfTheTileset()
-    {
-        var dir = Directory.CreateTempSubdirectory().FullName;
-        var (window, ctx) = CreateWindow();
-        try
-        {
-            var achxPath = Path.Combine(dir, "Hero.achx");
-            ctx.ProjectManager.FileName = achxPath;
-            ctx.AppCommands.AddAssociatedTiledTileset(WriteFixtureTileset(dir));
-            var frame = new AnimationFrameSave { TextureName = "sub/Heroes.png", FrameLength = 0.1f, RightCoordinate = 16f, BottomCoordinate = 16f };
-            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Frames = { frame } });
-            var label = window.FindControl<TextBlock>("TiledSyncLabel")!;
-
-            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.Equal("Tiled sync warning", label.Text);
-            Assert.Contains("Heroes.tsx: chain \"Walk\"", ToolTip.GetTip(label) as string);
-            var dot = window.FindControl<Ellipse>("TiledSyncDot")!;
-            Assert.Equal(Avalonia.Media.Color.FromRgb(0xf0, 0xc6, 0x74), ((Avalonia.Media.ISolidColorBrush)dot.Fill!).Color);
-
-            File.Move(Path.Combine(dir, "Hero.tiledsync"), Path.Combine(dir, "Hero.tiledsync.bak"));
-            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.False(window.FindControl<StackPanel>("TiledSyncStatusPanel")!.IsVisible);
-
-            File.Move(Path.Combine(dir, "Hero.tiledsync.bak"), Path.Combine(dir, "Hero.tiledsync"));
-            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.Equal("Tiled sync warning", label.Text);
-            Assert.True(window.FindControl<StackPanel>("TiledSyncStatusPanel")!.IsVisible);
-
-            frame.TextureName = "Heroes.png";
-            ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.Equal("Tiled sync OK", label.Text);
-        }
-        finally
-        {
-            window.Close();
-            Directory.Delete(dir, true);
-        }
-    }
-
 }

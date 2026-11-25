@@ -66,7 +66,7 @@ Tracking issue: [vchelaru/FlatRedBall2#1147](https://github.com/vchelaru/FlatRed
 Ongoing bug-sweep after a production incident where saving a native `.tsx` AnimationEditor project
 relocated/wiped unrelated tile animations (recompute-from-geometry instead of preserving the file's
 existing tile-id ownership). Ships fixes on a single long-running branch, one regression test +
-fix per item, until no more plausible gaps remain.
+fix per item, until no more plausible gaps remain. The achx push was removed in #2136.
 
 | Phase | Document | Status |
 |---|---|---|

@@ -90,28 +90,16 @@ public sealed class EditSession
     /// <summary>Writes the document back to the file it was opened from.</summary>
     /// <remarks>
     /// The editor reports save side effects through events; they are captured here: a .tsx save's
-    /// "could not be written" notes and an .achx/.achj save's associated-tileset sync outcomes become
-    /// <see cref="EditResult.Warnings"/> (a synced tileset is also listed in <see cref="EditResult.ChangedItems"/>).
+    /// "could not be written" notes become <see cref="EditResult.Warnings"/>.
     /// </remarks>
     public EditResult Save()
     {
         var errors = new List<string>();
         var warnings = new List<string>();
-        var changed = new List<string> { Path };
         void OnFailed(string message) => errors.Add(message);
         void OnTsxWarnings(string tsx, IReadOnlyList<string> notes) => warnings.AddRange(notes);
-        void OnSynced(string tsx, int count) => changed.Add(tsx);
-        void OnSyncWarned(IReadOnlyList<string> notes) => warnings.AddRange(notes.Select(note => $"Associated tileset {note}"));
-        void OnSyncFailed(string target, Exception ex) =>
-            // The target is this file when its .tiledsync cannot be read, so no tileset is known.
-            warnings.Add(target == Path
-                ? $"Associated tilesets were not updated: {ex.Message}"
-                : $"Associated tileset {System.IO.Path.GetFileName(target)} was not updated: {ex.Message}");
         _commands.SaveFailed += OnFailed;
         _commands.TsxSaveCompletedWithWarnings += OnTsxWarnings;
-        _commands.TiledSyncSucceeded += OnSynced;
-        _commands.TiledSyncWarned += OnSyncWarned;
-        _commands.TiledSyncFailed += OnSyncFailed;
         try
         {
             _commands.SaveCurrentAnimationChainList(Path);
@@ -120,12 +108,9 @@ public sealed class EditSession
         {
             _commands.SaveFailed -= OnFailed;
             _commands.TsxSaveCompletedWithWarnings -= OnTsxWarnings;
-            _commands.TiledSyncSucceeded -= OnSynced;
-            _commands.TiledSyncWarned -= OnSyncWarned;
-            _commands.TiledSyncFailed -= OnSyncFailed;
         }
         return errors.Count == 0
-            ? new EditResult(changed, [], warnings)
+            ? new EditResult([Path], [], warnings)
             : new EditResult([], errors.Select(e => $"Could not save {System.IO.Path.GetFileName(Path)}: {e}").ToList(), warnings,
                 errors.Select(_ => EditErrorCode.IoFailed).ToList());
     }
