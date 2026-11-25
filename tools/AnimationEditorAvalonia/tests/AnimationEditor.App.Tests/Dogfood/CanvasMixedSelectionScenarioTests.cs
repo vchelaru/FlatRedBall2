@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls.Primitives;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
@@ -126,5 +127,57 @@ public class CanvasMixedSelectionScenarioTests
         editor.DoubleClickAt(editor.WireframePointAt(80, 80));
 
         CheckFileAndUndo(editor, path, start, start);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CtrlClick_WithTwoAnimationsSelected_IsOneUndoEntry(bool lockFirst)
+    {
+        var (editor, path) = await OpenAsync(lockFirst);
+        using var _ = editor;
+        string start = Regions(editor.Project);
+        editor.ClickRow(editor.ChainNamed("First"));
+        editor.ClickRow(editor.ChainNamed("Second"), RawInputModifiers.Control);
+
+        editor.ClickAt(editor.WireframePointAt(90, 90), RawInputModifiers.Control);
+
+        editor.ChainNamed("Second").Frames.Count.ShouldBe(3);
+        editor.ChainNamed("First").Frames.Count.ShouldBe(lockFirst ? 2 : 3);
+        CheckFileAndUndo(editor, path, start, null);
+    }
+
+    [AvaloniaFact]
+    public async Task CtrlClick_WithTwoAnimationsSelected_KeepsBothSelected()
+    {
+        var (editor, _) = await OpenAsync(lockFirst: false);
+        using var disposed = editor;
+        editor.ClickRow(editor.ChainNamed("First"));
+        editor.ClickRow(editor.ChainNamed("Second"), RawInputModifiers.Control);
+        string[] both = ["First", "Second"];
+        string[] Selected() => editor.Services.SelectedState.SelectedChains.Select(c => c.Name).ToArray();
+
+        editor.ClickAt(editor.WireframePointAt(90, 90), RawInputModifiers.Control);
+        Selected().ShouldBe(both);
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        Selected().ShouldBe(both);
+        editor.Press(Key.Y, RawInputModifiers.Control);
+        Selected().ShouldBe(both);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CtrlHover_WithALockedAndAnUnlockedAnimationSelected_ShowsTheFrameTheClickAdds(bool clickLockedFirst)
+    {
+        var (editor, _) = await OpenAsync(lockFirst: true);
+        using var disposed = editor;
+        editor.ClickRow(editor.ChainNamed(clickLockedFirst ? "First" : "Second"));
+        editor.ClickRow(editor.ChainNamed(clickLockedFirst ? "Second" : "First"), RawInputModifiers.Control);
+
+        editor.Window.MouseMove(editor.WireframePointAt(90, 90), RawInputModifiers.Control);
+
+        editor.Wireframe.AddFrameGhost.ShouldNotBeNull();
+        editor.Wireframe.IsShowingAddFrameCursor.ShouldBeTrue();
     }
 }

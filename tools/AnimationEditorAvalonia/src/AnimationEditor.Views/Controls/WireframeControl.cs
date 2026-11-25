@@ -1689,15 +1689,14 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// True when a Ctrl+click's add-frame target is locked. Resolved the same way MainWindow's
-    /// <c>OnFrameCreatedFromRegion</c> picks the target chain: the first of
+    /// True when a Ctrl+click would add no frame because every target is locked. Resolved the same way MainWindow's
+    /// <c>OnFrameCreatedFromRegion</c> picks the target chains: all of
     /// <see cref="ISelectedState.SelectedChains"/>, falling back to <see cref="ISelectedState.SelectedChain"/>.
     /// </summary>
     private bool IsAddFrameTargetLocked()
     {
         var chains = _selectedState?.SelectedChains;
-        var target = chains is { Count: > 0 } ? chains[0] : _selectedState?.SelectedChain;
-        return target?.IsLocked == true;
+        return chains is { Count: > 0 } ? chains.All(c => c.IsLocked) : _selectedState?.SelectedChain?.IsLocked == true;
     }
 
     /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/>'s handle branch would

@@ -2053,7 +2053,7 @@ public partial class MainWindow : Window
         var chainsToAddTo = selectedChains.Count > 1 ? selectedChains : new List<AnimationChainSave> { primaryChain };
 
         var region = new FrameRegion(minX, minY, maxX, maxY);
-        if (chainsToAddTo.Select(chain => TsxEdit.CheckFrameSize(_projectManager, chain, region)).FirstOrDefault(r => r is not null) is { } otherSize)
+        if (chainsToAddTo.Where(chain => !chain.IsLocked).Select(chain => TsxEdit.CheckFrameSize(_projectManager, chain, region)).FirstOrDefault(r => r is not null) is { } otherSize)
         {
             ShowProblem($"⚠ {otherSize.Errors[0]}");
             return;
@@ -2066,11 +2066,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            // Multi-chain: add to each chain but preserve the current selection.
-            var priorFrame = _selectedState.SelectedFrame;
-            foreach (var chain in chainsToAddTo)
-                _appCommands.AddFrameFromPixelBounds(chain, relPath, minX, minY, maxX, maxY);
-            _selectedState.SelectedFrame = priorFrame;
+            _appCommands.AddFrameFromPixelBounds(chainsToAddTo, relPath, minX, minY, maxX, maxY);
         }
     }
 

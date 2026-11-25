@@ -10,11 +10,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IApplicationEvents _events;
         private readonly ISelectedState _selectedState;
         private readonly AnimationFrameSave? _preAddFrame;
+        private readonly bool _select;
 
         public string Description { get; }
 
+        /// <param name="select">False leaves the selection as it is, when the frame is one of several added to several chains.</param>
         public AddFrameCommand(AnimationFrameSave frame, AnimationChainSave chain,
-            IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
+            IAppCommands commands, IApplicationEvents events, ISelectedState selectedState, bool select = true)
         {
             _frame = frame;
             _chain = chain;
@@ -22,6 +24,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
             _selectedState = selectedState;
             _preAddFrame = selectedState.SelectedFrame;
+            _select = select;
             Description = $"Add Frame to '{chain.Name}'";
         }
 
@@ -30,6 +33,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain.Frames.Add(_frame);
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
+            if (!_select) return true;
             _selectedState.SelectedFrame = _frame;
             // Arm the wireframe to fit this frame into view on the reload the selection above triggers,
             // in case it's larger than the viewport (e.g. a whole-sheet default) — #616. Undo does not
