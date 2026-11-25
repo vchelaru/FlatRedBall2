@@ -227,6 +227,51 @@ public class TypedFieldLeaveScenarioTests
     }
 
     [AvaloniaFact]
+    public async Task ConvertingTheOpenFile_WhileALengthIsTyped_ConvertsTheTypedLength_AndDoesNotBringTheFileBack()
+    {
+        using var editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(hero);
+        editor.Window.DeleteToRecycleBin = path => { File.Delete(path); return null; };
+        editor.Dialogs.AnswerNextEditorDialog(_ => true);
+
+        Begin(editor, "PropFrameLen", "0.5");
+        _ = editor.Window.ConvertProjectFileToAchjAsync("hero.achx");
+        editor.WaitUntil(() => editor.Dialogs.Shown.Count > 0 && !editor.Window.IsConverting, TimeSpan.FromSeconds(10)).ShouldBeTrue();
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        File.Exists(hero).ShouldBeFalse();
+        Saved(Path.ChangeExtension(hero, ".achj"))[0].FrameLength.ShouldBe(0.5f);
+    }
+
+    [AvaloniaFact]
+    public async Task ClosingATab_WhoseTypedLengthCannotBeSaved_AsksFirst()
+    {
+        using var editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        await editor.OpenAsync(hero);
+        UnusualProjectScenarioTests.MakeUnwritable(hero);
+        try
+        {
+            editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Cancel);
+
+            Begin(editor, "PropFrameLen", "0.5");
+            var tab = editor.CenterOf(editor.TabFor("hero.achx"));
+            editor.Window.MouseDown(tab, MouseButton.Middle);
+            editor.Window.MouseUp(tab, MouseButton.Middle);
+            await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+            editor.TabLabels.ShouldBe(new[] { "hero.achx" });
+            editor.ChainNamed("Walk").Frames[0].FrameLength.ShouldBe(0.5f);
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(hero);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task CtrlZ_WhileTypingALength_TakesTheTypedLengthBack()
     {
         using var editor = new AnimationEditorHarness();
