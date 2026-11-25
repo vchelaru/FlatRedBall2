@@ -59,6 +59,53 @@ public class TiledTilesetSyncRunnerTests
         Assert.Equal("Walk", tile0.GetProperty<StringProperty>("achjAnimationName").Value);
     }
 
+    // The second file has renamed one of the first file's chains and deleted the other.
+    [Theory]
+    [InlineData("Hero.achx", "Hero.achj", "", true)] // converted
+    [InlineData("Hero.achj", "Hero.achx", "", true)]
+    [InlineData("Hero.achx", "HERO.ACHJ", "", true)]
+    [InlineData("Hero.achx", "hero.achx", "Hero.achx", true)] // one file
+    [InlineData("anims/Hero.achx", "anims/Hero.achj", "", true)]
+    [InlineData("Hero.v2.achx", "Hero.v2.achj", "", true)]
+    [InlineData("Hero.achx", "Hero.achj", "Hero.achx", false)] // two documents
+    [InlineData("Hero.achj", "Hero.achx", "Hero.achj", false)]
+    [InlineData("Hero.achx", "anims/Hero.achj", "", false)]
+    [InlineData("anims/Hero.achx", "other/Hero.achj", "", false)]
+    [InlineData("Hero.achx", "Hero2.achj", "", false)]
+    [InlineData("Hero.achx", "Hero.v2.achj", "", false)]
+    public void SyncAll_TilesPushedByAFileOfTheSameName_AreOwnOnlyWhenThatFileIsGone(
+        string first, string second, string existing, bool isOwn)
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(root);
+        if (existing != "") File.WriteAllText(Path.Combine(root, existing), "");
+        var achj = AchjWithWalkChain();
+        var walk = achj.AnimationChains[0];
+        foreach (var frame in walk.Frames)
+            frame.TextureName = Path.Combine(root, "Heroes.png");
+        var deleted = new AnimationChainSave { Name = "Deleted" };
+        deleted.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = Path.Combine(root, "Heroes.png"), FrameLength = 0.1f,
+            LeftCoordinate = 32, TopCoordinate = 0, RightCoordinate = 48, BottomCoordinate = 16,
+        });
+        achj.AnimationChains.Add(deleted);
+        TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(root, first), [tsxPath]).Single().AppliedCount.ShouldBe(2);
+
+        achj.AnimationChains.Remove(deleted);
+        walk.Name = "Renamed";
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(root, second), [tsxPath]).Single();
+
+        outcome.Error.ShouldBeNull();
+        outcome.Changed.ShouldBe(isOwn);
+        if (isOwn) outcome.Warnings.ShouldBeEmpty();
+        else outcome.Warnings.Single().ShouldContain($"already owned by \"{first}\"");
+        var tiles = Loader.Default().LoadTileset(tsxPath).Tiles;
+        tiles.Select(t => t.ID).ShouldBe(isOwn ? [0u] : [0u, 2u]);
+        tiles[0].GetProperty<StringProperty>("achjSourceFile").Value.ShouldBe(isOwn ? second : first);
+        tiles[0].GetProperty<StringProperty>("achjAnimationName").Value.ShouldBe(isOwn ? "Renamed" : "Walk");
+    }
+
     // No image file exists in any case: the comparison is by path only.
     [Theory]
     [InlineData("Hero.achx", "Heroes.png", "Heroes.png", true)]

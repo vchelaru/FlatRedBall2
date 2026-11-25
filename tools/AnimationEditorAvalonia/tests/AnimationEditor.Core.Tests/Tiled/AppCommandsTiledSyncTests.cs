@@ -442,6 +442,74 @@ public class AppCommandsTiledSyncTests
         raised.Single().ShouldContain("already owned by \"Other.achx\"");
     }
 
+    // One .tiledsync serves both files, so both push.
+    [Fact]
+    public void SaveCurrentAnimationChainList_AchxAndAchjOfOneName_TheFirstKeepsTheTileAndTheOtherWarnsEverySave()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        var achjPath = Path.Combine(dir.Path, "Hero.achj");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+        ctx.IoManager.GetAssociatedTiledTilesetPaths(achjPath).Count.ShouldBe(1);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "FromAchx");
+        chain.Frames.Add(Tile0Frame("Heroes.png"));
+        IReadOnlyList<string> raised = [];
+        ctx.AppCommands.TiledSyncWarned += w => raised = w;
+
+        foreach (var (path, warns) in new[] { (achxPath, false), (achjPath, true), (achxPath, false), (achjPath, true) })
+        {
+            ctx.ProjectManager.FileName = path;
+            chain.Name = path == achxPath ? "FromAchx" : "FromAchj";
+            ctx.AppCommands.SaveCurrentAnimationChainList(path);
+
+            raised.Count.ShouldBe(warns ? 1 : 0);
+            if (warns) raised.Single().ShouldContain("already owned by \"Hero.achx\"");
+            var tile = Loader.Default().LoadTileset(tsxPath).Tiles.Single();
+            tile.GetProperty<StringProperty>("achjSourceFile").Value.ShouldBe("Hero.achx");
+            tile.GetProperty<StringProperty>("achjAnimationName").Value.ShouldBe("FromAchx");
+        }
+    }
+
+    // The .achx it was saved from still has Bee, whose tile only the .achx may clear.
+    [Fact]
+    public async Task SaveAs_AchxToAchjOfTheSameName_WarnsAndLeavesTheTilesUntilTheAchxIsDeleted()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        var achjPath = Path.Combine(dir.Path, "Hero.achj");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("Heroes.png"));
+        var bee = TestHelpers.MakeChain(ctx.Acls, "Bee");
+        var beeFrame = Tile0Frame("Heroes.png");
+        beeFrame.LeftCoordinate = 16f;
+        beeFrame.RightCoordinate = 32f;
+        bee.Frames.Add(beeFrame);
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        Loader.Default().LoadTileset(tsxPath).Tiles.Count.ShouldBe(2);
+        var pushed = File.ReadAllText(tsxPath);
+        ctx.Acls.AnimationChains.Remove(bee);
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(achjPath);
+        IReadOnlyList<string> raised = [];
+        ctx.AppCommands.TiledSyncWarned += w => raised = w;
+
+        (await ctx.AppCommands.SaveCurrentAnimationChainListAsync()).ShouldBeTrue();
+
+        raised.Single().ShouldContain("already owned by \"Hero.achx\"");
+        File.ReadAllText(tsxPath).ShouldBe(pushed);
+
+        File.Delete(achxPath);
+        ctx.AppCommands.SaveCurrentAnimationChainList(achjPath);
+
+        raised.ShouldBeEmpty();
+        Loader.Default().LoadTileset(tsxPath).Tiles.Single().GetProperty<StringProperty>("achjSourceFile").Value.ShouldBe("Hero.achj");
+    }
+
     [Fact]
     public void SaveCurrentAnimationChainList_CorruptTiledSyncFile_RaisesTiledSyncFailed()
     {
