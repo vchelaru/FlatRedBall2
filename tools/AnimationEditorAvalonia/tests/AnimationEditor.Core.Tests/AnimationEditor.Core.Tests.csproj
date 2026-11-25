@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <Compile Include="../Shared/DocumentMatrix.cs" Link="Shared/DocumentMatrix.cs" />
+    <Compile Include="../Shared/SaveModelFill.cs" Link="Shared/SaveModelFill.cs" />
     <ProjectReference Include="..\..\src\AnimationEditor.Core\AnimationEditor.Core.csproj" />
   </ItemGroup>
 
