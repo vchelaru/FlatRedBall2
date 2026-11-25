@@ -44,13 +44,13 @@ public static class BrokenSequenceNotice
     /// blocks while those are few, else with how many it has.
     /// </summary>
     public static string? Message(RemovedChainNames removed, IEnumerable<BrokenSequenceFile> files) =>
-        Message(removed.Verb, removed.Names.Count == 1 ? $"'{removed.Names.First()}'" : Plural.Format(removed.Names.Count, "animation"), files);
+        Banner(removed.Verb, removed.Names.Count == 1 ? $"'{removed.Names.First()}'" : Plural.Format(removed.Names.Count, "animation"), files);
 
-    /// <summary>The same banner for files that are gone: <paramref name="verb"/> is what removed <paramref name="paths"/>.</summary>
-    public static string? Message(string verb, IReadOnlyCollection<string> paths, IEnumerable<BrokenSequenceFile> files) =>
-        Message(verb, paths.Count == 1 ? Path.GetFileName(paths.First()) : Plural.Format(paths.Count, "file"), files);
+    /// <summary>The same banner for a file that is gone: <paramref name="verb"/> is what removed <paramref name="path"/>.</summary>
+    public static string? Message(string verb, string path, IEnumerable<BrokenSequenceFile> files) =>
+        Banner(verb, Path.GetFileName(path), files);
 
-    private static string? Message(string verb, string subject, IEnumerable<BrokenSequenceFile> files)
+    private static string? Banner(string verb, string subject, IEnumerable<BrokenSequenceFile> files)
     {
         var broken = files.Where(file => file.Blocks.Count > 0).ToList();
         if (broken.Count == 0) return null;

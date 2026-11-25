@@ -646,10 +646,23 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         private bool RefuseIfChangedOnDisk(string path, DiskState? state)
         {
-            var file = new FilePath(path);
-            if (state == null || state.Path != file || !state.HasChanged(file)) return false;
+            if (!HasChangedOnDisk(path, state)) return false;
             SaveFailed?.Invoke(SaveTarget.ChangedOnDiskMessage(path));
             return true;
+        }
+
+        private static bool HasChangedOnDisk(string path, DiskState? state)
+        {
+            var file = new FilePath(path);
+            return state != null && state.Path == file && state.HasChanged(file);
+        }
+
+        /// <inheritdoc/>
+        public string? SaveRefusal(string path, TabEntry? background)
+        {
+            if (_staleOnDiskReasons.TryGetValue(new FilePath(path).FullPath, out var staleReason))
+                return SaveTarget.UnreadableOnDiskMessage(path, staleReason);
+            return HasChangedOnDisk(path, background == null ? _diskState : background.CachedDiskState) ? SaveTarget.ChangedOnDiskMessage(path) : null;
         }
 
         /// <inheritdoc/>
