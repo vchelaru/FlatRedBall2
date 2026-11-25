@@ -34,6 +34,15 @@ public class InspectorFieldFidelityScenarioTests
         frame.ShapesSave.Add(new AARectSave { Name = name, X = x, Y = y, ScaleX = scaleX, ScaleY = scaleY });
     }
 
+    private static void Clear(AnimationEditorHarness editor, TextBox box, Key leave)
+    {
+        box.Focus();
+        box.SelectAll();
+        editor.Press(Key.Delete);
+        box.Text.ShouldBeNullOrEmpty();
+        editor.Press(leave);
+    }
+
     private static void TypeVertex(AnimationEditorHarness editor, string name, string text)
     {
         var field = editor.Control<StackPanel>("PropPolygonVertices").GetVisualDescendants().OfType<NumericUpDown>().Single(n => n.Name == name);
@@ -337,5 +346,74 @@ public class InspectorFieldFidelityScenarioTests
         editor.TypeNumber("PropPixelX", "4");
 
         (walk.LeftCoordinate, run.LeftCoordinate).ShouldBe((4f, 4f));
+    }
+
+    [AvaloniaTheory]
+    [InlineData("PropPixelX", "* 999999999999")]
+    [InlineData("PropPixelW", "* 999999999999")]
+    [InlineData("PropPixelW", "- 20")]
+    public async Task Region_RefusedRelativeEditOnMixedFractionalFrames_ChangesNothing(string field, string text)
+    {
+        using var editor = await Open(chain =>
+        {
+            (chain.Frames[0].LeftCoordinate, chain.Frames[0].RightCoordinate) = (1.25f, 16.85f);
+            (chain.Frames[1].LeftCoordinate, chain.Frames[1].RightCoordinate) = (5.25f, 24.85f);
+        });
+        var frames = editor.ChainNamed("Walk").Frames;
+        editor.ClickRow(frames[0]);
+        editor.ClickRow(frames[1], RawInputModifiers.Control);
+
+        editor.TypeNumber(field, text);
+
+        editor.UndoLabels.ShouldBeEmpty();
+        frames.Select(f => (f.LeftCoordinate, f.RightCoordinate)).ShouldBe(new[] { (1.25f, 16.85f), (5.25f, 24.85f) });
+    }
+
+    [AvaloniaFact]
+    public async Task PixelWidth_RelativeEditRefusedForOneMixedFrame_LeavesItExactlyAsItWas()
+    {
+        using var editor = await Open(chain =>
+        {
+            chain.Frames[0].RightCoordinate = 15.6f;
+            chain.Frames[1].RightCoordinate = chain.Frames[1].LeftCoordinate + 19.6f;
+        });
+        var frames = editor.ChainNamed("Walk").Frames;
+        editor.ClickRow(frames[0]);
+        editor.ClickRow(frames[1], RawInputModifiers.Control);
+
+        editor.TypeNumber("PropPixelW", "- 16");
+
+        frames[0].RightCoordinate.ShouldBe(15.6f);
+        frames[1].RightCoordinate.ShouldBe(20f); // 19.6 shows as 20
+    }
+
+    [AvaloniaTheory]
+    [InlineData(Key.Tab)]
+    [InlineData(Key.Enter)]
+    public async Task ClearedNumber_ShowsItsValueAgain(Key leave)
+    {
+        using var editor = await Open(chain => chain.Frames[0].RelativeX = 1f / 3f);
+        editor.ClickRow(editor.ChainNamed("Walk").Frames[0]);
+
+        Clear(editor, editor.Control<NumericUpDown>("PropRelX").GetVisualDescendants().OfType<TextBox>().First(), leave);
+
+        editor.UndoLabels.ShouldBeEmpty();
+        editor.Control<NumericUpDown>("PropRelX").Value.ShouldBe(0.33333334m);
+    }
+
+    [AvaloniaFact]
+    public async Task ClearedPolygonName_ShowsItsNameAgain()
+    {
+        using var editor = await Open(chain =>
+        {
+            chain.Frames[0].ShapesSave = new ShapesSave();
+            chain.Frames[0].ShapesSave!.Add(new PolygonSave { Name = "P", X = 1f / 3f, Points = { new Vector2Save(), new Vector2Save { X = 8 }, new Vector2Save { Y = 8 } } });
+        });
+        editor.ClickRow(editor.ChainNamed("Walk").Frames[0].ShapesSave!.PolygonSaves.First());
+
+        Clear(editor, editor.Control<TextBox>("PropPolygonName"), Key.Tab);
+
+        editor.UndoLabels.ShouldBeEmpty();
+        editor.Control<TextBox>("PropPolygonName").Text.ShouldBe("P");
     }
 }

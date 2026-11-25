@@ -89,6 +89,15 @@ public readonly struct NumericEdit
     /// <summary>Rounds to the nearest integer, for whole-pixel and color-channel fields.</summary>
     public int Apply(int current) => (int)Math.Round(Apply((decimal)current), MidpointRounding.AwayFromZero);
 
+    /// <summary><see cref="Apply(int)"/> for a <paramref name="current"/> that is rounded from what is stored: writing it
+    /// back would change the item, so a refused edit (false) must write nothing.</summary>
+    public bool TryApply(int current, out int value)
+    {
+        bool accepted = TryApply((decimal)current, out decimal result);
+        value = accepted ? (int)Math.Round(result, MidpointRounding.AwayFromZero) : current;
+        return accepted;
+    }
+
     /// <summary>Returns false (leaving the target untouched) for empty, malformed, or
     /// divide-by-zero text.</summary>
     public static bool TryParse(string? text, out NumericEdit edit)

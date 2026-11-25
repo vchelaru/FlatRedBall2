@@ -6046,7 +6046,14 @@ public partial class MainWindow : Window
         foreach (var field in fields)
         {
             if (field is FlankerNumericField flanker) flanker.ValueChanged += (_, _) => CommitField(field, apply);
-            else ((NumericUpDown)field).ValueChanged += (_, _) => CommitField(field, apply);
+            else if (field is NumericUpDown box)
+            {
+                box.ValueChanged += (_, _) => CommitField(field, apply);
+                // A cleared box commits nothing, so leaving it shows the value again.
+                box.LostFocus += (_, _) => { if (box.Value is null) RefreshPropertyPanel(); };
+                box.AddHandler(KeyDownEvent, (_, e) => { if (e.Key == Key.Enter && box.Value is null) RefreshPropertyPanel(); },
+                    RoutingStrategies.Bubble, handledEventsToo: true);
+            }
         }
         CommitRelativeEdits(apply, fields);
     }
@@ -6771,7 +6778,12 @@ public partial class MainWindow : Window
         NumericEdit? y = EditOf(PropPolygonY);
         string? name = NameOf(PropPolygonName);
         if (RefuseUnstorable(name, polygon.Name)) return;
-        name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        if (name is not null && string.IsNullOrWhiteSpace(name))
+        {
+            RefreshPropertyPanel(); // a polygon needs a name: show it again
+            return;
+        }
+        name = name?.Trim();
 
         if (_selectedState.SelectedPolygons.Count <= 1
             && KeyframeInspectorState.IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, polygon, ChainOfShape(polygon)))
