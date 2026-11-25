@@ -319,8 +319,9 @@ public sealed partial class SequenceTimelineControl
         if (reference.TargetLength > 0)
         {
             var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
-            for (int k = 1; k * reference.TargetLength < reference.Length - 1e-9; k++)
+            foreach (int k in TimelineCulling.VisibleCycles(Viewport, reference.Start, reference.Length, reference.TargetLength, size.Width))
             {
+                if (k == 0) continue;
                 double x = Snap(left + k * reference.TargetLength * pps);
                 context.DrawLine(mark, new Point(x, body.Top + TimelineLayout.LabelHeight), new Point(x, body.Bottom - 2));
             }
@@ -380,7 +381,7 @@ public sealed partial class SequenceTimelineControl
                 double y = top + TimelineReferences.InheritedTop + i * TimelineReferences.InheritedRowHeight;
                 using (PushOpacityUnlessOpaque(context, row.Visible ? 1 : HiddenOpacity))
                 {
-                    for (int cycle = 0; reference.TargetLength > 0 && cycle * reference.TargetLength < reference.Length - 1e-9; cycle++)
+                    foreach (int cycle in TimelineCulling.VisibleCycles(Viewport, reference.Start, reference.Length, reference.TargetLength, Bounds.Width))
                     {
                         foreach (var span in row.Spans)
                         {

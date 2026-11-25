@@ -71,4 +71,28 @@ public class TimelineCullingTests
 
         TimelineCulling.IsBlockVisible(viewport, Block(2, 2, 1, 1), ViewWidth, TimelineViewport.RulerHeight + 48).ShouldBeFalse();
     }
+
+    [Fact]
+    public void VisibleCycles_OfAVeryLongBlock_AreOnlyTheOnesInTheView()
+    {
+        var viewport = new TimelineViewport();
+        viewport.ScrollHorizontally(50_000.25 * viewport.PixelsPerSecond);
+
+        // 0.5 s cycles are 60 px; the 1000 px of lanes show 50000.25 s to 50008.58 s.
+        TimelineCulling.VisibleCycles(viewport, 0, 100_000, 0.5, ViewWidth).ShouldBe(Enumerable.Range(100_000, 18));
+    }
+
+    [Fact]
+    public void VisibleCycles_OfABlockInsideTheView_AreEveryCycleItPlays()
+    {
+        TimelineCulling.VisibleCycles(new TimelineViewport(), 1, 1.5, 0.5, ViewWidth).ShouldBe(new[] { 0, 1, 2 });
+        TimelineCulling.VisibleCycles(new TimelineViewport(), 1, 1.6, 0.5, ViewWidth).ShouldBe(new[] { 0, 1, 2, 3 });
+        TimelineCulling.VisibleCycles(new TimelineViewport(), 1, 1, 0, ViewWidth).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void VisibleCycles_NarrowerThanAPixel_AreAboutOnePerPixel()
+    {
+        TimelineCulling.VisibleCycles(new TimelineViewport(), 0, 100, 0.00001, ViewWidth).Count().ShouldBeInRange(900, 1001);
+    }
 }

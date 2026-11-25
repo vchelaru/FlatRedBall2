@@ -55,13 +55,17 @@ public static class ReferenceFilmstrip
     /// <summary>The most cells one cycle is divided into, however far the view is zoomed in; wider zoom makes wider cells.</summary>
     public const int MaxCellsPerCycle = 96;
 
+    /// <summary>Stops a pathological clip (a target of microseconds) from building millions of cells.</summary>
+    private const int MaxCells = 50_000;
+
     /// <summary>
-    /// The cells of a clip <paramref name="length"/> seconds long (null: one run) of a target <paramref name="targetLength"/> seconds long, at
+    /// The cells, of those that reach into <paramref name="fromX"/> to <paramref name="toX"/> (pixels from the clip's left edge), of a clip <paramref name="length"/> seconds long (null: one run) of a target <paramref name="targetLength"/> seconds long, at
     /// <paramref name="pixelsPerSecond"/>. Every cycle is cut into the same whole number of equal cells (about
     /// <see cref="CellPixels"/> wide), so each cycle repeats the same pictures and its boundary falls on a cell edge; a last
     /// partial cycle is cut at the clip's end. Empty when the target has no length.
     /// </summary>
-    public static IReadOnlyList<ReferenceCell> Cells(double targetLength, double? length, double pixelsPerSecond)
+    public static IReadOnlyList<ReferenceCell> Cells(double targetLength, double? length, double pixelsPerSecond,
+        double fromX = 0, double toX = double.PositiveInfinity)
     {
         double clipSeconds = SequenceTimeline.FullLength(length, targetLength);
         if (clipSeconds <= 0 || pixelsPerSecond <= 0) return Array.Empty<ReferenceCell>();
@@ -69,16 +73,16 @@ public static class ReferenceFilmstrip
         int perCycle = Math.Clamp((int)Math.Round(cyclePixels / CellPixels), 1, MaxCellsPerCycle);
         double cellSeconds = targetLength / perCycle;
         var cells = new List<ReferenceCell>();
-        for (int cycle = 0; cycle * targetLength < clipSeconds - 1e-9; cycle++)
+        // One cell early, so rounding never loses the first visible one.
+        for (long n = Math.Max(0, (long)(fromX / (cellSeconds * pixelsPerSecond)) - 1); cells.Count < MaxCells; n++)
         {
-            for (int i = 0; i < perCycle; i++)
-            {
-                double start = cycle * targetLength + i * cellSeconds;
-                if (start >= clipSeconds - 1e-9) break;
-                double visible = Math.Min(cellSeconds, clipSeconds - start);
-                cells.Add(new ReferenceCell(cycle, start * pixelsPerSecond, visible * pixelsPerSecond, cellSeconds * pixelsPerSecond,
-                    start + visible / 2));
-            }
+            int cycle = (int)(n / perCycle);
+            double start = cycle * targetLength + n % perCycle * cellSeconds;
+            if (start >= clipSeconds - 1e-9 || start * pixelsPerSecond > toX) break;
+            double visible = Math.Min(cellSeconds, clipSeconds - start);
+            if ((start + visible) * pixelsPerSecond < fromX) continue;
+            cells.Add(new ReferenceCell(cycle, start * pixelsPerSecond, visible * pixelsPerSecond, cellSeconds * pixelsPerSecond,
+                start + visible / 2));
         }
         return cells;
     }
