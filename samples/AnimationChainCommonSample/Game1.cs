@@ -100,11 +100,8 @@ public class Game1 : Game
         GraphicsDevice.Clear(new Color(30, 30, 40));
 
         var frame = GetCurrentFrame();
-        var source = new Rectangle(
-            (int)frame.LeftCoordinate,
-            (int)frame.TopCoordinate,
-            (int)(frame.RightCoordinate - frame.LeftCoordinate),
-            (int)(frame.BottomCoordinate - frame.TopCoordinate));
+        var region = PixelRectangle.FromFrame(frame, TextureCoordinateType.Pixel, _spriteSheet.Width, _spriteSheet.Height);
+        var source = new Rectangle(region.X, region.Y, region.Width, region.Height);
 
         const float scale = 8f;
         var position = new Vector2(

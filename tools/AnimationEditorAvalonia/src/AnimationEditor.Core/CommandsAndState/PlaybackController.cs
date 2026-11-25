@@ -213,9 +213,7 @@ public class PlaybackController
 
         _animTime += deltaSeconds * SpeedMultiplier;
 
-        bool reachedEnd = _animTime >= totalTime;
-        if (reachedEnd)
-            _animTime = Loop ? _animTime % totalTime : totalTime;
+        (_animTime, _, bool reachedEnd) = PlaybackTimeline.Wrap(_animTime, totalTime, Loop);
 
         // Update FrameElapsed before events so it is already correct when FrameIndexChanged and PlaybackTicked handlers run.
         (int newIdx, _frameElapsed) = Locate(chain, _animTime);
@@ -230,7 +228,7 @@ public class PlaybackController
 
         // Pausing after the tick so subscribers see the final frame/time before the transport
         // button flips to "play" — matches how a manual Pause() behaves mid-playback.
-        if (reachedEnd && !Loop) Pause();
+        if (reachedEnd) Pause();
     }
 
     // Reverse and PingPong mirror the forward timeline (PlaybackTimeline); a time on a frame boundary shows the frame

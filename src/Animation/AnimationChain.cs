@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FlatRedBall2.AnimationEditorCommon;
 
 namespace FlatRedBall2.Animation;
 
@@ -8,7 +9,7 @@ namespace FlatRedBall2.Animation;
 /// <see cref="FlatRedBall2.Rendering.Sprite.AnimationChains"/> and play via
 /// <see cref="FlatRedBall2.Rendering.Sprite.PlayAnimation(string)"/>.
 /// </summary>
-public class AnimationChain : List<AnimationFrame>
+public class AnimationChain : List<AnimationFrame>, IReloadableChain
 {
     /// <summary>
     /// Identifier used by <see cref="FlatRedBall2.Rendering.Sprite.PlayAnimation(string)"/> and by

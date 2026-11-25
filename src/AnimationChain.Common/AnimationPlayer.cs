@@ -33,7 +33,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         {
             if (_currentChainIndex < 0) return null;
             var chain = _chains[_currentChainIndex];
-            return chain.Count > 0 ? chain[_currentFrameIndex] : null;
+            return chain.Count > 0 ? chain[FrameIndexIn(chain)] : null;
         }
     }
 
@@ -44,7 +44,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public (float X, float Y) CurrentOffset =>
         CurrentChain is { Count: > 0 } chain
-            ? KeyframeEvaluator.EvaluateOffset(chain, GlidesAcrossLoop, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            ? KeyframeEvaluator.EvaluateOffset(chain, GlidesAcrossLoop, FrameIndexIn(chain), ElapsedInCurrentFrame(chain))
             : (0f, 0f);
 
     /// <summary>
@@ -54,7 +54,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public KeyframeColor CurrentColor =>
         CurrentChain is { Count: > 0 } chain
-            ? KeyframeEvaluator.EvaluateColor(chain, GlidesAcrossLoop, _currentFrameIndex, ElapsedInCurrentFrame(chain))
+            ? KeyframeEvaluator.EvaluateColor(chain, GlidesAcrossLoop, FrameIndexIn(chain), ElapsedInCurrentFrame(chain))
             : default;
 
     /// <summary>The currently playing <see cref="AnimationChain{TFrame}"/>, or <c>null</c> if none.</summary>
@@ -74,7 +74,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// <exception cref="ArgumentOutOfRangeException">Value is outside the current chain's frame range.</exception>
     public int CurrentFrameIndex
     {
-        get => _currentFrameIndex;
+        get => _currentChainIndex < _chains.Count && CurrentChain is { Count: > 0 } chain ? FrameIndexIn(chain) : _currentFrameIndex;
         set
         {
             var chain = RequireCurrentPlayableChain();
@@ -138,7 +138,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// <summary>Multiplier applied to frame time. 2.0 plays twice as fast; 0.5 plays half-speed.</summary>
     public float AnimationSpeed { get; set; } = 1f;
 
-    /// <summary>Raised once when a non-looping animation reaches the end of its cycle.</summary>
+    /// <summary>Raised once when a non-looping animation reaches the end of its cycle. One with no length reaches it on its first update.</summary>
     public event Action? AnimationFinished;
 
     /// <summary>
@@ -234,47 +234,32 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         if (!Animate || _currentChainIndex < 0) return;
 
         var chain = _chains[_currentChainIndex];
-        if (chain.Count == 0) return;
+        double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
+        if (totalLength <= 0 && IsLooping) return;
 
         _timeIntoAnimation += elapsed.TotalSeconds * AnimationSpeed;
 
-        double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
-        if (totalLength <= 0) return;
-
         int previousVisitIndex = _currentVisitIndex;
-        int wraps = 0;
-        bool finished = false;
-        if (IsLooping)
-        {
-            while (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation -= totalLength;
-                wraps++;
-            }
-        }
-        else
-        {
-            if (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation = totalLength;
-                Animate = false;
-                finished = true;
-            }
-        }
+        (_timeIntoAnimation, int wraps, bool finished) = PlaybackTimeline.Wrap(_timeIntoAnimation, totalLength, IsLooping);
+        if (finished) Animate = false;
 
         UpdateFrameIndexFromTime(chain);
 
         int playbackVersion = _playbackVersion;
         if (FrameEventRaised != null)
         {
-            int visits = PlaybackTimeline.VisitCount(chain.Count, IsPingPong);
+            // As they are now: a handler that reloads the content changes them.
+            int count = chain.Count;
+            bool pingPong = IsPingPong, reversed = IsReversed;
+            int visits = PlaybackTimeline.VisitCount(count, pingPong);
             var (start, length) = FrameEventRange.Get(previousVisitIndex, _currentVisitIndex, wraps, visits);
             for (int j = 0; j < length; j++)
             {
                 int visit = (start + j) % visits;
-                if (!PlaybackTimeline.EntersNewFrame(visit, chain.Count, IsPingPong, IsReversed)) continue;
-                if (!RaiseEvents(chain[PlaybackTimeline.FrameOfVisit(visit, chain.Count, IsPingPong, IsReversed)], playbackVersion))
-                    break;
+                if (!PlaybackTimeline.EntersNewFrame(visit, count, pingPong, reversed)) continue;
+                int frame = PlaybackTimeline.FrameOfVisit(visit, count, pingPong, reversed);
+                if (frame >= chain.Count) continue;
+                if (!RaiseEvents(chain[frame], playbackVersion)) break;
             }
         }
         if (finished && playbackVersion == _playbackVersion)
@@ -332,17 +317,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     private void SeekToTime(AnimationChain<TFrame> chain, double seconds)
     {
         double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
-        if (totalLength <= 0)
-        {
-            _timeIntoAnimation = 0;
-            UpdateFrameIndexFromTime(chain);
-            return;
-        }
-
-        _timeIntoAnimation = IsLooping
-            ? seconds % totalLength
-            : seconds >= totalLength ? totalLength : seconds;
-
+        _timeIntoAnimation = PlaybackTimeline.Wrap(seconds, totalLength, IsLooping).CycleTime;
         UpdateFrameIndexFromTime(chain);
     }
 
@@ -356,11 +331,15 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         _currentVisitIndex = at.Visit;
     }
 
+    // A hot reload can shorten the chain under a player that is not updating.
+    private int FrameIndexIn(AnimationChain<TFrame> chain) => Math.Min(_currentFrameIndex, chain.Count - 1);
+
     // Forward seconds into the current frame at the current cycle time (falls while the timeline plays mirrored).
     private double ElapsedInCurrentFrame(AnimationChain<TFrame> chain)
     {
+        int frame = FrameIndexIn(chain);
         double forward = PlaybackTimeline.Map(_timeIntoAnimation, chain.TotalLength.TotalSeconds, IsPingPong, IsReversed).ForwardTime;
-        return Math.Clamp(forward - GetTimeAtFrameStart(chain, _currentFrameIndex), 0, chain[_currentFrameIndex].FrameLength.TotalSeconds);
+        return Math.Clamp(forward - GetTimeAtFrameStart(chain, frame), 0, chain[frame].FrameLength.TotalSeconds);
     }
 
     private static double GetTimeAtFrameStart(AnimationChain<TFrame> chain, int frameIndex)

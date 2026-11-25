@@ -47,7 +47,6 @@ public static class AnimationChainListSaveExtensions
     // Shared chain-building logic; loadTexture maps a save frame to its Texture2D (or null).
     private static AnimationChainList<AnimationFrame> BuildList(AnimationChainListSave save, Func<AnimationFrameSave, Texture2D?> loadTexture)
     {
-        float frameLengthDivisor = save.TimeMeasurementUnit == TimeMeasurementUnit.Millisecond ? 1000f : 1f;
         var list = new AnimationChainList<AnimationFrame> { Name = save.FileName };
 
         foreach (var chainSave in save.AnimationChains)
@@ -64,7 +63,7 @@ public static class AnimationChainListSaveExtensions
                 var frame = new AnimationFrame
                 {
                     TextureName = frameSave.TextureName,
-                    FrameLength = TimeSpan.FromSeconds(frameSave.FrameLength / frameLengthDivisor),
+                    FrameLength = frameSave.GetDuration(save.TimeMeasurementUnit),
                     FlipHorizontal = frameSave.FlipHorizontal,
                     FlipVertical = frameSave.FlipVertical,
                     FlipDiagonal = frameSave.FlipDiagonal,
@@ -85,24 +84,9 @@ public static class AnimationChainListSaveExtensions
 
                 if (frame.Texture != null)
                 {
-                    int left, top, width, height;
-                    if (save.CoordinateType == TextureCoordinateType.Pixel)
-                    {
-                        left   = (int)frameSave.LeftCoordinate;
-                        top    = (int)frameSave.TopCoordinate;
-                        width  = (int)(frameSave.RightCoordinate  - frameSave.LeftCoordinate);
-                        height = (int)(frameSave.BottomCoordinate - frameSave.TopCoordinate);
-                    }
-                    else // UV
-                    {
-                        left   = (int)(frameSave.LeftCoordinate   * frame.Texture.Width);
-                        top    = (int)(frameSave.TopCoordinate    * frame.Texture.Height);
-                        width  = (int)((frameSave.RightCoordinate  - frameSave.LeftCoordinate) * frame.Texture.Width);
-                        height = (int)((frameSave.BottomCoordinate - frameSave.TopCoordinate)  * frame.Texture.Height);
-                    }
-
-                    if (width > 0 && height > 0)
-                        frame.SourceRectangle = new PixelRectangle(left, top, width, height);
+                    var region = PixelRectangle.FromFrame(frameSave, save.CoordinateType, frame.Texture.Width, frame.Texture.Height);
+                    if (region.Width > 0 && region.Height > 0)
+                        frame.SourceRectangle = region;
                 }
 
                 AppendShapes(frame, frameSave.ShapesSave);
@@ -186,8 +170,10 @@ public static class AnimationChainListSaveExtensions
     /// Re-parses the .achx/.achj at <paramref name="achxPath"/> and applies changes to
     /// <paramref name="list"/> in place so any live <see cref="AnimationPlayer{TFrame}"/> reference
     /// keeps working. For each chain in the reloaded file, matches by
-    /// <see cref="AnimationChain{TFrame}.Name"/>: existing chains have their frames replaced in
-    /// place (instance identity preserved); new chains are appended.
+    /// <see cref="AnimationChain{TFrame}.Name"/> (the nth chain of a name matches the nth): existing
+    /// chains take the file's frames and Loop, PingPong and Reverse in place (instance identity
+    /// preserved), also over a value game code set on the chain; new chains are appended. A player already playing a chain takes the new Loop,
+    /// PingPong and Reverse the next time it starts that chain.
     /// <para>
     /// Returns <c>false</c> on I/O or parse failure (e.g. file mid-write) — XML or JSON, depending
     /// on <paramref name="achxPath"/>'s extension. Callers should retry after the next
@@ -258,20 +244,6 @@ public static class AnimationChainListSaveExtensions
         return true;
     }
 
-    private static void ApplyReloadedChains(AnimationChainList<AnimationFrame> list, AnimationChainList<AnimationFrame> fresh)
-    {
-        foreach (var freshChain in fresh)
-        {
-            var existing = list[freshChain.Name];
-            if (existing != null)
-            {
-                existing.Clear();
-                existing.AddRange(freshChain);
-            }
-            else
-            {
-                list.Add(freshChain);
-            }
-        }
-    }
+    private static void ApplyReloadedChains(AnimationChainList<AnimationFrame> list, AnimationChainList<AnimationFrame> fresh) =>
+        ChainReload.Apply<AnimationChain<AnimationFrame>, AnimationFrame>(list, fresh);
 }

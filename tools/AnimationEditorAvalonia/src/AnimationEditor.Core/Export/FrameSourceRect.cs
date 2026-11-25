@@ -21,26 +21,19 @@ public readonly record struct FrameSourceRect(int X, int Y, int Width, int Heigh
         out FrameSourceRect region)
     {
         region = default;
-        float scaleX = 1f, scaleY = 1f;
+        int textureWidth = 0, textureHeight = 0;
 
         if (coordinateType != TextureCoordinateType.Pixel)
         {
             var size = textureSizeResolver(frame.TextureName);
             if (size is not { Width: > 0, Height: > 0 }) return false;
-            scaleX = size.Value.Width;
-            scaleY = size.Value.Height;
+            (textureWidth, textureHeight) = size.Value;
         }
 
-        // Round the edges, not the width, so adjacent frames tile to exact pixel boundaries.
-        int left = Round(frame.LeftCoordinate * scaleX);
-        int top = Round(frame.TopCoordinate * scaleY);
-        int right = Round(frame.RightCoordinate * scaleX);
-        int bottom = Round(frame.BottomCoordinate * scaleY);
-        region = new FrameSourceRect(left, top, right - left, bottom - top);
+        var pixels = PixelRectangle.FromFrame(frame, coordinateType, textureWidth, textureHeight);
+        region = new FrameSourceRect(pixels.X, pixels.Y, pixels.Width, pixels.Height);
         return true;
     }
-
-    private static int Round(float value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 }
 
 internal static class ExportWarning
