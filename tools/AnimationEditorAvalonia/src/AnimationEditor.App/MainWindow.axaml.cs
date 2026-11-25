@@ -970,8 +970,8 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
-        // Before the settings and tabs are written, so a name typed into an open rename is kept.
-        SettlePendingInput();
+        // Before the settings and tabs are written, so what is typed is kept.
+        SettleBeforeLeaving();
         _closingForOsShutdown = e.CloseReason == WindowCloseReason.OSShutdown;
         if (_closeConfirmed || _closingForOsShutdown
             || !(_sequencePane.HasUnsavedEdits || _achxPane.HasUnsavedEdits)) return;
@@ -1024,7 +1024,7 @@ public partial class MainWindow : Window
     // What is typed is part of the document that is asked about, saved or dropped.
     private Task<TabEntry?> PrepareCloseAsync(TabEntry tab)
     {
-        SettlePendingInput();
+        SettleBeforeLeaving();
         return PaneFor(tab).PrepareCloseAsync(tab);
     }
 
@@ -1227,7 +1227,7 @@ public partial class MainWindow : Window
             var windows = OpenEditorWindows();
             foreach (var window in windows)
             {
-                window.SettlePendingInput();
+                window.SettleBeforeLeaving();
                 if (!await window.ConfirmUnsavedEditsAsync()) return;
             }
             foreach (var window in windows)
@@ -2541,7 +2541,7 @@ public partial class MainWindow : Window
         var absolutePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (absolutePath is null) return;
 
-        SettlePendingInput(); // now, because closing the tab of the deleted file must not write it again
+        SettleBeforeLeaving(); // now, because closing the tab of the deleted file must not write it again
         var fileName = new FilePath(absolutePath).NoPath;
         bool confirmed = await _appCommands.ConfirmAsync(
             $"Delete \"{fileName}\"? This cannot be undone.", "Delete File");
@@ -2660,7 +2660,7 @@ public partial class MainWindow : Window
     {
         if (IsConverting) return; // picked again while it is planned
         IsConverting = true;
-        SettlePendingInput(); // as in DeleteProjectFileAsync
+        SettleBeforeLeaving(); // as in DeleteProjectFileAsync
         try
         {
             var folder = _projectManager.ProjectFolderPath!;
@@ -3070,7 +3070,7 @@ public partial class MainWindow : Window
 
     private void CloseProject(bool closeAllTabs)
     {
-        SettlePendingInput();
+        SettleBeforeLeaving();
         var activeBefore = _tabManager.ActiveTab;
         if (closeAllTabs)
             _tabManager.RestoreFrom(Array.Empty<string>(), null);
@@ -6091,15 +6091,30 @@ public partial class MainWindow : Window
     {
         foreach (var field in fields)
         {
-            field.LostFocus += (_, _) => CommitField(field, apply);
-            field.KeyDown   += (_, e) => { if (e.Key == Key.Enter) CommitField(field, apply); };
+            field.LostFocus += (_, _) => CommitChannel(field, apply);
+            field.KeyDown   += (_, e) => { if (e.Key == Key.Enter) CommitChannel(field, apply); };
             _commitTyped.Add(field, () =>
             {
                 NumericExpressionInput.Commit(field);
-                CommitField(field, apply);
+                CommitChannel(field, apply);
             });
         }
         CommitRelativeEdits(apply, fields);
+    }
+
+    // A field still holding the value it was given commits nothing: one that is blank for "(mixed)" must not clear the
+    // channel (#1330), also after a relative edit that made the frames equal, nor one out of the channel's range clamp it.
+    private void CommitChannel(NumericUpDown field, Action apply)
+    {
+        if (Equals(field.Value, field.Tag)) return;
+        field.Tag = field.Value;
+        CommitField(field, apply);
+    }
+
+    private static void ShowChannel(NumericUpDown field, int? value)
+    {
+        field.Value = value;
+        field.Tag = field.Value;
     }
 
     // #1325: "+ 4" typed over a "(mixed)" field edits each selected item's own value.
@@ -6567,10 +6582,10 @@ public partial class MainWindow : Window
                 bool alphaMixed = colors.Select(c => c.Alpha).Distinct().Count() > 1;
                 bool opMixed    = frames.Select(f => f.ColorOperation).Distinct().Count() > 1;
 
-                PropRed.Value   = redMixed   ? null : colors[0].Red;
-                PropGreen.Value = greenMixed ? null : colors[0].Green;
-                PropBlue.Value  = blueMixed  ? null : colors[0].Blue;
-                PropAlpha.Value = alphaMixed ? null : colors[0].Alpha;
+                ShowChannel(PropRed, redMixed ? null : colors[0].Red);
+                ShowChannel(PropGreen, greenMixed ? null : colors[0].Green);
+                ShowChannel(PropBlue, blueMixed ? null : colors[0].Blue);
+                ShowChannel(PropAlpha, alphaMixed ? null : colors[0].Alpha);
                 SetComputedLook(colorState.FieldsEditable, PropRed, PropGreen, PropBlue, PropAlpha);
 
                 // Ghost the sticky effective value in each blank field: an omitted channel holds
@@ -7088,12 +7103,7 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frames = InspectorKeyframeFrames(KeyframeGroup.Color);
         if (frames.Count == 0) return;
-        // "(mixed)" is judged on what the fields display, which includes frames whose keyframe is off.
-        var shown = InspectorColors(InspectorFrames());
-        _appCommands.SetFrameColor(frames,
-            ChannelEditOf(PropRed, shown.Select(c => c.Red)),
-            ChannelEditOf(PropGreen, shown.Select(c => c.Green)),
-            ChannelEditOf(PropBlue, shown.Select(c => c.Blue)));
+        _appCommands.SetFrameColor(frames, ChannelEditOf(PropRed), ChannelEditOf(PropGreen), ChannelEditOf(PropBlue));
     }
 
     private void ApplyFrameAlpha()
@@ -7101,20 +7111,16 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frames = InspectorKeyframeFrames(KeyframeGroup.Color);
         if (frames.Count == 0) return;
-        _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha, InspectorColors(InspectorFrames()).Select(c => c.Alpha)));
+        _appCommands.SetFrameAlpha(frames, ChannelEditOf(PropAlpha));
     }
 
-    /// <summary>The channel edit being committed to <paramref name="field"/>. A blank field clears the channel (omitted
-    /// from the .achx, so it inherits), except when it is blank because the selection is "(mixed)" (#1330), and a field
-    /// left at the value it shows changes nothing, even a stored value out of the channel's range.</summary>
-    private ChannelEdit ChannelEditOf(NumericUpDown field, IEnumerable<int?> selectedValues)
-    {
-        if (_committing is not { } commit || !ReferenceEquals(commit.Field, field)) return ChannelEdit.Keep;
-        if (commit.Relative is { } relative) return ChannelEdit.Edit(relative);
-        var values = selectedValues.Distinct().ToList();
-        if (field.Value is not { } value) return values.Count > 1 ? ChannelEdit.Keep : ChannelEdit.Clear;
-        return values.Count == 1 && values[0] == value ? ChannelEdit.Keep : ChannelEdit.Edit(value);
-    }
+    /// <summary>The channel edit being committed to <paramref name="field"/>. A field the user blanked clears the channel
+    /// (omitted from the .achx, so it inherits).</summary>
+    private ChannelEdit ChannelEditOf(NumericUpDown field) =>
+        _committing is not { } commit || !ReferenceEquals(commit.Field, field) ? ChannelEdit.Keep
+        : commit.Relative is { } relative ? ChannelEdit.Edit(relative)
+        : field.Value is { } value ? ChannelEdit.Edit(value)
+        : ChannelEdit.Clear;
 
     private void ApplyFrameColorOperation()
     {
@@ -8954,9 +8960,9 @@ public partial class MainWindow : Window
         CommitInlineRename(vm, newName);
 
     /// <summary>
-    /// Applies what is typed into the Inspector field that has the focus, as Enter would. A field otherwise commits its
-    /// text on Enter or focus loss, which a tab switch, Ctrl+S, back/forward or opening another file does not cause. The
-    /// Apply methods read the selection, so this runs before the selection changes.
+    /// Applies what is typed into the Inspector field that has the focus, as Enter would, when the document is left or
+    /// saved. A field otherwise commits its text on Enter or focus loss, which a tab switch, Ctrl+S, back/forward or opening
+    /// another file does not cause. The Apply methods read the selection, so this runs before the selection changes.
     /// </summary>
     private void CommitPendingInspectorField()
     {
@@ -8968,6 +8974,15 @@ public partial class MainWindow : Window
             _appCommands.SealPendingEdits();
             return;
         }
+    }
+
+    /// <summary>
+    /// The part of <see cref="CommitPendingInspectorField"/> that any command causes: the name and texture boxes. A number
+    /// or event box keeps its text through a command that stays in the document (undo, redo, playback).
+    /// </summary>
+    private void CommitPendingInspectorName()
+    {
+        if (FocusManager?.GetFocusedElement() is TextBox box && _commitTyped.TryGetValue(box, out var commit)) commit();
     }
 
     /// <summary>The ANIMATIONS tree nodes whose in-place rename box is open.</summary>
@@ -8993,7 +9008,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void CommitPendingTreeRename()
     {
-        CommitPendingInspectorField();
+        CommitPendingInspectorName();
         foreach (var vm in EditingTreeNodes())
             CommitInlineRename(vm, vm.EditingText);
     }

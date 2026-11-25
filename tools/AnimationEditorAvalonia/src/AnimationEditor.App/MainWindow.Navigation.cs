@@ -96,6 +96,13 @@ public partial class MainWindow
         SettlePendingAchxInput();
     }
 
+    /// <summary><see cref="SettlePendingInput"/> for a way out of the document, which also applies a typed Inspector field.</summary>
+    private void SettleBeforeLeaving()
+    {
+        SettlePendingInput();
+        CommitPendingInspectorField();
+    }
+
     /// <summary>The .achx part of <see cref="SettlePendingInput"/>: its drags and its open renames.</summary>
     private void SettlePendingAchxInput()
     {
@@ -161,7 +168,7 @@ public partial class MainWindow
     private async Task NavigateHistoryAsync(bool back)
     {
         if (_navigatingHistory) return;
-        SettlePendingInput();
+        SettleBeforeLeaving();
         var here = CaptureNavigationLocation() ?? new NavigationLocation(string.Empty);
         _navigatingHistory = true;
         using var suppress = _navigation.Suppress();
