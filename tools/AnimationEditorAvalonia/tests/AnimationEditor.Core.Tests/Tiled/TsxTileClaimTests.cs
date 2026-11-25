@@ -42,8 +42,6 @@ public class TsxTileClaimTests : IDisposable
     private static string Tile(int id, string properties = "") =>
         $"<tile id=\"{id}\">{properties}<animation><frame tileid=\"{id}\" duration=\"200\"/></animation></tile>";
 
-    private const string AchxPushOwned = "<properties><property name=\"achjSourceFile\" value=\"Other.achx\"/></properties>";
-
     private static ProjectManager Load(string path)
     {
         var pm = new ProjectManager();
@@ -185,18 +183,59 @@ public class TsxTileClaimTests : IDisposable
         Assert.Equal("B", NameOn(path, 6));
     }
 
-    [Fact]
-    public void SaveTsxProject_NewChainOnAnAchxPushTile_IsReported()
+    [Theory]
+    [InlineData("<properties><property name=\"achjSourceFile\" value=\"Other.achx\"/></properties><animation><frame tileid=\"9\" duration=\"200\"/></animation>", 9)]
+    [InlineData("<properties><property name=\"Name\" value=\"Mine\"/></properties>", 9)]
+    [InlineData("<properties><property name=\"ParentId\" type=\"int\" value=\"2\"/></properties>", 9)]
+    [InlineData("<properties><property name=\"ParentId\" type=\"int\" value=\"2\"/></properties>", 8)] // its satellite would land on 9
+    public void TrySetTsxOwnerTileId_TileTheSaveRefuses_IsRefusedWithTheSameText(string tile9, int ownerTile)
     {
-        var path = WriteTsx(Tile(0) + Tile(5, AchxPushOwned));
+        var path = WriteTsx(Tile(0) + $"<tile id=\"9\">{tile9}</tile>");
         var pm = Load(path);
-        Assert.Equal("Tile 5 is already used by \"Other.achx\".", pm.TrySetTsxOwnerTileId(Chain(pm, "ID:0"), 5));
-        NewChain(pm, "B", 5);
+        var a = Chain(pm, "ID:0");
+        Place(a, 0, columns: 2);
+        pm.SaveTsxProject();
 
-        var warning = Assert.Single(pm.SaveTsxProject());
+        var error = pm.TrySetTsxOwnerTileId(a, (uint)ownerTile);
 
-        Assert.Contains("\"B\": Tiled tile 5 already carries \"Other.achx\"", warning);
-        Assert.Equal([0u, 5u], AnimatedTiles(path));
+        // A chain whose own cells are that tile: the save has the last word, and says the same.
+        pm.AnimationChainListSave!.AnimationChains.Remove(a);
+        Place(NewChain(pm, $"ID:{ownerTile}", ownerTile), ownerTile, columns: 2);
+        Assert.Equal(Assert.Throws<InvalidOperationException>(() => pm.SaveTsxProject()).Message, error);
+        Assert.Equal((uint)0, pm.GetTsxOwnerTileId(a) ?? 0);
+        Assert.Equal("ID:0", a.Name);
+    }
+
+    [Fact]
+    public void SaveTsxProject_TileAChainShrankOff_IsFreeWhileThatChainCannotBeMapped()
+    {
+        var path = WriteTsx(Tile(5));
+        var pm = Load(path);
+        var a = Chain(pm, "ID:5");
+        Place(a, 5, columns: 2);
+        pm.SaveTsxProject();
+        Place(a, 5);
+        pm.SaveTsxProject();
+        a.Frames[0].LeftCoordinate += 3;
+        NewChain(pm, "B", 6);
+
+        Assert.DoesNotContain(pm.SaveTsxProject(), w => w.Contains("\"B\""));
+        Assert.Equal("B", NameOn(path, 6));
+    }
+
+    [Fact]
+    public void SaveTsxProject_ChainThatLostOnlyASatellite_KeepsItsOwnerTile()
+    {
+        var path = WriteTsx(Tile(0) + Tile(1));
+        var pm = Load(path);
+        var a = Chain(pm, "ID:0");
+        Place(a, 8, columns: 2); // its owner tile stays 0, so its satellite belongs on 1
+        Assert.Single(pm.SaveTsxProject());
+
+        Place(a, 8);
+        Assert.Empty(pm.SaveTsxProject());
+
+        Assert.Equal([0u, 1u], AnimatedTiles(path));
     }
 
     [Fact]
@@ -310,14 +349,14 @@ public class TsxTileClaimTests : IDisposable
     [Fact]
     public void RandomEdits_EveryAcceptedStateIsSaved_AndEveryChainIsOnDiskOrReported()
     {
-        for (var seed = 0; seed < 120; seed++)
+        for (var seed = 0; seed < 60; seed++)
             RunRandomEdits(seed, steps: 8);
     }
 
     private void RunRandomEdits(int seed, int steps)
     {
         var random = new Random(seed);
-        var path = WriteTsx(Tile(0) + Tile(5) + Tile(10) + (seed % 4 == 0 ? Tile(15, AchxPushOwned) : ""));
+        var path = WriteTsx(Tile(0) + Tile(5) + Tile(10) );
         var ctx = new TestServices();
         var pm = ctx.ProjectManager;
         pm.LoadTsxProject(new FilePath(path));

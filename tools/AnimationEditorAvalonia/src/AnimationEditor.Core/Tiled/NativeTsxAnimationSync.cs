@@ -136,12 +136,6 @@ public static class NativeTsxAnimationSync
     private static bool IsAchxPushOwned(Tile tile) =>
         tile.Properties.OfType<StringProperty>().Any(p => p.Name == TilesetAnimationSync.SourceFilePropertyName);
 
-    /// <summary>The source file name per tile the achx-push feature owns, see <see cref="IsAchxPushOwned"/>.</summary>
-    internal static IReadOnlyDictionary<uint, string> AchxPushOwnedTiles(Tileset tileset) =>
-        tileset.Tiles.Where(IsAchxPushOwned).GroupBy(t => t.ID).ToDictionary(
-            g => g.Key,
-            g => g.First().Properties.OfType<StringProperty>().First(p => p.Name == TilesetAnimationSync.SourceFilePropertyName).Value);
-
     /// <summary>
     /// A native-tsx chain's own geometry computing the same tile id as a tile the achx-push
     /// feature already owns is the same "two independent claimants, can't silently pick a winner"
