@@ -25,9 +25,14 @@ public static class SeqjChainUsageScanner
     /// <paramref name="seqjPath"/>. Returns empty (never throws) for a missing, unreadable or malformed file.
     /// </summary>
     public static IReadOnlyList<SeqjChainMatch> FindMatches(
-        string seqjPath, string animationPath, IReadOnlyCollection<string> chains)
+        string seqjPath, string animationPath, IReadOnlyCollection<string> chains) =>
+        FindMatches(seqjPath, sequences => FindMatches(sequences, seqjPath, animationPath, chains));
+
+    /// <summary>What <paramref name="find"/> returns for the file at <paramref name="seqjPath"/>, or empty (never throws) for a missing, unreadable or malformed file.</summary>
+    public static IReadOnlyList<SeqjChainMatch> FindMatches(
+        string seqjPath, Func<SequenceListSave, IReadOnlyList<SeqjChainMatch>> find)
     {
-        try { return FindMatches(SequenceListSave.FromFile(seqjPath), seqjPath, animationPath, chains); }
+        try { return find(SequenceListSave.FromFile(seqjPath)); }
         catch { return []; }
     }
 
@@ -39,6 +44,17 @@ public static class SeqjChainUsageScanner
     public static IReadOnlyList<SeqjChainMatch> FindMatches(
         SequenceListSave sequences, string seqjPath, string animationPath, IReadOnlyCollection<string> chains)
     {
+        return FindBlocks(sequences, seqjPath, animationPath, chains.Contains);
+    }
+
+    /// <summary>The blocks of <paramref name="sequences"/>, stored at <paramref name="seqjPath"/>, that play any chain of any of <paramref name="animationPaths"/>.</summary>
+    public static IReadOnlyList<SeqjChainMatch> FindMatches(
+        SequenceListSave sequences, string seqjPath, IEnumerable<string> animationPaths) =>
+        animationPaths.SelectMany(path => FindBlocks(sequences, seqjPath, path, _ => true)).ToList();
+
+    private static List<SeqjChainMatch> FindBlocks(
+        SequenceListSave sequences, string seqjPath, string animationPath, Func<string, bool> plays)
+    {
         var target = new FilePath(animationPath).FullPath;
         var folder = new FilePath(seqjPath).GetDirectoryContainingThis().FullPath;
         var matches = new List<SeqjChainMatch>();
@@ -47,7 +63,7 @@ public static class SeqjChainUsageScanner
                 for (int i = 0; i < track.Chains.Count; i++)
                 {
                     var block = track.Chains[i];
-                    if (chains.Contains(block.Chain)
+                    if (plays(block.Chain)
                         && sequences.Sources.Contains(block.Source, StringComparer.OrdinalIgnoreCase)
                         && IsTarget(block.Source))
                         matches.Add(new SeqjChainMatch(sequence, track, i));

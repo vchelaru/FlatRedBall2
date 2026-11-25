@@ -2518,6 +2518,8 @@ public partial class MainWindow : Window
         // the user already confirmed a destructive, non-undoable action.
         if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(absolutePath)) is { } openTab)
             CloseTabCore(openTab);
+
+        if (await BrokenByRemovedFilesAsync("Deleting", [absolutePath]) is { } broken) ShowProblem(broken);
     }
 
     /// <summary>
@@ -2592,7 +2594,7 @@ public partial class MainWindow : Window
     /// put. Recycling is the safety net for an accidental convert, which is why the confirm names
     /// it. Open tabs on a recycled original are closed, same reason as
     /// <see cref="DeleteProjectFileAsync"/>; one whose last save failed is saved first, and when that
-    /// fails again its file is left out and named.
+    /// fails again its file is left out and named. The sequences that played a recycled original are named too.
     /// </summary>
     private async Task ConvertToAchjAsync(IReadOnlyList<string> sources, string confirmText)
     {
@@ -2616,7 +2618,8 @@ public partial class MainWindow : Window
         }
 
         var batch = AchxToAchjBatch.Convert(ready);
-        int converted = 0, skipped = batch.Skipped.Count();
+        var recycled = new List<string>();
+        int skipped = batch.Skipped.Count();
         problems.AddRange(batch.Failed.Select(f => $"{new FilePath(f.SourcePath).NoPath}: {f.Error}"));
         foreach (var file in batch.Converted)
         {
@@ -2629,18 +2632,21 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            converted++;
+            recycled.Add(source);
             if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } openTab)
                 CloseTabCore(openTab);
         }
 
+        int converted = recycled.Count;
+        var broken = await BrokenByRemovedFilesAsync("Converting", recycled);
         if (problems.Count > 0)
             // Posted because a failed save's own banner is, and would replace this one.
             await Dispatcher.UIThread.InvokeAsync(() =>
-                ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}"));
+                ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}{(broken is null ? "" : $". {broken}")}"));
         else
         {
             if (savedEdits) Notifications.HideProblem(AutoSaveFailedPrefix);
+            if (broken is not null) ShowProblem(broken);
             ShowStatusMessage(skipped > 0
                 ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
                 : $"Converted {converted} to .achj.");
