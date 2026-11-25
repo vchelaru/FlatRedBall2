@@ -173,7 +173,7 @@ namespace AnimationEditor.Core
             // entirely by the *current* achx's own ProjectFile reference, so a file with none must
             // clear whatever a previously loaded achx populated here rather than leaving it stale.
             if (!string.IsNullOrEmpty(acls.ProjectFile))
-                TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
+                TryLoadProjectFile(new FilePath(TexturePathHelper.ResolveDisplayPath(acls.ProjectFile, fileName.GetDirectoryContainingThis().FullPath)));
             else
                 ReferencedPngs = new FilePath[0];
         }
@@ -194,19 +194,29 @@ namespace AnimationEditor.Core
 
             var acls = AnimationChainListSave;
             if (acls == null) return;
-            SaveAnimationChainList(acls, targetPath, OnDiskCoordinateType);
+            SaveAnimationChainList(acls, string.IsNullOrEmpty(FileName) ? targetPath : FileName, targetPath, OnDiskCoordinateType);
         }
 
         /// <inheritdoc cref="IProjectManager.SaveAnimationChainList(AnimationChainListSave, string, TextureCoordinateType)"/>
-        public void SaveAnimationChainList(AnimationChainListSave acls, string targetPath, TextureCoordinateType diskFormat)
+        public void SaveAnimationChainList(AnimationChainListSave acls, string targetPath, TextureCoordinateType diskFormat) =>
+            SaveAnimationChainList(acls, targetPath, targetPath, diskFormat);
+
+        // ownPath: the file whose folder the document's relative paths are relative to so far.
+        private static void SaveAnimationChainList(
+            AnimationChainListSave acls, string ownPath, string targetPath, TextureCoordinateType diskFormat)
         {
+            var (from, to) = (new FilePath(ownPath).GetDirectoryContainingThis(), new FilePath(targetPath).GetDirectoryContainingThis());
             var achxDirectory = System.IO.Path.GetDirectoryName(targetPath) ?? string.Empty;
             var textureNames = acls.AnimationChains.SelectMany(chain => chain.Frames)
                 .Select(frame => (Frame: frame, frame.TextureName)).ToList();
+            var projectFile = acls.ProjectFile;
             void Write() { if (IsJsonPath(targetPath)) acls.SaveJson(targetPath); else acls.Save(targetPath); }
 
             try
             {
+                foreach (var (frame, name) in textureNames) frame.TextureName = TexturePathHelper.Rebase(name, from, to);
+                if (projectFile != null && from != to)
+                    acls.ProjectFile = TexturePathHelper.NormalizeStoredTextureName(TexturePathHelper.Rebase(projectFile, from, to), achxDirectory);
                 NormalizeFrameTextureNames(acls, achxDirectory);
                 TextureCoordinateConverter.WriteAs(acls, diskFormat, TextureCoordinateConverter.SizesIn(achxDirectory), Write);
             }
@@ -214,6 +224,7 @@ namespace AnimationEditor.Core
             {
                 // The document is still where it was, and a name relative to the target's folder is another file there.
                 foreach (var (frame, name) in textureNames) frame.TextureName = name;
+                acls.ProjectFile = projectFile;
                 throw;
             }
         }
@@ -282,7 +293,7 @@ namespace AnimationEditor.Core
             var projectFileRelative = AnimationChainListSave?.ProjectFile;
             if (!string.IsNullOrEmpty(projectFileRelative))
             {
-                var projectFile = new FilePath(achxFolder.FullPath + projectFileRelative);
+                var projectFile = new FilePath(TexturePathHelper.ResolveDisplayPath(projectFileRelative, achxFolder.FullPath));
                 var projectDirectory = projectFile.GetDirectoryContainingThis();
                 if (projectDirectory.Exists())
                 {

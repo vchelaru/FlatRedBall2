@@ -56,7 +56,7 @@ namespace AnimationEditor.Core
         /// After Save As wrote the open tsx to <paramref name="path"/>, makes that its file. From another folder, the
         /// image and the frames' textures are now relative to the new one. No-op unless a tsx project is loaded.
         /// </summary>
-        /// <returns>Whether the folder changed. Frames in the undo history still name the image from the old one.</returns>
+        /// <returns>Whether the folder changed.</returns>
         bool MoveTsxProject(FilePath path);
 
         /// <summary>
