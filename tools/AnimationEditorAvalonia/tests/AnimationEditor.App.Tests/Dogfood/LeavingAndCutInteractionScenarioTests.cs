@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
@@ -77,5 +78,61 @@ public class LeavingAndCutInteractionScenarioTests
         string text = File.ReadAllText(target);
         text.ShouldContain(what == "chain" ? "Walk" : "<Frame>");
         kept.Split(',').Where(part => !text.Contains(part)).ShouldBeEmpty();
+    }
+
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ClosingTheProjectFolder_WithATabWhoseEditCannotBeSaved_AsksFirst(bool inFront)
+    {
+        using var editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string other = editor.WriteAchx("other.achx", AnimationEditorHarness.Chain("Other", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(other);
+        await editor.OpenAsync(hero);
+        UnusualProjectScenarioTests.MakeUnwritable(hero);
+        try
+        {
+            editor.Services.AppCommands.AddAnimationChainWithName("Unsaved");
+            editor.Wait(TimeSpan.FromMilliseconds(100));
+            if (!inFront) editor.ClickTab("other.achx");
+            editor.Dialogs.AnswerNextSaveDiscardCancel(AnimationEditor.Views.Dialogs.SaveDiscardCancelChoice.Cancel);
+
+            editor.Window.CloseProjectFolder();
+            await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+            editor.TabLabels.ShouldContain(label => label.Contains("hero.achx"));
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(hero);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ClosingTheProjectFolder_WithASequenceTabWhoseEditCannotBeSaved_AsksFirst()
+    {
+        using var editor = new AnimationEditorHarness();
+        string fight = editor.WriteSeqj("fight.seqj", "One");
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(fight);
+        UnusualProjectScenarioTests.MakeUnwritable(fight);
+        try
+        {
+            editor.Click(editor.Control<Button>("AddSequenceButton"));
+            editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Auto save failed");
+            editor.Dialogs.AnswerNextSaveDiscardCancel(AnimationEditor.Views.Dialogs.SaveDiscardCancelChoice.Cancel);
+
+            editor.Window.CloseProjectFolder();
+            await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+            editor.TabLabels.ShouldContain(label => label.Contains("fight.seqj"));
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(fight);
+        }
     }
 }

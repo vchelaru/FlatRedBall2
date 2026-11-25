@@ -3057,11 +3057,36 @@ public partial class MainWindow : Window
     /// Closes the Open Project Folder (issues #948, #1360): closes the tabs whose file lives under
     /// the folder, clears the folder scope, and, when no tab is left, resets the editor to the same
     /// blank state as a fresh app launch (<see cref="IAppCommands.CloseProject"/>). Tabs for files
-    /// opened from elsewhere and Untitled tabs are not part of the project and stay open, so nothing
-    /// prompts: a saved tab is already persisted by the autosave-on-edit path (see the
-    /// <see cref="AppCommands"/> constructor comment) and an Untitled tab is never closed here.
+    /// opened from elsewhere and Untitled tabs are not part of the project and stay open. A tab with
+    /// edits its file lacks (a failed save) asks first, as closing it does; Cancel, or a save that fails
+    /// again, leaves the project and every tab open.
     /// </summary>
-    internal void CloseProjectFolder() => CloseProject(closeAllTabs: false);
+    internal void CloseProjectFolder() => _ = RunGuardedAsync(() => CloseProjectFolderAsync(), "Close Project Folder");
+
+    private async Task CloseProjectFolderAsync()
+    {
+        // Content made with no tab open is an Untitled document: it stays, with its recovery file.
+        if (_tabManager.ActiveTab is null)
+            _tabController.EnsureCurrentDocumentHasTab(_projectManager);
+        if (_projectManager.ProjectFolderPath is { } folder)
+        {
+            if (_confirmingClose) return;
+            _confirmingClose = true;
+            try
+            {
+                var inFolder = _tabManager.Tabs.Where(tab => tab.IsInsideFolder(new FilePath(folder))).ToList();
+                foreach (var tab in inFolder)
+                    if (await PrepareCloseAsync(tab) is null) return;
+                foreach (var tab in inFolder)
+                    PaneFor(tab).Closing(tab);
+            }
+            finally
+            {
+                _confirmingClose = false;
+            }
+        }
+        CloseProject(closeAllTabs: false);
+    }
 
     /// <summary>
     /// Like <see cref="CloseProjectFolder"/> but also closes every other tab, with no prompt. For
