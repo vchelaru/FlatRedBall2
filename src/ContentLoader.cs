@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using FlatRedBall2.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
@@ -48,6 +49,10 @@ public class ContentLoader
     // HTTP fetch on Blazor). Tests swap in an in-memory provider per service instance, so two
     // tests running in parallel can't trample each other.
     internal Func<string, Stream> StreamProvider { get; set; } = XnaTitleContainer.OpenStream;
+
+    // What is on screen, for a reload that has to reach the sprites using the reloaded content. Null for a loader that
+    // belongs to no engine or screen.
+    internal Func<IReadOnlyList<IRenderable>>? LiveRenderables { get; set; }
 
     /// <summary>
     /// Per-texture in-place reloader. Given the live tracked texture and a source path,

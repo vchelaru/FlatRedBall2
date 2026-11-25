@@ -48,6 +48,40 @@ public class SpriteLoopAndFrameChangeTests
     }
 
     [Fact]
+    public void AnimateSelf_StepOfOneFrame_EntersAFrameEachTimeAndLoopsOnTheBoundary()
+    {
+        var sprite = MakeSprite("Walk", 10);
+        int looped = 0;
+        sprite.AnimationLooped += () => looped++;
+
+        for (int step = 1; step <= 100; step++)
+        {
+            sprite.AnimateSelf(0.1);
+            sprite.CurrentAnimation!.IndexOf(sprite.CurrentFrame!).ShouldBe(step % 10, $"step {step}");
+            looped.ShouldBe(step / 10);
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void AnimationFinished_NonLoopingChainWithNoLength_IsRaised(int frameCount)
+    {
+        var chain = new AnimationChain { Name = "Hit", Loop = false };
+        for (int i = 0; i < frameCount; i++) chain.Add(new AnimationFrame());
+        var sprite = new Sprite { AnimationChains = new AnimationChainList { chain } };
+        int finished = 0;
+        sprite.AnimationFinished += () => finished++;
+        sprite.PlayAnimation("Hit");
+
+        sprite.AnimateSelf(1);
+        sprite.AnimateSelf(1);
+
+        finished.ShouldBe(1);
+        sprite.Animate.ShouldBeFalse();
+    }
+
+    [Fact]
     public void AnimationLooped_DeltaSpansSeveralLoops_RaisedOncePerUpdate()
     {
         var sprite = MakeSprite("Walk", 3);

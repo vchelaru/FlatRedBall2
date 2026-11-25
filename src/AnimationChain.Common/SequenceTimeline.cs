@@ -54,7 +54,7 @@ public static class SequenceTimeline
     /// whose end is 2.4 on paper ends a hair after it; without the slack a playhead on that end still shows the block.
     /// A start is inclusive and an end exclusive, within this slack.
     /// </summary>
-    public const double BoundaryTolerance = 1e-6;
+    public const double BoundaryTolerance = PlaybackTimeline.BoundaryTolerance;
 
     // Float error in a summed block end grows with the number of cycles, so the slack scales with the time.
     private static double Slack(double time) => BoundaryTolerance * Math.Max(1, Math.Abs(time));

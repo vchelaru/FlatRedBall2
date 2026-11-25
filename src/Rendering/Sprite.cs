@@ -387,6 +387,9 @@ public class Sprite : IRenderable, IAttachable
     /// </summary>
     public bool IsReversed { get; set; }
 
+    // Plays its chain once whatever the chain says (CreateFireAndForget), so a hot reload leaves its flags alone.
+    internal bool IsOneShot { get; set; }
+
     /// <summary>Multiplier applied to animation playback speed. Default is <c>1f</c> (normal speed).</summary>
     public float AnimationSpeed { get; set; } = 1f;
 
@@ -406,7 +409,7 @@ public class Sprite : IRenderable, IAttachable
     /// </summary>
     public AnimationFrame? CurrentFrame { get; private set; }
 
-    /// <summary>Fired when a non-looping animation reaches the end of its cycle (see <see cref="IsPingPong"/>).</summary>
+    /// <summary>Fired when a non-looping animation reaches the end of its cycle (see <see cref="IsPingPong"/>). One with no length reaches it on its first update.</summary>
     public event Action? AnimationFinished;
 
     /// <summary>
@@ -549,35 +552,16 @@ public class Sprite : IRenderable, IAttachable
         if (!Animate || _currentChainIndex < 0 || _animationChains == null) return;
 
         var chain = _animationChains[_currentChainIndex];
-        if (chain.Count == 0) return;
+        // Convert TimeSpan totals to seconds once at the boundary; per-frame math stays in double.
+        double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
+        if (totalLength <= 0 && IsLooping) return;
 
         _timeIntoAnimation += deltaSeconds * AnimationSpeed;
 
-        // Convert TimeSpan totals to seconds once at the boundary; per-frame math stays in double.
-        double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
-        if (totalLength <= 0) return;
-
         int previousFrameIndex = _currentFrameIndex;
         int previousVisitIndex = _currentVisitIndex;
-        int wraps = 0;
-        bool finished = false;
-        if (IsLooping)
-        {
-            while (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation -= totalLength;
-                wraps++;
-            }
-        }
-        else
-        {
-            if (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation = totalLength;
-                Animate = false;
-                finished = true;
-            }
-        }
+        (_timeIntoAnimation, int wraps, bool finished) = PlaybackTimeline.Wrap(_timeIntoAnimation, totalLength, IsLooping);
+        if (finished) Animate = false;
 
         LocateCurrentFrame(chain);
 
@@ -615,15 +599,19 @@ public class Sprite : IRenderable, IAttachable
     private bool RaiseEnteredFrameEvents(AnimationChain chain, int previousVisitIndex, int wraps)
     {
         if (FrameEventRaised == null) return true;
-        int visits = PlaybackTimeline.VisitCount(chain.Count, IsPingPong);
+        // As they are now: a handler that reloads the content changes them.
+        int count = chain.Count;
+        bool pingPong = IsPingPong, reversed = IsReversed;
+        int visits = PlaybackTimeline.VisitCount(count, pingPong);
         var (start, length) = FrameEventRange.Get(previousVisitIndex, _currentVisitIndex, wraps, visits);
         int playbackVersion = _playbackVersion;
         for (int j = 0; j < length; j++)
         {
             int visit = (start + j) % visits;
-            if (!PlaybackTimeline.EntersNewFrame(visit, chain.Count, IsPingPong, IsReversed)) continue;
-            if (!RaiseEvents(chain[PlaybackTimeline.FrameOfVisit(visit, chain.Count, IsPingPong, IsReversed)], playbackVersion))
-                return false;
+            if (!PlaybackTimeline.EntersNewFrame(visit, count, pingPong, reversed)) continue;
+            int frame = PlaybackTimeline.FrameOfVisit(visit, count, pingPong, reversed);
+            if (frame >= chain.Count) continue;
+            if (!RaiseEvents(chain[frame], playbackVersion)) return false;
         }
         return true;
     }

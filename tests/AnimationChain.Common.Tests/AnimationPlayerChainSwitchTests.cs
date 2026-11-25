@@ -111,4 +111,16 @@ public class AnimationPlayerChainSwitchTests
 
         player.TimeIntoAnimation.TotalSeconds.ShouldBe(1.0, 0.0001);
     }
+
+    [Fact]
+    public void IsLoopingAndCurrentFrameIndex_ListIsCleared_DoNotThrow()
+    {
+        var list = new AnimationChainList<TestFrame> { Chain("a") };
+        var player = new AnimationPlayer<TestFrame>(list);
+        player.Play("a");
+
+        list.Clear();
+
+        (player.IsLooping, player.CurrentFrameIndex).ShouldBe((true, 0));
+    }
 }
