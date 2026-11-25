@@ -952,6 +952,8 @@ namespace AnimationEditor.Core
 
             // The save refuses a tile achx-push owns or the user put a property on that it would overwrite.
             var name = _tsx.SyntheticNamedChains.Contains(chain) ? Tiled.TiledAnimationToAchjMapper.SyntheticChainName(tileId) : chain.Name;
+            if (name != chain.Name && AnimationChainListSave.AnimationChains.Any(c => c.Name == name))
+                return $"A chain named '{name}' already exists.";
             try
             {
                 Tiled.NativeTsxAnimationSync.Apply(

@@ -1309,19 +1309,18 @@ namespace AnimationEditor.Core.CommandsAndState
         public bool RenameChain(AnimationChainSave chain, string newName)
         {
             newName = newName.Trim();
+            bool NameTaken(string name) =>
+                _pm.AnimationChainListSave?.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == name) == true;
+
             if (newName.Length == 0)
             {
                 if (_pm.IsChainNameAuto(chain)) return true;
-                if (_pm.GetTsxOwnerTileId(chain) is null) return false;
+                if (_pm.GetTsxOwnerTileId(chain) is not { } tileId || NameTaken(TiledAnimationToAchjMapper.SyntheticChainName(tileId))) return false;
                 Rename(null);
                 return true;
             }
             if (chain.Name == newName) return true;
-
-            var acls = _pm.AnimationChainListSave;
-            if (acls is not null &&
-                acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
-                return false;
+            if (NameTaken(newName)) return false;
 
             Rename(newName);
             return true;

@@ -17,13 +17,14 @@ public sealed class EditingTestGraph : IDisposable
     public SelectedState SelectedState { get; }
     public ApplicationEvents Events { get; } = new();
     public ObjectFinder ObjectFinder { get; }
-    public UndoManager Undo { get; } = new();
+    public UndoManager Undo { get; }
     public AppCommands Commands { get; }
 
     public EditingTestGraph()
     {
         Directory.CreateDirectory(Root);
         SelectedState = new SelectedState(ProjectManager);
+        Undo = new UndoManager(ProjectManager);
         var appState = new AppState(Events, SelectedState);
         var io = new IoManager(appState, Path.Combine(Root, "recovery.achx"));
         ObjectFinder = new ObjectFinder(ProjectManager);

@@ -82,6 +82,54 @@ public class RenameEditTests : IDisposable
         _g.Undo.CanUndo.ShouldBeFalse();
     }
 
+    // Two animations with the same first tile: only one of them is stored on it, but both would be named after it.
+    [Fact]
+    public void RenameChain_EmptyInTsx_AutoNameOfAnotherChain_FailsWithDuplicateName()
+    {
+        OpenTsx(out var first, out var second);
+        RenameEdit.RenameChain(_g.ProjectManager, _g.Commands, first, "").Success.ShouldBeTrue();
+        first.Name.ShouldBe("ID:4");
+
+        var result = RenameEdit.RenameChain(_g.ProjectManager, _g.Commands, second, "");
+
+        result.HasError(EditErrorCode.DuplicateName).ShouldBeTrue();
+        result.Errors[0].ShouldContain("ID:4");
+        second.Name.ShouldBe("Second");
+    }
+
+    [Fact]
+    public void SetChainTsxOwnerTileId_AutoNamedChain_NameOfAnotherChain_Refuses()
+    {
+        OpenTsx(out var first, out var second);
+        RenameEdit.RenameChain(_g.ProjectManager, _g.Commands, first, "");
+        RenameEdit.RenameChain(_g.ProjectManager, _g.Commands, second, "ID:9");
+
+        string? error = _g.Commands.SetChainTsxOwnerTileId(first, 9);
+
+        error.ShouldNotBeNull();
+        error.ShouldContain("ID:9");
+        first.Name.ShouldBe("ID:4");
+    }
+
+    private void OpenTsx(out AnimationChainSave first, out AnimationChainSave second)
+    {
+        string path = Path.Combine(_g.Root, "Heroes.tsx");
+        File.WriteAllText(path, """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+             <image source="Heroes.png" width="64" height="64"/>
+            </tileset>
+            """);
+        _g.ProjectManager.LoadTsxProject(new AnimationEditor.Core.Paths.FilePath(path));
+        AnimationChainSave OnTile4(string name) => new()
+        {
+            Name = name,
+            Frames = { new AnimationFrameSave { TextureName = "Heroes.png", LeftCoordinate = 0, TopCoordinate = 16, RightCoordinate = 16, BottomCoordinate = 32, FrameLength = 0.1f } },
+        };
+        (first, second) = (OnTile4("First"), OnTile4("Second"));
+        _g.ProjectManager.AnimationChainListSave!.AnimationChains.AddRange([first, second]);
+    }
+
     [Fact]
     public void RenameShape_Rect_RenamesKeepingEverythingElseAndUndoes()
     {
