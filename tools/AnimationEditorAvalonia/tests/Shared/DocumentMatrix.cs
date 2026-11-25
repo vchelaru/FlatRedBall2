@@ -35,10 +35,12 @@ public enum DocAction
     WriteRecovery,
     Export,
     ConvertToAchj,
+    PushFromBackground,
     PushToTileset,
 
     CutChain,
     CutChainATilesetCannotStore,
+    CutChainOutOfPushSource,
     CutFrame,
     CutShape,
     CutSequence,
@@ -49,6 +51,7 @@ public enum DocAction
     Detach,
     LeaveDuringRename,
     ConvertOpenTabToAchj,
+    ConvertOpenPushSource,
     RecoverAtStartup,
 }
 

@@ -40,6 +40,8 @@ public class DocumentWriteMatrixScenarioTests
             DocAction.CutFrame => front != DocType.Seqj && background != DocType.Seqj,
             // A tileset holds neither a shape nor a second texture to cut.
             DocAction.CutChainATilesetCannotStore => front is DocType.Tsx or DocType.Achx && background is DocType.Achx or DocType.Untitled,
+            // What is in front plays no part in what the source pushes.
+            DocAction.CutChainOutOfPushSource => front == DocType.Achx && background == DocType.Achx,
             DocAction.CutShape => front != DocType.Seqj && background is (DocType.Achx or DocType.Untitled),
             // Cutting a sequence removes it at once, like text, and only another .seqj takes it.
             DocAction.CutSequence => front == DocType.Seqj && background == DocType.Seqj,
@@ -50,7 +52,7 @@ public class DocumentWriteMatrixScenarioTests
             // Both tabs are asked about, whichever is in front.
             DocAction.CloseWindowWithUnsavedEdits => front <= background,
             DocAction.LeaveDuringRename => background is DocType.Achx or DocType.Seqj,
-            DocAction.ConvertOpenTabToAchj => eitherPaneInFront && background == DocType.Achx,
+            DocAction.ConvertOpenTabToAchj or DocAction.ConvertOpenPushSource => eitherPaneInFront && background == DocType.Achx,
             // What was recovered is an Untitled document.
             DocAction.RecoverAtStartup => front == DocType.Untitled,
             _ => true,
@@ -95,7 +97,8 @@ public class DocumentWriteMatrixScenarioTests
 
         using var editor = new AnimationEditorHarness();
         // A folder each: an unwritable file on Linux is an unwritable folder. A cut needs both on the one texture.
-        bool apart = action is DocAction.CloseTabWithUnsavedEdits or DocAction.CloseBehindOutsideChange or DocAction.CloseWindowWithUnsavedEdits or DocAction.ConvertOpenTabToAchj;
+        bool apart = action is DocAction.CloseTabWithUnsavedEdits or DocAction.CloseBehindOutsideChange or DocAction.CloseWindowWithUnsavedEdits
+            or DocAction.ConvertOpenTabToAchj or DocAction.ConvertOpenPushSource;
         AnimationChainSave chain = Documents.ChainFor(background, Documents.BackgroundName);
         if (action == DocAction.CutChainATilesetCannotStore) chain = Documents.RichChain(Documents.BackgroundName, "other.png");
         else if (front == DocType.Tsx && action is DocAction.CutChain or DocAction.CutFrame) chain = Documents.PlainChain(Documents.BackgroundName);
@@ -104,11 +107,19 @@ public class DocumentWriteMatrixScenarioTests
         var tabs = new List<Tab> { back, current };
         var before = Documents.FileBytes(editor.ProjectFolder);
         var written = new List<string?>();
+        string? tileset = null;
+        if (action is DocAction.CutChainOutOfPushSource or DocAction.ConvertOpenPushSource)
+        {
+            tileset = Documents.Write(back.Folder, DocType.Tsx, Documents.FrontName);
+            editor.Services.IoManager.AddAssociatedTiledTilesetPath(back.Path!, tileset);
+            written.Add(tileset);
+        }
 
         switch (action)
         {
             case DocAction.CutChain:
             case DocAction.CutChainATilesetCannotStore:
+            case DocAction.CutChainOutOfPushSource:
             case DocAction.CutFrame:
             case DocAction.CutShape:
                 editor.ClickTab(back.Label);
@@ -191,6 +202,7 @@ public class DocumentWriteMatrixScenarioTests
                 await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
                 break;
             case DocAction.ConvertOpenTabToAchj:
+            case DocAction.ConvertOpenPushSource:
                 EditWithoutSaving(editor, back);
                 editor.ClickTab(current.Label);
                 editor.Services.ProjectManager.ProjectFolderPath = editor.ProjectFolder;
@@ -210,6 +222,11 @@ public class DocumentWriteMatrixScenarioTests
         }
 
         foreach (Tab tab in tabs) ShouldBeAsExpected(editor, tab);
+        // The tileset has what its source's file now has, beside its own animation.
+        if (tileset != null)
+            Documents.TileAnimations(tileset).ShouldBe(action == DocAction.ConvertOpenPushSource
+                ? ["3: 0@100 1@250", "4: 4@200", "8: 8@100 9@250 10@100", "12: 12@200"]
+                : ["3: 0@100 1@250", "4: 4@200", "12: 12@200"]);
         // Only a document that now holds something else was written.
         written.AddRange(tabs.Where(tab => tab.Path != null && !tab.Expected.Lines(tab.Folder).SequenceEqual(tab.Original)).Select(tab => tab.Path));
         Documents.Changed(before, editor.ProjectFolder).Except(written.Select(Path.GetFileName)).ShouldBeEmpty("a file that should not change did");

@@ -163,6 +163,44 @@ public class TabSwitchCacheTsxTests : IDisposable
         _ctx.AppCommands.LastSaveStored([notStored]).ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task LastSaveStored_BackInATsxThatDidNotStoreAChain_AfterAnotherTsxWasSaved_SaysSo()
+    {
+        string path = WriteTsx("Heroes.tsx");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        var notStored = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0];
+        notStored.Loop = false;
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(WriteTsx("Other.tsx"));
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+
+        _ctx.AppCommands.LastSaveStored([notStored]).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task LastSaveStored_BackInATsxWhoseBackgroundSaveStoredTheChain_SaysSo()
+    {
+        string path = WriteTsx("Heroes.tsx");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        var chain = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0];
+        chain.Loop = false;
+        _ctx.AppCommands.SaveCurrentAnimationChainList();
+        _ctx.AppCommands.LastSaveStored([chain]).ShouldBeFalse();
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(WriteAchx("Other.achx", "Idle"));
+        chain.Loop = true;
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        _ctx.AppCommands.TryActivateTabFromCache(tab).ShouldBeTrue();
+
+        _ctx.AppCommands.LastSaveStored([chain]).ShouldBeTrue();
+    }
+
     // A pasted frame's texture is an absolute path, which must be matched against the tab's own folder.
     [Fact]
     public async Task SaveDocument_BackgroundTsxTabInAnotherFolder_StoresAChainWithAnAbsoluteTexture()
