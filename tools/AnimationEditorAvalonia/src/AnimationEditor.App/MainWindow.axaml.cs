@@ -5,6 +5,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.Export;
 using AnimationEditor.Core.Export.Gif;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Conversions;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Diagnostics;
@@ -2622,9 +2623,7 @@ public partial class MainWindow : Window
         var sourcePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (sourcePath is null) return;
 
-        await ConvertToAchjAsync(
-            new[] { sourcePath },
-            $"Convert \"{new FilePath(sourcePath).NoPath}\" to .achj? The original .achx is moved to the Recycle Bin.");
+        await ConvertToAchjAsync(new[] { sourcePath });
     }
 
     /// <summary>
@@ -2643,75 +2642,40 @@ public partial class MainWindow : Window
             return;
         }
 
-        await ConvertToAchjAsync(
-            sources,
-            $"Convert {Plural.Format(sources.Count, ".achx file")} under \"{new FilePath(folder).NoPath}\" to .achj? " +
-            "The originals are moved to the Recycle Bin.");
+        await ConvertToAchjAsync(sources);
     }
 
     /// <summary>
-    /// Confirms, converts each source with <see cref="AchxToAchjConverter"/>, and recycles only the
-    /// originals that actually converted -- a skipped (an .achj already exists) or failed file stays
-    /// put. Recycling is the safety net for an accidental convert, which is why the confirm names
-    /// it. Open tabs on a recycled original are closed, same reason as
-    /// <see cref="DeleteProjectFileAsync"/>; one whose last save failed is saved first, and when that
-    /// fails again its file is left out and named. The sequences that played a recycled original are named too.
+    /// Shows the plan (<see cref="AchxConversionPlan"/>) and, once the user agrees, runs it. The tab of a converted file is
+    /// closed, same reason as <see cref="DeleteProjectFileAsync"/>.
     /// </summary>
-    private async Task ConvertToAchjAsync(IReadOnlyList<string> sources, string confirmText)
+    private async Task ConvertToAchjAsync(IReadOnlyList<string> sources)
     {
-        if (!await _appCommands.ConfirmAsync(confirmText, "Convert to .achj")) return;
+        TabEntry? OpenTab(string source) => _tabManager.Tabs.FirstOrDefault(open => open.Path == new FilePath(source));
 
-        var problems = new List<string>();
-        var ready = new List<string>();
-        bool savedEdits = false;
-        foreach (var source in sources)
-        {
-            if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } tab && _achxPane.HasFailedSave(tab))
-            {
-                if (_achxPane.SaveFailedEdits(tab) is { } reason)
-                {
-                    problems.Add($"{new FilePath(source).NoPath}: not converted, its unsaved edits could not be saved ({reason})");
-                    continue;
-                }
-                savedEdits = true;
-            }
-            ready.Add(source);
-        }
+        var folder = _projectManager.ProjectFolderPath!;
+        var openDocuments = new OpenDocuments(
+            sources.Select(OpenTab).OfType<TabEntry>().ToDictionary(tab => tab.Path, tab => _achxPane.UnsavedEdits(tab)),
+            _sequencePane.Documents.ToDictionary(document => document.Path,
+                document => document.HasUnsavedEdits ? SequenceListSave.FromJsonString(document.Save.ToJsonString()) : null));
+        var plan = await Task.Run(() => AchxConversionPlan.Build(sources, folder, openDocuments));
+        if (!await EditorDialogs.ShowConversionPlanAsync(_dialogHost, plan)) return;
 
-        var batch = AchxToAchjBatch.Convert(ready);
-        var recycled = new Dictionary<string, IReadOnlyCollection<string>>();
-        int skipped = batch.Skipped.Count();
-        problems.AddRange(batch.Failed.Select(f => $"{new FilePath(f.SourcePath).NoPath}: {f.Error}"));
-        foreach (var file in batch.Converted)
-        {
-            var source = file.SourcePath;
-            var name = new FilePath(source).NoPath;
-            var chains = ChainNamesIn(source);
-            var error = DeleteToRecycleBin(source);
-            if (error is not null)
-            {
-                problems.Add($"{name}: converted, but the original could not be recycled ({error})");
-                continue;
-            }
+        var outcome = AchxConversion.Run(plan, new ConversionSteps(
+            source => OpenTab(source) is { } tab ? _achxPane.SaveFailedEdits(tab) : null,
+            DeleteToRecycleBin,
+            (path, files) => _sequencePane.ChangeSourceExtension(path, files, AchxConversionPlan.TargetExtension,
+                (save, target) => AchxConversion.ReplaceRecyclingOriginal(save, target, DeleteToRecycleBin))));
+        foreach (var source in outcome.Converted)
+            if (OpenTab(source) is { } openTab) await CloseTabCoreAsync(openTab);
 
-            recycled[source] = chains;
-            if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } openTab)
-                await CloseTabCoreAsync(openTab);
-        }
-
-        int converted = recycled.Count;
-        var broken = await BrokenByRemovedFilesAsync("Converting", recycled);
-        if (problems.Count > 0)
+        if (outcome.Differences.Count > 0)
             // Posted because a failed save's own banner is, and would replace this one.
-            await Dispatcher.UIThread.InvokeAsync(() =>
-                ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}{(broken is null ? "" : $". {broken}")}"));
+            await Dispatcher.UIThread.InvokeAsync(() => ShowProblem(outcome.Message(plan)));
         else
         {
-            if (savedEdits) Notifications.HideProblem(AutoSaveFailedPrefix);
-            if (broken is not null) ShowProblem(broken);
-            ShowStatusMessage(skipped > 0
-                ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
-                : $"Converted {converted} to .achj.");
+            if (plan.Converted.Any(file => file.SavesEdits)) Notifications.HideProblem(AutoSaveFailedPrefix);
+            ShowStatusMessage(outcome.Message(plan));
         }
     }
 

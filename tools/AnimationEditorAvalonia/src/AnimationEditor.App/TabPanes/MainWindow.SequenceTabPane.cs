@@ -431,6 +431,21 @@ public partial class MainWindow
         /// <summary>Whether any open .seqj holds edits its file lacks (a failed save), for the window-close check.</summary>
         public bool HasUnsavedEdits => UnsavedDocuments.Any();
 
+        /// <summary>Every open document.</summary>
+        public IEnumerable<SequenceDocument> Documents => _documents.Values;
+
+        /// <summary>
+        /// <see cref="SequenceDocument.ChangeSourceExtension"/> on the open document at <paramref name="path"/>, in front or
+        /// not, once it holds what its file does.
+        /// </summary>
+        public string? ChangeSourceExtension(string path, IReadOnlyCollection<string> files, string extension, Func<SequenceListSave, string, string?> write)
+        {
+            var tab = _window._tabManager.Tabs.First(open => open.Path == new FilePath(path));
+            var document = _documents[tab.Path];
+            if (document != _document) CatchUpWithDisk(tab, document); // the live watcher keeps the one in front up to date
+            return document.ChangeSourceExtension(files, extension, write);
+        }
+
         /// <summary>The open documents holding edits their files lack.</summary>
         public IEnumerable<SequenceDocument> UnsavedDocuments => _documents.Values.Where(document => document.HasUnsavedEdits);
 

@@ -1395,6 +1395,43 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return null;
     }
 
+    // Each conversion of sources: the files it converted and their new extension. A snapshot remembers how many it has.
+    private readonly List<(IReadOnlyCollection<string> Files, string Extension)> _conversions = new();
+
+    /// <summary>
+    /// Gives the sources that are one of <paramref name="files"/> the extension <paramref name="extension"/> after those were
+    /// converted, and has <paramref name="write"/> put the result (given with <see cref="Path"/>) in the file. Not an edit:
+    /// the converted files are gone, so there is no undo entry, and undoing an earlier edit keeps the new sources.
+    /// Returns why it was refused or failed, and then nothing changed, or null.
+    /// </summary>
+    public string? ChangeSourceExtension(IReadOnlyCollection<string> files, string extension, Func<SequenceListSave, string, string?> write)
+    {
+        CancelGesture();
+        if ((SaveError ?? SaveRefusal()) is { } refusal) return refusal;
+        var copy = SequenceListSave.FromJsonString(Save.ToJsonString());
+        SequenceSourcePaths.ChangeExtension(copy, Folder, files, extension);
+        string? error = null;
+        try
+        {
+            SaveRunner(Path.FullPath, () =>
+            {
+                error = write(copy, Path.FullPath);
+                if (error is null) _diskState = DiskState.Read(Path);
+            });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+        }
+        if (error is not null) return error;
+
+        Save = copy;
+        _conversions.Add((files, extension));
+        SyncSources();
+        Changed?.Invoke();
+        return null;
+    }
+
     /// <summary>
     /// Points the chain references at <paramref name="chains"/> (track and chain index in sequence <paramref name="sequence"/>)
     /// at the chain called <paramref name="chainName"/> of their own source, in one undo entry. Relinks a reference whose
@@ -1535,12 +1572,15 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     // snapshotFolder is the folder the snapshot's relative sources were written for; a Save As since then moved the file.
+    // conversions is how many conversions of sources the snapshot has; the later ones are applied to it.
     private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null, SequenceSelectionState? selection = null,
-        FilePath? snapshotFolder = null)
+        FilePath? snapshotFolder = null, int? conversions = null)
     {
         _gestureBefore = null;
         Save = SequenceListSave.FromJsonString(json);
         if (snapshotFolder is not null) SequenceSourcePaths.Rebase(Save, snapshotFolder, Folder);
+        foreach (var (files, extension) in _conversions.Skip(conversions ?? _conversions.Count))
+            SequenceSourcePaths.ChangeExtension(Save, Folder, files, extension);
         if (selection is not null)
         {
             // A whole selection to put back (a multi-sequence edit, or its undo): the primary says which one is SelectedSequence.
@@ -1600,7 +1640,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
         int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
         (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null,
-        string? coalesceGroup = null, FilePath? beforeFolder = null, FilePath? afterFolder = null) : IUndoableCommand
+        string? coalesceGroup = null, FilePath? beforeFolder = null, FilePath? afterFolder = null, int? beforeConversions = null) : IUndoableCommand
     {
         public string Description => description;
 
@@ -1612,6 +1652,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
         private readonly FilePath _afterFolder = afterFolder ?? document.Folder;
         private FilePath BeforeFolder => _beforeFolder;
 
+        private readonly int _beforeConversions = beforeConversions ?? document._conversions.Count;
+        private readonly int _afterConversions = document._conversions.Count;
+
         // Only ever merges with another snapshot of the same document: the undo stack is shared by every tab.
         public string? CoalesceGroup => coalesceGroup is null ? null : $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(document)}:{coalesceGroup}";
 
@@ -1619,7 +1662,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
         public IUndoableCommand? CoalesceWith(IUndoableCommand previous) => previous is not SnapshotCommand first ? this
             : first.Before == after && first.BeforeFolder == _afterFolder ? null
             : new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
-                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup, first.BeforeFolder, _afterFolder);
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup, first.BeforeFolder, _afterFolder, first._beforeConversions);
 
         private string Before => before;
         private int? SelectBefore => selectBefore;
@@ -1629,20 +1672,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
         public bool Do()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter, stateAfter, _afterFolder);
+            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter, stateAfter, _afterFolder, _afterConversions);
             return true;
         }
 
         public void Redo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectAfter, trackAfter, stateAfter, _afterFolder);
+            document.Restore(after, selectAfter, trackAfter, stateAfter, _afterFolder, _afterConversions);
         }
 
         public void Undo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.To, names.From);
-            document.Restore(before, selectBefore, trackBefore, stateBefore, _beforeFolder);
+            document.Restore(before, selectBefore, trackBefore, stateBefore, _beforeFolder, _beforeConversions);
         }
     }
 }

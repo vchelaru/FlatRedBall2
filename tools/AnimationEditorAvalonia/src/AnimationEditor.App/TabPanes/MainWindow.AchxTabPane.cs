@@ -142,6 +142,11 @@ public partial class MainWindow
             return !HasFailedSave(tab);
         }
 
+        /// <summary>Whether <paramref name="tab"/> holds edits a failed save left out of its file, and why saving them again would be refused (null when it would not).</summary>
+        public (bool UnsavedEdits, string? CannotSave) UnsavedEdits(TabEntry tab) => HasFailedSave(tab)
+            ? (true, _window._appCommands.SaveRefusal(tab.Path.FullPath, tab == _window._tabManager.ActiveTab ? null : tab))
+            : (false, null);
+
         /// <summary>
         /// Writes the edits a failed save left in <paramref name="tab"/> (<see cref="HasFailedSave"/>), without switching to it. Returns why that failed
         /// again, or null when the file has them.
