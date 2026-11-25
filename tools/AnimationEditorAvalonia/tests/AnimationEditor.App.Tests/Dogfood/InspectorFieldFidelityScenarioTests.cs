@@ -293,4 +293,49 @@ public class InspectorFieldFidelityScenarioTests
         frame.RightCoordinate.ShouldBe(16f);
         editor.Control<NumericUpDown>("PropPixelW").Value.ShouldBe(16m);
     }
+
+    [AvaloniaFact]
+    public async Task PixelFields_OfAFrameWhoseTextureIsMissing_DoNotShowAnotherFramesRegion()
+    {
+        using var editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string gone = editor.WritePng("gone.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (8, 8, 16, 16)),
+            AnimationEditorHarness.Chain("Run", "gone.png", (32, 0, 20, 24)));
+        File.Delete(gone);
+        await editor.OpenAsync(path);
+        var walk = editor.ChainNamed("Walk").Frames[0];
+        var run = editor.ChainNamed("Run").Frames[0];
+        editor.Expand(editor.ChainNamed("Walk"));
+        editor.Expand(editor.ChainNamed("Run"));
+        editor.ClickRow(walk);
+        editor.ClickRow(run);
+
+        editor.Control<NumericUpDown>("PropPixelX").Value.ShouldNotBe(8);
+        editor.Control<NumericUpDown>("PropPixelW").Value.ShouldNotBe(16);
+    }
+
+    [AvaloniaFact]
+    public async Task PixelX_WithAFrameOfAMissingTextureAlsoSelected_EditsBothOrSaysWhy()
+    {
+        using var editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string gone = editor.WritePng("gone.png", 64, 64);
+        string path = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (8, 8, 16, 16)),
+            AnimationEditorHarness.Chain("Run", "gone.png", (32, 0, 20, 24)));
+        File.Delete(gone);
+        await editor.OpenAsync(path);
+        var walk = editor.ChainNamed("Walk").Frames[0];
+        var run = editor.ChainNamed("Run").Frames[0];
+        editor.Expand(editor.ChainNamed("Walk"));
+        editor.Expand(editor.ChainNamed("Run"));
+        editor.ClickRow(run);
+        editor.ClickRow(walk, RawInputModifiers.Control);
+
+        editor.TypeNumber("PropPixelX", "4");
+
+        (walk.LeftCoordinate, run.LeftCoordinate).ShouldBe((4f, 4f));
+    }
 }

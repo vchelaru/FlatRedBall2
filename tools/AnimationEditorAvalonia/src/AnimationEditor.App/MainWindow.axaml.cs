@@ -6552,14 +6552,11 @@ public partial class MainWindow : Window
                 // A tileset has one image, so its frames have no other texture to take.
                 PropTextureName.IsEnabled = PropTextureBrowseBtn.IsEnabled = !_projectManager.IsNativeTsxProject;
 
-                var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
-                if (bmpW > 0 && bmpH > 0)
-                {
-                    SetValueOrMixed(PropPixelX, frames.Select(f => (decimal)FrameDisplayValues.GetPixelX(f)).ToList());
-                    SetValueOrMixed(PropPixelY, frames.Select(f => (decimal)FrameDisplayValues.GetPixelY(f)).ToList());
-                    SetValueOrMixed(PropPixelW, frames.Select(f => (decimal)FrameDisplayValues.GetPixelWidth(f)).ToList());
-                    SetValueOrMixed(PropPixelH, frames.Select(f => (decimal)FrameDisplayValues.GetPixelHeight(f)).ToList());
-                }
+                // Regions are stored in pixels, so they show and edit without the texture.
+                SetValueOrMixed(PropPixelX, frames.Select(f => (decimal)FrameDisplayValues.GetPixelX(f)).ToList());
+                SetValueOrMixed(PropPixelY, frames.Select(f => (decimal)FrameDisplayValues.GetPixelY(f)).ToList());
+                SetValueOrMixed(PropPixelW, frames.Select(f => (decimal)FrameDisplayValues.GetPixelWidth(f)).ToList());
+                SetValueOrMixed(PropPixelH, frames.Select(f => (decimal)FrameDisplayValues.GetPixelHeight(f)).ToList());
 
                 // Read-only tile id readout (#1182), native-tsx projects only -- independent of
                 // which tile OWNS the chain's animation (PropChainTsxOwnerInput above). Lets a
@@ -7086,8 +7083,6 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frames = InspectorFrames();
         if (frames.Count == 0) return;
-        var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
-        if (bmpW <= 0 || bmpH <= 0) return;
         // A null component is one the user did not edit (see EditOf): SetFramePixelRegion leaves it alone per-frame.
         NumericEdit? x = EditOf(PropPixelX);
         NumericEdit? y = EditOf(PropPixelY);
