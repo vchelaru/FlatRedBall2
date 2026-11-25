@@ -23,6 +23,9 @@ public sealed class FolderWatcher : IDisposable
 
     private FileSystemWatcher? _watcher;
 
+    // Linux only: sees the watched folder made again, which its own watcher does not.
+    private FileSystemWatcher? _parentWatcher;
+
     /// <summary>Raised (debounced, ~100ms after the last change settles) with every changed path.</summary>
     public event Action<IReadOnlyList<(string Path, WatcherChangeType Type)>>? Changed;
 
@@ -31,7 +34,7 @@ public sealed class FolderWatcher : IDisposable
     /// many changes between flushes, e.g. a large <c>git pull</c>/checkout). The individual
     /// changed paths are lost at that point — callers should treat this as "assume anything under
     /// the watched folder may have changed" and rescan. Any other error raises it too: the folder went away, or, on
-    /// Linux, a subfolder that may not be listed.
+    /// Linux, a subfolder that may not be listed. So does, on Linux, the folder made again.
     /// </summary>
     public event Action? Overflowed;
 
@@ -46,27 +49,75 @@ public sealed class FolderWatcher : IDisposable
         lock (_lock)
         {
             StopWatcherLocked();
+            _parentWatcher?.Dispose();
+            _parentWatcher = null;
 
             if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
                 return;
 
-            var fsw = new FileSystemWatcher(folder)
-            {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
-            };
-
-            fsw.Changed += OnChanged;
-            fsw.Created += OnCreated;
-            fsw.Deleted += OnDeleted;
-            fsw.Renamed += OnRenamed;
-            fsw.Error += OnError;
-            fsw.EnableRaisingEvents = true;
-
-            _watcher = fsw;
+            StartLocked(folder);
+            if (OperatingSystem.IsLinux()) _parentWatcher = WatchForReplacement(folder);
         }
+    }
+
+    private void StartLocked(string folder)
+    {
+        var fsw = new FileSystemWatcher(folder)
+        {
+            IncludeSubdirectories = true,
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+        };
+
+        fsw.Changed += OnChanged;
+        fsw.Created += OnCreated;
+        fsw.Deleted += OnDeleted;
+        fsw.Renamed += OnRenamed;
+        fsw.Error += OnError;
+        fsw.EnableRaisingEvents = true;
+
+        _watcher = fsw;
 
         _flushTimer.Change(100, 100);
+    }
+
+    // Linux watches the folder itself, not its path: once it is gone nothing is reported, and one made or moved in its
+    // place is another folder.
+    private FileSystemWatcher? WatchForReplacement(string folder)
+    {
+        folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        if (Path.GetDirectoryName(folder) is not { } parent) return null;
+
+        void OnAppeared(object sender, FileSystemEventArgs e)
+        {
+            if (e.FullPath != folder) return;
+            lock (_lock)
+            {
+                if (!ReferenceEquals(sender, _parentWatcher)) return;
+                StopWatcherLocked();
+                try
+                {
+                    StartLocked(folder);
+                }
+                catch (Exception ex) when (ex is ArgumentException or IOException)
+                {
+                    return; // gone again already
+                }
+            }
+            Overflowed?.Invoke();
+        }
+
+        try
+        {
+            var watcher = new FileSystemWatcher(parent) { NotifyFilter = NotifyFilters.DirectoryName };
+            watcher.Created += OnAppeared;
+            watcher.Renamed += OnAppeared;
+            watcher.EnableRaisingEvents = true;
+            return watcher;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null; // a parent that may not be listed
+        }
     }
 
     /// <summary>
@@ -87,6 +138,8 @@ public sealed class FolderWatcher : IDisposable
         lock (_lock)
         {
             StopWatcherLocked();
+            _parentWatcher?.Dispose();
+            _parentWatcher = null;
         }
     }
 
