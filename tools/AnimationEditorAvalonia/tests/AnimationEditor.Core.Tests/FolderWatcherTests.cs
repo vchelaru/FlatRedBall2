@@ -3,6 +3,7 @@ using AnimationEditor.Core.IO;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -47,6 +48,41 @@ public class FolderWatcherTests
         await changed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         watcher.Dispose();
         Directory.Delete(dir, recursive: true);
+    }
+
+    /// <summary>
+    /// #2140: <c>rm -rf</c> then an unzip. The editor calls <see cref="FolderWatcher.RestartIfStopped"/> on every change.
+    /// Windows does not let the folder be made again before the watcher stopped, the test above.
+    /// </summary>
+    [Fact]
+    public async Task RestartIfStopped_FolderDeletedAndMadeAgainAtOnce_IsWatchedAgain()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        string dir = Directory.CreateTempSubdirectory("ae-watch").FullName;
+        File.WriteAllText(Path.Combine(dir, "a.achx"), "");
+        using var watcher = new FolderWatcher(AchxFolderScanner.IsAchxPath);
+        var seen = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        watcher.Overflowed += () => { seen.Enqueue("overflowed"); watcher.RestartIfStopped(); };
+        watcher.Changed += changes =>
+        {
+            foreach (var change in changes) seen.Enqueue($"{change.Type} {Path.GetFileName(change.Path)}");
+            watcher.RestartIfStopped();
+        };
+        watcher.Watch(dir);
+        seen.Enqueue($"created {Directory.GetCreationTimeUtc(dir):mm:ss.fffffff}");
+        await Task.Delay(50);
+
+        Directory.Delete(dir, recursive: true);
+        Directory.CreateDirectory(dir);
+        seen.Enqueue($"created {Directory.GetCreationTimeUtc(dir):mm:ss.fffffff}");
+        File.WriteAllText(Path.Combine(dir, "a.achx"), "");
+        await Task.Delay(1000);
+        seen.Enqueue($"created {Directory.GetCreationTimeUtc(dir):mm:ss.fffffff}");
+        File.WriteAllText(Path.Combine(dir, "b.achx"), "");
+        await Task.Delay(1000);
+
+        Directory.Delete(dir, recursive: true);
+        Assert.True(seen.Any(e => e.EndsWith("b.achx")), string.Join("; ", seen));
     }
 
     [Fact]
