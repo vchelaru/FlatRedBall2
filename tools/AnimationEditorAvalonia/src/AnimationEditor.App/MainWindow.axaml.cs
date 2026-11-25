@@ -1100,6 +1100,9 @@ public partial class MainWindow : Window
     /// </summary>
     internal bool IsDetached { get; set; }
 
+    /// <summary>The file the editor was started with (a double-click in Explorer), or null. Tests set it before the window opens.</summary>
+    internal string? LaunchFile { get; set; } = Services.LaunchFile.FromArguments(Environment.GetCommandLineArgs().Skip(1).ToArray());
+
     private void OnOpened(object? sender, EventArgs e)
     {
         _ = HandleStartupAsync();
@@ -1129,37 +1132,26 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// What a start of the editor opens: the file it was started with or the tabs of the last session, the documents a
-    /// crash left unsaved, and the project folder.
+    /// What a start of the editor opens: the tabs of the last session, the documents a crash left unsaved, the file it was
+    /// started with in front of them, and the project folder.
     /// </summary>
     private async Task RestoreSessionAsync()
     {
         // Each step is guarded on its own: one that fails says so and the rest still run (#2085).
-        var args = Environment.GetCommandLineArgs();
-        if (args.Length >= 2 && File.Exists(args[1]))
-        {
-            await RunGuardedAsync(() => LoadAnimationFileAsync(args[1]), "Open");
-        }
-        else if (_appSettings.OpenTabPaths.Count > 0)
-        {
-            await RunGuardedAsync(RestoreTabsAsync, "Restoring the open tabs");
-        }
-        else
-        {
-            _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        }
-
-        // After the branches above, awaited, so nothing is still in flight to clobber a recovered document, and a recovery
-        // never replaces the tabs the session had open (#1020).
+        // The tabs first: they replace whatever is open. A recovered document never replaces them either (#1020).
+        _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        await RunGuardedAsync(RestoreTabsAsync, "Restoring the open tabs");
         await RestoreRecoveredDocumentsAsync();
+        if (LaunchFile is { } file)
+            await RunGuardedAsync(() => LoadAnimationFileAsync(file), "Open");
 
-        // Independent of which branch above ran -- the Project tab tree isn't tied to which
+        // Independent of the steps above -- the Project tab tree isn't tied to which
         // document tab is open (#772).
         if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
             await RunGuardedAsync(() => LoadAndPersistProjectFolderAsync(lastProjectFolder, selectSidebarTab: false), "Open Project Folder");
 
-        // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, the
-        // recovered document, or none of them) did so directly rather than through
+        // Whichever step above set the active tab (RestoreTabsAsync, the recovered document, the
+        // launch file, or none of them) did so directly rather than through
         // ActivateTabAsync, so it never synced the Project list's own selection (#910
         // follow-up) -- do it once here, now the tree is populated.
         if (_tabManager.ActiveTab is { } activeTab)
