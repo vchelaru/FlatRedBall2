@@ -107,6 +107,9 @@ namespace AnimationEditor.Core
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         public bool IsNativeTsxProject => _tsx != null;
 
+        /// <inheritdoc/>
+        public Tiled.TilesetAnimationInfo? TsxTileset => _tsx is null ? null : BuildTsxTilesetInfo(_tsx);
+
         /// <summary>Guards the achx/achj-format save (<see cref="SaveAnimationChainList(string)"/>)
         /// against being called on a native tsx project --
         /// defense-in-depth alongside <c>AppCommands.SaveCurrentAnimationChainList</c>'s own branch

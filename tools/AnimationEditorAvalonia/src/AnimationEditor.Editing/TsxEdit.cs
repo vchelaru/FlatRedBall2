@@ -11,6 +11,20 @@ namespace AnimationEditor.Editing;
 /// </summary>
 public static class TsxEdit
 {
+    internal const string Stores = "A Tiled tile animation holds only frame rectangles and durations";
+
+    /// <summary>Why a frame of a .tsx takes no other texture.</summary>
+    public const string OtherImageRefusal = "A Tiled tileset has one image, so frames can only use the tileset's own image.";
+
+    /// <summary>Why collision shapes cannot be added to a frame of a .tsx.</summary>
+    public const string ShapesRefusal = Stores + ", so collision shapes cannot be kept in a .tsx.";
+
+    /// <summary>The refusal when <paramref name="texture"/> is not the open .tsx's image; null when it is, or when no .tsx is open.</summary>
+    public static EditResult? CheckImage(IProjectManager projectManager, string texture) =>
+        projectManager.TsxTileset is { } tileset && !tileset.IsImage(texture)
+            ? Fail(EditErrorCode.NotSupportedInTsx, OtherImageRefusal)
+            : null;
+
     /// <summary>
     /// Moves a native-.tsx chain's animation to <paramref name="tileId"/>. Fails with
     /// <see cref="EditErrorCode.InvalidValue"/> (the project's own reason) for a tile past the tileset or owned by

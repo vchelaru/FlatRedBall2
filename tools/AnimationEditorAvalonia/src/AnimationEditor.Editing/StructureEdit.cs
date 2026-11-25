@@ -174,7 +174,7 @@ public static class StructureEdit
                 return Fail(EditErrorCode.InvalidValue,
                     $"The region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {size.Width}x{size.Height} texture.");
         }
-        else if (FrameTextureEdit.CheckWholeTexture(commands, absoluteTexture) is { } refused)
+        else if (FrameTextureEdit.CheckTexture(projectManager, commands, absoluteTexture) is { } refused)
         {
             return refused;
         }
