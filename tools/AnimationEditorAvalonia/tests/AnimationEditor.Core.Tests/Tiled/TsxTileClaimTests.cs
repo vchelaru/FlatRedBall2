@@ -186,7 +186,6 @@ public class TsxTileClaimTests : IDisposable
     }
 
     [Theory]
-    [InlineData("<properties><property name=\"achjSourceFile\" value=\"Other.achx\"/></properties><animation><frame tileid=\"9\" duration=\"200\"/></animation>", 9)]
     [InlineData("<properties><property name=\"Name\" value=\"Mine\"/></properties>", 9)]
     [InlineData("<properties><property name=\"ParentId\" type=\"int\" value=\"2\"/></properties>", 9)]
     [InlineData("<properties><property name=\"ParentId\" type=\"int\" value=\"2\"/></properties>", 8)] // its satellite would land on 9

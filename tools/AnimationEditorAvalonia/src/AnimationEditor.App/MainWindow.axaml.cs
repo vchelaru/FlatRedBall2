@@ -1280,35 +1280,9 @@ public partial class MainWindow : Window
         _appCommands.LoadFailed += (path, ex) =>
             Dispatcher.UIThread.InvokeAsync(() => ShowLoadFailedDialogAsync(path, ex));
 
-        // Tab-awareness for the native-tsx/achx-push coexistence guard (issue #1147):
-        // AddAssociatedTiledTileset needs to know whether the target .tsx is open as a native-tsx
-        // project in some OTHER tab, which AppCommands/ProjectManager alone can't see -- ProjectManager
-        // only knows its own current (active) project, not the full set of tabs _tabManager owns.
-        _appCommands.IsTsxPathOpenAsNativeProject = tsxPath =>
-        {
-            var target = new FilePath(tsxPath);
-            if (_projectManager.IsNativeTsxProject && _projectManager.FileName != null &&
-                new FilePath(_projectManager.FileName) == target)
-                return true;
-            return _tabManager.Tabs.Any(t => t.Path == target && t.CachedTsxState != null);
-        };
-
         _appCommands.HotReloadFailed += (path, reason) =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowProblem($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason} Saving to it is paused until it reloads."));
-
-        _appCommands.TiledSyncFailed += (tsxPath, ex) =>
-            Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
-                "Tiled sync failed", _failedBrush, $"{Path.GetFileName(tsxPath)}: {ex.Message}"));
-        _appCommands.TiledSyncSucceeded += (tsxPath, appliedCount) =>
-            Dispatcher.UIThread.InvokeAsync(() => UpdateTiledSyncStatus(
-                "Tiled sync OK", _autoSaveBrush, $"{Path.GetFileName(tsxPath)}: {Plural.Format(appliedCount, "chain")} applied"));
-        _appCommands.TiledSyncWarned += warnings =>
-            Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (warnings.Count == 0) TiledSyncStatusPanel.IsVisible = false;
-                else UpdateTiledSyncStatus("Tiled sync warning", _unsavedBrush, string.Join("\n", warnings));
-            });
 
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>
@@ -2277,21 +2251,6 @@ public partial class MainWindow : Window
     private static readonly Avalonia.Media.SolidColorBrush _failedBrush =
         new(Avalonia.Media.Color.FromRgb(0xe0, 0x55, 0x55));
 
-    /// <summary>
-    /// Shows the Tiled tileset sync status indicator next to the autosave dot (issue #1139).
-    /// Stays visible once first shown -- reflects the most recent sync outcome or external-change
-    /// note, updated in place as further events arrive. <paramref name="tooltip"/> carries the
-    /// full detail (which .tsx, what happened) since the label itself stays short.
-    /// </summary>
-    private void UpdateTiledSyncStatus(string label, Avalonia.Media.IBrush brush, string tooltip)
-    {
-        TiledSyncStatusPanel.IsVisible = true;
-        TiledSyncDot.Fill = brush;
-        TiledSyncLabel.Text = label;
-        ToolTip.SetTip(TiledSyncDot, tooltip);
-        ToolTip.SetTip(TiledSyncLabel, tooltip);
-    }
-
     // The active tab's kind decides the contents, so a background document never shows through.
     private void UpdateStatusBar()
     {
@@ -2595,8 +2554,7 @@ public partial class MainWindow : Window
     /// Issue #1208: right-click Duplicate on a Project-tree file row. Byte-copies the file into the
     /// same folder under <see cref="NewAnimationFileNaming.SuggestDuplicateFileName"/>'s name, so
     /// texture paths (relative to the file) still resolve, then opens the copy the way "New
-    /// Animation File" does. Companion files (<c>.aeproperties</c>, <c>.tiledsync</c>) are not
-    /// copied: a second file pushing into the same tilesets would fight the original. An open file whose last
+    /// Animation File" does. The <c>.aeproperties</c> companion file is not copied. An open file whose last
     /// save failed is saved first, and when that fails again nothing is copied. The folder
     /// watcher refreshes the tree, same as <see cref="DeleteProjectFileAsync"/>.
     /// </summary>
@@ -2842,7 +2800,6 @@ public partial class MainWindow : Window
         Closed += (_, _) => _diagnosticsHub.Enabled = false;   // its watcher thread must not outlive the window
         SequenceTimeline.DiagnosticsExtraLines = _diagnosticsHub.Lines;
         MenuSettings.Click += OnSettingsClick;
-        MenuAssociateTiledTileset.Click += OnAssociateTiledTilesetClick;
         // A Mac runs Cmd+C/X/V through these items, so with a text box focused they edit its text, not the selection.
         MenuCopy.Click          += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Copy(); else ActivePane.CopySelection(); };
         MenuCut.Click           += (_, _) => { if (FocusManager?.GetFocusedElement() is TextBox box) box.Cut(); else ActivePane.CutSelection(); };
@@ -3293,18 +3250,6 @@ public partial class MainWindow : Window
     private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = RunGuardedAsync(() => ActivePane.SaveAsync(_tabManager.ActiveTab), "Save");
 
     private void OnSaveAsClick(object? sender, RoutedEventArgs e) => _ = RunGuardedAsync(() => ActivePane.SaveAsAsync(_tabManager.ActiveTab), "Save As");
-
-    /// <summary>"Associate Tiled Tileset…" menu command (issue #1133) -- picks a .tsx via the
-    /// same open-file dialog seam as everything else, then hands off to
-    /// <see cref="IAppCommands.AddAssociatedTiledTilesetViaDialogAsync"/>.</summary>
-    private async void OnAssociateTiledTilesetClick(object? sender, RoutedEventArgs e)
-    {
-        // The status bar also shows it, as it does for a save's sync, but a refused command gets the banner.
-        void OnFailed(string path, Exception ex) => ShowProblem($"Could not associate the tileset: {ex.Message}");
-        _appCommands.TiledSyncFailed += OnFailed;
-        try { await _appCommands.AddAssociatedTiledTilesetViaDialogAsync(); }
-        finally { _appCommands.TiledSyncFailed -= OnFailed; }
-    }
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
         _ = RunGuardedAsync(() => _appCommands.ExportAsync(ExportFormat.PixiJs), "PixiJS export");

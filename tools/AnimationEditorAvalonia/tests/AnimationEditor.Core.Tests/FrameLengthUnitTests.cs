@@ -85,7 +85,6 @@ public class FrameLengthUnitTiledPinTests
     [InlineData(TimeMeasurementUnit.Undefined, 0.25f, 250)]
     public void TiledDuration_IsWholeMillisecondsInEitherUnit(TimeMeasurementUnit unit, float length, int expectedMs)
     {
-        Assert.Equal(expectedMs, AnimationEditor.Core.Tiled.AchjToTiledAnimationMapper.FrameDurationMs(length, unit));
         Assert.Equal(expectedMs, new FrameLengthUnit(unit).ToMilliseconds(length));
     }
 }

@@ -67,17 +67,12 @@ namespace AnimationEditor.Core.CommandsAndState
             // and was twice misdiagnosed while investigating issue #839. Living here instead
             // means AppCommandsSaveOnChangeTests exercises it with no Avalonia/UI involved.
             _events.AnimationChainsChanged += OnAnimationChainsChanged;
-
-            // A corrupt .tiledsync is a Tiled-sync problem same as a broken .tsx write -- route
-            // it through the one event the UI already listens on (issue #1139) rather than
-            // adding a second failure channel it would also need to wire up.
-            _ioManager.TiledSyncParseFailed += (achxFile, ex) => TiledSyncFailed?.Invoke(achxFile, ex);
         }
 
         // The one save per edit. SaveCurrentAnimationChainList itself writes the crash-recovery
         // snapshot when there is no file yet, so an untitled document is covered too. Commands
         // must NOT call SaveCurrentAnimationChainList on their own as well: every edit, undo and
-        // redo used to be written twice (two disk writes, two Tiled-sync pushes, two toasts).
+        // redo used to be written twice (two disk writes, two toasts).
         private void OnAnimationChainsChanged()
         {
             if (AutosaveOnChange) SaveCurrentAnimationChainList();
@@ -387,7 +382,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             // Was hand-duplicating FinishLoadIntoEditor's steps here instead of calling it, and
             // had drifted out of sync with it: missing HotReloadWatcher.StartWatching (a tsx's
-            // external changes -- hand edits, another tab's "sync associated Tiled tilesets" --
+            // external changes -- hand edits, a save from Tiled --
             // were never picked up, no matter how long you waited) and missing
             // LoadAndApplyCompanionFileFor (saved grid/zoom/expanded-tree-state silently dropped
             // on every tsx open). Calling the shared helper, same as the achx open path
@@ -710,10 +705,6 @@ namespace AnimationEditor.Core.CommandsAndState
                 return false;
             }
 
-            // A native tsx project has no achx to push from -- the achj-push feature
-            // (issue #1133) doesn't apply to it.
-            if (document.CachedTsxState == null)
-                SyncAssociatedTiledTilesets(document.CachedEditorModel, target, isOpen);
             return true;
         }
 
@@ -721,124 +712,6 @@ namespace AnimationEditor.Core.CommandsAndState
         public bool LastSaveStored(IEnumerable<AnimationChainSave> chains) =>
             _undoManager.SaveState != SaveState.Failed
             && !(_pm.IsNativeTsxProject && chains.Any(_pm.TsxChainsNotFullySaved.Contains));
-
-        /// <inheritdoc/>
-        public event Action<string, Exception>? TiledSyncFailed;
-
-        /// <inheritdoc/>
-        public event Action<string, int>? TiledSyncSucceeded;
-
-        /// <inheritdoc/>
-        public event Action<IReadOnlyList<string>>? TiledSyncWarned;
-        private bool _tiledSyncWarned;
-
-        /// <inheritdoc/>
-        public Func<string, bool>? IsTsxPathOpenAsNativeProject { get; set; }
-
-        public void AddAssociatedTiledTileset(string tsxAbsolutePath)
-        {
-            if (string.IsNullOrEmpty(_pm.FileName)) return;
-
-            if (IsTsxPathOpenAsNativeProject?.Invoke(tsxAbsolutePath) == true)
-                throw new InvalidOperationException(
-                    $"Cannot associate \"{tsxAbsolutePath}\" -- it is currently open as a native " +
-                    "AnimationEditor project in another tab. Close that tab first, or choose a " +
-                    "different .tsx file. A .tsx cannot be both a native-tsx project and an " +
-                    "achx-push target at the same time.");
-            if (_pm.IsNativeTsxProject)
-                throw new InvalidOperationException(ProjectManager.NativeTsxAssociationRefusal);
-
-            _ioManager.AddAssociatedTiledTilesetPath(_pm.FileName, tsxAbsolutePath);
-        }
-
-        public async Task AddAssociatedTiledTilesetViaDialogAsync()
-        {
-            if (string.IsNullOrEmpty(_pm.FileName))
-            {
-                TiledSyncFailed?.Invoke("Untitled", new InvalidOperationException("Save the project as an .achx or .achj first."));
-                return;
-            }
-
-            var path = await FileDialogService.PickOpenFileAsync(
-                "Associate Tiled Tileset", "tsx", "Tiled Tileset (*.tsx)");
-            if (string.IsNullOrEmpty(path)) return;
-
-            try
-            {
-                AddAssociatedTiledTileset(path);
-            }
-            catch (Exception ex)
-            {
-                TiledSyncFailed?.Invoke(path, ex);
-            }
-        }
-
-        /// <summary>
-        /// Runs on every successful .achx/.achj save (including autosave, so this must stay cheap
-        /// when nothing is associated -- see <see cref="AddAssociatedTiledTileset"/>). Runs
-        /// synchronously rather than backgrounded: the common case (no associated tilesets) is a
-        /// single list lookup, and even the rare case (a handful of .tsx files) is small XML
-        /// DotTiled I/O -- not slow enough to justify the complexity of coordinating a background
-        /// task against a project model the user may keep editing while it runs. A failure for one
-        /// .tsx never rolls back or retries the .achx save, which has already succeeded by this point.
-        /// </summary>
-        private void SyncAssociatedTiledTilesets(AnimationChainListSave? acls, string achxPath, bool isOpen)
-        {
-            void ClearWarning()
-            {
-                if (!_tiledSyncWarned) return;
-                _tiledSyncWarned = false;
-                TiledSyncWarned?.Invoke([]);
-            }
-
-            // A background push replaces the open document's warning only when it has something to say.
-            if (isOpen) ClearWarning();
-            if (acls == null) return;
-
-            IReadOnlyList<string> tsxPaths;
-            try
-            {
-                tsxPaths = _ioManager.GetAssociatedTiledTilesetPaths(achxPath);
-            }
-            catch (Exception ex)
-            {
-                TiledSyncFailed?.Invoke(achxPath, ex);
-                return;
-            }
-            if (tsxPaths.Count == 0) return;
-
-            // Snapshot rather than hand the live model to the mapper: defensive even though this
-            // runs synchronously today, so this stays safe if a future change backgrounds it.
-            var snapshot = AchjSyncSnapshot.Clone(acls);
-            IReadOnlyList<TiledTilesetSyncOutcome> outcomes;
-            try
-            {
-                outcomes = TiledTilesetSyncRunner.SyncAll(snapshot, achxPath, tsxPaths);
-            }
-            catch (Exception ex)
-            {
-                TiledSyncFailed?.Invoke(achxPath, ex);
-                return;
-            }
-
-            if (outcomes.Any(o => !o.Success || o.Changed || o.Warnings.Count > 0)) ClearWarning();
-            foreach (var outcome in outcomes.Where(o => o.Success && o.Changed))
-                TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
-
-            // Relative to the .achx, because two tilesets can have the same file name.
-            var achxFolder = new FilePath(achxPath).GetDirectoryContainingThis();
-            var warnings = outcomes
-                .SelectMany(o => o.Warnings.Select(w => $"{new FilePath(o.TsxPath).RelativeTo(achxFolder)}: {w}"))
-                .ToList();
-            if (warnings.Count > 0)
-            {
-                _tiledSyncWarned = true;
-                TiledSyncWarned?.Invoke(warnings);
-            }
-
-            foreach (var outcome in outcomes.Where(o => !o.Success))
-                TiledSyncFailed?.Invoke(outcome.TsxPath, outcome.Error!);
-        }
 
         /// <summary>
         /// Show a Save-As file picker via <see cref="FileDialogService"/>, save the
@@ -888,11 +761,6 @@ namespace AnimationEditor.Core.CommandsAndState
             if (IsPathOpenInAnotherTab?.Invoke(path) == true)
             {
                 SaveAsRefused?.Invoke(SaveTarget.OpenInAnotherTabMessage(path));
-                return false;
-            }
-            if (_pm.IsNativeTsxProject && TiledSyncAssociationScanner.FindAssociationsTargeting(path) is [var owner, ..])
-            {
-                SaveAsRefused?.Invoke(SaveTarget.AssociatedTilesetMessage(path, owner));
                 return false;
             }
 

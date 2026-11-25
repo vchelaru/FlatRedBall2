@@ -287,8 +287,7 @@ shows the other document; fifty chains named by keyboard reload identically, a h
 25 tab switches keep both files and both undo stacks, twenty undo/redo ping-pongs and twenty
 open/close cycles leave everything consistent; Edit > Undo/Redo enable with the stack, Copy,
 Paste and Duplicate work from the menu, Export to PixiJS writes the JSON beside a copy of the
-texture and toasts, Associate Tiled Tileset records the association through the scripted picker,
-Expand All and Collapse All, the bounding-box toggle, the PNG usage overlay finds the chain and
+texture and toasts, Expand All and Collapse All, the bounding-box toggle, the PNG usage overlay finds the chain and
 its two regions, Move and Magic Wand are one or the other and Move cannot be turned off, Green,
 Blue, Alpha, Relative Y, Pixel H, rectangle Y and Scale Y, circle X and Y and both shape name
 fields reach the file, File > New and File > Save through the menu, Follow System theme survives
@@ -343,7 +342,7 @@ knows where to look. Add to it whenever a scenario has to route around something
 | Smooth zoom, selection reveal, toast auto-hide, playback cadence | Timers tick only while the test awaits; no 60 fps loop | Wheel-zoom feel, reveal animation, toast racing a click on its button |
 | Anything drawn | `UseHeadlessDrawing = true`: no pixels; nothing here asserts on rendering | Handles, overlapping-frame highlight, onion skin, guides, grid, PNG diff view, timeline thumbnails, theme colours |
 | Tree drag-and-drop reorder (chains, frames), tab reorder by drag | Avalonia `DragDrop` needs a platform drag source | Drag rows above/below/into, drag tabs, drop a PNG from Explorer onto the wireframe and onto the tree |
-| Native dialogs: About, Settings | They build their own `Window` and `ShowDialog` it, bypassing `IEditorDialogHost` (Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are scripted with `AnswerNextEditorDialog`; File > Load, Open Project Folder, texture Browse…, Export to PixiJS and Associate Tiled Tileset go through `IFileDialogService` and are scripted too) | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed |
+| Native dialogs: About, Settings | They build their own `Window` and `ShowDialog` it, bypassing `IEditorDialogHost` (Adjust Frame Time, Add Multiple Frames and Adjust Offsets do go through the host and are scripted with `AnswerNextEditorDialog`; File > Load, Open Project Folder, texture Browse… and Export to PixiJS go through `IFileDialogService` and are scripted too) | Open each, Enter/Escape, Tab order inside them, cancel leaves nothing changed |
 | Clipboard with other apps, file association, single-instance handoff, Velopack update, crash recovery on next launch | Stubbed or process-level | Paste from another editor instance, double-click an `.achx` in Explorer with the editor open, kill and relaunch |
 | DPI scaling, multi-monitor, window restore position, macOS Dock/menu | Platform | Move between monitors with different scaling, restart |
 | Cursor changes (add-frame cursor on Ctrl-hover, handle cursors, hand over tabs) | Cursor is set but never observed | Hover every handle and the tabs with and without Ctrl |

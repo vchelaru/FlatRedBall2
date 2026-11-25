@@ -7,7 +7,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// A named sequence of <typeparamref name="TFrame"/>s. Assign to an
 /// <see cref="AnimationPlayer{TFrame}"/> and play via <see cref="AnimationPlayer{TFrame}.Play(string)"/>.
 /// </summary>
-public class AnimationChain<TFrame> : List<TFrame> where TFrame : AnimationFrameBase
+public class AnimationChain<TFrame> : List<TFrame>, IReloadableChain where TFrame : AnimationFrameBase
 {
     /// <summary>
     /// Identifier used by <see cref="AnimationPlayer{TFrame}.Play(string)"/> and by the

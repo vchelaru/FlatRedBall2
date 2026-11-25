@@ -215,7 +215,7 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string>? SaveAsRefused;
 
         /// <summary>
-        /// Writes a background tab's cached document to its own file, in that file's disk format, and pushes it to its associated tilesets: a cross-document cut removes chains from a background tab's model, and unless
+        /// Writes a background tab's cached document to its own file, in that file's disk format: a cross-document cut removes chains from a background tab's model, and unless
         /// that model reaches disk the chain comes back from the file on the next load or reload.
         /// A failure, or a file that changed since the document was read or saved, is reported through <see
         /// cref="SaveFailed"/> and returns false. Sets <see cref="TabEntry.SaveFailed"/> either way.
@@ -755,74 +755,5 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>Duplicates the homogeneous multi-selection as one undo step.</summary>
         void DuplicateSelection(CopySelectionPayload payload);
-
-        // ── Tiled tileset sync (issue #1133) ─────────────────────────────────────
-
-        /// <summary>
-        /// Associates <paramref name="tsxAbsolutePath"/> with the current project (via
-        /// <see cref="IIoManager.AddAssociatedTiledTilesetPath"/>) so every future save syncs this
-        /// project's animation chains into that Tiled tileset. No-op if the project has never been
-        /// saved (<c>ProjectManager.FileName</c> is null) or the path is already associated.
-        /// </summary>
-        /// <exception cref="InvalidOperationException"><paramref name="tsxAbsolutePath"/> is
-        /// currently open as a native-tsx project in another tab (see
-        /// <see cref="IsTsxPathOpenAsNativeProject"/>, issue #1147) -- a .tsx cannot be both a
-        /// native-tsx project and an achx-push target at the same time. Also thrown when the open
-        /// project is a native .tsx.</exception>
-        /// <remarks>Also throws when the association could not be stored: see
-        /// <see cref="IIoManager.AddAssociatedTiledTilesetPath"/>.</remarks>
-        void AddAssociatedTiledTileset(string tsxAbsolutePath);
-
-        /// <summary>
-        /// Shows an open-file dialog (via <see cref="FileDialogService"/>) for the user to pick a
-        /// <c>.tsx</c> file, then associates it via <see cref="AddAssociatedTiledTileset"/>. The
-        /// "Associate Tiled Tileset…" menu command. No-op if the dialog is cancelled.
-        /// Unlike <see cref="AddAssociatedTiledTileset"/>, a failure here (including a project that
-        /// has never been saved, which shows no dialog) is reported via <see cref="TiledSyncFailed"/>
-        /// rather than thrown, since this method is the fire-and-forget UI entry point.
-        /// </summary>
-        Task AddAssociatedTiledTilesetViaDialogAsync();
-
-        /// <summary>
-        /// Host-supplied check for whether <c>tsxPath</c> (an absolute path) is currently open as a
-        /// native-tsx project -- either the active tab (<see
-        /// cref="IProjectManager.IsNativeTsxProject"/>) or a backgrounded one. <see
-        /// langword="null"/> when the host hasn't wired tab awareness, which <see
-        /// cref="AddAssociatedTiledTileset"/> treats as "not open anywhere" (same permissive-default
-        /// pattern as <see cref="CanvasDefaultTexturePath"/>). Used to refuse pointing a
-        /// <c>.tiledsync</c> association at a <c>.tsx</c> while it's open natively (issue #1147) --
-        /// the symmetric block to <c>ProjectManager.LoadTsxProject</c> refusing to open a <c>.tsx</c>
-        /// that already has such an association.
-        /// </summary>
-        Func<string, bool>? IsTsxPathOpenAsNativeProject { get; set; }
-
-        /// <summary>
-        /// Raised when syncing to one associated .tsx tileset fails after a save (missing file, an
-        /// unsupported <c>TsxWriter</c> feature, etc.), or when the .tiledsync companion file
-        /// itself exists but fails to parse (see <see cref="IIoManager.TiledSyncParseFailed"/>).
-        /// The first argument is the .tsx (or .achx, for a .tiledsync parse failure) path; the
-        /// second is the exception. A failure here never affects the .achx save itself, which has
-        /// already completed by the time this fires -- the app layer should surface it as a
-        /// non-blocking toast/log entry, not retry the .achx save.
-        /// </summary>
-        event Action<string, Exception>? TiledSyncFailed;
-
-        /// <summary>
-        /// Raised when syncing to one associated .tsx tileset actually writes a change (see
-        /// <see cref="Tiled.TilesetAnimationSyncResult.Changed"/>) -- not on every sync, since
-        /// autosave runs this on nearly every edit and most saves have nothing new to write; firing
-        /// on every one would be a meaningless constant flicker rather than useful confirmation.
-        /// The first argument is the .tsx path; the second is how many chains were applied. Pairs
-        /// with <see cref="TiledSyncFailed"/> for a UI status indicator that needs both outcomes.
-        /// </summary>
-        event Action<string, int>? TiledSyncSucceeded;
-
-        /// <summary>
-        /// Raised after a save whose sync left something out of an associated .tsx, with one message per problem,
-        /// each starting with the .tsx's path relative to the saved file. Comes after every <see cref="TiledSyncSucceeded"/>
-        /// of the save and before any <see cref="TiledSyncFailed"/>, so a status indicator that shows the last event shows
-        /// the worst one. The next save, of any file, first raises it with an empty list to take the warning back.
-        /// </summary>
-        event Action<IReadOnlyList<string>>? TiledSyncWarned;
     }
 }

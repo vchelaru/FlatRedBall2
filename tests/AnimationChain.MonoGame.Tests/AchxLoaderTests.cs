@@ -280,6 +280,20 @@ public class AchxLoaderTests
     }
 
     [Fact]
+    public void TryReload_TwoChainsShareAName_EachTakesItsOwnFramesAndFlags()
+    {
+        const string frame = "<Frame><FrameLength>0.1</FrameLength></Frame>";
+        string Xml(string secondChain) => "<AnimationChainArraySave><AnimationChain><Name>Walk</Name>" + frame + "</AnimationChain>"
+            + "<AnimationChain><Name>Walk</Name>" + secondChain + "</AnimationChain></AnimationChainArraySave>";
+        var list = AnimationChainListSave.FromString(Xml(frame)).ToAnimationChainList(_ => null);
+        using var reloadStream = new MemoryStream(Encoding.UTF8.GetBytes(Xml("<Loop>false</Loop><PingPong>true</PingPong><Reverse>true</Reverse>" + frame + frame)));
+
+        Assert.True(list.TryReload(reloadStream, _ => null));
+
+        Assert.Equal(new[] { (1, true, false, false), (2, false, true, true) }, list.Select(c => (c.Count, c.Loop, c.PingPong, c.Reversed)));
+    }
+
+    [Fact]
     public void TryReloadFrom_Stream_InvalidXml_ReturnsFalseAndLeavesListUntouched()
     {
         var list = AnimationChainListSave.FromFile("dummy.achx", XmlStream(SimpleAchx))
@@ -576,5 +590,17 @@ public class AchxLoaderTests
             openFile: _ => throw new InvalidOperationException());
 
         Assert.Null(stream);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_LongFrameLength_IsTheDecimalTheFileHolds()
+    {
+        // 10.1f widens to 10.1000003815, ticks past the 10.1 the file holds.
+        var chain = new AnimationChainSave { Name = "a" };
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 10.1f });
+
+        var list = new AnimationChainListSave { AnimationChains = { chain } }.ToAnimationChainList(_ => null);
+
+        Assert.Equal(101_000_000, list[0][0].FrameLength.Ticks);
     }
 }
