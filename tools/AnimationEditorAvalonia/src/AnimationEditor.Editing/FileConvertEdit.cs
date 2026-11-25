@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Conversions;
 using AnimationEditor.Core.IO;
 using FlatRedBall2.AnimationEditorCommon;
 
@@ -6,7 +7,8 @@ namespace AnimationEditor.Editing;
 /// <summary>
 /// Converts an animation file between <c>.achx</c> (XML) and <c>.achj</c> (JSON) next to the source (#1811).
 /// Only the serialization changes: coordinates, unit, texture names and every frame value are written as parsed.
-/// Never overwrites the target and never touches the source.
+/// Never overwrites the target and never touches the source. A file the other format cannot hold exactly is refused
+/// (<see cref="EditErrorCode.WouldLoseData"/>), with the check Convert to .achj uses (<see cref="ConversionLoss"/>).
 /// </summary>
 public static class FileConvertEdit
 {
@@ -40,7 +42,11 @@ public static class FileConvertEdit
             return Fail(EditErrorCode.AlreadyExists, $"{Path.GetFileName(target)} already exists; remove it first.");
         try
         {
-            AnimationChainListSave.FromJsonFile(path).Save(target);
+            var text = File.ReadAllText(path);
+            var list = AnimationChainListSave.FromJsonString(text);
+            if (ConversionLoss.ToAchx(text, list) is { } loss)
+                return Fail(EditErrorCode.WouldLoseData, Refusal(Path.GetFileName(path), loss));
+            list.Save(target);
             return new EditResult([target], [], []);
         }
         catch (Exception ex)
@@ -49,6 +55,9 @@ public static class FileConvertEdit
             return Fail(EditErrorCode.IoFailed, $"Could not convert {Path.GetFileName(path)}: {ex.Message}");
         }
     }
+
+    internal static string Refusal(string name, ConversionLoss loss) =>
+        $"{name} is not converted: {loss.What}{(loss.Where is null ? "" : $" ({loss.Where})")} would not be kept. Remove or change it first.";
 
     private static EditResult Fail(EditErrorCode code, string message) => new([], [message], [], [code]);
 }

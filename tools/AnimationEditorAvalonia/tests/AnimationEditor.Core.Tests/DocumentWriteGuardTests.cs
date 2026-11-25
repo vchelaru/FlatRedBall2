@@ -70,6 +70,7 @@ public class DocumentWriteGuardTests
         ["CleanShutdownMarker.Write"] = "diagnostics",
         ["FileLogger.Append"] = "diagnostics",
         ["SingleInstanceServer.SendToRunningInstanceAsync"] = "a pipe to the running editor",
+        ["ConversionLoss.ToAchx"] = "memory, read back to compare",
         ["PreviewControl.BuildPolygonPath"] = "draws a path (SKPath.MoveTo)",
         ["CrashLogging.IsDirectoryWritable"] = "diagnostics",
         ["LogRotation.RotateIfLarge"] = "diagnostics",
