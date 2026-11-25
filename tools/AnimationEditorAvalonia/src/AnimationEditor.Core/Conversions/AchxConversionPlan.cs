@@ -105,12 +105,15 @@ public sealed record AchxConversionPlan(
 
             var list = AnimationFileLoader.Parse(text, new FilePath(source));
             var document = XDocument.Parse(text);
-            if (check.FirstUnread(document, list) is { } unread)
-                return skipped with { Problem = new($"{unread} would be lost", $"The AnimationEditor does not read {unread}, so the .achj would not hold it.") };
-            if (AnimationListComparison.FirstDifference(list, AnimationChainListSave.FromJsonString(list.ToJsonString())) is { } difference)
-                return skipped with { Problem = new($"Not exact: {difference}", "The .achj would not hold the same data there.") };
+            if (ConversionLoss.ToAchj(document, list, check) is { } loss)
+                return skipped with
+                {
+                    Problem = loss.Where is null
+                        ? new($"{loss.What} would be lost", $"The AnimationEditor does not read {loss.What}, so the .achj would not hold it.")
+                        : new($"Not exact: {loss.Where}", "The .achj would not hold the same data there."),
+                };
             return new PlannedFile(source, target, null, list.AnimationChains.Count,
-                list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits, document.DescendantNodes().OfType<XComment>().Any(), content);
+                list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits, AchxElementCheck.HasComments(document), content);
         }
         catch (Exception ex)
         {
