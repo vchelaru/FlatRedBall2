@@ -61,6 +61,8 @@ public enum EditErrorCode
     UsageError,
     /// <summary>The edits applied, but the result would have a check error, so nothing was written.</summary>
     WouldBreakFile,
+    /// <summary>The file holds something the format to convert it to cannot keep, so nothing was written.</summary>
+    WouldLoseData,
 }
 
 /// <summary>

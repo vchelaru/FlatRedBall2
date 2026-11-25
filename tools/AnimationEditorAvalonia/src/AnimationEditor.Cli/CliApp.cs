@@ -15,7 +15,7 @@ public static class CliApp
           describe <file> [--chain|--sequence|--track <glob>] [--summary] [--json]  chains, frames and shapes of an .achx/.achj; sequences, tracks and blocks of a .seqj
           check <file> [--json]                  validate; exit 1 on errors
           new <file> [--json]                    create an empty .achx/.achj/.seqj
-          convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source
+          convert <file> --to achj|achx [--json] write the other format next to it; never overwrites, keeps the source, refuses a file it cannot convert exactly
           edit <file> --ops <ops.json> [--json]  apply an ordered operations file; writes nothing unless all succeed
           edit <file> --op "<op> <address> key=value ..." [--op ...] [--json]   same, inline (see --schema); --ops - reads the file from stdin
           render <file> --out <dir> [options]    write PNGs of a sequence (--sequence <name> --at 0,2.2 [--pass <n>]) or a chain (--chain <name> --frame 0 | --at 0.3)

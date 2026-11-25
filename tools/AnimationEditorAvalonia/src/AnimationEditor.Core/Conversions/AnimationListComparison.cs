@@ -1,5 +1,6 @@
 using FlatRedBall2.AnimationEditorCommon;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
 namespace AnimationEditor.Core.Conversions;
@@ -25,6 +26,46 @@ public static class AnimationListComparison
             return frame < 0 ? chain : $"{chain}, frame {frame + 1}";
         }
         return "the settings of the file";
+    }
+
+    /// <summary>The first element that differs where <see cref="FirstDifference"/> finds a difference: "&lt;ColorKey&gt;".</summary>
+    internal static string FirstDifferingElement(AnimationChainListSave original, AnimationChainListSave other) =>
+        $"<{FirstDiffering(Fields(original), Fields(other)).Name.LocalName}>";
+
+    private static XElement FirstDiffering(XElement from, XElement to)
+    {
+        foreach (var group in from.Elements().GroupBy(element => element.Name))
+        {
+            var pairs = to.Elements(group.Key).ToList();
+            int i = 0;
+            foreach (var element in group)
+            {
+                if (i == pairs.Count) return element;
+                var pair = pairs[i++];
+                if (!XNode.DeepEquals(element, pair)) return FirstDiffering(element, pair);
+            }
+        }
+        return from;
+    }
+
+    /// <summary>
+    /// The path of the first property, as the <c>.achj</c> format writes them, that differs ("animationChains[0].name"), or
+    /// null when none does. Unlike an <c>.achx</c>, an <c>.achj</c> keeps every text as it is.
+    /// </summary>
+    internal static string? FirstDifferingProperty(AnimationChainListSave original, AnimationChainListSave other) =>
+        FirstDiffering(JsonNode.Parse(original.ToJsonString())!, JsonNode.Parse(other.ToJsonString()))?.GetPath()[2..];
+
+    private static JsonNode? FirstDiffering(JsonNode from, JsonNode? to)
+    {
+        if (JsonNode.DeepEquals(from, to)) return null;
+        var inside = (from, to) switch
+        {
+            (JsonObject properties, JsonObject others) => properties.Where(property => property.Value is not null)
+                .Select(property => FirstDiffering(property.Value!, others[property.Key])),
+            (JsonArray items, JsonArray others) when items.Count == others.Count => items.Zip(others, (item, pair) => FirstDiffering(item!, pair)),
+            _ => [],
+        };
+        return inside.FirstOrDefault(node => node is not null) ?? from;
     }
 
     // An .achx writes an empty text as an empty element or as none, whichever it was read as, and both mean the same.

@@ -15,6 +15,9 @@ public sealed class AchxElementCheck
     // By the element's path, such as "AnimationChainArraySave/AnimationChain/Frame/RelativeX".
     private readonly ConcurrentDictionary<string, bool> _isRead = new();
 
+    /// <summary>Whether <paramref name="source"/> has XML comments, which no save keeps.</summary>
+    public static bool HasComments(XDocument source) => source.DescendantNodes().OfType<XComment>().Any();
+
     /// <summary>
     /// The first element or attribute of <paramref name="source"/> that <paramref name="list"/>, read from it, does not hold:
     /// "&lt;Custom&gt;", or null. An element without any content holds nothing to lose.
@@ -24,37 +27,56 @@ public sealed class AchxElementCheck
 
     private string? FirstUnread(XElement source, XElement written)
     {
-        if (source.Attributes().FirstOrDefault(attribute => !attribute.IsNamespaceDeclaration && attribute.Name.Namespace != Xsi) is { } unread)
-            return $"the attribute {unread.Name.LocalName}";
+        if (UnreadAttribute(source) is { } unread) return unread;
         foreach (var group in source.Elements().GroupBy(element => element.Name))
         {
             var pairs = written.Elements(group.Key).ToList();
             int i = 0;
             foreach (var element in group)
             {
-                // What is written back is compared inside. What is not is a default, left out, when it is read at all.
+                // What is written back is compared inside. What is not is a default, left out, or in another element, when it is read at all.
                 if (i < pairs.Count)
                 {
                     if (FirstUnread(element, pairs[i++]) is { } inside) return inside;
                 }
-                else if (HasContent(element) && (pairs.Count > 0 || !IsRead(element)))
+                else if (HasContent(element))
                 {
-                    return $"<{element.Name.LocalName}>";
+                    if (pairs.Count > 0) return $"<{element.Name.LocalName}>";
+                    if (FirstUnreadByProbing(element) is { } inside) return inside;
                 }
             }
         }
         return null;
     }
 
+    private string? FirstUnreadByProbing(XElement element)
+    {
+        if (!IsRead(element)) return $"<{element.Name.LocalName}>";
+        if (UnreadAttribute(element) is { } unread) return unread;
+        return element.Elements().Where(HasContent).Select(FirstUnreadByProbing).FirstOrDefault(inside => inside is not null);
+    }
+
+    private static string? UnreadAttribute(XElement element) =>
+        element.Attributes().FirstOrDefault(attribute => !attribute.IsNamespaceDeclaration && attribute.Name.Namespace != Xsi) is { } unread
+            ? $"the attribute {unread.Name.LocalName}"
+            : null;
+
     private static bool HasContent(XElement element) => element.HasElements || element.HasAttributes || element.Value.Length > 0;
 
-    private bool IsRead(XElement element) => _isRead.GetOrAdd(
-        string.Join('/', element.AncestorsAndSelf().Reverse().Select(part => part.Name)), _ => ChangesWhatIsRead(element));
+    private bool IsRead(XElement element)
+    {
+        string path = string.Join('/', element.AncestorsAndSelf().Reverse().Select(part => part.Name));
+        if (_isRead.TryGetValue(path, out bool known)) return known;
+        bool isRead = ChangesWhatIsRead(element);
+        // Other elements inside it may make a difference where these do not.
+        return isRead || !element.HasElements ? _isRead[path] = isRead : isRead;
+    }
 
-    // An element is read when some value of it makes a difference, which an unreadable value does too.
+    // An element is read when some value of it makes a difference, which an unreadable value does too, or the elements inside it do.
     private static bool ChangesWhatIsRead(XElement element)
     {
         string? without = Read(element, null);
+        if (element.HasElements && Read(element.Document!.Root!) != without) return true;
         return without is null || new[] { "7", "true", "false", "x" }.Any(value => Read(element, value) != without);
     }
 
@@ -67,6 +89,11 @@ public sealed class AchxElementCheck
         var root = copy.AncestorsAndSelf().Last();
         if (value is null) copy.Remove();
         else copy.ReplaceNodes(value);
+        return Read(root);
+    }
+
+    private static string? Read(XElement root)
+    {
         try
         {
             return AnimationChainListSave.FromString(root.ToString()).ToXmlString();
