@@ -66,4 +66,42 @@ public class SplashFormatTests : IDisposable
         var stored = (1234.5678f + 2f).ToString("R", CultureInfo.InvariantCulture);
         File.ReadAllText(path).ShouldContain($"<{element}>{stored}</{element}>");
     }
+
+    [Fact]
+    public async Task Check_UnnamedShape_IsAnError()
+    {
+        var r = await _w.RunAsync("check", Achx(Shape("CircleSave", "<Name />")));
+
+        r.Code.ShouldBe(1, r.Out);
+        r.Out.ShouldContain("A circle in frame A/0 has no name.");
+    }
+
+    [Fact]
+    public async Task Check_ShapeNameUsedForTwoKinds_IsAnError()
+    {
+        var r = await _w.RunAsync("check", Achx(Shape("CircleSave", "<Name>Hit</Name>"), Shape("AxisAlignedRectangleSave", "<Name>Hit</Name>")));
+
+        r.Code.ShouldBe(1, r.Out);
+        r.Out.ShouldContain("'Hit' is used for a circle (frame A/0) and a rect (frame A/1)");
+    }
+
+    [Fact]
+    public async Task Check_ShapeNameUsedForOneKindInSeveralFrames_IsOk()
+    {
+        var r = await _w.RunAsync("check", Achx(Shape("CircleSave", "<Name>Hit</Name>"), Shape("CircleSave", "<Name>Hit</Name>")));
+
+        r.Code.ShouldBe(0, r.Out);
+    }
+
+    [Fact]
+    public async Task Edit_MakesAShapeNameTwoKinds_IsRefused()
+    {
+        var path = Achx(Shape("CircleSave", "<Name>Hit</Name>"), "");
+        var before = File.ReadAllText(path);
+
+        var r = await _w.RunAsync("edit", path, "--op", "add-shape A/1 type=rect name=Hit");
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        File.ReadAllText(path).ShouldBe(before);
+    }
 }
