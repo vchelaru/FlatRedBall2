@@ -112,6 +112,8 @@ public class ProjectConvertUnsavedScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
         UnusualProjectScenarioTests.MakeWritable(hero);
+        // The live watcher's banner about the change can come after the convert's and replace it.
+        editor.Services.AppCommands.HotReloadWatcher.IsEnabled = false;
         File.AppendAllText(hero, "<!-- edited elsewhere -->");
         string heroText = File.ReadAllText(hero);
 
