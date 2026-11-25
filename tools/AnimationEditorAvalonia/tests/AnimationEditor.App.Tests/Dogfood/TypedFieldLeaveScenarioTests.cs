@@ -271,17 +271,61 @@ public class TypedFieldLeaveScenarioTests
         }
     }
 
-    [AvaloniaFact]
-    public async Task CtrlZ_WhileTypingALength_TakesTheTypedLengthBack()
+    // "* 0" makes both frames equal, so the box that was blank for "(mixed)" reads as a blank channel until it is refilled.
+    [AvaloniaTheory]
+    [InlineData("PropRed", "row")]
+    [InlineData("PropRed", "tab click")]
+    [InlineData("PropRed", "Enter")]
+    [InlineData("PropAlpha", "row")]
+    [InlineData("PropAlpha", "tab click")]
+    [InlineData("PropAlpha", "Enter")]
+    public async Task ARelativeColorEditThatMakesMixedFramesEqual_IsOneStep_AndClearsNothing(string field, string way)
+    {
+        using var editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        string other = WriteFixture(editor, "other.achx");
+        await editor.OpenAsync(other);
+        await editor.OpenAsync(hero);
+        var frames = editor.ChainNamed("Walk").Frames;
+        (frames[0].Alpha, frames[1].Alpha) = (10, 20);
+
+        Begin(editor, field, "* 0", both: true);
+        if (way == "row") editor.ClickRow(editor.ChainNamed("Walk"));
+        else if (way == "Enter") editor.Press(Key.Enter);
+        else editor.ClickTab("other.achx");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+        if (way == "tab click") editor.ClickTab("hero.achx");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+
+        frames.Select(f => field == "PropRed" ? f.Red : f.Alpha).ShouldBe(new int?[] { 0, 0 });
+        editor.UndoLabels.Count.ShouldBe(1);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("PropFrameLen", "Ctrl+Z")]
+    [InlineData("PropFrameLen", "Ctrl+Y")]
+    [InlineData("PropFrameLen", "F3")]
+    [InlineData("PropRed", "Ctrl+Z")]
+    [InlineData("PropRed", "Ctrl+Y")]
+    [InlineData("PropRed", "F3")]
+    [InlineData("EventName", "Ctrl+Z")]
+    [InlineData("EventName", "Ctrl+Y")]
+    public async Task AHotkeyThatDoesNotLeaveTheDocument_CommitsNoTypedField(string field, string hotkey)
     {
         using var editor = new AnimationEditorHarness();
         string hero = WriteFixture(editor);
         await editor.OpenAsync(hero);
+        Begin(editor, "PropRelX", "9");
+        editor.Press(Key.Enter);
+        if (hotkey == "Ctrl+Y") editor.Press(Key.Z, RawInputModifiers.Control);
 
-        Begin(editor, "PropFrameLen", "0.5");
-        editor.Press(Key.Z, RawInputModifiers.Control);
+        Begin(editor, field, "0.5");
+        if (hotkey == "F3") editor.Press(Key.F3);
+        else editor.Press(hotkey == "Ctrl+Z" ? Key.Z : Key.Y, RawInputModifiers.Control);
 
-        Saved(hero)[0].FrameLength.ShouldBe(0.1f);
-        editor.UndoLabels.ShouldBeEmpty();
+        var frame = editor.ChainNamed("Walk").Frames[0];
+        (frame.FrameLength, frame.Red, frame.Events[0].Name).ShouldBe((0.1f, 10, "Step"));
+        frame.RelativeX.ShouldBe(hotkey == "Ctrl+Z" ? 1f : 9f);
+        editor.UndoManager.CanRedo.ShouldBe(hotkey == "Ctrl+Z");
     }
 }
