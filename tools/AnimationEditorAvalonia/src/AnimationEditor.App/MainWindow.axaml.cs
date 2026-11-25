@@ -46,6 +46,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -1015,9 +1016,16 @@ public partial class MainWindow : Window
     {
         // Closing the active tab moves the user to another one, which is a history entry.
         using var navigation = _navigation.BeginUserAction();
-        var toClose = await PaneFor(tab).PrepareCloseAsync(tab);
+        var toClose = await PrepareCloseAsync(tab);
         if (toClose is not null)
             await CloseTabCoreAsync(toClose);
+    }
+
+    // What is typed is part of the document that is asked about, saved or dropped.
+    private Task<TabEntry?> PrepareCloseAsync(TabEntry tab)
+    {
+        SettlePendingInput();
+        return PaneFor(tab).PrepareCloseAsync(tab);
     }
 
     private async Task CloseTabCoreAsync(TabEntry tab)
@@ -2532,6 +2540,7 @@ public partial class MainWindow : Window
         var absolutePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (absolutePath is null) return;
 
+        SettlePendingInput(); // now, because closing the tab of the deleted file must not write it again
         var fileName = new FilePath(absolutePath).NoPath;
         bool confirmed = await _appCommands.ConfirmAsync(
             $"Delete \"{fileName}\"? This cannot be undone.", "Delete File");
@@ -2650,6 +2659,7 @@ public partial class MainWindow : Window
     {
         if (IsConverting) return; // picked again while it is planned
         IsConverting = true;
+        SettlePendingInput(); // as in DeleteProjectFileAsync
         try
         {
             var folder = _projectManager.ProjectFolderPath!;
@@ -3059,6 +3069,7 @@ public partial class MainWindow : Window
 
     private void CloseProject(bool closeAllTabs)
     {
+        SettlePendingInput();
         var activeBefore = _tabManager.ActiveTab;
         if (closeAllTabs)
             _tabManager.RestoreFrom(Array.Empty<string>(), null);
@@ -5950,6 +5961,7 @@ public partial class MainWindow : Window
             if (RefuseUnstorable(name, current.Name) || RefuseUnstorable(data, current.Data)) return;
             _appCommands.SetFrameEvent(frame, index, name, data);
         };
+        _commitTyped.Add(PropFrameEvents, PropFrameEvents.CommitTypedText);
         PropFrameEvents.RemoveRequested += index =>
         {
             if (_selectedState.SelectedFrame is { } frame) _appCommands.RemoveFrameEvent(frame, index);
@@ -6036,14 +6048,22 @@ public partial class MainWindow : Window
         finally { _committing = outer; }
     }
 
+    // Per wired Inspector field, what Enter in it commits, for the ways of leaving the document that take no focus off it.
+    private readonly ConditionalWeakTable<Control, Action> _commitTyped = new();
+
     // Commits as the value changes, so the canvas follows the typing.
     private void CommitLive(Action apply, params Control[] fields)
     {
         foreach (var field in fields)
         {
-            if (field is FlankerNumericField flanker) flanker.ValueChanged += (_, _) => CommitField(field, apply);
+            if (field is FlankerNumericField flanker)
+            {
+                flanker.ValueChanged += (_, _) => CommitField(field, apply);
+                _commitTyped.Add(flanker, () => flanker.CommitText(flanker.TypedText));
+            }
             else if (field is NumericUpDown box)
             {
+                _commitTyped.Add(box, () => NumericExpressionInput.Commit(box));
                 box.ValueChanged += (_, _) => CommitField(field, apply);
                 // A cleared box commits nothing, so leaving it shows the value again.
                 box.LostFocus += (_, _) => { if (box.Value is null) RefreshPropertyPanel(); };
@@ -6060,6 +6080,11 @@ public partial class MainWindow : Window
         {
             field.LostFocus += (_, _) => CommitField(field, apply);
             field.KeyDown   += (_, e) => { if (e.Key == Key.Enter) CommitField(field, apply); };
+            _commitTyped.Add(field, () =>
+            {
+                NumericExpressionInput.Commit(field);
+                CommitField(field, apply);
+            });
         }
         CommitRelativeEdits(apply, fields);
     }
@@ -6082,6 +6107,7 @@ public partial class MainWindow : Window
     {
         box.LostFocus += (_, _) => CommitName(box);
         box.KeyDown   += (_, e) => { if (e.Key == Key.Enter) CommitName(box); };
+        _commitTyped.Add(box, () => CommitName(box));
     }
 
     // A box still holding the text it was given commits nothing.
@@ -7370,7 +7396,7 @@ public partial class MainWindow : Window
         if (IsUntitledTab(tab)) return;
         var filePath = tab.Path.FullPath;
         // Detaching closes the tab here, so a .seqj whose last save failed asks first, as closing it does.
-        if (await PaneFor(tab).PrepareCloseAsync(tab) is not { } toClose) return;
+        if (await PrepareCloseAsync(tab) is not { } toClose) return;
         await CloseTabCoreAsync(toClose);
         var window = DetachedWindowFactory();
         window.Show();
@@ -8898,15 +8924,20 @@ public partial class MainWindow : Window
         CommitInlineRename(vm, newName);
 
     /// <summary>
-    /// Applies the text typed into the inspector's name or texture box while it still has the focus, as Enter would.
-    /// Those boxes otherwise commit only on Enter or focus loss, which a tab switch, Ctrl+S, back/forward or opening
-    /// another file does not cause. The Apply methods read the selection, so this runs before the selection changes.
+    /// Applies what is typed into the Inspector field that has the focus, as Enter would. A field otherwise commits its
+    /// text on Enter or focus loss, which a tab switch, Ctrl+S, back/forward or opening another file does not cause. The
+    /// Apply methods read the selection, so this runs before the selection changes.
     /// </summary>
-    private void CommitPendingInspectorName()
+    private void CommitPendingInspectorField()
     {
-        object? focused = FocusManager?.GetFocusedElement();
-        if (focused is TextBox box && new[] { PropChainName, PropRectName, PropCircleName, PropPolygonName, PropShapesName, PropTextureName }.Contains(box))
-            CommitName(box);
+        if (FocusManager?.GetFocusedElement() is not Avalonia.Visual focused) return;
+        foreach (var control in focused.GetSelfAndVisualAncestors().OfType<Control>())
+        {
+            if (!_commitTyped.TryGetValue(control, out var commit)) continue;
+            commit();
+            _appCommands.SealPendingEdits();
+            return;
+        }
     }
 
     /// <summary>The ANIMATIONS tree nodes whose in-place rename box is open.</summary>
@@ -8932,7 +8963,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void CommitPendingTreeRename()
     {
-        CommitPendingInspectorName();
+        CommitPendingInspectorField();
         foreach (var vm in EditingTreeNodes())
             CommitInlineRename(vm, vm.EditingText);
     }

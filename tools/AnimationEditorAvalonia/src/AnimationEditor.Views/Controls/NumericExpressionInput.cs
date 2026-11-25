@@ -42,6 +42,12 @@ public static class NumericExpressionInput
         TemplatedControl.TemplateAppliedEvent.AddClassHandler<NumericUpDown>(Attach);
     }
 
+    /// <summary>Commits what is typed in <paramref name="box"/>, as Enter does.</summary>
+    public static void Commit(NumericUpDown box)
+    {
+        if (States.TryGetValue(box, out EditState? state)) state.Commit();
+    }
+
     private static void Attach(NumericUpDown box, TemplateAppliedEventArgs e)
     {
         if (!States.TryGetValue(box, out EditState? state))

@@ -1228,7 +1228,7 @@ public partial class MainWindow
                 if (_items[index].IsEditing) CommitListRename(document, index);
             }
             _window.SequenceTimeline.CommitRename();
-            // As CommitPendingInspectorName does for the .achx Inspector.
+            // As CommitPendingInspectorField does for the .achx Inspector.
             _window.SequenceInspector.CommitTypedText();
         }
 
