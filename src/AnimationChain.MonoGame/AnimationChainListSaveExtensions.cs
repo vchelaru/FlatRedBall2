@@ -85,24 +85,9 @@ public static class AnimationChainListSaveExtensions
 
                 if (frame.Texture != null)
                 {
-                    int left, top, width, height;
-                    if (save.CoordinateType == TextureCoordinateType.Pixel)
-                    {
-                        left   = (int)frameSave.LeftCoordinate;
-                        top    = (int)frameSave.TopCoordinate;
-                        width  = (int)(frameSave.RightCoordinate  - frameSave.LeftCoordinate);
-                        height = (int)(frameSave.BottomCoordinate - frameSave.TopCoordinate);
-                    }
-                    else // UV
-                    {
-                        left   = (int)(frameSave.LeftCoordinate   * frame.Texture.Width);
-                        top    = (int)(frameSave.TopCoordinate    * frame.Texture.Height);
-                        width  = (int)((frameSave.RightCoordinate  - frameSave.LeftCoordinate) * frame.Texture.Width);
-                        height = (int)((frameSave.BottomCoordinate - frameSave.TopCoordinate)  * frame.Texture.Height);
-                    }
-
-                    if (width > 0 && height > 0)
-                        frame.SourceRectangle = new PixelRectangle(left, top, width, height);
+                    var region = PixelRectangle.FromFrame(frameSave, save.CoordinateType, frame.Texture.Width, frame.Texture.Height);
+                    if (region.Width > 0 && region.Height > 0)
+                        frame.SourceRectangle = region;
                 }
 
                 AppendShapes(frame, frameSave.ShapesSave);
