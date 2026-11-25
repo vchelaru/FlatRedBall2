@@ -109,6 +109,22 @@ public class ForcedRestartScenarioTests
     }
 
     [AvaloniaFact]
+    public void RestartToUpdate_ThatFailsAfterDontSave_KeepsTheOpenDocumentRecoverable()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        NewUntitledWith(editor, "Unsaved");
+        editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Discard);
+
+        ClickRestart(editor, () => throw new IOException("the update is in use"));
+
+        bool recoverable = editor.Services.IoManager.RecoveryFileExists();
+        List<string> tabs = editor.TabLabels.ToList();
+        editor.Window.CloseWithoutPrompt();
+        tabs.ShouldBe(new[] { "Untitled" });
+        recoverable.ShouldBeTrue("the document is still open");
+    }
+
+    [AvaloniaFact]
     public void RestartToUpdate_AfterSavingTheUntitledDocument_RestoresItsTab()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();

@@ -1172,6 +1172,11 @@ public partial class MainWindow : Window
     private void RestoreRecoveredDocument(string recoveryFile)
     {
         if (_ioManager.TryReadRecoveryFile(recoveryFile) is not { } recovered) return;
+        if (recovered.AnimationChains.Count == 0)
+        {
+            _ioManager.DeleteRecoveryFile(recovered);
+            return;
+        }
         CaptureLeavingActiveTab();
         OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
         _tabManager.ActiveTab!.IsRecoveredDocument = true;
@@ -1219,7 +1224,16 @@ public partial class MainWindow : Window
                 window.SaveTabsToSettings();
                 window._appCommands.HandleApplicationClosing();
             }
-            _applicationUpdater.ApplyUpdateAndRestart();
+            try
+            {
+                _applicationUpdater.ApplyUpdateAndRestart();
+            }
+            finally
+            {
+                // Still here: it did not restart, and the documents are still open.
+                foreach (var window in windows)
+                    window._achxPane.WriteRecoveryFiles();
+            }
         }
         catch (Exception ex)
         {

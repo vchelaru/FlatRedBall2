@@ -120,6 +120,30 @@ public class CrashRecoveryScenarioTests
     }
 
     [AvaloniaFact]
+    public void AnUntitledDocumentUndoneToEmpty_DoesNotComeBack()
+    {
+        string folder = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            string recovery = Path.Combine(folder, "recovery.achx");
+            new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel }.Save(recovery);
+
+            using AnimationEditorHarness editor = new AnimationEditorHarness(recoveryFilePath: recovery);
+            editor.Wait(TimeSpan.FromMilliseconds(200));
+
+            List<string> tabs = editor.TabLabels.ToList();
+            string[] left = RecoveryFiles(editor);
+            editor.Window.CloseWithoutPrompt();
+            tabs.ShouldBeEmpty();
+            left.ShouldBeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
     public void ARecoveredDocument_IsStillRecoverableAfterASecondCrash()
     {
         string folder = Directory.CreateTempSubdirectory().FullName;

@@ -189,6 +189,13 @@ public partial class MainWindow
         /// </summary>
         private bool UntitledTabHasContent(TabEntry tab) => UntitledDocument(tab) is { AnimationChains.Count: > 0 };
 
+        /// <summary>Writes the crash-recovery file of every Untitled document with content.</summary>
+        public void WriteRecoveryFiles()
+        {
+            foreach (var tab in _window._tabManager.Tabs.Where(tab => IsUntitledTab(tab) && UntitledTabHasContent(tab)))
+                _window._ioManager.WriteRecoveryFile(UntitledDocument(tab));
+        }
+
         private AnimationChainListSave? UntitledDocument(TabEntry tab) =>
             tab == _window._tabManager.ActiveTab ? _window._projectManager.AnimationChainListSave : tab.CachedEditorModel;
 
