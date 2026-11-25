@@ -67,6 +67,7 @@ namespace AnimationEditor.Core.CommandsAndState
             // and was twice misdiagnosed while investigating issue #839. Living here instead
             // means AppCommandsSaveOnChangeTests exercises it with no Avalonia/UI involved.
             _events.AnimationChainsChanged += OnAnimationChainsChanged;
+            _undoManager.StackChanged += DeselectWhatLeftTheDocument;
 
             // A corrupt .tiledsync is a Tiled-sync problem same as a broken .tsx write -- route
             // it through the one event the UI already listens on (issue #1139) rather than
@@ -78,6 +79,23 @@ namespace AnimationEditor.Core.CommandsAndState
         // snapshot when there is no file yet, so an untitled document is covered too. Commands
         // must NOT call SaveCurrentAnimationChainList on their own as well: every edit, undo and
         // redo used to be written twice (two disk writes, two Tiled-sync pushes, two toasts).
+        // For every command, undo and redo: a command only knows the items it removes, not what else inside them is selected.
+        private void DeselectWhatLeftTheDocument()
+        {
+            if (_pm.AnimationChainListSave is not { } acls) return;
+            var frames = acls.AnimationChains.SelectMany(c => c.Frames).ToList();
+            var present = acls.AnimationChains.Cast<object>().Concat(frames)
+                .Concat(frames.SelectMany(f => f.ShapesSave?.Shapes ?? [])).ToHashSet();
+
+            _selectedState.SelectedNodes = _selectedState.SelectedNodes.Where(present.Contains).ToList();
+            if (_selectedState.SelectedChain is { } chain && !present.Contains(chain))
+                _selectedState.SelectedChain = null;
+            if (_selectedState.SelectedFrame is { } frame && !present.Contains(frame))
+                _selectedState.SelectedFrame = null;
+            if (_selectedState.SelectedShape is { } shape && !present.Contains(shape))
+                _selectedState.SelectShape(null);
+        }
+
         private void OnAnimationChainsChanged()
         {
             if (AutosaveOnChange) SaveCurrentAnimationChainList();
@@ -1998,7 +2016,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 var invertedName = ChainFlipNaming.Rename(source.Name, flip, source.Frames);
                 // Duplicates increment the trailing number (Walk -> Walk2, Walk2 -> Walk3, Id0 -> Id1)
                 // so repeated duplicates never stack a suffix. Only an unnumbered name skips 1.
-                bool numbered = invertedName.Length > 0 && char.IsDigit(invertedName[^1]);
+                bool numbered = invertedName.Length > 0 && char.IsAsciiDigit(invertedName[^1]);
                 copy.Name = StringFunctions.MakeStringUnique(invertedName, existingNames, numbered ? 1 : 2);
                 existingNames.Add(copy.Name);
                 items.Add((source, copy));
