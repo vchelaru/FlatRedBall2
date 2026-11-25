@@ -55,7 +55,7 @@ public class SequenceDuplicateAndPasteTests
         var document = SequenceDocument.Load(path);
         var undo = new UndoManager();
 
-        string name = document.DuplicateSequences(undo, new[] { 0 }).Single();
+        string name = document.DuplicateSequences(undo, new[] { 0 }).Names.Single();
 
         name.ShouldBe("Idle 2");
         Names(document).ShouldBe(new[] { "Idle", "Idle 2", "Attack" });
@@ -96,7 +96,7 @@ public class SequenceDuplicateAndPasteTests
         string path = WriteSeqj(dir.Path, "boss.seqj", SaveWith(new string[0], Sequence("Idle"), Sequence("Idle 2")));
         var document = SequenceDocument.Load(path);
 
-        document.DuplicateSequences(new UndoManager(), new[] { 1 }).ShouldBe(new[] { "Idle 3" });
+        document.DuplicateSequences(new UndoManager(), new[] { 1 }).Names.ShouldBe(new[] { "Idle 3" });
 
         Names(document).ShouldBe(new[] { "Idle", "Idle 2", "Idle 3" });
     }
