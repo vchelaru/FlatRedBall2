@@ -186,7 +186,7 @@ public static class SequenceDescriber
             bool missingSource = !sources.IsListed(block.Source) || sources.Chains(block.Source) is null;
             bool missingChain = !missingSource && !sources.HasChain(block);
             double played = SequenceTimeline.PlayedLength(track, block, sources.CycleLength(block));
-            result.Add(new BlockInfo(i, block.Source, block.Chain, null, block.Start, block.Length, block.Start + played, missingSource, missingChain, sources.CycleLength(block)));
+            result.Add(new BlockInfo(i, block.Source, block.Chain, null, block.Start, block.Length, block.Start + played, missingSource, missingChain, sources.CycleLength(block) ?? 0));
         }
         return result;
     }

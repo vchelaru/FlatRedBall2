@@ -12,7 +12,7 @@ namespace AnimationEditor.Core.Rendering;
 public static class ChainClock
 {
     /// <summary>
-    /// Length of one cycle in seconds (unset lengths count as 0.1s): the sum of the chain's frames, or twice that under
+    /// Length of one cycle in seconds (0 when every frame is skipped): the sum of the chain's frames, or twice that under
     /// <see cref="AnimationChainSave.PingPong"/>.
     /// </summary>
     public static double TotalLength(AnimationChainSave chain, FrameLengthUnit unit)
@@ -22,6 +22,13 @@ public static class ChainClock
             total += PlaybackController.FrameSeconds(frame, unit);
         return PlaybackTimeline.CycleLength(total, chain.PingPong);
     }
+
+    /// <summary>
+    /// <see cref="TotalLength"/> as <see cref="SequenceTimeline"/> takes it: null for a chain that is missing or has no frames,
+    /// which never plays, and 0 for one whose frames are all skipped.
+    /// </summary>
+    public static double? CycleLength(AnimationChainSave? chain, FrameLengthUnit unit) =>
+        chain is { Frames.Count: > 0 } ? TotalLength(chain, unit) : null;
 
     /// <summary>
     /// The frame showing <paramref name="time"/> seconds after the chain starts, and the forward seconds into

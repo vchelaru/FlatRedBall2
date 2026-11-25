@@ -63,6 +63,33 @@ public class AppCommandsSaveOnChangeTests
         }
     }
 
+    // A delete of several things is one edit, however many commands it is made of.
+    [Fact]
+    public void Delete_AcrossAnimationsOrKinds_SavesExactlyOnce()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var tmpPath = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N") + ".achx");
+        ctx.ProjectManager.FileName = tmpPath;
+        var walk = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var run = TestHelpers.MakeChain(ctx.Acls, "Run", 2);
+        var saves = 0;
+        ctx.AppCommands.EditorProjectModelChanged += _ => saves++;
+
+        try
+        {
+            ctx.AppCommands.DeleteFrames([walk.Frames[0], run.Frames[0]]);
+            Assert.Equal(1, saves);
+            ctx.UndoManager.Undo();
+            Assert.Equal(2, saves);
+            ctx.AppCommands.DeleteSelection([run], [walk.Frames[0]], []);
+            Assert.Equal(3, saves);
+        }
+        finally
+        {
+            if (File.Exists(tmpPath)) File.Delete(tmpPath);
+        }
+    }
+
     // An untitled document has no file to autosave to; the crash-recovery snapshot is what
     // stands in for it, and the event path must write it just like the commands used to.
     [Fact]

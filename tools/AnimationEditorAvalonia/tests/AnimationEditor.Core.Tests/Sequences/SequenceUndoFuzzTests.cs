@@ -127,7 +127,7 @@ public class SequenceUndoFuzzTests
         for (int i = 0; i < 80; i++) RandomEdit(document, undo, random);
 
         double Length(SequenceSave s) => document.SequenceLength(document.Save.Sequences.IndexOf(s));
-        double Cycle(SequenceChainReferenceSave r) => document.CycleLength(r) ?? 0;
+        double? Cycle(SequenceChainReferenceSave r) => document.CycleLength(r);
         for (int s = 0; s < document.Save.Sequences.Count; s++)
         {
             var sequence = document.Save.Sequences[s];

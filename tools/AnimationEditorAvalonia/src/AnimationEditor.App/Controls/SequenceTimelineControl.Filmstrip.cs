@@ -22,10 +22,10 @@ public sealed partial class SequenceTimelineControl
         set => _filmstrip.Thumbnails = value;
     }
 
-    /// <summary>The cells <paramref name="block"/>'s filmstrip draws at the current zoom; empty for a missing or empty chain.</summary>
+    /// <summary>The cells <paramref name="block"/>'s filmstrip draws at the current zoom; empty for a block that plays nothing.</summary>
     public IReadOnlyList<FilmstripCell> FilmstripCells(TimelineBlock block) =>
         _document is { } document && document.FindChain(block.Reference) is { Frames.Count: > 0 } chain
-            ? _filmstrip.CellsFor(document, block.Reference.Source, chain, block.Played, Viewport.PixelsPerSecond, TimelineLayout.FilmHeight)
+            ? _filmstrip.CellsFor(document, block.Reference.Source, chain, block.PlayedSeconds, Viewport.PixelsPerSecond, TimelineLayout.FilmHeight)
             : Array.Empty<FilmstripCell>();
 
     /// <summary>The card shown over the filmstrip cell under the pointer, or null when there is none.</summary>

@@ -93,7 +93,7 @@ public class FrameLengthUnitPlaybackTests
     [Theory]
     [InlineData(TimeMeasurementUnit.Millisecond)]
     [InlineData(TimeMeasurementUnit.Undefined)]
-    public void Controller_ZeroLengthFrame_PlaysForAHundredMilliseconds(TimeMeasurementUnit unit)
+    public void Controller_ZeroLengthFrames_ShowTheLastFrame(TimeMeasurementUnit unit)
     {
         var chain = new AnimationChainSave { Name = "Z" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f });

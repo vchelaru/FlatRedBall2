@@ -167,8 +167,13 @@ public class EventMarkersTests
     public void Occurrences_NoEventsOrNoLength_IsEmpty()
     {
         EventMarkers.Occurrences(new[] { F(0.1), F(0.1) }, false, false, 1).ShouldBeEmpty();
-        EventMarkers.Occurrences(new[] { F(0, "A") }, false, false, 1).ShouldBeEmpty();
         EventMarkers.Occurrences(new[] { F(0.1, "A") }, false, false, 0).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Occurrences_ChainOfNoLength_FiresTheHeldFramesEventsOnce()
+    {
+        Fired(EventMarkers.Occurrences(new[] { F(0, "A"), F(0, "B") }, false, false, 1)).ShouldBe(new[] { ("B", 0.0) });
     }
 
     [Fact]

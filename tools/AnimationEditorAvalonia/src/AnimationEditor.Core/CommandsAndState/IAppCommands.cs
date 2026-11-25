@@ -223,6 +223,12 @@ namespace AnimationEditor.Core.CommandsAndState
         bool SaveDocument(TabEntry tab);
 
         /// <summary>
+        /// Why saving the document at <paramref name="path"/> would be refused (its file changed on disk), or null.
+        /// <paramref name="background"/> is its tab, null for the open document. Nothing is written or reported.
+        /// </summary>
+        string? SaveRefusal(string path, TabEntry? background);
+
+        /// <summary>
         /// The removal half of a cut pasted into another tab: takes the cut items out of <paramref name="tab"/>'s
         /// document and adds that to the tab's own undo history. Saves nothing (<see cref="SaveDocument"/>). Frames
         /// and shapes in a locked chain stay, as in a same-document cut.

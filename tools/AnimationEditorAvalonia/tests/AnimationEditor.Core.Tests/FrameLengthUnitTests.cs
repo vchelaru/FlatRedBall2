@@ -45,9 +45,9 @@ public class FrameLengthUnitTests
     }
 
     [Fact]
-    public void PlaybackSeconds_NonPositiveFallsBackToTheDefault()
+    public void PlaybackSeconds_IsSeconds_AndZeroForALengthThatIsNotPositive()
     {
-        Assert.Equal(0.1, FrameLengthUnit.Milliseconds.PlaybackSeconds(0), 6);
+        Assert.Equal(0, FrameLengthUnit.Milliseconds.PlaybackSeconds(0), 6);
         Assert.Equal(0.2, FrameLengthUnit.Milliseconds.PlaybackSeconds(200), 6);
         Assert.Equal(0.2, FrameLengthUnit.Seconds.PlaybackSeconds(0.2f), 6);
     }

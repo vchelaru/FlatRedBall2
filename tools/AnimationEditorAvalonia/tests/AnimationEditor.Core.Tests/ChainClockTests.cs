@@ -54,10 +54,10 @@ public class ChainClockTests
     }
 
     [Fact]
-    public void TotalLength_SumsFrameLengths_WithTheSameDefaultForUnsetLengths()
+    public void TotalLength_SumsFrameLengths_AndAFrameOfNoLengthAddsNothing()
     {
         var chain = Chain(loop: true, 0.25f, 0f);
 
-        ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).ShouldBe(0.35, tolerance: 1e-6);
+        ChainClock.TotalLength(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).ShouldBe(0.25, tolerance: 1e-6);
     }
 }

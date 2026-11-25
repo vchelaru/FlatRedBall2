@@ -91,9 +91,8 @@ public static class SequenceCheck
                         continue;
                     }
 
-                    double cycle = sources.CycleLength(block);
-                    if (cycle <= 0) continue;
-                    double full = SequenceTimeline.FullLength(block.Length, cycle);
+                    double? cycle = sources.CycleLength(block);
+                    double full = SequenceTimeline.ChainLength(block.Length, cycle);
                     double played = SequenceTimeline.PlayedLength(track, block, cycle);
                     if (played <= Tolerance && full > Tolerance)
                         issues.Add(new(CheckSeverity.Warning, "unreachable-block", $"{where} never plays: the next block on the track starts at the same time."));

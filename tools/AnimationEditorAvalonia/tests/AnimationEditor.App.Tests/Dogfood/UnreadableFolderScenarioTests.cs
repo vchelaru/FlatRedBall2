@@ -2,7 +2,9 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.App.Services;
 using AnimationEditor.Tests.Shared;
 using AnimationEditor.Views.Controls;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Shouldly;
 
 namespace AnimationEditor.App.Tests.Dogfood;
@@ -69,6 +71,24 @@ public class UnreadableFolderScenarioTests
         await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
 
         editor.Control<ProjectPanelControl>("ProjectPanel").TreeRoots.Select(node => node.Name).ShouldContain("hero.achx");
+    }
+
+    /// <summary>On Windows a folder the user may not list cannot be watched, so opening it fails.</summary>
+    [AvaloniaFact]
+    public async Task OpenRecent_OnAnUnreadableFolder_ShowsTheProblem()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string folder = Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "denied")).FullName;
+        await editor.OpenProjectFolderAsync(folder);
+        await editor.OpenProjectFolderAsync(editor.ProjectFolder);
+        using var denied = new UnlistableFolder(folder);
+
+        editor.Control<MenuItem>("MenuLoadRecent").Items.OfType<MenuItem>().Single(item => item.Header!.ToString()!.Contains("denied"))
+            .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(200));
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Open Project Folder failed");
     }
 
     /// <summary>On Linux the watcher reports an error for the subfolder each time it starts.</summary>

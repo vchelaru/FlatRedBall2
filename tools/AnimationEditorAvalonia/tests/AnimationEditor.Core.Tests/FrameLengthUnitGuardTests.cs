@@ -36,6 +36,7 @@ public class FrameLengthUnitGuardTests
         "Editing/AnimationDescriber.cs", // prints lengths in the file's own unit, labelled with it
         "Editing/EditOps.cs", // reads the raw value a relative edit starts from; both are in the file's unit
         "Editing/CheckReport.cs", // only compares the raw value with zero
+        "Editing/TsxOpPolicy.cs", // only compares the raw value before and after the ops
     };
 
     /// <summary>Files still treating the raw value as seconds. Empty: every file that touches FrameLength is reviewed.</summary>

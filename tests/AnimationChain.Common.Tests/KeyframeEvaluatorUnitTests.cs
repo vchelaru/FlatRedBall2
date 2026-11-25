@@ -29,8 +29,28 @@ public class KeyframeEvaluatorUnitTests
     }
 
     [Fact]
-    public void MillisecondFile_UnsetLengthCountsAsAHundredMilliseconds()
+    public void MillisecondFile_FrameOfNoLengthTakesNoTime()
     {
-        KeyframeEvaluator.EvaluateOffset(Slide(0f), 0, 0.05, TimeMeasurementUnit.Millisecond).X.ShouldBe(50f, 0.001f);
+        KeyframeEvaluator.EvaluateOffset(Slide(0f), 0, 0.05, TimeMeasurementUnit.Millisecond).X.ShouldBe(0f);
+    }
+
+    // An unset length is a length of 0, in the game and the editor: both readers leave it at 0, so nothing can tell them apart.
+    [Theory]
+    [InlineData("a.achx", "<AnimationChainArraySave><TimeMeasurementUnit>Millisecond</TimeMeasurementUnit><AnimationChain><Name>a</Name><Frame><TextureName>a.png</TextureName></Frame><Frame><FrameLength>0</FrameLength></Frame></AnimationChain></AnimationChainArraySave>")]
+    [InlineData("a.achj", """{ "timeMeasurementUnit": "Millisecond", "animationChains": [ { "name": "a", "frames": [ { "textureName": "a.png" }, { "frameLength": 0 } ] } ] }""")]
+    public void UnsetLength_IsReadAsZero(string file, string content)
+    {
+        string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N") + file);
+        System.IO.File.WriteAllText(path, content);
+        try
+        {
+            var chain = AnimationChainListSave.FromFile(path).AnimationChains[0];
+
+            foreach (var frame in chain.Frames) frame.GetDuration(TimeMeasurementUnit.Millisecond).ShouldBe(System.TimeSpan.Zero);
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
     }
 }

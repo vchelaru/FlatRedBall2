@@ -88,10 +88,14 @@ internal static class TextureCoordinateConverter
     }
 
     /// <summary>Reads sizes of textures named relative to <paramref name="directory"/>; null for an empty name or an unreadable PNG.</summary>
-    internal static Func<string, (int Width, int Height)?> SizesIn(string directory) => name =>
-        string.IsNullOrEmpty(name)
-            ? null
-            : TryReadPngSize(System.IO.Path.IsPathRooted(name) ? name : System.IO.Path.Combine(directory, name.Replace('\\', '/')));
+    internal static Func<string, (int Width, int Height)?> SizesIn(
+        string directory, Action<string>? reading = null) => name =>
+    {
+        if (string.IsNullOrEmpty(name)) return null;
+        string path = System.IO.Path.IsPathRooted(name) ? name : System.IO.Path.Combine(directory, name.Replace('\\', '/'));
+        reading?.Invoke(path);
+        return TryReadPngSize(path);
+    };
 
     private static FrameRegion ToPixels(FrameRegion uv, (int Width, int Height) size) =>
         new(uv.Left * size.Width, uv.Top * size.Height, uv.Right * size.Width, uv.Bottom * size.Height);

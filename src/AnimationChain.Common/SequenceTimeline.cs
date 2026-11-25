@@ -16,7 +16,10 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// hold.</item>
 /// <item>The next chain is the one with the next later start. On a tie, list order decides: of two chains starting
 /// together, the earlier one in <see cref="SequenceTrackSave.Chains"/> plays for zero seconds.</item>
-/// <item>A missing chain (cycle length 0) never plays, but it still cuts the chain before it.</item>
+/// <item>A missing chain, or one with no frames (cycle length null), never plays, but it still cuts the chain before it.</item>
+/// <item>A chain whose frames all have no length (cycle length 0) plays nothing, except that a reference with its own
+/// <see cref="SequenceChainReferenceSave.Length"/> enters the frame <see cref="PlaybackTimeline.Locate"/> gives at time 0 once and
+/// holds it for that length.</item>
 /// <item>Outside every chain, the track's sprite is hidden. That includes the time before the first chain starts,
 /// on purpose: it is how a sprite appears partway through a sequence. If it showed before its chain, it would always
 /// be visible.</item>
@@ -60,11 +63,20 @@ public static class SequenceTimeline
     private static double Slack(double time) => BoundaryTolerance * Math.Max(1, Math.Abs(time));
 
     /// <summary>
-    /// Authored length in seconds: <paramref name="length"/> when set, else one <paramref name="cycleLength"/>. Never
-    /// negative, and 0 when <paramref name="cycleLength"/> is not positive (a missing chain or target never plays).
+    /// Authored length in seconds of a reference clip: <paramref name="length"/> when set, else one run of its target
+    /// (<paramref name="cycleLength"/>). Never negative, and 0 when the target has no length or is missing, as it never plays.
+    /// A chain reference's is <see cref="ChainLength"/>.
     /// </summary>
     public static double FullLength(double? length, double cycleLength) =>
         cycleLength > 0 ? Math.Max(0, length ?? cycleLength) : 0;
+
+    /// <summary>
+    /// Authored length in seconds of a chain reference: <paramref name="length"/> when set, else one
+    /// <paramref name="cycleLength"/>. Never negative, and 0 when <paramref name="cycleLength"/> is null (a chain that is missing
+    /// or has no frames never plays).
+    /// </summary>
+    public static double ChainLength(double? length, double? cycleLength) =>
+        cycleLength is { } cycle ? Math.Max(0, length ?? cycle) : 0;
 
     /// <summary>
     /// Seconds a chain actually plays: <paramref name="fullLength"/>, cut where <paramref name="nextStart"/> begins.
@@ -74,8 +86,8 @@ public static class SequenceTimeline
         nextStart is { } next ? Math.Clamp(next - start, 0, fullLength) : fullLength;
 
     /// <summary>Seconds <paramref name="reference"/> plays on <paramref name="track"/> after the cut rule.</summary>
-    public static double PlayedLength(SequenceTrackSave track, SequenceChainReferenceSave reference, double cycleLength) =>
-        PlayedLength(reference.Start, FullLength(reference.Length, cycleLength), NextStart(track, reference));
+    public static double PlayedLength(SequenceTrackSave track, SequenceChainReferenceSave reference, double? cycleLength) =>
+        PlayedLength(reference.Start, ChainLength(reference.Length, cycleLength), NextStart(track, reference));
 
     /// <summary>The track's references in playback order: by start, ties kept in list order.</summary>
     public static IReadOnlyList<SequenceChainReferenceSave> Ordered(SequenceTrackSave track) =>
@@ -102,11 +114,11 @@ public static class SequenceTimeline
     /// </summary>
     /// <param name="track">The track to sample.</param>
     /// <param name="time">Seconds from the sequence start.</param>
-    /// <param name="cycleLength">A reference's cycle length in seconds; 0 for a missing chain.</param>
+    /// <param name="cycleLength">A reference's cycle length in seconds; null for a chain that is missing or has no frames.</param>
     /// <param name="localTime">Seconds since the returned reference's start; 0 when none plays. The caller maps it onto the
     /// chain: wrapped when the chain loops, held at the end of the cycle when it does not.</param>
     public static SequenceChainReferenceSave? ActiveAt(SequenceTrackSave track, double time,
-        Func<SequenceChainReferenceSave, double> cycleLength, out double localTime)
+        Func<SequenceChainReferenceSave, double?> cycleLength, out double localTime)
     {
         localTime = 0;
         var ordered = Ordered(track);
@@ -117,7 +129,7 @@ public static class SequenceTimeline
             if (reference.Start > time + Slack(time)) continue;
 
             double? next = i + 1 < ordered.Count ? ordered[i + 1].Start : null;
-            double played = PlayedLength(reference.Start, FullLength(reference.Length, cycleLength(reference)), next);
+            double played = PlayedLength(reference.Start, ChainLength(reference.Length, cycleLength(reference)), next);
             if (time + Slack(time) >= reference.Start + played) return null;
 
             localTime = Math.Max(0, time - reference.Start);
@@ -137,7 +149,7 @@ public static class SequenceTimeline
     /// counted by the player: the number of times the looping sequence has wrapped.
     /// </summary>
     public static double CarryOver(SequenceTrackSave track, double sequenceLength, int pass,
-        Func<SequenceChainReferenceSave, double> cycleLength)
+        Func<SequenceChainReferenceSave, double?> cycleLength)
     {
         if (!track.Continuous || pass <= 0 || sequenceLength <= 0 || track.Chains.Count == 0) return 0;
         var first = Ordered(track)[0];
@@ -158,7 +170,7 @@ public static class SequenceTimeline
     /// the wraps itself (a seek or restart makes it pass 0 again).
     /// </summary>
     public static SequenceChainReferenceSave? ActiveAtPass(SequenceTrackSave track, double time, int pass, double sequenceLength,
-        Func<SequenceChainReferenceSave, double> cycleLength, out double localTime)
+        Func<SequenceChainReferenceSave, double?> cycleLength, out double localTime)
     {
         var active = ActiveAt(track, time, cycleLength, out localTime);
         if (active is not null && track.Continuous && pass > 0 && ReferenceEquals(active, Ordered(track)[0]))
@@ -174,12 +186,12 @@ public static class SequenceTimeline
     /// </summary>
     /// <param name="sequences">Every sequence of the file, to resolve references by name.</param>
     /// <param name="sequence">The sequence to measure.</param>
-    /// <param name="cycleLength">A chain reference's cycle length in seconds; 0 for a missing chain.</param>
-    public static double Length(IReadOnlyList<SequenceSave> sequences, SequenceSave sequence, Func<SequenceChainReferenceSave, double> cycleLength) =>
+    /// <param name="cycleLength">A chain reference's cycle length in seconds; null for a chain that is missing or has no frames.</param>
+    public static double Length(IReadOnlyList<SequenceSave> sequences, SequenceSave sequence, Func<SequenceChainReferenceSave, double?> cycleLength) =>
         LengthWithin(sequences, sequence, cycleLength, new List<SequenceSave> { sequence });
 
     private static double LengthWithin(IReadOnlyList<SequenceSave> sequences, SequenceSave sequence,
-        Func<SequenceChainReferenceSave, double> cycleLength, List<SequenceSave> stack)
+        Func<SequenceChainReferenceSave, double?> cycleLength, List<SequenceSave> stack)
     {
         double end = 0;
         foreach (var track in sequence.Tracks)

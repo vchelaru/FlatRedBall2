@@ -233,7 +233,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
         nameof(IAppCommands.ReloadPngFromDisk), nameof(IAppCommands.WireHotReloadWatcher), nameof(IAppCommands.SyncHotReloadWatcher),
         nameof(IAppCommands.NewFile), nameof(IAppCommands.CloseProject), nameof(IAppCommands.HandleApplicationClosing),
         nameof(IAppCommands.SaveCurrentAnimationChainList), nameof(IAppCommands.SaveCurrentAnimationChainListAsync),
-        nameof(IAppCommands.SaveDocument), nameof(IAppCommands.LastSaveStored), nameof(IAppCommands.ExportAsync),
+        nameof(IAppCommands.SaveDocument), nameof(IAppCommands.SaveRefusal), nameof(IAppCommands.LastSaveStored), nameof(IAppCommands.ExportAsync),
         nameof(IAppCommands.RefreshTreeNode), nameof(IAppCommands.RefreshAnimationFrameDisplay), nameof(IAppCommands.RefreshWireframe),
         nameof(IAppCommands.RefreshTreeView), nameof(IAppCommands.GetTextureSize), nameof(IAppCommands.SealPendingEdits),
         nameof(IAppCommands.DiscardPendingEdits), nameof(IAppCommands.HasSameFrameNameCollision),

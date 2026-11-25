@@ -20,8 +20,21 @@ public class AnimationFrameSave
     /// </summary>
     public TimeSpan GetDuration(TimeMeasurementUnit unit)
     {
-        double seconds = AsWritten(FrameLength) / (unit == TimeMeasurementUnit.Millisecond ? 1000.0 : 1.0);
+        double seconds = Seconds(FrameLength, unit);
         return TimeSpan.FromTicks(checked((long)Math.Round(seconds * TimeSpan.TicksPerSecond)));
+    }
+
+    private static double Seconds(float length, TimeMeasurementUnit unit) =>
+        AsWritten(length) / (unit == TimeMeasurementUnit.Millisecond ? 1000.0 : 1.0);
+
+    // Seconds a tool plays a frame for. 0, so the frame is skipped, where GetDuration is zero. Negative, NaN and infinite
+    // lengths are garbage data the editor cannot produce: they are skipped too, though a game does not (a negative one
+    // subtracts from its timeline, the others throw at load).
+    internal static double PlayedSeconds(float length, TimeMeasurementUnit unit)
+    {
+        if (!float.IsFinite(length)) return 0;
+        double seconds = Seconds(length, unit);
+        return Math.Round(seconds * TimeSpan.TicksPerSecond) > 0 ? seconds : 0;
     }
 
     // The number the file holds: 0.1, not the 0.10000000149 that 0.1f widens to, which drifts as cycles add up. The cast

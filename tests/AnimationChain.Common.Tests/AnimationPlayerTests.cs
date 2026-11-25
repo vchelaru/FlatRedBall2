@@ -464,4 +464,25 @@ public class AnimationPlayerTests
 
         log.ShouldBe(new[] { "Last", "IdleStart" });
     }
+
+    [Theory]
+    [InlineData(-1f)]
+    [InlineData(float.NegativeInfinity)]
+    [InlineData(float.NaN)]
+    public void AnimationSpeed_NegativeOrNaN_ThrowsNamingIsReversed(float speed)
+    {
+        var player = new AnimationPlayer<SpeedFrame>(new AnimationChainList<SpeedFrame>()) { AnimationSpeed = 2f };
+
+        Should.Throw<ArgumentOutOfRangeException>(() => player.AnimationSpeed = speed).Message.ShouldContain("IsReversed");
+
+        player.AnimationSpeed.ShouldBe(2f);
+    }
+
+    [Fact]
+    public void AnimationSpeed_Zero_IsAllowed()
+    {
+        new AnimationPlayer<SpeedFrame>(new AnimationChainList<SpeedFrame>()) { AnimationSpeed = 0f }.AnimationSpeed.ShouldBe(0f);
+    }
+
+    private sealed class SpeedFrame : AnimationFrameBase { }
 }

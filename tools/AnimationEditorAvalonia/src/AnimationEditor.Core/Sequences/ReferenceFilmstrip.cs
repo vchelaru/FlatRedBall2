@@ -76,12 +76,12 @@ public static class ReferenceFilmstrip
         // One cell early, so rounding never loses the first visible one.
         for (long n = Math.Max(0, (long)(fromX / (cellSeconds * pixelsPerSecond)) - 1); cells.Count < MaxCells; n++)
         {
-            int cycle = (int)(n / perCycle);
+            long cycle = n / perCycle;
             double start = cycle * targetLength + n % perCycle * cellSeconds;
             if (start >= clipSeconds - 1e-9 || start * pixelsPerSecond > toX) break;
             double visible = Math.Min(cellSeconds, clipSeconds - start);
             if ((start + visible) * pixelsPerSecond < fromX) continue;
-            cells.Add(new ReferenceCell(cycle, start * pixelsPerSecond, visible * pixelsPerSecond, cellSeconds * pixelsPerSecond,
+            cells.Add(new ReferenceCell((int)cycle, start * pixelsPerSecond, visible * pixelsPerSecond, cellSeconds * pixelsPerSecond,
                 start + visible / 2));
         }
         return cells;
@@ -95,7 +95,7 @@ public static class ReferenceFilmstrip
     public static ScenePose? PoseAt(SequenceReferenceSave reference, SequenceSave target, double clipTime, ISequenceChainLookup lookup,
         IReadOnlyList<SequenceSave> file)
     {
-        double length = SequenceTimeline.Length(file, target, chain => lookup.FindChain(chain) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(chain)) : 0);
+        double length = SequenceTimeline.Length(file, target, chain => ChainClock.CycleLength(lookup.FindChain(chain), lookup.UnitOf(chain)));
         if (SequenceTimeline.ReferenceTime(reference, target, length, reference.Start + clipTime) is not { } inner) return null;
         var sprites = SequenceScene.At(target, 0, inner, lookup, file);
         if (sprites.Count == 0) return null;

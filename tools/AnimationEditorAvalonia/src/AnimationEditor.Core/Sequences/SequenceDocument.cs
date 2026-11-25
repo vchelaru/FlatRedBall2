@@ -35,10 +35,18 @@ public sealed class SequenceDocument : ISequenceChainLookup
     // Keyed by the source string as written in the file. A null value is a source that could not be loaded.
     private readonly Dictionary<string, AnimationChainListSave?> _sources = new(StringComparer.OrdinalIgnoreCase);
 
-    // What each source's file looked like when it was read, so a later change to the file is seen.
-    private readonly Dictionary<string, FileStamp> _stamps = new(StringComparer.OrdinalIgnoreCase);
+    // What each file a source was read from looked like then, so a later change to it is seen.
+    private readonly Dictionary<string, Dictionary<string, FileStamp>> _stamps = new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly record struct FileStamp(bool Exists, DateTime WrittenUtc, long Length);
+    private readonly record struct FileStamp(bool Exists, DateTime WrittenUtc, long Length)
+    {
+        public static FileStamp Of(string path)
+        {
+            if (!File.Exists(path)) return default; // also for a path that can't be one
+            var info = new FileInfo(path);
+            return info.Exists ? new FileStamp(true, info.LastWriteTimeUtc, info.Length) : default;
+        }
+    }
 
     // The file as this document last read or wrote it. A file that still holds this has not changed under us.
     private DiskState _diskState;
@@ -71,7 +79,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>Seconds until sequence <paramref name="index"/> ends (<see cref="SequenceTimeline.Length"/>); 0 for an index outside the file.</summary>
     public double SequenceLength(int index) =>
         index >= 0 && index < Save.Sequences.Count
-            ? SequenceTimeline.Length(Save.Sequences, Save.Sequences[index], reference => CycleLength(reference) ?? 0)
+            ? SequenceTimeline.Length(Save.Sequences, Save.Sequences[index], CycleLength)
             : 0;
 
     /// <summary>The grey text after sequence <paramref name="index"/>'s name in the list: its track count and length (<see cref="SequenceListSummary"/>).</summary>
@@ -265,7 +273,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     /// <summary>
-    /// Re-reads every source whose file changed since it was loaded (or could not be read and now can), and raises
+    /// Re-reads every source whose file (or, for a UV source, a texture its pixels come from) changed since it was loaded (or could not be read and now can), and raises
     /// <see cref="Changed"/> when any did. Returns whether any did.
     /// </summary>
     public bool ReloadChangedSources()
@@ -869,10 +877,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
     /// <summary>
     /// Seconds of one playback cycle of <paramref name="reference"/>'s chain (twice its length for ping-pong), or null
-    /// when the chain is missing.
+    /// when the chain is missing or has no frames.
     /// </summary>
-    public double? CycleLength(SequenceChainReferenceSave reference) =>
-        FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, UnitOf(reference)) : null;
+    public double? CycleLength(SequenceChainReferenceSave reference) => ChainClock.CycleLength(FindChain(reference), UnitOf(reference));
 
     /// <summary>
     /// The block's length in seconds as shown and edited: <see cref="SequenceChainReferenceSave.Length"/> when set, else
@@ -1395,6 +1402,46 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return null;
     }
 
+    /// <summary>Whether the file holds something other than what this document last read or wrote.</summary>
+    public bool HasChangedOnDisk => _diskState.HasChanged(Path);
+
+    // Each conversion of sources: the files it converted and their new extension. A snapshot remembers how many it has.
+    private readonly List<(IReadOnlyCollection<string> Files, string Extension)> _conversions = new();
+
+    /// <summary>
+    /// Gives the sources that are one of <paramref name="files"/> the extension <paramref name="extension"/> after those were
+    /// converted, and has <paramref name="write"/> put the result (given with <see cref="Path"/>) in the file. Not an edit:
+    /// the converted files are gone, so there is no undo entry, and undoing an earlier edit keeps the new sources.
+    /// Returns why it was refused or failed, and then nothing changed, or null.
+    /// </summary>
+    public string? ChangeSourceExtension(IReadOnlyCollection<string> files, string extension, Func<SequenceListSave, string, string?> write)
+    {
+        CancelGesture();
+        if ((SaveError ?? SaveRefusal()) is { } refusal) return refusal;
+        var copy = SequenceListSave.FromJsonString(Save.ToJsonString());
+        SequenceSourcePaths.ChangeExtension(copy, Folder, files, extension);
+        string? error = null;
+        try
+        {
+            SaveRunner(Path.FullPath, () =>
+            {
+                error = write(copy, Path.FullPath);
+                if (error is null) _diskState = DiskState.Read(Path);
+            });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
+        }
+        if (error is not null) return error;
+
+        Save = copy;
+        _conversions.Add((files, extension));
+        SyncSources();
+        Changed?.Invoke();
+        return null;
+    }
+
     /// <summary>
     /// Points the chain references at <paramref name="chains"/> (track and chain index in sequence <paramref name="sequence"/>)
     /// at the chain called <paramref name="chainName"/> of their own source, in one undo entry. Relinks a reference whose
@@ -1535,12 +1582,15 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     // snapshotFolder is the folder the snapshot's relative sources were written for; a Save As since then moved the file.
+    // conversions is how many conversions of sources the snapshot has; the later ones are applied to it.
     private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null, SequenceSelectionState? selection = null,
-        FilePath? snapshotFolder = null)
+        FilePath? snapshotFolder = null, int? conversions = null)
     {
         _gestureBefore = null;
         Save = SequenceListSave.FromJsonString(json);
         if (snapshotFolder is not null) SequenceSourcePaths.Rebase(Save, snapshotFolder, Folder);
+        foreach (var (files, extension) in _conversions.Skip(conversions ?? _conversions.Count))
+            SequenceSourcePaths.ChangeExtension(Save, Folder, files, extension);
         if (selection is not null)
         {
             // A whole selection to put back (a multi-sequence edit, or its undo): the primary says which one is SelectedSequence.
@@ -1562,29 +1612,28 @@ public sealed class SequenceDocument : ISequenceChainLookup
     private FilePath SourcePath(string source) =>
         new(System.IO.Path.Combine(Path.GetDirectoryContainingThis().FullPath, source));
 
-    /// <summary>Reads every source in the file whose own file is new or differs from when it was last read. Returns whether any was read.</summary>
+    /// <summary>Reads every source in the file whose own files are new or differ from when it was last read. Returns whether any was read.</summary>
     private bool SyncSources()
     {
         bool any = false;
         foreach (var source in Save.Sources)
         {
             string full = SourcePath(source).FullPath;
-            var info = new FileInfo(full);
-            var stamp = info.Exists ? new FileStamp(true, info.LastWriteTimeUtc, info.Length) : default;
-            if (_stamps.TryGetValue(source, out var known) && known == stamp) continue;
-            _sources[source] = TryLoad(full);
-            _stamps[source] = stamp;
+            if (_stamps.TryGetValue(source, out var known) && known.All(file => FileStamp.Of(file.Key) == file.Value)) continue;
+            var stamps = new Dictionary<string, FileStamp> { [full] = FileStamp.Of(full) };
+            _sources[source] = TryLoad(full, texture => stamps[texture] = FileStamp.Of(texture));
+            _stamps[source] = stamps;
             any = true;
         }
         if (any) SourcesVersion++;
         return any;
     }
 
-    private static AnimationChainListSave? TryLoad(string absolutePath)
+    private static AnimationChainListSave? TryLoad(string absolutePath, Action<string> readingTexture)
     {
         try
         {
-            return AnimationFileLoader.Load(absolutePath).List;
+            return AnimationFileLoader.Load(absolutePath, readingTexture).List;
         }
         catch (Exception ex)
         {
@@ -1600,7 +1649,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     private sealed class SnapshotCommand(SequenceDocument document, string description, string before, string after,
         int? selectBefore = null, int? selectAfter = null, int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true,
         (string From, string To)? renamed = null, SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null,
-        string? coalesceGroup = null, FilePath? beforeFolder = null, FilePath? afterFolder = null) : IUndoableCommand
+        string? coalesceGroup = null, FilePath? beforeFolder = null, FilePath? afterFolder = null, int? beforeConversions = null) : IUndoableCommand
     {
         public string Description => description;
 
@@ -1612,6 +1661,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
         private readonly FilePath _afterFolder = afterFolder ?? document.Folder;
         private FilePath BeforeFolder => _beforeFolder;
 
+        private readonly int _beforeConversions = beforeConversions ?? document._conversions.Count;
+        private readonly int _afterConversions = document._conversions.Count;
+
         // Only ever merges with another snapshot of the same document: the undo stack is shared by every tab.
         public string? CoalesceGroup => coalesceGroup is null ? null : $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(document)}:{coalesceGroup}";
 
@@ -1619,7 +1671,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
         public IUndoableCommand? CoalesceWith(IUndoableCommand previous) => previous is not SnapshotCommand first ? this
             : first.Before == after && first.BeforeFolder == _afterFolder ? null
             : new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
-                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup, first.BeforeFolder, _afterFolder);
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup, first.BeforeFolder, _afterFolder, first._beforeConversions);
 
         private string Before => before;
         private int? SelectBefore => selectBefore;
@@ -1629,20 +1681,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
         public bool Do()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter, stateAfter, _afterFolder);
+            document.Restore(after, selectOnDo ? selectAfter : null, trackAfter, stateAfter, _afterFolder, _afterConversions);
             return true;
         }
 
         public void Redo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.From, names.To);
-            document.Restore(after, selectAfter, trackAfter, stateAfter, _afterFolder);
+            document.Restore(after, selectAfter, trackAfter, stateAfter, _afterFolder, _afterConversions);
         }
 
         public void Undo()
         {
             if (renamed is { } names) document.NotifyRenamed(names.To, names.From);
-            document.Restore(before, selectBefore, trackBefore, stateBefore, _beforeFolder);
+            document.Restore(before, selectBefore, trackBefore, stateBefore, _beforeFolder, _beforeConversions);
         }
     }
 }

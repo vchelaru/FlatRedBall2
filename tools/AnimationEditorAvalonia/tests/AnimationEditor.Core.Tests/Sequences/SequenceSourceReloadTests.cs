@@ -112,6 +112,59 @@ public class SequenceSourceReloadTests
         document.IsSourceMissing("hero.achj").ShouldBeTrue();
     }
 
+    // A UV frame covering its whole texture: its pixels come from the texture's size (#2112).
+    private static SequenceDocument OpenUvDocument(string folder, string texture = "sheet.png")
+    {
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = texture, FrameLength = 0.1f, RightCoordinate = 1, BottomCoordinate = 1 });
+        list.AnimationChains.Add(chain);
+        list.SaveJson(Path.Combine(folder, "hero.achj"));
+        return OpenDocument(folder);
+    }
+
+    // Only the header, which is all that is read of a texture here.
+    private static void WritePng(string folder, byte size)
+    {
+        string path = Path.Combine(folder, "sheet.png");
+        File.WriteAllBytes(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, size, 0, 0, 0, size]);
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(nextStamp++));
+    }
+
+    [Fact]
+    public void ReloadChangedSources_UvSourceWhoseTextureIsThereOnlyLater_ShowsTheWholeTexture()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = OpenUvDocument(dir.Path);
+
+        WritePng(dir.Path, 64);
+
+        document.ReloadChangedSources().ShouldBeTrue();
+        document.SourceChains("hero.achj")!.AnimationChains[0].Frames.Single().RightCoordinate.ShouldBe(64);
+    }
+
+    [Fact]
+    public void ReloadChangedSources_UvSourceWhoseTextureChangesSize_ShowsTheWholeTexture()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WritePng(dir.Path, 64);
+        var document = OpenUvDocument(dir.Path);
+
+        WritePng(dir.Path, 128);
+
+        document.ReloadChangedSources().ShouldBeTrue();
+        document.SourceChains("hero.achj")!.AnimationChains[0].Frames.Single().RightCoordinate.ShouldBe(128);
+    }
+
+    [Fact]
+    public void Load_UvSourceWithATextureNameNoPathCanHold_ShowsTheSource()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = OpenUvDocument(dir.Path, "nul" + (char)0 + ".png");
+
+        document.SourceChains("hero.achj")!.AnimationChains.Single().Name.ShouldBe("Walk");
+    }
+
     [Fact]
     public void AnyEdit_PicksUpASourceChangedOnDisk()
     {

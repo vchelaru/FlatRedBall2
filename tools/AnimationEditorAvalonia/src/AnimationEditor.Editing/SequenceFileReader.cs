@@ -56,11 +56,11 @@ internal sealed class SequenceSources(SequenceListSave save, string sequencePath
     public bool HasChain(SequenceChainReferenceSave reference) =>
         Chains(reference.Source)?.AnimationChains.Any(c => c.Name == reference.Chain) == true;
 
-    /// <summary>Seconds of one playback cycle of the block's chain; 0 when its source or chain is missing.</summary>
-    public double CycleLength(SequenceChainReferenceSave reference)
+    /// <summary>Seconds of one playback cycle of the block's chain; null when its source or chain is missing, or the chain has no frames.</summary>
+    public double? CycleLength(SequenceChainReferenceSave reference)
     {
         var list = Chains(reference.Source);
         var chain = list?.AnimationChains.FirstOrDefault(c => c.Name == reference.Chain);
-        return chain is null ? 0 : ChainClock.TotalLength(chain, FrameLengthUnit.Of(list));
+        return ChainClock.CycleLength(chain, FrameLengthUnit.Of(list));
     }
 }

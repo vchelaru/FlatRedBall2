@@ -49,6 +49,36 @@ public class FolderWatcherTests
         Directory.Delete(dir, recursive: true);
     }
 
+    /// <summary>#2140: <c>rm -rf</c> then an unzip. Windows stops the watcher instead, the test above.</summary>
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(300, false)]
+    [InlineData(0, true)]
+    public async Task Watch_FolderReplacedByAnother_WatchesThatOne(int millisecondsBetween, bool moved)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string root = Directory.CreateTempSubdirectory("ae-watch").FullName;
+        string dir = Directory.CreateDirectory(Path.Combine(root, "project")).FullName;
+        using var watcher = new FolderWatcher(AchxFolderScanner.IsAchxPath);
+        var rescan = new TaskCompletionSource();
+        var changed = new TaskCompletionSource();
+        watcher.Overflowed += () => rescan.TrySetResult();
+        watcher.Changed += _ => changed.TrySetResult();
+        watcher.Watch(dir);
+
+        if (moved) Directory.Move(dir, Path.Combine(root, "old"));
+        else Directory.Delete(dir);
+        await Task.Delay(millisecondsBetween);
+        if (moved) Directory.Move(Directory.CreateDirectory(Path.Combine(root, "new")).FullName, dir);
+        else Directory.CreateDirectory(dir);
+        await rescan.Task.WaitAsync(WaitTimeout);
+        File.WriteAllText(Path.Combine(dir, "a.achx"), "");
+
+        await changed.Task.WaitAsync(WaitTimeout);
+        watcher.Dispose();
+        Directory.Delete(root, recursive: true);
+    }
+
     [Fact]
     public async Task Changed_DeletingMatchingFile_RaisesDeleted()
     {

@@ -160,7 +160,7 @@ public class PlaybackControllerTests
     // ── Zero FrameLength defaults ─────────────────────────────────────────────
 
     [Fact]
-    public void Advance_WithZeroFrameLength_UsesDefaultOf100ms()
+    public void Advance_WithNoLength_ShowsTheLastFrameAsTheGameDoes()
     {
         var ctrl = new PlaybackController();
         var chain = new AnimationChainSave { Name = "Z" };
@@ -168,7 +168,7 @@ public class PlaybackControllerTests
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0 });
         ctrl.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
 
-        ctrl.Advance(0.15); // 0.15 > 0.1 default → frame 1
+        ctrl.Advance(0.15);
 
         Assert.Equal(1, ctrl.CurrentFrameIndex);
     }

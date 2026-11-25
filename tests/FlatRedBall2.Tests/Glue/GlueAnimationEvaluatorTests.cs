@@ -210,4 +210,57 @@ public class GlueAnimationEvaluatorTests
         public float X { get; }
         public float Y { get; }
     }
+
+    // What AnimationSpeed refuses (the loader reports it) leaves the sprite's speed as it was.
+    [Theory]
+    [InlineData(GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier, -0.1f, 100f)]
+    [InlineData(GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier, float.PositiveInfinity, 0f)]
+    [InlineData(GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, -1f, 100f)]
+    public void EvaluatePlatformer_MultiplierThatMakesAnInvalidSpeed_LeavesTheSpeed(GlueAnimationSpeedAssignment assignment, float multiplier, float velocity)
+    {
+        var entity = new Entity { VelocityX = velocity, VelocityY = velocity };
+        var platformer = new PlatformerBehavior { AirMovement = new PlatformerValues { MaxSpeedX = 50f, MaxFallSpeed = 50f } };
+        var x = new GluePlatformerAnimationLayer { AnimationName = "Run", HasLeftAndRight = false, AnimationSpeedAssignment = assignment, AbsoluteXVelocityAnimationSpeedMultiplier = multiplier, MaxSpeedXRatioMultiplier = multiplier };
+        var y = new GluePlatformerAnimationLayer { AnimationName = "Run", HasLeftAndRight = false, AnimationSpeedAssignment = assignment, AbsoluteYVelocityAnimationSpeedMultiplier = multiplier, MaxSpeedYRatioMultiplier = multiplier };
+
+        foreach (var layer in new[] { x, y })
+        {
+            var sprite = new Sprite { AnimationSpeed = 2f };
+            GlueAnimationEvaluator.EvaluatePlatformer(entity, platformer, sprite, [layer], currentMovementName: null).ShouldBe("Run");
+            sprite.AnimationSpeed.ShouldBe(2f);
+        }
+    }
+
+    [Theory]
+    [InlineData(-50f, -50f)]
+    [InlineData(float.NaN, float.NaN)]
+    public void EvaluatePlatformer_NegativeMaxSpeed_LeavesTheSpeed(float maxSpeedX, float maxFallSpeed)
+    {
+        var entity = new Entity { VelocityX = 100f, VelocityY = 100f };
+        var platformer = new PlatformerBehavior { AirMovement = new PlatformerValues { MaxSpeedX = maxSpeedX, MaxFallSpeed = maxFallSpeed } };
+        var x = new GluePlatformerAnimationLayer { AnimationName = "Run", AnimationSpeedAssignment = GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, MaxSpeedXRatioMultiplier = 1f };
+        var y = new GluePlatformerAnimationLayer { AnimationName = "Run", AnimationSpeedAssignment = GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, MaxSpeedYRatioMultiplier = 1f };
+        var sprite = new Sprite { AnimationSpeed = 2f };
+
+        GlueAnimationEvaluator.EvaluatePlatformer(entity, platformer, sprite, [x], currentMovementName: null);
+        GlueAnimationEvaluator.EvaluatePlatformer(entity, platformer, sprite, [y], currentMovementName: null);
+
+        sprite.AnimationSpeed.ShouldBe(2f);
+    }
+
+    [Theory]
+    [InlineData(GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier, -1f, 50f)]
+    [InlineData(GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, -1f, 50f)]
+    [InlineData(GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, 1f, -50f)]
+    public void EvaluateTopDown_InvalidSpeed_LeavesTheSpeed(GlueAnimationSpeedAssignment assignment, float multiplier, float maxSpeed)
+    {
+        var entity = new Entity { VelocityX = 100f };
+        var topDown = new TopDownBehavior { MovementValues = new TopDownValues { MaxSpeed = maxSpeed } };
+        var layer = new GlueTopDownAnimationLayer { AnimationName = "Walk", IsDirectionFacingAppended = false, AnimationSpeedAssignment = assignment, AbsoluteVelocityAnimationSpeedMultiplier = multiplier, MaxSpeedRatioMultiplier = multiplier };
+        var sprite = new Sprite { AnimationSpeed = 2f };
+
+        GlueAnimationEvaluator.EvaluateTopDown(entity, topDown, sprite, [layer], currentMovementName: null).ShouldBe("Walk");
+
+        sprite.AnimationSpeed.ShouldBe(2f);
+    }
 }

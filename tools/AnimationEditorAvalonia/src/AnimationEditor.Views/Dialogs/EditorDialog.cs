@@ -13,7 +13,14 @@ public sealed record EditorDialogOptions(
     string Title,
     double Width,
     double? Height = null,
-    bool SizeToContentHeight = false);
+    bool SizeToContentHeight = false)
+{
+    /// <summary>The tallest a dialog sized to its content gets, which is never taller than the window it belongs to.</summary>
+    public double? MaxHeight { get; init; }
+
+    /// <summary>Whether Enter confirms wherever the focus is. Without it Enter only presses the focused button.</summary>
+    public bool EnterConfirms { get; init; } = true;
+}
 
 public sealed class EditorDialog<T>
 {
@@ -31,6 +38,9 @@ public sealed class EditorDialog<T>
     public T CancelResult { get; }
     public Action Confirm { get; set; } = () => { };
     public Action Cancel { get; set; } = () => { };
+
+    /// <summary>While set, the dialog's window does not close.</summary>
+    public bool IsBusy { get; set; }
 
     internal event Action? CloseRequested;
     internal Task<T> Result => _completion.Task;
@@ -66,10 +76,13 @@ public sealed class WindowEditorDialogHost(Window owner) : IEditorDialogHost
             window.Height = height;
         if (options.SizeToContentHeight)
             window.SizeToContent = SizeToContent.Height;
+        if (options.MaxHeight is { } maxHeight)
+            window.MaxHeight = Math.Min(maxHeight, owner.ClientSize.Height);
 
         dialog.CloseRequested += window.Close;
+        window.Closing += (_, e) => e.Cancel |= dialog.IsBusy;
         window.Closed += (_, _) => dialog.CloseWithoutResult();
-        DialogKeyboard.Wire(window, dialog.Confirm, dialog.Cancel);
+        DialogKeyboard.Wire(window, options.EnterConfirms ? dialog.Confirm : () => { }, dialog.Cancel);
 
         await window.ShowDialog(owner);
         return await dialog.Result;

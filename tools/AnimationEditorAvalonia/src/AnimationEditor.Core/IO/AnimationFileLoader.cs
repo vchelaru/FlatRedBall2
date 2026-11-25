@@ -17,14 +17,15 @@ public static class AnimationFileLoader
 {
     /// <summary>Reads <paramref name="path"/> and converts it to pixels.</summary>
     /// <remarks>A UV frame whose texture size can't be read gets an unset region (<see cref="Utilities.FrameRegion.Unset"/>).</remarks>
+    /// <param name="readingTexture">Called with the path of each texture whose size is about to be read.</param>
     /// <exception cref="FileNotFoundException">The file does not exist.</exception>
     /// <exception cref="InvalidDataException">The file contains merge conflict markers.</exception>
-    public static EditorAnimationFile Load(string path)
+    public static EditorAnimationFile Load(string path, Action<string>? readingTexture = null)
     {
         var filePath = new FilePath(path);
         var list = Read(filePath);
         var onDisk = list.CoordinateType;
-        TextureCoordinateConverter.ToPixels(list, SizesBeside(filePath));
+        TextureCoordinateConverter.ToPixels(list, SizesBeside(filePath, readingTexture));
         return new EditorAnimationFile(list, onDisk);
     }
 
@@ -34,7 +35,12 @@ public static class AnimationFileLoader
         if (!path.Exists())
             throw new FileNotFoundException($"Animation chain file not found: {path.FullPath}", path.FullPath);
 
-        var rawContent = File.ReadAllText(path.FullPath);
+        return Parse(File.ReadAllText(path.FullPath), path);
+    }
+
+    /// <summary><see cref="Read"/> of <paramref name="rawContent"/>, the text of the file at <paramref name="path"/>.</summary>
+    internal static AnimationChainListSave Parse(string rawContent, FilePath path)
+    {
         if (AchxConflictMarkerDetector.HasConflictMarkers(rawContent))
             throw new InvalidDataException($"{AchxConflictMarkerDetector.ConflictMarkerMessage} ({path.FullPath})");
 
@@ -58,6 +64,6 @@ public static class AnimationFileLoader
         return onDisk;
     }
 
-    private static Func<string, (int Width, int Height)?> SizesBeside(FilePath path) =>
-        TextureCoordinateConverter.SizesIn(path.GetDirectoryContainingThis().FullPath);
+    private static Func<string, (int Width, int Height)?> SizesBeside(FilePath path, Action<string>? readingTexture = null) =>
+        TextureCoordinateConverter.SizesIn(path.GetDirectoryContainingThis().FullPath, readingTexture);
 }

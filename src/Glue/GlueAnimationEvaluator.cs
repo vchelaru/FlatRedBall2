@@ -131,19 +131,19 @@ public static class GlueAnimationEvaluator
 
             case GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier:
                 if (layer.AbsoluteXVelocityAnimationSpeedMultiplier is float xMultiplier)
-                    sprite.AnimationSpeed = xMultiplier * MathF.Abs(entity.VelocityX);
+                    SetSpeed(sprite, xMultiplier * MathF.Abs(entity.VelocityX));
                 else if (layer.AbsoluteYVelocityAnimationSpeedMultiplier is float yMultiplier)
-                    sprite.AnimationSpeed = yMultiplier * MathF.Abs(entity.VelocityY);
+                    SetSpeed(sprite, yMultiplier * MathF.Abs(entity.VelocityY));
                 break;
 
             case GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier:
                 var active = ActivePlatformerValues(platformer);
                 if (layer.MaxSpeedXRatioMultiplier is float xRatio)
-                    sprite.AnimationSpeed = active.MaxSpeedX == 0f
-                        ? 1f : xRatio * MathF.Abs(entity.VelocityX) / active.MaxSpeedX;
+                    SetSpeed(sprite, active.MaxSpeedX == 0f
+                        ? 1f : xRatio * MathF.Abs(entity.VelocityX) / active.MaxSpeedX);
                 else if (layer.MaxSpeedYRatioMultiplier is float yRatio)
-                    sprite.AnimationSpeed = active.MaxFallSpeed == 0f
-                        ? 1f : yRatio * MathF.Abs(entity.VelocityY) / active.MaxFallSpeed;
+                    SetSpeed(sprite, active.MaxFallSpeed == 0f
+                        ? 1f : yRatio * MathF.Abs(entity.VelocityY) / active.MaxFallSpeed);
                 break;
 
             // NoAssignment: leave the sprite's current AnimationSpeed untouched.
@@ -162,18 +162,25 @@ public static class GlueAnimationEvaluator
 
             case GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier:
                 if (layer.AbsoluteVelocityAnimationSpeedMultiplier is float multiplier)
-                    sprite.AnimationSpeed = multiplier * Magnitude(entity.VelocityX, entity.VelocityY);
+                    SetSpeed(sprite, multiplier * Magnitude(entity.VelocityX, entity.VelocityY));
                 break;
 
             case GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier:
                 float maxSpeed = topDown.MovementValues?.MaxSpeed ?? 0f;
                 if (layer.MaxSpeedRatioMultiplier is float ratio)
-                    sprite.AnimationSpeed = maxSpeed == 0f
-                        ? 1f : ratio * Magnitude(entity.VelocityX, entity.VelocityY) / maxSpeed;
+                    SetSpeed(sprite, maxSpeed == 0f
+                        ? 1f : ratio * Magnitude(entity.VelocityX, entity.VelocityY) / maxSpeed);
                 break;
 
             // NoAssignment / BasedOnInputMultiplier: see the platformer switch above.
         }
+    }
+
+    // Authored data that gives a speed the sprite refuses is reported at load (GlueAnimationLayerLoader) and, as with
+    // NoAssignment, leaves the speed as it is: a setter that throws here would end the game in the middle of play.
+    private static void SetSpeed(Sprite sprite, float speed)
+    {
+        if (speed >= 0f) sprite.AnimationSpeed = speed;
     }
 
     /// <summary>Mirrors <see cref="PlatformerBehavior.Update"/>'s private slot-selection logic using

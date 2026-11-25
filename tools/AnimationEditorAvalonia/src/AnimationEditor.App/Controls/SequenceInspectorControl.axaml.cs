@@ -344,7 +344,7 @@ public partial class SequenceInspectorControl : UserControl
         var document = _document!;
         SequenceNameBox.IsEnabled = _canRenameSequence;
         SequenceLoopBox.IsChecked = sequence.Loop;
-        SequenceLengthText.Text = Seconds(SequenceTimeline.Length(document.Save.Sequences, sequence, reference => document.CycleLength(reference) ?? 0));
+        SequenceLengthText.Text = Seconds(SequenceTimeline.Length(document.Save.Sequences, sequence, document.CycleLength));
         SequenceTracksText.Text = sequence.Tracks.Count.ToString(CultureInfo.InvariantCulture);
     }
 
@@ -444,9 +444,10 @@ public partial class SequenceInspectorControl : UserControl
 
     /// <summary>
     /// The Cycle row: the chain's cycle, then how many cycles a set length spans, or that an unset length follows the
-    /// cycle. "Unknown" for a missing chain.
+    /// cycle. "Unknown" for a missing or empty chain.
     /// </summary>
-    internal static string ChainCycleLabel(double? length, double? cycle) => cycle is not { } c || c <= 0 ? "Unknown"
+    internal static string ChainCycleLabel(double? length, double? cycle) => cycle is not { } c ? "Unknown"
+        : c <= 0 ? Seconds(0)
         : length is { } l ? $"{Seconds(c)} (×{(l / c).ToString("0.##", CultureInfo.InvariantCulture)})"
         : $"{Seconds(c)} (length follows it)";
 

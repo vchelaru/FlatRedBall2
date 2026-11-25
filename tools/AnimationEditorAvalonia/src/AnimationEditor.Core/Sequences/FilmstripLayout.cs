@@ -4,6 +4,7 @@ using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
@@ -32,7 +33,8 @@ public sealed record FilmstripCell(
 /// frames (<see cref="PlaybackTimeline"/>: Reverse plays last to first, PingPong plays forward then back). A ping-pong's
 /// end frames show twice as long, back to back across the turnaround and across the loop point, so each is one
 /// double-length cell. The last cycle is clipped at the played end, which is where a cut chain stops. A chain that does
-/// not loop draws its one cycle, then its final showing stretched to the played end (the hold), not further cycles.
+/// not loop draws its one cycle, then its final showing stretched to the played end (the hold), not further cycles. A chain of
+/// no length is one held cell of the frame playback shows.
 /// </summary>
 public static class FilmstripLayout
 {
@@ -90,20 +92,27 @@ public static class FilmstripLayout
         if (count == 0 || played <= 0 || pixelsPerSecond <= 0 || cellHeight <= 0) return Array.Empty<FilmstripCell>();
         double forward = 0;
         foreach (var frame in frames) forward += Math.Max(0, frame.Duration);
-        if (forward <= 0) return Array.Empty<FilmstripCell>();
 
         double cycle = PlaybackTimeline.CycleLength(forward, pingPong);
         int visitsPerCycle = PlaybackTimeline.VisitCount(count, pingPong);
-        int cycles = loop ? (int)Math.Ceiling(played / cycle - 1e-9) : 1;
+        // A ping-pong that shows one frame is one cell over all its cycles, so counting units never stops it.
+        bool oneCell = pingPong && loop && frames.Count(frame => frame.Duration > 0) == 1;
+        int cycles = cycle <= 0 ? 0 : loop ? (int)Math.Min(oneCell ? MaxUnits : int.MaxValue, Math.Ceiling(played / cycle - 1e-9)) : 1;
 
         var units = new List<Unit>();
+        if (cycle <= 0)
+        {
+            int held = PlaybackTimeline.Locate(frames, frame => frame.Duration, 0, pingPong, reverse).FrameIndex;
+            units.Add(new Unit(new FilmstripVisit(held, 0, played, 0, IsHold: true), played));
+        }
         for (int k = 0; k < cycles && units.Count < MaxUnits; k++)
         {
             double start = k * cycle;
             for (int v = 0; v < visitsPerCycle && units.Count < MaxUnits; v++)
             {
                 int frame = PlaybackTimeline.FrameOfVisit(v, count, pingPong, reverse);
-                double end = start + Math.Max(0, frames[frame].Duration);
+                if (frames[frame].Duration <= 0) continue; // skipped
+                double end = start + frames[frame].Duration;
                 if (start >= played - 1e-9) break;
                 var visit = new FilmstripVisit(frame, start, Math.Min(end, played), k, pingPong && (v >= count ^ reverse));
                 if (pingPong && units.Count > 0 && units[^1].Frame == frame)
@@ -122,13 +131,17 @@ public static class FilmstripLayout
             }
         }
 
+        if (oneCell && units[0].End < played) units[0].End = units[0].NaturalEnd = played;
+
         // A chain that does not loop holds its final showing: that cell stretches to the end of the block.
-        if (!loop && played > cycle + 1e-9 && units.Count > 0)
+        // The end frame may have no length, and is held all the same.
+        if (!loop && cycle > 0 && played > cycle + 1e-9 && units.Count > 0)
         {
+            int held = PlaybackTimeline.Locate(frames, frame => frame.Duration, cycle, pingPong, reverse).FrameIndex;
+            if (units[^1].Frame != held) units.Add(new Unit(new FilmstripVisit(held, cycle, played, 0), played));
             var last = units[^1];
             var visits = last.Visits;
-            var held = visits[^1];
-            visits[^1] = held with { End = played, IsHold = true };
+            visits[^1] = visits[^1] with { End = played, IsHold = true };
             last.End = played;
             last.NaturalEnd = played;
         }

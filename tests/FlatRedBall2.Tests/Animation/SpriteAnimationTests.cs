@@ -285,4 +285,24 @@ public class SpriteAnimationTests
         sprite.X.ShouldBe(0f);
         sprite.Y.ShouldBe(0f);
     }
+
+    [Theory]
+    [InlineData(-1f)]
+    [InlineData(-0.001f)]
+    [InlineData(float.NegativeInfinity)]
+    [InlineData(float.NaN)]
+    public void AnimationSpeed_NegativeOrNaN_ThrowsNamingIsReversed(float speed)
+    {
+        var sprite = new Sprite { AnimationSpeed = 2f };
+
+        Should.Throw<ArgumentOutOfRangeException>(() => sprite.AnimationSpeed = speed).Message.ShouldContain("IsReversed");
+
+        sprite.AnimationSpeed.ShouldBe(2f);
+    }
+
+    [Fact]
+    public void AnimationSpeed_Zero_IsAllowed()
+    {
+        new Sprite { AnimationSpeed = 0f }.AnimationSpeed.ShouldBe(0f);
+    }
 }
