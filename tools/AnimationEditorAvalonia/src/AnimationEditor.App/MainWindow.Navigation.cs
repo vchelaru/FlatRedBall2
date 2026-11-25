@@ -96,7 +96,7 @@ public partial class MainWindow
         SettlePendingAchxInput();
     }
 
-    /// <summary><see cref="SettlePendingInput"/> for a way out of the document, which also applies a typed Inspector field.</summary>
+    /// <summary><see cref="SettlePendingInput"/> for a way out of the document, or a command that copies or exports it, which also applies a typed Inspector field.</summary>
     private void SettleBeforeLeaving()
     {
         SettlePendingInput();
