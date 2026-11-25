@@ -42,7 +42,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 : $"Flip {frames.Count} Frames {axisLabel}";
         }
 
-        public bool Do() { Toggle(); return true; }
+        public bool Do()
+        {
+            if (_frames.Count == 0) return false;
+            Toggle();
+            return true;
+        }
+
         public void Undo() => Toggle();
 
         private static FlipPose PoseOf(AnimationFrameSave frame) =>

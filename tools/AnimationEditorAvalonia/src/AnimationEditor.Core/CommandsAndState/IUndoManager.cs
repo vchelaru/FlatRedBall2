@@ -51,6 +51,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         void SealCoalescing();
 
         /// <summary>
+        /// Whether the newest undo entry is a coalesced edit a further matching
+        /// <see cref="Execute"/> would still merge into (no <see cref="SealCoalescing"/> since).
+        /// </summary>
+        bool HasOpenCoalescedEdit { get; }
+
+        /// <summary>
         /// Records an <em>already-applied</em> command in the undo history and clears the
         /// redo stack. Reserved for interactive-gesture commands (shape drag/resize, region
         /// drag) whose mutation is applied incrementally during the gesture and committed on

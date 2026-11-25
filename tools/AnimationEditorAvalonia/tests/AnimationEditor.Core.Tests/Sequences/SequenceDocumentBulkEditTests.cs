@@ -103,6 +103,21 @@ public class SequenceDocumentBulkEditTests
     }
 
     [Fact]
+    public void SetChainsStart_UpThenBackDown_RecordsNoUndoEntry()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = Load(dir);
+        var undo = new UndoManager();
+        document.SetChainsStart(undo, 0, AllChains, 4m).ShouldBeNull();
+        undo.SealCoalescing();
+
+        document.SetChainsStart(undo, 0, AllChains, 5m).ShouldBeNull();
+        document.SetChainsStart(undo, 0, AllChains, 4m).ShouldBeNull();
+
+        undo.UndoHistory.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public void SetChainsLength_SetsAll_AndRefusesAValueThatWouldBreakAnyChain_ChangingNone()
     {
         using var dir = new TestHelpers.TempDir();
