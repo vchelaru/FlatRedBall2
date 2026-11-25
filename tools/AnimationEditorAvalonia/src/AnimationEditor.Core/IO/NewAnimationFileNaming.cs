@@ -66,20 +66,17 @@ public static class NewAnimationFileNaming
     /// <summary>
     /// Name for a duplicate of <paramref name="sourceFileName"/> in the same folder: the stem's
     /// trailing number incremented to the next free one, starting at 2 ("Hero" -> "Hero2",
-    /// "Hero2" -> "Hero3"), matching duplicated chain names. Keeps the source's extension. Only files of
-    /// the same extension collide, except that <c>.achx</c> and <c>.achj</c> share their stems, same as <see cref="Resolve"/>.
+    /// "Hero2" -> "Hero3"), matching duplicated chain names. Keeps the source's extension. <c>.achx</c>, <c>.achj</c>
+    /// and <c>.tsx</c> files of one stem share its companion files, so they collide; a <c>.seqj</c> only with another.
     /// </summary>
     public static string SuggestDuplicateFileName(string sourceFileName, IEnumerable<string> siblingFileNames)
     {
         var source = new FilePath(sourceFileName);
         var stem = source.NoPathNoExtension;
         var baseStem = stem.TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
-        var taken = AchxFolderScanner.IsAchxPath(sourceFileName)
-            ? StemSet(siblingFileNames)
-            : siblingFileNames
-                .Where(name => HasExtension(name, source.Extension))
-                .Select(name => new FilePath(name).NoPathNoExtension)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var taken = AchxFolderScanner.IsSequencePath(sourceFileName)
+            ? SequenceStemSet(siblingFileNames)
+            : Stems(siblingFileNames, name => AchxFolderScanner.IsAchxPath(name) || AchxFolderScanner.IsTsxPath(name));
 
         int suffix = baseStem.Length < stem.Length && int.TryParse(stem[baseStem.Length..], out var n)
             ? n + 1
@@ -169,20 +166,18 @@ public static class NewAnimationFileNaming
     }
 
     private static HashSet<string> SequenceStemSet(IEnumerable<string> fileNames) =>
-        fileNames
-            .Where(AchxFolderScanner.IsSequencePath)
-            .Select(name => new FilePath(name).NoPathNoExtension)
-            .Where(stem => !string.IsNullOrEmpty(stem))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Stems(fileNames, AchxFolderScanner.IsSequencePath);
 
     // Path.GetInvalidFileNameChars() is the host OS's list, so a name legal on Linux but not on
     // Windows would pass here and produce a project other contributors can't check out. The set
     // below is the union both platforms have to live with.
     private static readonly char[] InvalidNameChars = "\\/:*?\"<>|".ToCharArray();
 
-    private static HashSet<string> StemSet(IEnumerable<string> fileNames) =>
+    private static HashSet<string> StemSet(IEnumerable<string> fileNames) => Stems(fileNames, AchxFolderScanner.IsAchxPath);
+
+    private static HashSet<string> Stems(IEnumerable<string> fileNames, Func<string, bool> included) =>
         fileNames
-            .Where(AchxFolderScanner.IsAchxPath)
+            .Where(included)
             .Select(name => new FilePath(name).NoPathNoExtension)
             .Where(stem => !string.IsNullOrEmpty(stem))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
