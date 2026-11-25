@@ -650,7 +650,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             if (GetCurrentPlaybackFrame(chain) is not { } frame) continue;
             string? texPath = _thumbnailService!.ResolveTexturePath(frame);
             _thumbnailService.GetImage(texPath);
-            var sample = ResolveGroupLayerSample(chain, frame);
+            var sample = DrawnSample(chain, frame);
             layers.Add(new PreviewLayer(frame, texPath, sample.OffsetX, sample.OffsetY, sample.Color));
         }
         return layers.ToArray();
@@ -682,15 +682,49 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     }
 
     /// <summary>
-    /// A group layer's offset and color, glided by the stored curves at its own track's playhead (#1478).
-    /// A pinned frame the playhead isn't on shows its value at the start of the frame.
+    /// The offset and color <paramref name="frame"/> is drawn with when its chain shows it, glided by the stored
+    /// curves (#1478). A pinned frame the playhead isn't on shows its value at the start of the frame.
     /// </summary>
-    private KeyframeSample ResolveGroupLayerSample(AnimationChainSave chain, AnimationFrameSave frame)
+    private KeyframeSample DrawnSample(AnimationChainSave chain, AnimationFrameSave frame)
     {
         int index = chain.Frames.IndexOf(frame);
-        var controller = GetPlaybackController(chain);
-        bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == index;
-        return KeyframeSampler.Sample(chain, DocumentUnit, index, playheadOnFrame ? controller!.FrameElapsed : 0);
+        return KeyframeSampler.Sample(chain, DocumentUnit, index, DrawnElapsed(chain, index));
+    }
+
+    // How far into a shown frame its sprite and shapes are drawn: the playhead's position when it is on that frame, else the start.
+    private double DrawnElapsed(AnimationChainSave chain, int frameIndex) =>
+        GetPlaybackController(chain) is { } controller && controller.CurrentFrameIndex == frameIndex ? controller.FrameElapsed : 0;
+
+    /// <summary>Offset and size <paramref name="shape"/> is drawn with, gliding by the curves stored on the shapes (#1478); with the default snap curve its own.</summary>
+    private static KeyframeShapeValue SampleShape(
+        AnimationChainSave? chain, FrameLengthUnit unit, int frameIndex, double elapsedInFrame, ShapeSave shape)
+    {
+        if (chain is not null && frameIndex >= 0)
+            return KeyframeSampler.SampleShape(chain, unit, frameIndex, elapsedInFrame, shape);
+        var own = SaveKeyframeShape.Create(shape);
+        return new KeyframeShapeValue(own.X, own.Y, own.SizeX, own.SizeY);
+    }
+
+    /// <summary>The points <paramref name="polygon"/> is drawn with, gliding by its stored points curve (#1484); with the default snap curve its own.</summary>
+    private static IReadOnlyList<System.Numerics.Vector2> SamplePoints(
+        AnimationChainSave? chain, FrameLengthUnit unit, int frameIndex, double elapsedInFrame, PolygonSave polygon) =>
+        chain is not null && frameIndex >= 0
+            ? KeyframeSampler.SampleShapePoints(chain, unit, frameIndex, elapsedInFrame, polygon)
+            : SaveKeyframeShape.Create(polygon).Points;
+
+    private (AnimationChainSave? Chain, int Index, double Elapsed) DrawnFrameOf(ShapeSave shape)
+    {
+        var frame = FindOwningFrame(shape);
+        var chain = FindOwningChain(frame);
+        int index = chain?.Frames.IndexOf(frame!) ?? -1;
+        return (chain, index, chain is null ? 0 : DrawnElapsed(chain, index));
+    }
+
+    /// <summary>Offset and size <paramref name="shape"/> is drawn with while its frame is shown, so a press hits what is on screen.</summary>
+    private KeyframeShapeValue DrawnShape(ShapeSave shape)
+    {
+        var (chain, index, elapsed) = DrawnFrameOf(shape);
+        return SampleShape(chain, DocumentUnit, index, elapsed, shape);
     }
 
     /// <summary>Whether the animation is currently playing.</summary>
@@ -991,12 +1025,23 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     // Hidden shapes are inert exactly like locked ones, so no drag/resize/vertex gesture can edit what isn't drawn.
     private bool IsShapeLocked(object? shape) => !_showShapes || IsFrameLocked(FindOwningFrame(shape));
 
-    // A polygon's vertices take no gestures while its chain is locked or its Points keyframe is off: a skipped
-    // frame's own points are ignored by playback, so a drag there would edit data nothing reads (#1484).
-    private bool IsPolygonVertexLocked(PolygonSave polygon) =>
-        IsShapeLocked(polygon)
-        || !KeyframeInspectorState.IsEffectivelyKeyframe(
-            ShapeKeyframeGroup.Points, polygon, FindOwningChain(FindOwningFrame(polygon)));
+    // A gesture also takes no press on a value whose keyframe is off: playback ignores that value, so a drag there
+    // would edit data nothing reads (#1484, #2167).
+    private bool IsGestureLocked(ShapeSave shape, params ShapeKeyframeGroup[] writes) =>
+        IsShapeLocked(shape) || !writes.All(group => KeyframeInspectorState.IsEffectivelyKeyframe(
+            group, shape, FindOwningChain(FindOwningFrame(shape))));
+
+    private bool IsPolygonVertexLocked(PolygonSave polygon) => IsGestureLocked(polygon, ShapeKeyframeGroup.Points);
+
+    private bool IsShapeMoveLocked(ShapeSave shape) => IsGestureLocked(shape, ShapeKeyframeGroup.Offset);
+
+    // A rectangle keeps its opposite edge, so resizing it moves its center too; a circle keeps its center.
+    private bool IsShapeResizeLocked(ShapeSave shape) => shape is AARectSave
+        ? IsGestureLocked(shape, ShapeKeyframeGroup.Size, ShapeKeyframeGroup.Offset)
+        : IsGestureLocked(shape, ShapeKeyframeGroup.Size);
+
+    private bool IsFrameMoveLocked(AnimationFrameSave frame) => IsFrameLocked(frame)
+        || !KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Offset, frame, FindOwningChain(frame));
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
@@ -1338,7 +1383,11 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// and selects the topmost collision shape under the cursor, if any.
     /// Mirrors the shape-selection code path in <see cref="OnPointerPressed"/>.
     /// </summary>
-    internal void SimulateCanvasClick(float px, float py) => TrySelectShapeAt(px, py);
+    internal void SimulateCanvasClick(float px, float py)
+    {
+        if (HitTestShape(px, py) is { } shape) SelectShapeFromClick(shape);
+    }
+
     /// <summary>
     /// Test-only: applies a world-space drag delta to the currently selected shape and commits.
     /// Bypasses coordinate conversion, so results are independent of zoom/pan/OffsetMultiplier.
@@ -1346,10 +1395,10 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     internal void SimulateShapeDrag(float worldDx, float worldDy)
     {
         var shape = _selectedState!.SelectedShape;
-        if (shape is null || IsShapeLocked(shape)) return;
+        if (shape is not ShapeSave save || IsShapeMoveLocked(save)) return;
         _draggingShape = shape;
 
-        (_shapeDragStartX, _shapeDragStartY) = (((ShapeSave)shape).X, ((ShapeSave)shape).Y);
+        (_shapeDragStartX, _shapeDragStartY) = (save.X, save.Y);
         ApplyShapeDrag(worldDx, worldDy);
         CommitShapeDrag();
     }
@@ -1363,7 +1412,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     internal void SimulateShapeResize(HandleKind handle, float newParam1, float newParam2 = 0f)
     {
         var shape = _selectedState!.SelectedShape;
-        if (shape is null || IsShapeLocked(shape)) return;
+        if (shape is not ShapeSave save || IsShapeResizeLocked(save)) return;
         _draggingShape = shape;
 
         _shapeResizeHandle = handle;
@@ -1396,7 +1445,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     internal void SimulateShapeResizeDrag(HandleKind handle, float worldDx, float worldDy)
     {
         var shape = _selectedState!.SelectedShape;
-        if (shape is null || IsShapeLocked(shape)) return;
+        if (shape is not ShapeSave save || IsShapeResizeLocked(save)) return;
         _draggingShape = shape;
         _shapeResizeHandle = handle;
 
@@ -1426,7 +1475,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     internal void SimulateFrameDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         var frame = _selectedState!.SelectedFrame;
-        if (frame is null || _selectedState!.SelectedFrames.Count > 1 || IsFrameLocked(frame)) return;
+        if (frame is null || _selectedState!.SelectedFrames.Count > 1 || IsFrameMoveLocked(frame)) return;
 
         (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
@@ -1920,22 +1969,21 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 return StandardCursorType.Hand;
         }
 
-        // A locked chain is inert to every drag gesture below (OnPointerPressed's ~2081-2161
-        // guards via IsShapeLocked/IsFrameLocked) -- the hover cursor must not imply otherwise
-        // (#1032 follow-up).
+        // The cursor must not imply a drag that OnPointerPressed refuses (a locked chain, hidden shapes, or a value
+        // whose keyframe is off), so it tests the same locks in the same order (#1032 follow-up).
         var handle = HitTestShapeHandle((float)pos.X, (float)pos.Y);
-        if (handle != HandleKind.None && !IsShapeLocked(_selectedState!.SelectedShape))
+        bool handleLocked = handle != HandleKind.None && IsShapeResizeLocked((ShapeSave)_selectedState!.SelectedShape!);
+        if (handle != HandleKind.None && !handleLocked)
             return GetResizeCursor(handle);
 
         StandardCursorType? cursorType = _draggedGuideIdx >= 0
             ? (_draggingHGuide ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast)
             : GetGuideCursorAt((float)pos.X, (float)pos.Y);
-        var hitShape = HitTestShape((float)pos.X, (float)pos.Y);
-        if (cursorType is null && hitShape is not null && !IsShapeLocked(hitShape))
-            cursorType = StandardCursorType.SizeAll;
-        if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y))
-            cursorType = StandardCursorType.SizeAll;
-        return cursorType;
+        if (cursorType is not null || handleLocked) return cursorType;
+        bool draggable = HitTestShape((float)pos.X, (float)pos.Y) is ShapeSave hitShape
+            ? !IsShapeMoveLocked(hitShape)
+            : HitTestFrameSprite((float)pos.X, (float)pos.Y);
+        return draggable ? StandardCursorType.SizeAll : null;
     }
 
     /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/> would apply at the
@@ -1968,12 +2016,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             var all = new List<PreviewShapeInfo>();
             foreach (var chain in _selectedState!.PreviewChains)
                 if (GetCurrentPlaybackFrame(chain) is { } groupFrame)
-                {
-                    var controller = GetPlaybackController(chain);
-                    bool playheadOnFrame = controller is not null && controller.CurrentFrameIndex == chain.Frames.IndexOf(groupFrame);
                     all.AddRange(BuildShapeInfos(groupFrame, pinned: GroupPinnedFrame(chain) is not null,
-                        playheadOnFrame ? controller!.FrameElapsed : 0, DocumentUnit));
-                }
+                        DrawnElapsed(chain, chain.Frames.IndexOf(groupFrame)), DocumentUnit));
             return all.ToArray();
         }
 
@@ -1991,19 +2035,9 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     {
         if (frame.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
 
-        // Shape offset and size glide by the curves stored on the shapes (#1478); with the default snap curve
-        // this is each shape's own value.
         var chain = owningChain ?? FindOwningChain(frame);
         int frameIndex = chain?.Frames.IndexOf(frame) ?? -1;
-        KeyframeShapeValue ValueOf(ShapeSave shape)
-        {
-            if (chain is null || frameIndex < 0)
-            {
-                var own = SaveKeyframeShape.Create(shape);
-                return new KeyframeShapeValue(own.X, own.Y, own.SizeX, own.SizeY);
-            }
-            return KeyframeSampler.SampleShape(chain, unit, frameIndex, elapsedInFrame, shape);
-        }
+        KeyframeShapeValue ValueOf(ShapeSave shape) => SampleShape(chain, unit, frameIndex, elapsedInFrame, shape);
 
         var selectedRects   = new HashSet<AARectSave>();
         var selectedCircles  = new HashSet<CircleSave>();
@@ -2018,34 +2052,30 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             selectedPolygons = _selectedState!.SelectedPolygons.ToHashSet();
         }
 
-        bool frameLocked = IsFrameLocked(frame);
         var list = new List<PreviewShapeInfo>();
         var pendingShapes = _pendingCutState?.WireframeShapes.ToHashSet() ?? [];
         foreach (var r in frame.ShapesSave!.AARectSaves)
         {
             var v = ValueOf(r);
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, v.X, v.Y, v.SizeX, v.SizeY,
-                selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked, IsHovered: pinned && IsHoverTarget(r)));
+                selectedRects.Contains(r), pendingShapes.Contains(r), selectedRects.Contains(r) && IsShapeResizeLocked(r), IsHovered: pinned && IsHoverTarget(r)));
         }
         foreach (var c in frame.ShapesSave!.CircleSaves)
         {
             var v = ValueOf(c);
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, v.X, v.Y, v.SizeX, 0f,
-                selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked, IsHovered: pinned && IsHoverTarget(c)));
+                selectedCircles.Contains(c), pendingShapes.Contains(c), selectedCircles.Contains(c) && IsShapeResizeLocked(c), IsHovered: pinned && IsHoverTarget(c)));
         }
         foreach (var p in frame.ShapesSave!.PolygonSaves)
         {
-            // The vertices glide by the polygon's stored points curve (#1484); with the default snap curve they are its own.
-            var sampled = chain is null || frameIndex < 0
-                ? SaveKeyframeShape.Create(p).Points
-                : KeyframeSampler.SampleShapePoints(chain, unit, frameIndex, elapsedInFrame, p);
+            var sampled = SamplePoints(chain, unit, frameIndex, elapsedInFrame, p);
             int n = PolygonVertices.Count(sampled);
             var points = new float[n * 2];
             for (int i = 0; i < n; i++)
                 (points[i * 2], points[i * 2 + 1]) = (sampled[i].X, sampled[i].Y);
             var v = ValueOf(p);
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Polygon, v.X, v.Y, 0f, 0f,
-                selectedPolygons.Contains(p), pendingShapes.Contains(p), frameLocked,
+                selectedPolygons.Contains(p), pendingShapes.Contains(p), selectedPolygons.Contains(p) && IsPolygonVertexLocked(p),
                 points, sampled.Count >= 2 && sampled[0] == sampled[^1], PolygonVertices.IsSelfIntersecting(p),
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? HighlightedVertexIndex(n) : -1,
                 ReferenceEquals(p, _selectedState!.SelectedPolygon) ? VertexRevealInflation() : 0f,
@@ -2270,17 +2300,17 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             var circles = frame.ShapesSave.CircleSaves.ToList();
             for (int i = circles.Count - 1; i >= 0; i--)
             {
-                var c = circles[i];
-                if (PreviewShapeHitTester.HitsCircle(px, py, cx + c.X * om, cy - c.Y * om, c.Radius * om, tolerance))
-                    result.Add(c);
+                var v = DrawnShape(circles[i]);
+                if (PreviewShapeHitTester.HitsCircle(px, py, cx + v.X * om, cy - v.Y * om, v.SizeX * om, tolerance))
+                    result.Add(circles[i]);
             }
 
             var rects = frame.ShapesSave.AARectSaves.ToList();
             for (int i = rects.Count - 1; i >= 0; i--)
             {
-                var r = rects[i];
-                if (PreviewShapeHitTester.HitsRect(px, py, cx + r.X * om, cy - r.Y * om, r.ScaleX * om, r.ScaleY * om, tolerance))
-                    result.Add(r);
+                var v = DrawnShape(rects[i]);
+                if (PreviewShapeHitTester.HitsRect(px, py, cx + v.X * om, cy - v.Y * om, v.SizeX * om, v.SizeY * om, tolerance))
+                    result.Add(rects[i]);
             }
         }
         return result;
@@ -2390,8 +2420,9 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         var selected = _selectedState!.SelectedShapes;
         if (selected.Count < 2 || !selected.Contains(pressed)) return null;
         return selected
-            .Where(s => !ReferenceEquals(s, pressed) && !IsShapeLocked(s))
+            .Where(s => !ReferenceEquals(s, pressed))
             .Cast<ShapeSave>()
+            .Where(s => !IsShapeMoveLocked(s))
             .Select(s => (s, s.X, s.Y))
             .ToArray();
     }
@@ -2420,19 +2451,19 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _shapeDragCompanions = null;
     }
 
-    /// <summary>Screen-space positions of <paramref name="polygon"/>'s vertices (closing point excluded).</summary>
+    /// <summary>Screen-space positions <paramref name="polygon"/>'s vertices are drawn at (closing point excluded).</summary>
     private (float X, float Y)[] PolygonScreenVertices(PolygonSave polygon)
     {
         float cx = GetCenterX();
         float cy = GetCenterY();
         float om = _appState!.OffsetMultiplier * _zoom;
-        int n = PolygonVertices.Count(polygon);
+        var (chain, index, elapsed) = DrawnFrameOf(polygon);
+        var origin = SampleShape(chain, DocumentUnit, index, elapsed, polygon);
+        var points = SamplePoints(chain, DocumentUnit, index, elapsed, polygon);
+        int n = PolygonVertices.Count(points);
         var result = new (float X, float Y)[n];
         for (int i = 0; i < n; i++)
-        {
-            var (vx, vy) = PolygonVertices.Get(polygon, i);
-            result[i] = (cx + (polygon.X + vx) * om, cy - (polygon.Y + vy) * om);
-        }
+            result[i] = (cx + (origin.X + points[i].X) * om, cy - (origin.Y + points[i].Y) * om);
         return result;
     }
 
@@ -2591,25 +2622,14 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         float om = _appState!.OffsetMultiplier * _zoom;
         const float Hs = 5f;
 
-        float left, top, right, bottom;
-        if (sel is AARectSave r)
-        {
-            float sx = cx + r.X * om;
-            float sy = cy - r.Y * om;
-            float hw = r.ScaleX * om;
-            float hh = r.ScaleY * om;
-            left = sx - hw; right  = sx + hw;
-            top  = sy - hh; bottom = sy + hh;
-        }
-        else if (sel is CircleSave c)
-        {
-            float sx = cx + c.X * om;
-            float sy = cy - c.Y * om;
-            float sr = c.Radius * om;
-            left = sx - sr; right  = sx + sr;
-            top  = sy - sr; bottom = sy + sr;
-        }
-        else return HandleKind.None;
+        if (sel is not (AARectSave or CircleSave)) return HandleKind.None;
+        var drawn = DrawnShape((ShapeSave)sel);
+        float sx = cx + drawn.X * om;
+        float sy = cy - drawn.Y * om;
+        float hw = drawn.SizeX * om;
+        float hh = (sel is CircleSave ? drawn.SizeX : drawn.SizeY) * om;
+        float left = sx - hw, right  = sx + hw;
+        float top  = sy - hh, bottom = sy + hh;
 
         var kind = DragHandleHitTester.GetHandleAt(px, py, left, top, right, bottom,
             hitRadius: Hs, handleOffset: Hs);
@@ -2717,67 +2737,6 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _draggingShape     = null;
     }
 
-    /// <summary>
-    /// Selects the topmost collision shape under (<paramref name="px"/>, <paramref name="py"/>)
-    /// in screen space. Circles are checked before rectangles because they are rendered on top.
-    /// Within each type, shapes are iterated in reverse render order so the last-drawn (topmost)
-    /// shape wins when two shapes overlap.
-    /// Returns <c>true</c> if a shape was selected.
-    /// </summary>
-    private bool TrySelectShapeAt(float px, float py)
-    {
-        var frame = _selectedState!.SelectedFrame;
-        if (!_showShapes || frame?.ShapesSave is null) return false;
-        if (px < RulerSize || py < RulerSize) return false;
-
-        float cx = GetCenterX();
-        float cy = GetCenterY();
-        float om = _appState!.OffsetMultiplier * _zoom;
-        const float tolerance = 5f;
-
-        // Polygons render last, then circles, then rects, so check in that order.
-        var polygons = frame.ShapesSave!.PolygonSaves.ToList();
-        for (int i = polygons.Count - 1; i >= 0; i--)
-        {
-            if (PreviewShapeHitTester.HitsPolygon(px, py, PolygonScreenVertices(polygons[i]), tolerance))
-            {
-                _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
-                _selectedState!.SelectedPolygon = polygons[i];
-                return true;
-            }
-        }
-
-        var circles = frame.ShapesSave!.CircleSaves.ToList();
-        for (int i = circles.Count - 1; i >= 0; i--)
-        {
-            var c = circles[i];
-            float sx = cx + c.X * om;
-            float sy = cy - c.Y * om;
-            if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, c.Radius * om, tolerance))
-            {
-                _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
-                _selectedState!.SelectedCircle = c;
-                return true;
-            }
-        }
-
-        var rects = frame.ShapesSave!.AARectSaves.ToList();
-        for (int i = rects.Count - 1; i >= 0; i--)
-        {
-            var r = rects[i];
-            float sx = cx + r.X * om;
-            float sy = cy - r.Y * om;
-            if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, r.ScaleX * om, r.ScaleY * om, tolerance))
-            {
-                _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
-                _selectedState!.SelectedRectangle = r;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     /// <summary>What a sprite grab moves: <see cref="Frames"/>, and whether it is the lone-selected-frame case.</summary>
     private readonly record struct SpriteDragScope(AnimationFrameSave[] Frames, bool IsSingleFrame, (ShapeSave Shape, AnimationFrameSave Frame)[] Shapes);
 
@@ -2786,8 +2745,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// than by the overall shape of the selection, so any mix of whole animations and individual
     /// frames (a group preview with one track playing and another pinned to a frame) is handled the
     /// same way. Every unlocked selected animation contributes all its frames and every unlocked
-    /// selected frame contributes itself; locked ones contribute nothing, so they neither move nor
-    /// block the rest. The grab hits when the cursor is over the sprite currently shown for any
+    /// selected frame contributes itself; locked ones, and frames whose Offset keyframe is off,
+    /// contribute nothing, so they neither move nor block the rest. The grab hits when the cursor is over the sprite currently shown for any
     /// contributing animation or frame. Returns null when nothing unlocked is grabbed, and in a
     /// <c>.tsx</c>, which cannot store a sprite offset.
     /// <paramref name="requireHit"/> false skips the cursor test (test helpers).
@@ -2804,10 +2763,10 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         foreach (var chain in chains)
         {
             if (chain.IsLocked) continue;
-            moves.AddRange(chain.Frames);
+            // Offset edits go only to keyframes; the rest inherit and follow on their own.
+            moves.AddRange(chain.Frames.Where(f => KeyframeInspectorState.IsEffectivelyKeyframe(KeyframeGroup.Offset, f, chain)));
             foreach (var chainFrame in chain.Frames)
                 foreach (var shape in chainFrame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [])
-                    // Offset edits go only to keyframes; the rest inherit and follow on their own.
                     if (KeyframeInspectorState.IsEffectivelyKeyframe(ShapeKeyframeGroup.Offset, shape, chain))
                         shapesToMove.Add((shape, chainFrame));
             if (!hit && GetCurrentPlaybackFrame(chain) is { } shown && HitTestFrameFootprint(shown, px, py))
@@ -2817,7 +2776,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         var selectedFrames = _selectedState!.SelectedFrames;
         foreach (var frame in selectedFrames)
         {
-            if (IsFrameLocked(frame)) continue;
+            if (IsFrameMoveLocked(frame)) continue;
             moves.Add(frame);
             if (!hit && IsFrameShown(frame) && HitTestFrameFootprint(frame, px, py))
                 hit = true;
@@ -2869,8 +2828,10 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
 
         var (sw, sh) = ComputeDisplayedSize(frame);
         float om = _appState!.OffsetMultiplier * _zoom;
-        float sx = GetCenterX() + frame.RelativeX * om;
-        float sy = GetCenterY() - frame.RelativeY * om;
+        var (offsetX, offsetY) = FindOwningChain(frame) is { } chain && DrawnSample(chain, frame) is var drawn
+            ? (drawn.OffsetX, drawn.OffsetY) : (frame.RelativeX, frame.RelativeY);
+        float sx = GetCenterX() + offsetX * om;
+        float sy = GetCenterY() - offsetY * om;
         float halfW = sw * _zoom / 2f;
         float halfH = sh * _zoom / 2f;
 
@@ -3137,8 +3098,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         var handleKind = HitTestShapeHandle(px, py);
         if (handleKind != HandleKind.None)
         {
-            var sel = _selectedState!.SelectedShape!;
-            if (!IsShapeLocked(sel))
+            var sel = (ShapeSave)_selectedState!.SelectedShape!;
+            if (!IsShapeResizeLocked(sel))
             {
                 _draggingShape   = sel;
                 _shapeDragAnchor = pos;
@@ -3166,13 +3127,14 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _pendingCycleShape = null;
         if (hitShape is not null)
         {
+            bool moveLocked = IsShapeMoveLocked((ShapeSave)hitShape);
             // Pressing the already-selected shape where others overlap: drag it as usual, but a
-            // release without moving cycles to the next shape beneath (a locked shape can't be
-            // dragged, so it cycles right away).
+            // release without moving cycles to the next shape beneath (a shape that can't be
+            // dragged cycles right away).
             object? cycleTarget = ReferenceEquals(hitShape, _selectedState!.SelectedShape)
                 ? ShapeClickTarget(px, py) : null;
             if (ReferenceEquals(cycleTarget, hitShape)) cycleTarget = null;
-            if (cycleTarget is not null && IsShapeLocked(hitShape))
+            if (cycleTarget is not null && moveLocked)
             {
                 SelectShapeFromClick(cycleTarget);
                 return;
@@ -3180,12 +3142,12 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             _pendingCycleShape = cycleTarget;
 
             // Pressing one of several selected shapes keeps the selection and drags them all.
-            _shapeDragCompanions = IsShapeLocked(hitShape) ? null : ResolveShapeDragCompanions(hitShape);
+            _shapeDragCompanions = moveLocked ? null : ResolveShapeDragCompanions(hitShape);
             if (_shapeDragCompanions is null)
                 SelectShapeFromClick(hitShape);
             else
                 _pendingCycleShape = null;
-            if (!IsShapeLocked(hitShape))
+            if (!moveLocked)
             {
                 _draggingShape     = hitShape;
                 _shapeDragAnchor   = pos;
@@ -3196,9 +3158,6 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             }
             return;
         }
-
-        // No shape hit — try to select a collision shape.
-        if (TrySelectShapeAt(px, py)) return;
 
         // Nothing above matched — try to drag the selected frame's sprite, or (when no single
         // frame is pinned) the whole selected chain together, or (when 2+ frames are
@@ -3419,9 +3378,9 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         float Param1, float Param2,
         bool IsSelected,
         bool IsPendingCut = false,
-        // A locked chain's shape still shows the gold "selected" highlight via IsSelected --
-        // only the resize handles (implying it can be dragged) are suppressed (#1032 follow-up).
-        bool IsLocked = false,
+        // A selected shape of a locked chain, or one whose keyframe is off, still shows the gold highlight via
+        // IsSelected -- only the handles (implying they can be dragged) are suppressed (#1032 follow-up, #2167).
+        bool HandlesLocked = false,
         float[]? Points = null,
         bool IsClosed = true,
         bool IsSelfIntersecting = false,
@@ -3528,14 +3487,14 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 canvas.DrawPath(path, paint);
                 if (sh.IsSelected)
                     DrawPolygonOrigin(canvas, sx, sy);
-                if (sh.IsSelected && !sh.IsLocked)
+                if (sh.IsSelected && !sh.HandlesLocked)
                     DrawPolygonHandles(canvas, sh, sx, sy, om);
             }
             else if (sh.Kind == PreviewShapeKind.Rect)
             {
                 float hw = sh.Param1 * om;
                 float hh = sh.Param2 * om;
-                if (sh.IsSelected && !sh.IsLocked)
+                if (sh.IsSelected && !sh.HandlesLocked)
                     DrawShapeHandles(canvas, sx - hw, sy - hh, sx + hw, sy + hh);
                 canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), paint);
             }
@@ -3552,7 +3511,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                         StrokeWidth = 1f,
                         PathEffect  = SKPathEffect.CreateDash(new float[] { 4f, 4f }, 0f),
                     };
-                    if (!sh.IsLocked)
+                    if (!sh.HandlesLocked)
                         DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
                     canvas.DrawRect(new SKRect(sx - sr, sy - sr, sx + sr, sy + sr), boxPaint);
                 }
