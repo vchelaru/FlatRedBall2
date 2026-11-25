@@ -34,6 +34,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         event Action? StackChanged;
 
         /// <summary>
+        /// Raised when a command has run through <see cref="Execute"/>, <see cref="Undo"/> or <see cref="Redo"/>, before
+        /// <see cref="StackChanged"/>.
+        /// </summary>
+        event Action? CommandRan;
+
+        /// <summary>
         /// Runs <see cref="IUndoableCommand.Do"/> and, if it reported a real change,
         /// records the command in the undo history (clearing the redo stack).
         /// This is the chokepoint for project mutation — call it instead of mutating
