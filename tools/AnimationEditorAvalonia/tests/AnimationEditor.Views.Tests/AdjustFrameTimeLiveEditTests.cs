@@ -42,6 +42,7 @@ public class AdjustFrameTimeLiveEditTests
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
         public uint? GetTsxOwnerTileId(AnimationChainSave chain) => null;
         public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId) => "not a tsx project";
+        public IReadOnlyList<AnimationEditor.Core.Tiled.MultiTileMappingResult> MapTsxForSave() => [];
         public bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId) => false;
         public bool MarkChainNameExplicit(AnimationChainSave chain) => false;
         public bool IsChainNameAuto(AnimationChainSave chain) => false;
