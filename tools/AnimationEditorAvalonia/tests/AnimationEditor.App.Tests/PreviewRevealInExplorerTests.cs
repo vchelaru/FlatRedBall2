@@ -9,6 +9,7 @@ using FlatRedBall2.AnimationEditorCommon;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -62,6 +63,22 @@ public class PreviewRevealInExplorerTests
         ctx.ProjectManager.FileName = @"C:\proj\anim.achx";
 
         Assert.Equal("C:/proj/textures/hero.png", ctrl.ResolveSelectedTexturePath());
+    }
+
+    // #2103
+    [AvaloniaFact]
+    public void ResolveSelectedTexturePath_TextureOnAnotherDrive_IsItsStoredPath()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var ctrl = ctx.CreatePreviewControl();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave { TextureName = "D:/art/hero.png" };
+        chain.Frames.Add(frame);
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.ProjectManager.FileName = "C:/proj/anim.achx";
+
+        ctrl.ResolveSelectedTexturePath().ShouldBe("D:/art/hero.png");
     }
 
     // ── OnContextMenuOpening ───────────────────────────────────────────────────
