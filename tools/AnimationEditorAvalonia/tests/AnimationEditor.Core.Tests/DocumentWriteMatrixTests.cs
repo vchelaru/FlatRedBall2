@@ -42,7 +42,6 @@ public class DocumentWriteMatrixTests
     private static (string Issue, string Failure)? KnownBug(DocAction action, DocType front) => (action, front) switch
     {
         (DocAction.SaveAsToAnotherFolder, DocType.Achx or DocType.Achj) => ("#2031", "the new file names files that are not there"),
-        (DocAction.SaveAsToAnotherFolder, DocType.Tsx) => ("#2016", "the new file names files that are not there"),
         _ => null,
     };
 

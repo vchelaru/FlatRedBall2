@@ -15,8 +15,7 @@ namespace AnimationEditor.Core.Tests.Tiled;
 /// <summary>
 /// Round trip of every construct Tiled's TMX/TSX reference allows in a tileset file (#2007), through
 /// the editor's own load and save. Adding a construct is one <see cref="Row"/>. Each row runs every
-/// <see cref="Op"/>; the saved XML tree must equal the original one, apart from whitespace, attribute
-/// order and the normalisations in <see cref="Normalise"/>.
+/// <see cref="Op"/>; the saved bytes must equal the original ones, apart from the edited duration.
 /// </summary>
 public class TsxCorpusRoundTripTests : IDisposable
 {
@@ -29,12 +28,10 @@ public class TsxCorpusRoundTripTests : IDisposable
         /// <summary>Open, save.</summary>
         Save,
 
-        /// <summary>Open, change one frame's duration on the first animated tile, save. That tile is
-        /// regenerated; the rest of the file is patched around it.</summary>
+        /// <summary>Open, change one frame's duration on the first animated tile, save.</summary>
         EditSave,
 
-        /// <summary><see cref="EditSave"/> on a file with no line breaks, as Tiled's "minimize output"
-        /// writes it. The writer cannot patch it, so the whole file is regenerated.</summary>
+        /// <summary><see cref="EditSave"/> on a file with no line breaks, as Tiled's "minimize output" writes it.</summary>
         EditSaveOneLine,
 
         /// <summary>Open, save to a path that does not exist yet.</summary>
@@ -44,13 +41,8 @@ public class TsxCorpusRoundTripTests : IDisposable
     /// <param name="Xml">The whole file. Every row that opens has an animated tile to edit.</param>
     /// <param name="FileEncoding">Null is UTF-8 without a byte order mark.</param>
     /// <param name="TemplateXml">Written beside the file as <c>Template.tx</c>.</param>
-    /// <param name="RefusedOnOneLine">The one-line form does not open (see <see cref="RefusedRows"/>).</param>
     private sealed record Row(
-        string Name, string Xml, Encoding? FileEncoding = null, string? TemplateXml = null, bool RefusedOnOneLine = false);
-
-    /// <summary>Rows that lose something today. <see cref="Issue"/> is the issue that fixes it. What each
-    /// one loses is listed in <c>Fixtures/TsxCorpusKnownLosses.txt</c>.</summary>
-    private sealed record Loss(string Issue, Op[] Ops, string[] Rows);
+        string Name, string Xml, Encoding? FileEncoding = null, string? TemplateXml = null);
 
     private const string Animation =
         "<animation>\n   <frame tileid=\"0\" duration=\"200\"/>\n   <frame tileid=\"1\" duration=\"100\"/>\n  </animation>";
@@ -215,7 +207,7 @@ public class TsxCorpusRoundTripTests : IDisposable
             + "<wangcolor name=\"Grass\" class=\"Soft\" color=\"#00ff00\" tile=\"0\" probability=\"0.5\"><properties><property name=\"speed\" type=\"float\" value=\"1.5\"/></properties></wangcolor>"
             + $"{WangColor}{WangTile}<wangtile tileid=\"4\" wangid=\"0,1,0,2,0,1,0,254\"/></wangset>"))),
         new("wangsets sharing a name", Tsx(tail: Wangsets(
-            $"<wangset name=\"Unnamed Set\" type=\"corner\" tile=\"-1\">{WangColor}{WangTile}</wangset>\n  <wangset name=\"Unnamed Set\" type=\"edge\" tile=\"-1\">{WangColor}{WangTile}</wangset>")), RefusedOnOneLine: true),
+            $"<wangset name=\"Unnamed Set\" type=\"corner\" tile=\"-1\">{WangColor}{WangTile}</wangset>\n  <wangset name=\"Unnamed Set\" type=\"edge\" tile=\"-1\">{WangColor}{WangTile}</wangset>"))),
         new("wangset without type (before 1.5)", Tsx(tail: Wangsets($"<wangset name=\"Ground\" tile=\"-1\">{WangColor}{WangTile}</wangset>"))),
         new("wangset empty", Tsx(tail: Wangsets("<wangset name=\"Ground\" type=\"mixed\" tile=\"-1\"/>"))),
         new("wangsets empty", Tsx(tail: "<wangsets/>")),
@@ -249,6 +241,23 @@ public class TsxCorpusRoundTripTests : IDisposable
         new("default namespace", Tsx(root: " xmlns=\"urn:tiled\"")),
         new("standalone declaration", Tsx(prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")),
         new("image after the tiles", Tsx(image: "", tail: "<image source=\"Heroes.png\" width=\"64\" height=\"64\"/>")),
+        new("attributes in single quotes", Tsx(tile0Attributes: " type='a \"b\"'").Replace("tileid=\"1\" duration=\"100\"", "duration = '100'  tileid='1'")),
+        new("spaces inside tags", Tsx(tiles: "<tile id=\"5\"  type=\"Water\"   />\n <tile id=\"6\" ></tile >")),
+        new("CR line endings", Tsx(tiles: "<tile id=\"5\" type=\"Water\"/>").Replace("\n", "\r")),
+        new("mixed line endings", Tsx(tiles: "<tile id=\"5\" type=\"A\"/>\r\n <tile id=\"6\" type=\"B\"/>")),
+
+        // Constructs DotTiled cannot read.
+        new("missing object template", Tsx(tile0Before: Objects("<object id=\"1\" template=\"Missing.tx\" x=\"1\" y=\"2\"/>"))),
+        new("wangid in hex (before 1.5)", Tsx(tail: Wangsets($"<wangset name=\"Ground\" tile=\"-1\">{WangColor}<wangtile tileid=\"0\" wangid=\"0x01010101\"/></wangset>"))),
+        new("property list (1.12)", Tsx(tile0Before: Properties("<property name=\"L\" type=\"list\"><item type=\"int\" value=\"10\"/><item value=\"text\"/></property>"))),
+        new("property list on the tileset (1.12)", Tsx(head: "<properties>\n  <property name=\"L\" type=\"list\">\n   <item type=\"int\" value=\"10\"/>\n  </property>\n </properties>")),
+        new("property unknown type", Tsx(tile0Before: Properties("<property name=\"V\" type=\"vector\" value=\"1,2\"/>"))),
+        new("properties unknown child", Tsx(tile0Before: Properties("<property name=\"S\" value=\"text\"/><future a=\"1\"/>"))),
+        new("objectgroup without id (before 1.2)", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\"/>", " draworder=\"index\""))),
+        new("object unknown child", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\" width=\"3\" height=\"4\"><future/></object>"))),
+        new("object capsule (1.12)", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\" width=\"3\" height=\"4\"><capsule/></object>"))),
+        new("no XML declaration", Tsx(prolog: "")),
+        new("two wangsets on one line", Tsx(tail: Wangsets($"<wangset name=\"A\" tile=\"-1\">{WangColor}{WangTile}</wangset><wangset name=\"B\" tile=\"-1\">{WangColor}{WangTile}</wangset>"))),
     ];
 
     /// <summary>Files the editor refuses to open, so nothing in them can be lost.</summary>
@@ -259,260 +268,87 @@ public class TsxCorpusRoundTripTests : IDisposable
         new("sheet with one extra tile image", Tsx(tile0Before: "<image source=\"a.png\" width=\"16\" height=\"16\"/>")),
         new("no image", Tsx(image: "")),
         new("two tiles with one id", Tsx(tiles: "<tile id=\"5\" type=\"A\"/>\n <tile id=\"5\" type=\"B\"/>")),
-        new("missing object template", Tsx(tile0Before: Objects("<object id=\"1\" template=\"Missing.tx\" x=\"1\" y=\"2\"/>"))),
         new("DOCTYPE with an entity", Tsx(tile0Attributes: " type=\"&e;\"", prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE tileset [<!ENTITY e \"ext\">]>\n")),
-        new("wangid in hex (before 1.5)", Tsx(tail: Wangsets($"<wangset name=\"Ground\" tile=\"-1\">{WangColor}<wangtile tileid=\"0\" wangid=\"0x01010101\"/></wangset>"))),
         new("tileset pointing at another file", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tileset firstgid=\"1\" source=\"Other.tsx\"/>\n"),
         new("map file", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<map version=\"1.10\" orientation=\"orthogonal\" width=\"1\" height=\"1\" tilewidth=\"16\" tileheight=\"16\"/>\n"),
         new("image embedded data", Tsx(image: "<image format=\"png\" width=\"64\" height=\"64\">\n  <data encoding=\"base64\">iVBORw0KGgo=</data>\n </image>")),
-        new("property list (1.12)", Tsx(tile0Before: Properties("<property name=\"L\" type=\"list\"><item type=\"int\" value=\"10\"/><item value=\"text\"/></property>"))),
-        new("property list on the tileset (1.12)", Tsx(head: "<properties>\n  <property name=\"L\" type=\"list\">\n   <item type=\"int\" value=\"10\"/>\n  </property>\n </properties>")),
-        new("property unknown type", Tsx(tile0Before: Properties("<property name=\"V\" type=\"vector\" value=\"1,2\"/>"))),
-        new("properties unknown child", Tsx(tile0Before: Properties("<property name=\"S\" value=\"text\"/><future a=\"1\"/>"))),
-        new("objectgroup without id (before 1.2)", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\"/>", " draworder=\"index\""))),
-        new("object unknown child", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\" width=\"3\" height=\"4\"><future/></object>"))),
-        new("object capsule (1.12)", Tsx(tile0Before: Objects("<object id=\"1\" x=\"1\" y=\"2\" width=\"3\" height=\"4\"><capsule/></object>"))),
         new("UTF-16 little endian", Tsx(tile0Attributes: " type=\"Größe 日本\"", prolog: "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n"), Encoding.Unicode),
         new("UTF-16 big endian", Tsx(tile0Attributes: " type=\"Größe 日本\"", prolog: "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n"), Encoding.BigEndianUnicode),
         new("ISO-8859-1", Tsx(tile0Attributes: " type=\"Größe\"", tiles: "<tile id=\"5\" type=\"Wäter\"/>", prolog: "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n"), Encoding.Latin1),
-        new("no XML declaration", Tsx(prolog: "")),
-        new("two wangsets on one line", Tsx(tail: Wangsets($"<wangset name=\"A\" tile=\"-1\">{WangColor}{WangTile}</wangset><wangset name=\"B\" tile=\"-1\">{WangColor}{WangTile}</wangset>"))),
         new("truncated file", Tsx().Replace("</tileset>", "")),
     ];
 
-    /// <summary>Differences a save is allowed to make. Applied to both trees, so a listed difference
-    /// is invisible and anything else fails.</summary>
-    private static void Normalise(XDocument document)
-    {
-        foreach (var element in document.Descendants().ToList())
-        {
-            var name = element.Name.LocalName;
-
-            // Tiled itself omits an attribute that holds the format's default, so the writer may too.
-            foreach (var attribute in element.Attributes().ToList())
-                if (Defaults.TryGetValue((name, attribute.Name.LocalName), out var value) && attribute.Value == value)
-                    attribute.Remove();
-
-            // Tiled 1.9 wrote a tile's class as "class"; every other version reads and writes "type".
-            if (name == "tile" && element.Attribute("class") is { } tileClass && element.Attribute("type") is null)
-            {
-                element.SetAttributeValue("type", tileClass.Value);
-                tileClass.Remove();
-            }
-
-            // "#RRGGBB" and "#ffRRGGBB" are one color, and the '#' is optional. Tiled writes the short
-            // form (a tintcolor without alpha, a trans without '#'); the writer spells the long one out.
-            foreach (var color in ColorAttributes(element))
-                color.Value = "#" + color.Value.TrimStart('#').ToLowerInvariant().PadLeft(8, 'f');
-
-            // The writer adds the format DotTiled derives from the file extension. Tiled reads
-            // "format" only for embedded images.
-            if (name == "image" && element.Attribute("source") is not null)
-                element.Attribute("format")?.Remove();
-
-            // The format allows a string value as an attribute or as the element's text.
-            if (name is "property" && element.Attribute("value") is null && !element.HasElements && element.Value.Length > 0)
-            {
-                var text = element.Value;
-                element.RemoveNodes();
-                element.SetAttributeValue("value", text);
-            }
-
-            // An empty container holds nothing.
-            if (name is "properties" or "animation" or "wangsets" && !element.HasAttributes && !element.Nodes().Any())
-                element.Remove();
-
-            // A tileset holds at most one of each of these, so their order carries nothing. The
-            // writer puts the image first; Tiled puts it last.
-            if (name == "tileset")
-                foreach (var single in new[] { "properties", "image", "transformations", "grid", "tileoffset" })
-                    if (element.Elements().FirstOrDefault(e => e.Name.LocalName == single) is { } child)
-                    {
-                        child.Remove();
-                        element.AddFirst(child);
-                    }
-        }
-    }
-
-    private static readonly Dictionary<(string Element, string Attribute), string> Defaults = new()
-    {
-        [("tileset", "class")] = "",
-        [("tileset", "spacing")] = "0",
-        [("tileset", "margin")] = "0",
-        [("tileset", "objectalignment")] = "unspecified",
-        [("tileset", "tilerendersize")] = "tile",
-        [("tileset", "fillmode")] = "stretch",
-        [("grid", "orientation")] = "orthogonal",
-        [("property", "type")] = "string",
-        [("objectgroup", "draworder")] = "topdown",
-        [("object", "id")] = "0",
-        [("text", "color")] = "#ff000000",
-    };
-
-    private static IEnumerable<XAttribute> ColorAttributes(XElement element) => element.Attributes().Where(a =>
-        a.Value.Length > 0
-        && (a.Name.LocalName is "color" or "tintcolor" or "trans" or "backgroundcolor"
-            || (a.Name.LocalName == "value" && (string?)element.Attribute("type") == "color")));
-
-    private static readonly Op[] EveryOp = [Op.Save, Op.EditSave, Op.EditSaveOneLine, Op.SaveAs];
-    private static readonly Op[] EveryEdit = [Op.EditSave, Op.EditSaveOneLine, Op.SaveAs];
-    private static readonly Op[] WholeFile = [Op.EditSaveOneLine, Op.SaveAs];
-
-    private const string TileOrder = "#2013 B: tiles are sorted by id";
-    private const string EditedTile = "#2013 C: an edited tile loses what DotTiled does not model";
-    private const string TextIndent = "#2013 D: multi-line text in an edited tile gains a space per line";
-    private const string AfterEditedTile = "#2013 E: what follows an edited tile is removed";
-    private const string Rewrite = "#2013 F: rewriting the whole file loses what DotTiled does not model";
-    private const string SaveAsLoss = "#2013 G: Save As loses backgroundcolor and the wangset type";
-    private const string DefaultNamespace = "#2013 I: a default namespace duplicates every tile";
-    private const string ImagePath = "#2016 J: Save As to another folder breaks the image path";
-
-    private static readonly Loss[] KnownLosses =
-    [
-        new(TileOrder, EveryOp, ["tiles in display order (1.7)"]),
-        // A whole-file rewrite regenerates every tile, so it loses the same.
-        new(EditedTile, EveryEdit,
-        [
-            "tile terrain (before 1.5)", "tile probability zero", "tile unknown attribute", "tile unknown child",
-            "property unknown attribute", "property float with many digits", "edited animation unknown frame attribute",
-            "objectgroup deprecated position and size", "objectgroup unknown attribute",
-            "object class (1.9)", "object opacity (1.12)", "object unknown attribute", "object many digits",
-            "object polygon many digits", "object template (1.1)", "comment inside the edited tile",
-        ]),
-        new(TextIndent, [Op.EditSave], ["object text"]),
-        new(AfterEditedTile, EveryEdit,
-        [
-            "comment between tiles", "comment after the last tile",
-            "unknown element between tiles", "unknown element after the last tile",
-        ]),
-        new(AfterEditedTile, [Op.EditSave], ["image after the tiles"]),
-        new(Rewrite, WholeFile,
-        [
-            "editorsettings", "tileoffset unknown attribute", "transformations unknown attribute", "terraintypes (before 1.5)",
-            "image deprecated id", "image unknown attribute", "untouched tile unknown attribute and child",
-            "animation unknown attribute", "wangset unknown attribute and child", "wangcolor unknown attribute",
-            "wangset corner and edge colors (before 1.5)", "wangtile flips (before 1.5)",
-            "comment before the root", "comment after the root", "comment before the first tile", "comment after the wangsets",
-            "comment inside an untouched tile", "processing instruction", "unknown element before the tiles",
-            "unknown element after the wangsets", "prefixed namespace",
-        ]),
-        new(SaveAsLoss, [Op.SaveAs],
-        [
-            "tileset backgroundcolor", "tileset unknown attribute", "wangset", "wangset empty", "wangsets sharing a name",
-        ]),
-        new(DefaultNamespace, EveryOp, ["default namespace"]),
-    ];
-
-    /// <param name="issue">Null for the cases that keep everything, else the pinned cases of one issue.</param>
-    public static TheoryData<string, Op> Cases(string? issue)
+    public static TheoryData<string, Op> Cases()
     {
         var data = new TheoryData<string, Op>();
         foreach (var row in Rows)
-            foreach (var op in EveryOp)
-                if (!(row.RefusedOnOneLine && op == Op.EditSaveOneLine)
-                    && KnownLosses.SingleOrDefault(l => l.Ops.Contains(op) && l.Rows.Contains(row.Name))?.Issue == issue)
-                    data.Add(row.Name, op);
+            foreach (var op in Enum.GetValues<Op>())
+                data.Add(row.Name, op);
         return data;
     }
 
     [Theory]
-    [MemberData(nameof(Cases), [null])]
-    [MemberData(nameof(Cases), TileOrder, Skip = TileOrder)]
-    [MemberData(nameof(Cases), EditedTile, Skip = EditedTile)]
-    [MemberData(nameof(Cases), TextIndent, Skip = TextIndent)]
-    [MemberData(nameof(Cases), AfterEditedTile, Skip = AfterEditedTile)]
-    [MemberData(nameof(Cases), Rewrite, Skip = Rewrite)]
-    [MemberData(nameof(Cases), SaveAsLoss, Skip = SaveAsLoss)]
-    [MemberData(nameof(Cases), DefaultNamespace, Skip = DefaultNamespace)]
-    public void SaveTsxProject_CorpusFile_KeepsEverything(string rowName, Op op) => RoundTripDiff(rowName, op).ShouldBe("");
-
-    [Fact(Skip = ImagePath)]
-    public void SaveTsxProject_SaveAsToAnotherFolder_ImageStillResolves() => ImageSourceAfterSaveAsElsewhere().ShouldBe("../Heroes.png");
-
-    /// <summary>
-    /// A pinned case must lose exactly what the fixture lists: no more, and no less. After a fix, remove
-    /// the case from <see cref="KnownLosses"/> (and move a file that no longer opens to
-    /// <see cref="RefusedRows"/>), then replace the fixture with the file the failure names.
-    /// </summary>
-    [Fact]
-    public void KnownLosses_EveryPinnedCase_LosesWhatTheFixtureLists()
-    {
-        var actual = new List<string>();
-        foreach (var row in KnownLosses.SelectMany(l => l.Rows).Distinct().OrderBy(name => name, StringComparer.Ordinal))
-            foreach (var same in KnownLosses.Where(l => l.Rows.Contains(row)).SelectMany(l => l.Ops).GroupBy(op => DiffOrException(row, op)))
-                actual.AddRange([$"## {row} [{string.Join(", ", same)}]", .. same.Key.Split('\n')]);
-        actual.AddRange(["## Save As to another folder", ImageSourceAfterSaveAsElsewhere()]);
-        var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TsxCorpusKnownLosses.txt");
-        var actualPath = Path.ChangeExtension(fixture, ".actual.txt");
-        File.WriteAllLines(actualPath, actual);
-
-        Diff(File.ReadAllLines(fixture), [.. actual]).ShouldBe("", actualPath);
-    }
-
-    // The tree comparison ignores whitespace, so these compare the text.
-    [Theory]
-    [InlineData("\n", true)]
-    [InlineData("\r\n", true)]
-    [InlineData("\r\n", false)]
-    public void SaveTsxProject_KeptFile_KeepsLineEndingsAndFinalNewline(string newline, bool finalNewline)
-    {
-        var xml = Tsx(
-            tile0Before: Properties("<property name=\"S\" value=\"a\"/>"), tiles: "<tile id=\"5\" type=\"Water\"/>").Replace("\n", newline);
-        var row = new Row("", finalNewline ? xml : xml.TrimEnd());
-        var path = WriteFile(row, row.Xml);
-        var pm = new ProjectManager();
-        pm.LoadTsxProject(new FilePath(path));
-
-        pm.SaveTsxProject();
-        var saved = File.ReadAllBytes(path);
-        pm.AnimationChainListSave!.AnimationChains[0].Frames[0].FrameLength = 0.3f;
-        pm.SaveTsxProject();
-        var edited = File.ReadAllText(path);
-
-        saved.ShouldBe(Encoding.UTF8.GetBytes(row.Xml));
-        // The regenerated tile closes its empty elements with " />", Tiled with "/>".
-        edited.Replace(" />", "/>").ShouldBe(row.Xml.Replace("duration=\"200\"", "duration=\"300\""));
-    }
-
-    private string DiffOrException(string rowName, Op op)
-    {
-        try
-        {
-            return RoundTripDiff(rowName, op);
-        }
-        catch (Exception exception)
-        {
-            return "throws " + exception.GetType().Name;
-        }
-    }
-
-    /// <summary>What <paramref name="op"/> changes in the row's file, or "" when it keeps everything.</summary>
-    private string RoundTripDiff(string rowName, Op op)
+    [MemberData(nameof(Cases))]
+    public void SaveTsxProject_CorpusFile_ChangesOnlyTheEditedDuration(string rowName, Op op)
     {
         var row = Rows.Single(r => r.Name == rowName);
         var xml = op == Op.EditSaveOneLine ? Regex.Replace(row.Xml, @">\s+<", "><") : row.Xml;
         var path = WriteFile(row, xml);
-        var expected = XDocument.Load(path);
-
         var pm = new ProjectManager();
         pm.LoadTsxProject(new FilePath(path));
-        var savedPath = path;
+        var savedPath = op == Op.SaveAs ? Path.Combine(Path.GetDirectoryName(path)!, "Copy.tsx") : path;
         if (op is Op.EditSave or Op.EditSaveOneLine)
         {
             pm.AnimationChainListSave!.AnimationChains[0].Frames[0].FrameLength = 0.3f;
-            // A satellite tile (ParentId) of a multi-tile animation shares its anchor's durations.
-            foreach (var tile in expected.Descendants().Where(e => e.Name.LocalName == "tile"
-                && ((string?)e.Attribute("id") == "0" || e.Descendants("property").Any(p => (string?)p.Attribute("name") == "ParentId"))))
-                tile.Descendants().First(e => e.Name.LocalName == "frame").SetAttributeValue("duration", "300");
+            // Every row's first animated tile, and the satellites that share its durations, hold the only 200s.
+            xml = xml.Replace("duration=\"200\"", "duration=\"300\"");
         }
-        else if (op == Op.SaveAs)
-            savedPath = Path.Combine(Path.GetDirectoryName(path)!, "Copy.tsx");
+
         pm.SaveTsxProject(savedPath);
 
-        // DotTiled's reader is stricter than XDocument's, so a file it refuses is caught only here.
+        File.ReadAllBytes(savedPath).ShouldBe(Bytes(row, xml));
         new ProjectManager().LoadTsxProject(new FilePath(savedPath));
-        return Diff(Dump(expected), Dump(XDocument.Load(savedPath)));
     }
+
+    /// <summary>A copy of every <c>.tsx</c> in the repository that the editor opens.</summary>
+    [Fact]
+    public void SaveTsxProject_RepositoryFileWithNoEdit_KeepsEveryByte()
+    {
+        var opened = 0;
+        foreach (var original in RepositoryFiles())
+        {
+            var path = Path.Combine(_dir.Path, Guid.NewGuid().ToString("N") + ".tsx");
+            File.Copy(original, path);
+            var pm = new ProjectManager();
+            try
+            {
+                pm.LoadTsxProject(new FilePath(path));
+            }
+            catch (NotSupportedException)
+            {
+                continue;
+            }
+            opened++;
+
+            pm.SaveTsxProject();
+
+            File.ReadAllBytes(path).ShouldBe(File.ReadAllBytes(original), original);
+        }
+        opened.ShouldBeGreaterThan(5);
+    }
+
+    private static IEnumerable<string> RepositoryFiles()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!Directory.Exists(Path.Combine(root.FullName, ".claude", "templates")))
+            root = root.Parent!;
+        return new[] { ".claude/templates", "samples", "templates", "tests", "tools/AnimationEditorAvalonia/tests" }
+            .SelectMany(folder => Directory.EnumerateFiles(Path.Combine(root.FullName, folder), "*.tsx", SearchOption.AllDirectories))
+            .Where(file => !file.Split('/', '\\').Any(part => part is "bin" or "obj"));
+    }
+
+    [Fact]
+    public void SaveTsxProject_SaveAsToAnotherFolder_ImageStillResolves() => ImageSourceAfterSaveAsElsewhere().ShouldBe("../Heroes.png");
 
     private string ImageSourceAfterSaveAsElsewhere()
     {
@@ -542,65 +378,15 @@ public class TsxCorpusRoundTripTests : IDisposable
     {
         var folder = Directory.CreateDirectory(Path.Combine(_dir.Path, Guid.NewGuid().ToString("N"))).FullName;
         var path = Path.Combine(folder, "Heroes.tsx");
-        File.WriteAllText(path, xml, row.FileEncoding ?? new UTF8Encoding(false));
+        File.WriteAllBytes(path, Bytes(row, xml));
         if (row.TemplateXml is not null)
             File.WriteAllText(Path.Combine(folder, "Template.tx"), row.TemplateXml);
         return path;
     }
 
-    /// <summary>One line per node, attributes sorted, whitespace-only text left out.</summary>
-    private static string[] Dump(XDocument source)
+    private static byte[] Bytes(Row row, string xml)
     {
-        var document = new XDocument(source);
-        Normalise(document);
-        var lines = new List<string>();
-        void Add(XNode node, int depth)
-        {
-            var indent = new string(' ', depth);
-            switch (node)
-            {
-                case XElement element:
-                    var attributes = element.Attributes().Where(a => !a.IsNamespaceDeclaration)
-                        .OrderBy(a => a.Name.ToString(), StringComparer.Ordinal).Select(a => $" {a.Name}=\"{a.Value}\"");
-                    lines.Add($"{indent}<{element.Name}{string.Concat(attributes)}>");
-                    foreach (var child in element.Nodes())
-                        Add(child, depth + 1);
-                    break;
-                // A CDATA section and plain text hold the same characters.
-                case XText text when !string.IsNullOrWhiteSpace(text.Value):
-                    lines.Add($"{indent}\"{text.Value.Replace("\n", "\\n")}\"");
-                    break;
-                case XComment comment:
-                    lines.Add($"{indent}<!--{comment.Value}-->");
-                    break;
-                case XProcessingInstruction instruction:
-                    lines.Add($"{indent}<?{instruction.Target} {instruction.Data}?>");
-                    break;
-            }
-        }
-        foreach (var node in document.Nodes())
-            Add(node, 0);
-        return [.. lines];
-    }
-
-    /// <summary>Line diff by longest common subsequence, so a moved or repeated line shows too.</summary>
-    private static string Diff(string[] expected, string[] actual)
-    {
-        var common = new int[expected.Length + 1, actual.Length + 1];
-        for (var i = expected.Length - 1; i >= 0; i--)
-            for (var j = actual.Length - 1; j >= 0; j--)
-                common[i, j] = expected[i] == actual[j] ? common[i + 1, j + 1] + 1 : Math.Max(common[i + 1, j], common[i, j + 1]);
-
-        var lines = new List<string>();
-        for (int i = 0, j = 0; i < expected.Length || j < actual.Length;)
-        {
-            if (i < expected.Length && j < actual.Length && expected[i] == actual[j])
-                (i, j) = (i + 1, j + 1);
-            else if (j == actual.Length || (i < expected.Length && common[i + 1, j] >= common[i, j + 1]))
-                lines.Add("- " + expected[i++]);
-            else
-                lines.Add("+ " + actual[j++]);
-        }
-        return string.Join("\n", lines);
+        var encoding = row.FileEncoding ?? new UTF8Encoding(false);
+        return [.. encoding.GetPreamble(), .. encoding.GetBytes(xml)];
     }
 }

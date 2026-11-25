@@ -880,9 +880,7 @@ public class ProjectManagerTsxProjectTests : IDisposable
     }
 
     // "Save As" (SaveTsxProject(targetPath: <new path>)) must produce a complete, correct tsx at
-    // the new path -- via TsxWriter's full-rewrite branch, since a brand-new path never satisfies
-    // TsxWriter.Write's `File.Exists(path)` patch-mode gate -- and must leave the file the project
-    // was loaded from completely untouched.
+    // the new path, and must leave the file the project was loaded from completely untouched.
     [Fact]
     public void SaveTsxProject_TargetPath_WritesCompleteFileAtNewPathWithoutModifyingOriginal()
     {

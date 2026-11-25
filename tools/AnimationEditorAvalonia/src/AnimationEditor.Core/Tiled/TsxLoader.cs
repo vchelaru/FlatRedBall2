@@ -1,114 +1,100 @@
 using DotTiled;
-using DotTiled.Serialization;
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Xml.Linq;
+using System.Xml;
 
 namespace AnimationEditor.Core.Tiled;
 
 /// <summary>
-/// The one way this editor reads a <c>.tsx</c> from disk. Wraps DotTiled's loader with the fixups
-/// its model needs to round-trip a real Tiled file through <see cref="TsxWriter"/> without loss.
+/// The one way this editor reads a <c>.tsx</c>. Reads what the editor works with: the tile grid, the image, and each
+/// tile's type, properties and animation. The rest stays in the <see cref="TsxSource"/>, so a construct the editor
+/// does not know cannot keep a file from opening.
 /// </summary>
 public static class TsxLoader
 {
-    /// <summary>
-    /// Loads <paramref name="path"/> and folds a Tiled 1.9-era <c>class="..."</c> tile attribute
-    /// into <see cref="Tile.Type"/> (1.10 and later write <c>type</c>, which is all DotTiled reads).
-    /// A regenerated tile then keeps its class (as <c>type</c>, exactly what Tiled itself writes
-    /// on resave), and <see cref="NativeTsxAnimationSync"/> no longer sees a class-only tile as
-    /// empty and deletes it.
-    /// </summary>
-    /// <exception cref="NotSupportedException">The file is not UTF-8.</exception>
-    public static Tileset LoadTileset(string path)
+    /// <exception cref="NotSupportedException">The file is not UTF-8, is not a tileset, or holds its image.</exception>
+    public static Tileset LoadTileset(string path) => ReadTileset(TsxSource.Load(path));
+
+    /// <inheritdoc cref="LoadTileset"/>
+    public static Tileset ReadTileset(TsxSource source)
     {
-        if (!TsxCompatibilityChecker.CheckEncoding(path, out var blockingReason))
-            throw new NotSupportedException(blockingReason);
+        var root = source.Root;
+        if (root.Name != "tileset" || root.Attribute("source") is not null)
+            throw new NotSupportedException("the file is not a Tiled tileset.");
 
-        var tileset = Loader.Default().LoadTileset(path);
-
-        var classByTileId = XDocument.Load(path).Root?
-            .Elements("tile")
-            .Select(e => (Id: (string?)e.Attribute("id"), Class: (string?)e.Attribute("class"), Type: (string?)e.Attribute("type")))
-            .Where(t => t.Id is not null && !string.IsNullOrEmpty(t.Class) && string.IsNullOrEmpty(t.Type))
-            .ToDictionary(t => uint.Parse(t.Id!), t => t.Class!);
-        if (classByTileId is { Count: > 0 })
-            foreach (var tile in tileset.Tiles)
-                if (string.IsNullOrEmpty(tile.Type) && classByTileId.TryGetValue(tile.ID, out var tileClass))
-                    tile.Type = tileClass;
-
-        FoldEnumReferences(tileset, XDocument.Load(path).Root);
+        var tileset = new Tileset
+        {
+            Name = Required(root, "name", value => value),
+            TileWidth = Required(root, "tilewidth", XmlConvert.ToInt32),
+            TileHeight = Required(root, "tileheight", XmlConvert.ToInt32),
+            TileCount = Required(root, "tilecount", XmlConvert.ToInt32),
+            Columns = Required(root, "columns", XmlConvert.ToInt32),
+            Spacing = XmlConvert.ToInt32(root.Attribute("spacing") ?? "0"),
+            Margin = XmlConvert.ToInt32(root.Attribute("margin") ?? "0"),
+            Tiles = source.TilesById.Select(tile => ReadTile(tile.Key, tile.Value)).ToList(),
+        };
+        if (root.Child("image") is { } image)
+            tileset.Image = ReadImage(image);
         return tileset;
     }
 
-    /// <summary>Swaps every enum-typed property DotTiled flattened for an <see cref="EnumReferenceProperty"/>.
-    /// Covers tileset, tile, tile object-layer, object and wangset properties, plus members nested
-    /// in class properties.</summary>
-    private static void FoldEnumReferences(Tileset tileset, XElement? root)
+    private static Tile ReadTile(uint id, TsxElement element)
     {
-        if (root is null)
-            return;
-
-        FoldProperties(tileset.Properties, root);
-
-        var tileElements = root.Elements("tile").ToDictionary(e => (string?)e.Attribute("id") ?? "", e => e);
-        foreach (var tile in tileset.Tiles)
+        // Tiled 1.9 wrote a tile's class as "class"; every other version reads and writes "type".
+        var type = element.Attribute("type");
+        var tile = new Tile
         {
-            if (!tileElements.TryGetValue(tile.ID.ToString(), out var tileElement))
-                continue;
-            FoldProperties(tile.Properties, tileElement);
-            if (!tile.ObjectLayer.HasValue || tileElement.Element("objectgroup") is not { } group)
-                continue;
-            FoldProperties(tile.ObjectLayer.Value.Properties, group);
-            var objectElements = group.Elements("object").ToList();
-            var objects = tile.ObjectLayer.Value.Objects;
-            if (objectElements.Count == objects.Count)
-                for (var i = 0; i < objects.Count; i++)
-                    FoldProperties(objects[i].Properties, objectElements[i]);
-        }
-
-        var wangsetElements = root.Element("wangsets")?.Elements("wangset").ToList() ?? [];
-        if (wangsetElements.Count != tileset.Wangsets.Count)
-            return;
-        for (var i = 0; i < wangsetElements.Count; i++)
-        {
-            FoldProperties(tileset.Wangsets[i].Properties, wangsetElements[i]);
-            var colorElements = wangsetElements[i].Elements("wangcolor").ToList();
-            if (colorElements.Count == tileset.Wangsets[i].WangColors.Count)
-                for (var c = 0; c < colorElements.Count; c++)
-                    FoldProperties(tileset.Wangsets[i].WangColors[c].Properties, colorElements[c]);
-        }
+            ID = id,
+            Width = 0,
+            Height = 0,
+            Type = string.IsNullOrEmpty(type) ? element.Attribute("class") ?? "" : type,
+            Properties = PropertyElements(element).Select(ReadProperty).ToList(),
+            Animation = FrameElements(element).Select(ReadFrame).ToList(),
+        };
+        if (element.Child("image") is { } image)
+            tile.Image = ReadImage(image);
+        return tile;
     }
 
-    /// <param name="owner">The element whose <c>&lt;properties&gt;</c> child lists
-    /// <paramref name="properties"/>; skipped when the two do not line up one to one.</param>
-    private static void FoldProperties(IList<IProperty> properties, XElement owner)
+    internal static IEnumerable<TsxElement> PropertyElements(TsxElement tile) =>
+        tile.Child("properties")?.ChildrenNamed("property") ?? [];
+
+    internal static IEnumerable<TsxElement> FrameElements(TsxElement tile) =>
+        tile.Child("animation")?.ChildrenNamed("frame") ?? [];
+
+    internal static IProperty ReadProperty(TsxElement element)
     {
-        var elements = owner.Element("properties")?.Elements("property").ToList();
-        if (elements is null || elements.Count != properties.Count)
-            return;
-
-        for (var i = 0; i < properties.Count; i++)
+        var name = element.Attribute("name") ?? "";
+        var value = element.Attribute("value") ?? element.Text;
+        return (element.Attribute("type") ?? "string", element.Attribute("propertytype") ?? "") switch
         {
-            var element = elements[i];
-            if ((string?)element.Attribute("name") != properties[i].Name)
-                continue;
-
-            if (properties[i] is ClassProperty classProperty)
-            {
-                FoldProperties(classProperty.Value, element);
-                continue;
-            }
-
-            var propertyType = (string?)element.Attribute("propertytype");
-            if (!string.IsNullOrEmpty(propertyType) && properties[i] is StringProperty or IntProperty)
-                properties[i] = new EnumReferenceProperty
-                {
-                    Name = properties[i].Name,
-                    PropertyType = propertyType,
-                    Value = (string?)element.Attribute("value") ?? "",
-                    StorageType = (string?)element.Attribute("type"),
-                };
-        }
+            ("string", "") => new StringProperty { Name = name, Value = value },
+            ("int", "") when int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number) =>
+                new IntProperty { Name = name, Value = number },
+            _ => new ForeignProperty { Name = name },
+        };
     }
+
+    internal static Frame ReadFrame(TsxElement element) => new()
+    {
+        TileID = Required(element, "tileid", XmlConvert.ToUInt32),
+        Duration = Required(element, "duration", XmlConvert.ToInt32),
+    };
+
+    private static Image ReadImage(TsxElement element)
+    {
+        if (element.Child("data") is not null)
+            throw new NotSupportedException("the tileset's image is embedded in the file, which AnimationEditor doesn't support yet.");
+
+        var image = new Image();
+        if (element.Attribute("source") is { } source) image.Source = source;
+        if (element.Attribute("width") is { } width) image.Width = XmlConvert.ToInt32(width);
+        if (element.Attribute("height") is { } height) image.Height = XmlConvert.ToInt32(height);
+        return image;
+    }
+
+    internal static T Required<T>(TsxElement element, string attribute, Func<string, T> read) =>
+        read(element.Attribute(attribute) ?? throw new XmlException($"Missing attribute '{attribute}' on <{element.Name}>."));
 }

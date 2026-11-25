@@ -103,8 +103,8 @@ public class NativeTsxForeignContentRoundTripTests : IDisposable
     }
 
     // Tiled 1.9 saved a tile's class as `class="..."` (1.10 went back to `type="..."`, which is
-    // all DotTiled reads). An edited tile is regenerated from the model, so without a fixup the
-    // class vanished from any 1.9-era animated tile the moment its animation was touched -- and a
+    // all DotTiled reads). Before TsxLoader read it, the
+    // class vanished from any 1.9-era animated tile the moment its animation was touched, and a
     // class-only tile whose animation was removed was deleted outright as "empty".
     private const string Tiled19ClassXml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -126,7 +126,7 @@ public class NativeTsxForeignContentRoundTripTests : IDisposable
 
         EditFirstFrameDurationAndSave(path);
 
-        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var reloaded = AnimationEditor.Core.Tiled.TsxLoader.LoadTileset(path);
         Assert.Equal("Grass", reloaded.Tiles.Single(t => t.ID == 0).Type);
         Assert.Equal([((uint)0, 300), ((uint)1, 200)], reloaded.Tiles.Single(t => t.ID == 0).Animation.Select(f => (f.TileID, f.Duration)));
     }
@@ -141,7 +141,7 @@ public class NativeTsxForeignContentRoundTripTests : IDisposable
 
         pm.SaveTsxProject();
 
-        var reloaded = DotTiled.Serialization.Loader.Default().LoadTileset(path);
+        var reloaded = AnimationEditor.Core.Tiled.TsxLoader.LoadTileset(path);
         var tile = reloaded.Tiles.Single(t => t.ID == 0);
         Assert.Equal("Grass", tile.Type);
         Assert.Empty(tile.Animation);

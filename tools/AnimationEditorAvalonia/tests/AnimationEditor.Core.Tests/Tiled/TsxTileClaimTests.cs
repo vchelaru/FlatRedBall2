@@ -199,6 +199,110 @@ public class TsxTileClaimTests : IDisposable
         Assert.Equal([0u, 5u], AnimatedTiles(path));
     }
 
+    [Fact]
+    public void SaveTsxProject_OwnerTileSetByTheUserIsWantedByAnEarlierNewChain_TheOwnerTileWins()
+    {
+        var path = WriteTsx(Tile(0));
+        var pm = Load(path);
+        var a = Chain(pm, "ID:0");
+        Assert.Null(pm.TrySetTsxOwnerTileId(a, 7));
+        var b = NewChain(pm, "B", 7);
+        pm.AnimationChainListSave!.AnimationChains.Remove(b);
+        pm.AnimationChainListSave.AnimationChains.Insert(0, b);
+
+        var warning = Assert.Single(pm.SaveTsxProject());
+
+        Assert.Contains("\"B\": Tiled tile 7 already carries \"ID:7\"", warning);
+    }
+
+    [Fact]
+    public void SaveTsxProject_ChainThatYieldsKeepsItsTilesInTheFile_EvenFromAChainAlreadySettled()
+    {
+        var path = WriteTsx(Tile(5));
+        var pm = Load(path);
+        var a = Chain(pm, "ID:5");
+        Place(a, 5, columns: 2);
+        pm.SaveTsxProject();
+        // "A" would give up tile 6 to be 1x2 (tiles 5 and 9), but loses 9 to "D" and so stays 2x1 in the file.
+        Place(a, 5);
+        a.Frames[0].BottomCoordinate += 16;
+        NewChain(pm, "C", 6);
+        NewChain(pm, "D", 9);
+        pm.AnimationChainListSave!.AnimationChains.Remove(a);
+        pm.AnimationChainListSave.AnimationChains.Add(a);
+
+        var warnings = pm.SaveTsxProject();
+
+        Assert.Equal(2, warnings.Count);
+        Assert.Contains(warnings, w => w.Contains("\"ID:5\": Tiled tile 9 already carries \"D\""));
+        Assert.Contains(warnings, w => w.Contains("\"C\": Tiled tile 6 already carries \"ID:5\""));
+        Assert.Equal([5u, 6u, 9u], AnimatedTiles(path));
+    }
+
+    [Fact]
+    public void SaveTsxProject_NewChainThatYieldsElsewhere_DoesNotHoldItsOtherTiles()
+    {
+        var path = WriteTsx(Tile(5));
+        var pm = Load(path);
+        Place(NewChain(pm, "Wide", 4), 4, columns: 2);
+        NewChain(pm, "B", 4);
+
+        var warning = Assert.Single(pm.SaveTsxProject());
+
+        Assert.Contains("\"Wide\": Tiled tile 5 already carries \"ID:5\"", warning);
+        Assert.Equal("B", NameOn(path, 4));
+    }
+
+    [Fact]
+    public void SaveTsxProject_LoadedGroupThatCannotBeMapped_KeepsItsSatelliteInTheFile()
+    {
+        var path = WriteTsx(Tile(5) + Tile(6, "<properties><property name=\"ParentId\" type=\"int\" value=\"5\"/></properties>"));
+        var pm = Load(path);
+        Chain(pm, "ID:5").Frames[0].LeftCoordinate = 3;
+
+        Assert.Single(pm.SaveTsxProject());
+
+        Assert.Equal([5u, 6u], AnimatedTiles(path));
+    }
+
+    [Fact]
+    public void RestoreTsxState_ChainThatCannotBeMapped_KeepsItsTileInTheFile()
+    {
+        var path = WriteTsx(Tile(0));
+        var pm = Load(path);
+        var list = pm.AnimationChainListSave!;
+        var state = pm.CaptureTsxState();
+        pm.ResetToBlankDocument();
+        pm.RestoreTsxState(state);
+        pm.AnimationChainListSave = list;
+        Chain(pm, "ID:0").Frames[0].LeftCoordinate = 3;
+
+        Assert.Single(pm.SaveTsxProject(path));
+
+        Assert.Equal([0u], AnimatedTiles(path));
+    }
+
+    [Fact]
+    public void SaveTsxProject_FrameAddedWhileTheChainCannotBeMapped_ClearingAndPuttingBackKeepsTheOwnerTile()
+    {
+        var path = WriteTsx(Tile(0));
+        var pm = Load(path);
+        var a = Chain(pm, "ID:0");
+        Place(a, 1);  // the owner tile stays 0
+        var added = new AnimationFrameSave { TextureName = "Other.png", FrameLength = 0.2f, LeftCoordinate = 32, RightCoordinate = 48, BottomCoordinate = 16 };
+        a.Frames.Add(added);
+        Assert.Single(pm.SaveTsxProject());
+        var frames = a.Frames.ToList();
+        a.Frames.Clear();
+        pm.SaveTsxProject();
+
+        a.Frames.AddRange(frames);
+        added.TextureName = "Heroes.png";
+        pm.SaveTsxProject();
+
+        Assert.Equal([0u], AnimatedTiles(path));
+    }
+
     // Seeded, so a failure names a sequence that replays.
     [Fact]
     public void RandomEdits_EveryAcceptedStateIsSaved_AndEveryChainIsOnDiskOrReported()

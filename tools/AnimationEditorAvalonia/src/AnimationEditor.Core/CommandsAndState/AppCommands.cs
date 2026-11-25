@@ -649,7 +649,10 @@ namespace AnimationEditor.Core.CommandsAndState
                         else
                             _pm.SaveAnimationChainList(target);
                     });
-                    _diskState = ReadDiskState(target);
+                    if (_pm.TsxLacksOutsideChange)
+                        HotReloadWatcher.ReportChange(target);
+                    else
+                        _diskState = ReadDiskState(target);
                     if (tsxWarnings is { Count: > 0 })
                         TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
                     _undoManager.MarkSaved();
@@ -901,6 +904,11 @@ namespace AnimationEditor.Core.CommandsAndState
 
             bool toAnotherFile = string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path);
             if (!WriteDocument(path, toAnotherFile)) return false;
+            if (_pm.MoveTsxProject(new FilePath(path)))
+            {
+                _undoManager.Clear();
+                _undoManager.MarkSaved();
+            }
             _pm.FileName = path;
             SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();
@@ -3092,6 +3100,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? System.IO.Path.GetDirectoryName(achxPath) ?? string.Empty
                 : string.Empty;
             HotReloadWatcher.StartWatching(achxPath, GetReferencedAbsolutePngPaths(achxPath, achxDir));
+            // It takes the file as it is now for what the document holds.
+            if (_pm.TsxLacksOutsideChange)
+                HotReloadWatcher.ReportChange(achxPath);
         }
 
         private IEnumerable<string> GetReferencedAbsolutePngPaths(string _, string achxDir)

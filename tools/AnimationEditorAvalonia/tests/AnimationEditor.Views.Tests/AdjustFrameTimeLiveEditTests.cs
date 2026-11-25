@@ -36,6 +36,8 @@ public class AdjustFrameTimeLiveEditTests
         public TileGrid? TsxTileGrid => null;
         public void LoadTsxProject(FilePath fileName) { }
         public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => [];
+        public bool MoveTsxProject(FilePath path) => false;
+        public bool TsxLacksOutsideChange => false;
         public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => new HashSet<AnimationChainSave>();
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
         public uint? GetTsxOwnerTileId(AnimationChainSave chain) => null;

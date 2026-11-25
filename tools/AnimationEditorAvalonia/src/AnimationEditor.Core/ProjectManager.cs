@@ -34,12 +34,12 @@ namespace AnimationEditor.Core
             "Associating a tileset applies to an .achx/.achj; a .tsx cannot be a native project and an association target at once.";
 
         /// <summary>
-        /// The tileset behind a native <c>.tsx</c> project (issue #1140), kept in memory (rather
-        /// than re-read from disk) so a load-then-save round trip preserves any tileset content
-        /// AnimationEditor doesn't understand -- same reasoning as <see cref="TilesetAnimationSync"/>
-        /// for the achj-push feature. <see langword="null"/> for an achx/achj project.
+        /// The tileset behind a native <c>.tsx</c> project (issue #1140), as of the last save.
+        /// <see langword="null"/> for an achx/achj project.
         /// </summary>
         private DotTiled.Tileset? _tsxTileset;
+
+        private Tiled.TsxFile? _tsxFile;
 
         /// <summary>Each native-tsx chain's own tile id, keyed by chain object reference (survives
         /// a rename, unlike keying by name) -- populated on <see cref="LoadTsxProject"/> from what
@@ -162,6 +162,7 @@ namespace AnimationEditor.Core
             // project: IsNativeTsxProject must go false, or SaveCurrentAnimationChainList would
             // route this achx's save through SaveTsxProject against the stale tileset.
             _tsxTileset = null;
+            _tsxFile = null;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
             _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
             _tsxSyntheticNamedChains = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
@@ -448,18 +449,13 @@ namespace AnimationEditor.Core
                     "(Associate Tiled Tileset). A .tsx cannot be both a native-tsx project and an " +
                     "achx-push target at the same time.");
 
-            if (!Tiled.TsxCompatibilityChecker.CheckEncoding(fileName.FullPath, out var blockingReason))
-                throw CannotOpenTsx(fileName, blockingReason);
-
-            var tileset = Tiled.TsxLoader.LoadTileset(fileName.FullPath);
-
-            if (!Tiled.TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out blockingReason))
-                throw CannotOpenTsx(fileName, blockingReason);
+            var (source, tileset) = ReadTsx(fileName);
 
             var acls = Tiled.TiledAnimationToAchjMapper.Map(
                 tileset, out var entryTileIdsByChain, out var satelliteTileIdsByChain, out var syntheticNamedChains);
 
             _tsxTileset = tileset;
+            _tsxFile = new Tiled.TsxFile(fileName, source, tileset);
             _tsxUserProperties = Tiled.TsxUserProperties.Read(tileset);
             AnimationChainListSave = acls;
             _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(entryTileIdsByChain, ReferenceEqualityComparer.Instance);
@@ -495,8 +491,21 @@ namespace AnimationEditor.Core
             OnDiskCoordinateType = TextureCoordinateType.Pixel;
         }
 
-        private static NotSupportedException CannotOpenTsx(FilePath fileName, string? blockingReason) =>
-            new($"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
+        internal static (Tiled.TsxSource Source, DotTiled.Tileset Tileset) ReadTsx(FilePath fileName)
+        {
+            try
+            {
+                var source = Tiled.TsxSource.Load(fileName.FullPath);
+                var tileset = Tiled.TsxLoader.ReadTileset(source);
+                if (!Tiled.TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out var blockingReason))
+                    throw new NotSupportedException(blockingReason);
+                return (source, tileset);
+            }
+            catch (NotSupportedException ex)
+            {
+                throw new NotSupportedException($"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {ex.Message}", ex);
+            }
+        }
 
         /// <summary>The tileset's single <c>&lt;image source&gt;</c> resolved against the tsx's own
         /// folder (how Tiled resolves it), or <see langword="null"/> when the tileset has no image
@@ -514,6 +523,9 @@ namespace AnimationEditor.Core
                 ? new FilePath(source)
                 : new FilePath(tsxPath.GetDirectoryContainingThis().FullPath + source);
         }
+
+        /// <inheritdoc/>
+        public bool TsxLacksOutsideChange => _tsxFile?.LacksOutsideChange == true;
 
         /// <summary>
         /// The chains the last <see cref="SaveTsxProject"/> did not store in full: not written at all (a mapping
@@ -535,12 +547,12 @@ namespace AnimationEditor.Core
         /// <remarks>Same all-or-nothing invariant as <see cref="LoadTsxProject"/>: <see
         /// cref="Tiled.NativeTsxAnimationSync.Apply"/> runs against a working copy (<see
         /// cref="Tiled.NativeTsxAnimationSync.CloneForSave"/>), and this instance only adopts it
-        /// after <see cref="Tiled.TsxWriter.Write(DotTiled.Tileset, string)"/> has actually
-        /// succeeded -- so a write failure (an unsupported construct, a disk/permissions error)
+        /// after <see cref="Tiled.TsxWriter"/> has actually
+        /// succeeded -- so a write failure (a disk/permissions error)
         /// can't leave the in-memory tileset reflecting computed-but-never-persisted state.</remarks>
         public IReadOnlyList<string> SaveTsxProject(string? targetPath = null)
         {
-            if (_tsxTileset == null || AnimationChainListSave == null)
+            if (_tsxTileset == null || _tsxFile == null || AnimationChainListSave == null)
                 return [];
 
             // Revives a dormant hint for this save's Map() call, but only for a chain whose
@@ -572,7 +584,7 @@ namespace AnimationEditor.Core
             }
 
             var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(
-                AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset, targetPath), entryHintsForMap, satelliteHintsForMap);
+                AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset), entryHintsForMap, satelliteHintsForMap);
 
             // No "ownership transfer" here: a chain's owner tile is a storage-slot choice (loaded,
             // computed once, or explicitly set), never re-derived from frame geometry after the
@@ -583,7 +595,7 @@ namespace AnimationEditor.Core
 
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
             Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped, _tsxUserProperties);
-            Tiled.TsxWriter.Write(workingTileset, targetPath ?? FileName!);
+            _tsxFile.Save(workingTileset, new FilePath(targetPath ?? FileName!));
             _tsxTileset = workingTileset;
 
             // Commits this save's tile assignments (including a brand-new chain's freshly-chosen
@@ -631,7 +643,7 @@ namespace AnimationEditor.Core
             foreach (var result in mapped)
             {
                 var chain = result.SourceChain;
-                if (result.EntryTileId is { } entryTileId && result.Warnings.Count == 0)
+                if (result.EntryTileId is { } entryTileId)
                 {
                     // A live hint again this save (freshly computed, or a dormant one just
                     // revived above) -- not dormant, and remembers these frames as the sequence
@@ -691,7 +703,7 @@ namespace AnimationEditor.Core
                 {
                     // Its tile carries another chain now, so it is placed by its frames from here on.
                 }
-                else if (entryHintsForMap.TryGetValue(chain, out var stillActiveEntry))
+                else if (_tsxEntryTileIdsByChain.TryGetValue(chain, out var stillActiveEntry))
                 {
                     // The chain still has frames, but this save's mapping aborted with a warning
                     // (a mismatched texture name, a misaligned/negative-origin rect, a footprint
@@ -709,7 +721,7 @@ namespace AnimationEditor.Core
                     // save state, not a real identity change.
                     updatedEntries[chain] = stillActiveEntry;
                     updatedLastFrames[chain] = chain.Frames.ToArray();
-                    if (satelliteHintsForMap.TryGetValue(chain, out var stillActiveSatellites))
+                    if (_tsxSatelliteTileIdsByChain.TryGetValue(chain, out var stillActiveSatellites))
                         updatedSatellites[chain] = stillActiveSatellites;
                 }
                 else if (_tsxDormantHintsByChain.TryGetValue(chain, out var stillDormantThroughAbort))
@@ -743,6 +755,19 @@ namespace AnimationEditor.Core
             return mapped.SelectMany(r => r.Warnings)
                 .Concat(Tiled.TsxLossyDataCheck.Warnings(AnimationChainListSave))
                 .ToList();
+        }
+
+        /// <inheritdoc/>
+        public bool MoveTsxProject(FilePath path)
+        {
+            if (_tsxFile == null || _tsxTileset == null || AnimationChainListSave == null)
+                return false;
+
+            var (from, to) = (_tsxFile.Path.GetDirectoryContainingThis(), path.GetDirectoryContainingThis());
+            foreach (var frame in AnimationChainListSave.AnimationChains.SelectMany(chain => chain.Frames))
+                frame.TextureName = TexturePathHelper.Rebase(frame.TextureName, from, to);
+            _tsxFile.SetPath(path, _tsxTileset);
+            return from != to;
         }
 
         /// <summary>
@@ -847,6 +872,7 @@ namespace AnimationEditor.Core
         /// always replace these fields wholesale rather than mutating them in place.</summary>
         private sealed record TsxState(
             DotTiled.Tileset Tileset,
+            Tiled.TsxFile? File,
             Tiled.TsxUserProperties? UserProperties,
             Dictionary<AnimationChainSave, uint> EntryTileIdsByChain,
             Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>> SatelliteTileIdsByChain,
@@ -858,7 +884,7 @@ namespace AnimationEditor.Core
         /// <inheritdoc/>
         public object? CaptureTsxState() =>
             _tsxTileset is null ? null : new TsxState(
-                _tsxTileset, _tsxUserProperties, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain, _tsxSyntheticNamedChains,
+                _tsxTileset, _tsxFile, _tsxUserProperties, _tsxEntryTileIdsByChain, _tsxSatelliteTileIdsByChain, _tsxSyntheticNamedChains,
                 _tsxLastNonEmptyFramesByChain, _tsxDormantHintsByChain, _tsxTileOwners);
 
         /// <inheritdoc/>
@@ -867,6 +893,7 @@ namespace AnimationEditor.Core
             if (state is TsxState tsxState)
             {
                 _tsxTileset = tsxState.Tileset;
+                _tsxFile = tsxState.File;
                 _tsxUserProperties = tsxState.UserProperties;
                 _tsxEntryTileIdsByChain = tsxState.EntryTileIdsByChain;
                 _tsxSatelliteTileIdsByChain = tsxState.SatelliteTileIdsByChain;
@@ -878,6 +905,7 @@ namespace AnimationEditor.Core
             else
             {
                 _tsxTileset = null;
+                _tsxFile = null;
                 _tsxUserProperties = null;
                 _tsxEntryTileIdsByChain = new Dictionary<AnimationChainSave, uint>(ReferenceEqualityComparer.Instance);
                 _tsxSatelliteTileIdsByChain = new Dictionary<AnimationChainSave, IReadOnlyDictionary<(int Dx, int Dy), uint>>(ReferenceEqualityComparer.Instance);
@@ -1097,12 +1125,9 @@ namespace AnimationEditor.Core
         /// <summary>
         /// Builds a <see cref="Tiled.TilesetAnimationInfo"/> from <paramref name="tileset"/>, which
         /// both <see cref="SaveTsxProject"/> and <see cref="GetChainNamesWithTsxIssues"/> need.
-        /// <paramref name="path"/> is the tsx's file, or null for the open one.
         /// </summary>
-        private Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset, string? path = null)
+        private Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset)
         {
-            path ??= FileName;
-            var image = tileset.Image;
             var (textureWidth, textureHeight) = Tiled.TiledAnimationToAchjMapper.GetTextureSize(tileset);
             return new Tiled.TilesetAnimationInfo
             {
@@ -1112,8 +1137,8 @@ namespace AnimationEditor.Core
                 TileCount = tileset.TileCount,
                 Margin = tileset.Margin,
                 TileSpacing = tileset.Spacing,
-                ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
-                Folder = string.IsNullOrEmpty(path) ? string.Empty : new FilePath(path).GetDirectoryContainingThis().FullPath,
+                ImageFileName = _tsxFile?.ImageSource ?? string.Empty,
+                Folder = _tsxFile is null ? string.Empty : _tsxFile.Path.GetDirectoryContainingThis().FullPath,
                 TextureWidth = textureWidth,
                 TextureHeight = textureHeight,
             };
