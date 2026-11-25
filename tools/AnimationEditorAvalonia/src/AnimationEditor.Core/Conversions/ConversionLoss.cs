@@ -20,12 +20,12 @@ public sealed record ConversionLoss(IReadOnlyList<ConversionDrop> Drops, Convers
             : null);
     }
 
-    /// <summary>What saving <paramref name="list"/> as an <c>.achj</c> leaves out: what it only carries from an <c>.achx</c>.</summary>
+    /// <summary>What saving <paramref name="list"/> as an <c>.achj</c> leaves out: what it holds as an <c>.achx</c> and not read back from the <c>.achj</c>.</summary>
     public static IReadOnlyList<ConversionDrop> OfSavingAsAchj(AnimationChainListSave list)
     {
         try
         {
-            return new AchxElementCheck().Drops(XDocument.Parse(list.ToXmlString()), list);
+            return AnimationListComparison.Lost(list, AnimationChainListSave.FromJsonString(list.ToJsonString()));
         }
         catch (InvalidDataException) // it holds a text that no .achx can, so it carries nothing from one
         {

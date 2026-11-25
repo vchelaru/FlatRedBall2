@@ -59,7 +59,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// untouched rather than cleared, but the edit that caused the failure was NOT written; the
         /// app layer should surface these as a toast so the user knows the save didn't fully apply.
         /// Also raised after <see cref="SaveCurrentAnimationChainListAsync"/> saves an achj that does not keep what the document
-        /// carries from an achx (<see cref="Conversions.ConversionLoss.OfSavingAsAchj"/>). Never raised with no warnings.
+        /// holds and the achj does not read back (<see cref="Conversions.ConversionLoss.OfSavingAsAchj"/>). Never raised with no warnings.
         /// The first argument is the saved path.
         /// </summary>
         event Action<string, IReadOnlyList<string>>? SaveCompletedWithWarnings;

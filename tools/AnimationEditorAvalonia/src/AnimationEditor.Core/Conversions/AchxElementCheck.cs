@@ -20,20 +20,6 @@ public sealed class AchxElementCheck
     public static bool HasComments(XDocument source) => source.DescendantNodes().OfType<XComment>().Any();
 
     /// <summary>
-    /// Whether <paramref name="element"/> is one that an <c>.achx</c> is only saved back with, and that has no place in an
-    /// <c>.achj</c>: see the remarks of <see cref="AnimationChainListSave.Save(string)"/>.
-    /// </summary>
-    internal static bool IsOnlyCarried(XElement element) => (element.Parent?.Name.LocalName, element.Name.LocalName) switch
-    {
-        ("AnimationChainArraySave", "FileName") => true,
-        ("AnimationChain", "ColorKey" or "ParentFile") => true,
-        ("AxisAlignedRectangleSave" or "CircleSave", "Parent") => true,
-        ("PolygonSave", "RotationZ") => true,
-        ("ShapeCollectionSave", "AxisAlignedCubeSaves" or "SphereSaves") => true,
-        _ => false,
-    };
-
-    /// <summary>
     /// Every element, attribute and text of <paramref name="source"/> that <paramref name="list"/>, read from it, does not hold or
     /// only carries. An element without any content holds nothing to lose.
     /// </summary>
@@ -50,7 +36,7 @@ public sealed class AchxElementCheck
         AddAttributes(source, place, drops);
         // What is read from such an element is written in the place of its siblings, which are not read then.
         bool replacesOthers = source.Elements().Any(element =>
-            element.HasElements && !IsOnlyCarried(element) && !written.Elements(element.Name).Any() && IsRead(element));
+            element.HasElements && !AnimationChainListSave.IsOnlyCarried(element) && !written.Elements(element.Name).Any() && IsRead(element));
         foreach (var group in source.Elements().GroupBy(element => element.Name))
         {
             var pairs = written.Elements(group.Key).ToList();
@@ -62,7 +48,7 @@ public sealed class AchxElementCheck
                 if (pairs.Count == 0)
                     // A default, left out, or written in another element, when it is read at all.
                     AddDropsByProbing(element, inside, drops);
-                else if (number <= pairs.Count && !replacesOthers && !IsOnlyCarried(element))
+                else if (number <= pairs.Count && !replacesOthers && !AnimationChainListSave.IsOnlyCarried(element))
                     AddDrops(element, pairs[number - 1], inside, drops);
                 else
                     AddIfContent(element, inside, drops);
@@ -73,7 +59,7 @@ public sealed class AchxElementCheck
     private void AddDropsByProbing(XElement element, ConversionPlace place, List<ConversionDrop> drops)
     {
         if (!HasContent(element)) return;
-        if (IsOnlyCarried(element) || !IsRead(element))
+        if (AnimationChainListSave.IsOnlyCarried(element) || !IsRead(element))
         {
             AddIfContent(element, place, drops);
             return;
@@ -92,14 +78,14 @@ public sealed class AchxElementCheck
     private static void AddAttributes(XElement element, ConversionPlace place, List<ConversionDrop> drops) =>
         drops.AddRange(UnreadAttributes(element).Select(attribute => new ConversionDrop($"the attribute {attribute.Name.LocalName}", place)));
 
-    private static ConversionPlace PlaceOf(XElement element, int number, ConversionPlace outer) => element.Name.LocalName switch
+    internal static ConversionPlace PlaceOf(XElement element, int number, ConversionPlace outer) => element.Name.LocalName switch
     {
         "AnimationChain" when !outer.IsInAnimation => new ConversionPlace(number, (string?)element.Element("Name") ?? "", 0),
         "Frame" when outer is { IsInAnimation: true, IsInFrame: false } => outer with { Frame = number },
         _ => outer,
     };
 
-    private static string Named(XElement element) => $"<{element.Name.LocalName}>";
+    internal static string Named(XElement element) => $"<{element.Name.LocalName}>";
 
     private static IEnumerable<XAttribute> UnreadAttributes(XElement element) =>
         element.Attributes().Where(attribute => !attribute.IsNamespaceDeclaration && attribute.Name.Namespace != Xsi);

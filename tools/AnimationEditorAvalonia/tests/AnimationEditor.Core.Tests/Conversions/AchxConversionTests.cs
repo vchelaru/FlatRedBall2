@@ -276,6 +276,24 @@ public sealed class AchxConversionTests : IDisposable
         AnimationListComparison.FirstDifference(List(0.1f), List(0.1f, radius: 5)).ShouldBe("animation 'Walk', frame 1");
     }
 
+    // Found by comparing with what the .achj reads back, so a field missing from the list of carried ones would show too.
+    [Fact]
+    public void OfSavingAsAchj_ListsWhatTheAchjDoesNotReadBack()
+    {
+        var list = AnimationChainListSave.FromString("<AnimationChainArraySave><AnimationChain><Name>Walk</Name><ColorKey>0</ColorKey><Frame><FrameLength>1</FrameLength><ShapeCollectionSave>"
+            + "<AxisAlignedCubeSaves><AxisAlignedCubeSave><X>1</X></AxisAlignedCubeSave></AxisAlignedCubeSaves><PolygonSaves><PolygonSave><Points /><Name>P</Name><RotationZ>1</RotationZ></PolygonSave></PolygonSaves>"
+            + "</ShapeCollectionSave></Frame></AnimationChain><AnimationChain><Name>Idle</Name></AnimationChain><FileName>a.achx</FileName></AnimationChainArraySave>");
+
+        ConversionDrop.Describe(ConversionLoss.OfSavingAsAchj(list)).ShouldBe(
+        [
+            "<ColorKey> in animation 'Walk' is not kept",
+            "<AxisAlignedCubeSaves> in animation 'Walk', frame 1 is not kept",
+            "<RotationZ> in animation 'Walk', frame 1 is not kept",
+            "<FileName> is not kept",
+        ]);
+        ConversionLoss.OfSavingAsAchj(AnimationChainListSave.FromJsonString(list.ToJsonString())).ShouldBeEmpty();
+    }
+
     // Only what the .achj has no place for may be missing. A difference beside it still counts.
     [Fact]
     public void FirstDifference_WhatIsOnlyCarried_IsNotCompared()
