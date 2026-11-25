@@ -26,7 +26,7 @@ public sealed partial class SequenceTimelineControl
     /// <summary>
     /// Pastes copied chains or tracks. Chains go onto the tracks <see cref="SequenceDocument.PasteChains"/> describes, anchored at
     /// <see cref="PasteAnchorTrack"/>, the earliest at the playhead. Tracks go directly in front of the topmost selected track, else on top.
-    /// What was pasted becomes the selection. False when nothing was pasted.
+    /// What was pasted becomes the selection. A refused paste raises <see cref="ErrorRaised"/>. False when there was nothing to paste.
     /// </summary>
     public bool Paste(TimelineClipboardContent content)
     {
@@ -43,7 +43,7 @@ public sealed partial class SequenceTimelineControl
             SelectTracks(result.Tracks);
         }
         if (result.Errors.Count > 0) ErrorRaised?.Invoke(string.Join(" ", result.Errors));
-        return result.Chains.Count > 0 || result.Tracks.Count > 0;
+        return result.Errors.Count > 0 || result.Chains.Count > 0 || result.Tracks.Count > 0;
     }
 
     /// <summary>
