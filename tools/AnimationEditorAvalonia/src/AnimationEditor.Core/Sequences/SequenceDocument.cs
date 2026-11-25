@@ -1572,6 +1572,8 @@ public sealed class SequenceDocument : ISequenceChainLookup
     {
         public string Description => description;
 
+        public bool EditsAnimations => false;
+
         // The snapshots hold sources relative to the file's folder at the time; a Save As to another folder since then is
         // undone by rewriting them on restore (SequenceSourcePaths.Rebase).
         private readonly FilePath _beforeFolder = beforeFolder ?? document.Folder;
