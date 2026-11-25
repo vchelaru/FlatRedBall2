@@ -87,6 +87,21 @@ public class RenderCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task SequenceInAnotherCase_IsUsedOnlyWhenOneSequenceMatches()
+    {
+        var file = WriteSequence();
+        var single = await _w.RunAsync("render", file, "--sequence", "RUN", "--out", _w.PathOf("out"));
+        var save = SequenceListSave.FromFile(file);
+        save.Sequences.Add(new SequenceSave { Name = "run" });
+        save.Save(file);
+        var ambiguous = await _w.RunAsync("render", file, "--sequence", "RUN", "--out", _w.PathOf("out"));
+
+        single.Code.ShouldBe(0, single.Err);
+        ambiguous.Code.ShouldBe(1);
+        ambiguous.Err.ShouldContain("No sequence named 'RUN'");
+    }
+
+    [Fact]
     public async Task UnknownSequence_FailsWithDidYouMean_InTextAndJson()
     {
         var file = WriteSequence();
