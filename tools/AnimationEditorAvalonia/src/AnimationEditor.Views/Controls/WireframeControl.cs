@@ -2277,6 +2277,7 @@ public class WireframeControl : TextureViewport
     {
         if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
         var frame = _selectedState!.SelectedFrame;
+        if (IsFrameLocked(frame)) return;
         float bL = frame.LeftCoordinate, bT = frame.TopCoordinate;
         float bR = frame.RightCoordinate, bB = frame.BottomCoordinate;
         float aL = minX, aT = minY, aR = maxX, aB = maxY;

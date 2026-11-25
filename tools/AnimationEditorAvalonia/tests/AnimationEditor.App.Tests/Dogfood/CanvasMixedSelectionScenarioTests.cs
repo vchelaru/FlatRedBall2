@@ -97,4 +97,34 @@ public class CanvasMixedSelectionScenarioTests
         string moved = lockFirst ? "First: 0,0,16,16; 0,32,16,48" : "First: 4,10,20,26; 4,42,20,58";
         CheckFileAndUndo(editor, path, start, moved + " | Second: 52,10,68,26; 52,42,68,58");
     }
+
+    [AvaloniaFact]
+    public async Task GridDoubleClick_OnAFrameOfALockedAnimation_LeavesIt()
+    {
+        var (editor, path) = await OpenAsync(lockFirst: true);
+        using var _ = editor;
+        string start = Regions(editor.Project);
+        editor.ClickRow(editor.ChainNamed("First").Frames[0]);
+        editor.Click(editor.Control<ToggleButton>("SnapToGridCheck"));
+        editor.TypeFlanker("GridSizeInput", "32");
+
+        editor.DoubleClickAt(editor.WireframePointAt(70, 70));
+
+        CheckFileAndUndo(editor, path, start, start);
+    }
+
+    [AvaloniaFact]
+    public async Task WandDoubleClick_OnAFrameOfALockedAnimation_LeavesIt()
+    {
+        var (editor, path) = await OpenAsync(lockFirst: true);
+        using var _ = editor;
+        string start = Regions(editor.Project);
+        editor.ClickRow(editor.ChainNamed("First").Frames[0]);
+        editor.Click(editor.Control<ToggleButton>("MagicWandToggle"));
+        editor.Hover(editor.WireframePointAt(80, 80));
+
+        editor.DoubleClickAt(editor.WireframePointAt(80, 80));
+
+        CheckFileAndUndo(editor, path, start, start);
+    }
 }
