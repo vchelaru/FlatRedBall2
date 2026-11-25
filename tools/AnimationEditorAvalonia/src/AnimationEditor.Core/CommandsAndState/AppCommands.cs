@@ -908,7 +908,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
             _pm.FileName = path;
             SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
-            _ioManager.DeleteRecoveryFile();
+            _ioManager.DeleteRecoveryFile(_pm.AnimationChainListSave);
             SaveAsCompleted?.Invoke(path);
             _events.RaiseCurrentFileChanged(path);
             return true;
@@ -2242,12 +2242,12 @@ namespace AnimationEditor.Core.CommandsAndState
             // No content survives a close, so remove any crash-recovery file rather than
             // writing a fresh one for an empty project (unlike NewFile, which still fires
             // AnimationChainsChanged and lets the autosave path write one).
-            _ioManager.DeleteRecoveryFile();
+            _ioManager.DeleteRecoveryFiles();
             RefreshTreeViewRequested?.Invoke();
         }
 
         /// <inheritdoc cref="IAppCommands.HandleApplicationClosing"/>
-        public void HandleApplicationClosing() => _ioManager.DeleteRecoveryFile();
+        public void HandleApplicationClosing() => _ioManager.DeleteRecoveryFiles();
 
         // ── WF09: Create frame from magic-wand pixel bounds ───────────────────
 

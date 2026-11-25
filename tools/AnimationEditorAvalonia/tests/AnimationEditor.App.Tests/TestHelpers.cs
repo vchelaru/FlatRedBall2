@@ -29,7 +29,14 @@ internal sealed class FakeApplicationUpdater : IApplicationUpdater
         return Task.FromResult(Result);
     }
 
-    public void ApplyUpdateAndRestart() => RestartCount++;
+    /// <summary>Runs where the real updater ends the process.</summary>
+    public Action? Restarting { get; set; }
+
+    public void ApplyUpdateAndRestart()
+    {
+        RestartCount++;
+        Restarting?.Invoke();
+    }
 }
 
 /// <summary>
@@ -163,4 +170,10 @@ internal static class TestHelpers
     /// addressed directly through the returned context.
     /// </summary>
     internal static TestServices BuildServices() => new TestServices();
+}
+
+/// <summary>Whether any unsaved document has a crash-recovery file.</summary>
+internal static class RecoveryFileTestExtensions
+{
+    public static bool RecoveryFileExists(this IIoManager ioManager) => ioManager.FindRecoveryFiles().Count > 0;
 }
