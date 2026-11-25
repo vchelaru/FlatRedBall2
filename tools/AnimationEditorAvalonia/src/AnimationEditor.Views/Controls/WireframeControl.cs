@@ -456,8 +456,8 @@ public class WireframeControl : TextureViewport
     public event Action<AnimationFrameSave>? FrameRegionChanged;
 
     /// <summary>
-    /// Fired after all frames in a chain have been translated by dragging the chain's
-    /// composite bounding rect on the wireframe. The payload is the chain whose frames moved.
+    /// Fired once after a whole-selection drag moved frames on the wireframe. The payload is the
+    /// chain of the first frame that moved; frames of other selected chains may have moved too.
     /// </summary>
     public event Action<AnimationChainSave>? ChainRegionChanged;
 
@@ -1099,40 +1099,11 @@ public class WireframeControl : TextureViewport
         float startScreenX, float startScreenY,
         float endScreenX,   float endScreenY)
     {
-        var chain = _selectedState?.SelectedChain;
-        if (chain is null || _bitmap is null || _frameRects.Count == 0 || chain.IsLocked) return;
-
-        _draggingChain = true;
-        _chainDragStarts.Clear();
-        // A locked chain among the visible frames keeps its own frames still (bulk
-        // skip-locked-entries pattern, matching SimulateBulkHandleDrag).
-        foreach (var fr in _frameRects)
-        {
-            if (IsFrameLocked(fr.Frame)) continue;
-            _chainDragStarts.Add((fr, fr.Bounds,
-                fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
-                fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
-        }
-        _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
+        if (_selectedState?.SelectedChain is null || _bitmap is null) return;
+        if (!BeginChainDrag(new Point(startScreenX, startScreenY))) return;
 
         ApplyChainDrag(new Point(endScreenX, endScreenY));
-
-        if (_chainDragStarts.Count > 0)
-        {
-            var snapshots = _chainDragStarts
-                .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
-                    s.Rect.Frame,
-                    s.BL, s.BT, s.BR, s.BB,
-                    s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
-                    s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
-                .ToList();
-            if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
-                _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-        }
-
-        ChainRegionChanged?.Invoke(chain);
-        _draggingChain = false;
-        _chainDragStarts.Clear();
+        CommitChainDrag();
     }
 
     /// <summary>
@@ -1166,16 +1137,9 @@ public class WireframeControl : TextureViewport
     /// </summary>
     public void SimulateChainDragBegin(float startScreenX, float startScreenY)
     {
-        var chain = _selectedState?.SelectedChain;
-        if (chain is null || _bitmap is null || _frameRects.Count == 0 || chain.IsLocked) return;
+        if (_selectedState?.SelectedChain is null || _bitmap is null) return;
+        if (!BeginChainDrag(new Point(startScreenX, startScreenY))) return;
 
-        _draggingChain = true;
-        _chainDragStarts.Clear();
-        foreach (var fr in _frameRects)
-            _chainDragStarts.Add((fr, fr.Bounds,
-                fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
-                fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
-        _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
         _lastPointerPos = new Point(startScreenX, startScreenY);
     }
 
@@ -1516,22 +1480,7 @@ public class WireframeControl : TextureViewport
                 }
                 else
                 {
-                    // Chain drag: move all selected frames together. A locked chain among the
-                    // visible frames keeps its own frames still (bulk skip-locked-entries
-                    // pattern, matching the resize-handle branch above); when every visible
-                    // frame is locked there is nothing to move, so refuse to start.
-                    if (!HasUnlockedFrameRect()) return;
-
-                    _draggingChain = true;
-                    _chainDragStarts.Clear();
-                    foreach (var fr in _frameRects)
-                    {
-                        if (IsFrameLocked(fr.Frame)) continue;
-                        _chainDragStarts.Add((fr, fr.Bounds,
-                            fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
-                            fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
-                    }
-                    _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
+                    if (!BeginChainDrag(pos)) return;
                 }
                 _lastPointerPos = pos;
                 _dragPointer = e.Pointer;
@@ -2034,6 +1983,50 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
+    /// Starts moving every selected frame together. A locked chain among the visible frames keeps
+    /// its own frames still, as in a bulk handle drag; false when that leaves nothing to move.
+    /// What moves is decided here only: neither the drag nor its commit asks about locks again.
+    /// </summary>
+    private bool BeginChainDrag(Point pos)
+    {
+        if (!HasUnlockedFrameRect()) return false;
+
+        _draggingChain = true;
+        _chainDragStarts.Clear();
+        foreach (var fr in _frameRects)
+        {
+            if (IsFrameLocked(fr.Frame)) continue;
+            _chainDragStarts.Add((fr, fr.Bounds,
+                fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
+                fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+        }
+        _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
+        return true;
+    }
+
+    /// <summary>
+    /// Commits a chain drag: one undo command covering every frame it moved, then
+    /// <see cref="ChainRegionChanged"/> once. Clears <see cref="_chainDragStarts"/>.
+    /// </summary>
+    private void CommitChainDrag()
+    {
+        var snapshots = _chainDragStarts
+            .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
+                s.Rect.Frame,
+                s.BL, s.BT, s.BR, s.BB,
+                s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
+                s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
+            .ToList();
+        if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+        {
+            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+            ChainRegionChanged?.Invoke(_objectFinder!.GetAnimationChainContaining(snapshots[0].Frame)!);
+        }
+        _draggingChain = false;
+        _chainDragStarts.Clear();
+    }
+
+    /// <summary>
     /// Commits the in-progress handle or chain drag (undo + region-changed events) and clears
     /// drag state. Shared by <see cref="OnEditPointerReleased"/> and
     /// <see cref="OnPointerCaptureLost"/> so both paths leave the control idle.
@@ -2050,10 +2043,7 @@ public class WireframeControl : TextureViewport
                 float aT = _draggingRect.Frame.TopCoordinate;
                 float aR = _draggingRect.Frame.RightCoordinate;
                 float aB = _draggingRect.Frame.BottomCoordinate;
-                // Defense-in-depth: OnEditPointerPressed/Simulate* already refuse to start a
-                // drag on a locked chain's frame, so this should never fire for one.
-                if (!IsFrameLocked(_draggingRect.Frame) &&
-                    RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
+                if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
                 {
                     // RecordFrameRegionChange raises FrameRegionChanged itself, once sibling
                     // frames (if any) are already synced -- see its remarks.
@@ -2069,26 +2059,7 @@ public class WireframeControl : TextureViewport
 
         if (_draggingChain)
         {
-            var chain = _selectedState!.SelectedChain;
-            // Defense-in-depth: see the comment above for the single/bulk-frame drag case.
-            if (chain != null && !chain.IsLocked)
-            {
-                if (_chainDragStarts.Count > 0)
-                {
-                    var snapshots = _chainDragStarts
-                        .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
-                            s.Rect.Frame,
-                            s.BL, s.BT, s.BR, s.BB,
-                            s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
-                            s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
-                        .ToList();
-                    if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
-                        _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-                }
-                ChainRegionChanged?.Invoke(chain);
-            }
-            _draggingChain = false;
-            _chainDragStarts.Clear();
+            CommitChainDrag();
             StopAutoPanTimer();
         }
     }
@@ -2174,9 +2145,6 @@ public class WireframeControl : TextureViewport
 
         foreach (var (fr, startBounds, _, _, _, _) in _chainDragStarts)
         {
-            // Defense-in-depth: population above already skips locked frames.
-            if (IsFrameLocked(fr.Frame)) continue;
-
             float newL = startBounds.Left   + dx;
             float newT = startBounds.Top    + dy;
             float newR = startBounds.Right  + dx;
