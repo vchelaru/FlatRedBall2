@@ -163,7 +163,7 @@ public class SequenceMultiEditTests
         var undo = new UndoManager();
         Select(document, "C", "A");
 
-        var names = document.DuplicateSequences(undo, document.SelectedIndices);
+        var names = document.DuplicateSequences(undo, document.SelectedIndices).Names;
 
         names.ShouldBe(new[] { "A 2", "C 2" });
         Names(document).ShouldBe(new[] { "A", "B", "C", "A 2", "C 2", "D" });
@@ -206,7 +206,7 @@ public class SequenceMultiEditTests
         var document = Open(dir, "Idle", "Idle 2", "Run");
         Select(document, "Idle", "Idle 2");
 
-        var names = document.DuplicateSequences(new UndoManager(), document.SelectedIndices);
+        var names = document.DuplicateSequences(new UndoManager(), document.SelectedIndices).Names;
 
         names.ShouldBe(new[] { "Idle 3", "Idle 4" });
         Names(document).ShouldBe(new[] { "Idle", "Idle 2", "Idle 3", "Idle 4", "Run" });
@@ -220,7 +220,7 @@ public class SequenceMultiEditTests
         var undo = new UndoManager();
         Select(document, "A");
 
-        document.DuplicateSequences(undo, document.SelectedIndices).ShouldBe(new[] { "A 2" });
+        document.DuplicateSequences(undo, document.SelectedIndices).Names.ShouldBe(new[] { "A 2" });
 
         Labels(undo).ShouldBe(new[] { "Duplicate Sequence 'A'" });
         document.SelectedSequence.ShouldBe(1);

@@ -50,10 +50,10 @@ public partial class MainWindow
         {
             if (MouseNavigationDirection(e.GetCurrentPoint(this).Properties.PointerUpdateKind) is not { } direction) return;
             e.Handled = true;
-            _ = NavigateHistoryAsync(back: direction < 0);
+            _ = RunGuardedAsync(() => NavigateHistoryAsync(back: direction < 0), direction < 0 ? "Back" : "Forward");
         }, RoutingStrategies.Tunnel);
-        MenuNavBack.Click += (_, _) => _ = NavigateHistoryAsync(back: true);
-        MenuNavForward.Click += (_, _) => _ = NavigateHistoryAsync(back: false);
+        MenuNavBack.Click += (_, _) => _ = RunGuardedAsync(() => NavigateHistoryAsync(back: true), "Back");
+        MenuNavForward.Click += (_, _) => _ = RunGuardedAsync(() => NavigateHistoryAsync(back: false), "Forward");
         _navigationHistory.Changed += UpdateNavigationMenuItems;
         UpdateNavigationMenuItems();
     }
@@ -75,25 +75,48 @@ public partial class MainWindow
 
     private void Undo()
     {
-        CommitPendingRename();
+        SettlePendingInput();
         using (_navigation.Suppress()) _undoManager.Undo();
     }
 
     private void Redo()
     {
-        CommitPendingRename();
+        SettlePendingInput();
         using (_navigation.Suppress()) _undoManager.Redo();
     }
 
     /// <summary>
     /// Applies the name typed into an in-place rename that is still open (a sequence row, a track header, an ANIMATIONS
-    /// tree row), before whatever the user did next. Every way out of a rename other than Enter and Escape funnels here;
-    /// see <see cref="SequenceTabPane.CommitPendingRename"/> and <see cref="CommitPendingTreeRename"/>.
+    /// tree row), and cancels a drag that is still held, before whatever the user did next. Every way out of a rename other than Enter and Escape funnels here;
+    /// see <see cref="SequenceTabPane.SettlePendingInput"/> and <see cref="CommitPendingTreeRename"/>.
     /// </summary>
-    private void CommitPendingRename()
+    private void SettlePendingInput()
     {
-        _sequencePane.CommitPendingRename();
+        _sequencePane.SettlePendingInput();
+        SettlePendingAchxInput();
+    }
+
+    /// <summary>The .achx part of <see cref="SettlePendingInput"/>: its drags and its open renames.</summary>
+    private void SettlePendingAchxInput()
+    {
+        CancelAchxDrags();
         CommitPendingTreeRename();
+    }
+
+    /// <summary>
+    /// Cancels a drag that is still held on the wireframe, the preview or an ANIMATIONS row, as Escape does. A drag holds objects
+    /// of the document as it was when pressed, so it ends when a command runs, the file is reloaded or another tab is shown.
+    /// </summary>
+    private void CancelAchxDrags()
+    {
+        WireframeCtrl.CancelDrag();
+        PreviewCtrl.CancelDrag();
+        // The OS still holds a row drag until the release; without its source the drop does nothing.
+        _pendingFrameDrag = null;
+        _pendingChainDrag = null;
+        _pendingShapeDrag = null;
+        ClearFrameDragCandidate();
+        RemoveFrameDropIndicators();
     }
 
     /// <summary>-1 for the mouse Back button, +1 for Forward, null for any other press.</summary>
@@ -138,7 +161,7 @@ public partial class MainWindow
     private async Task NavigateHistoryAsync(bool back)
     {
         if (_navigatingHistory) return;
-        CommitPendingRename();
+        SettlePendingInput();
         var here = CaptureNavigationLocation() ?? new NavigationLocation(string.Empty);
         _navigatingHistory = true;
         using var suppress = _navigation.Suppress();

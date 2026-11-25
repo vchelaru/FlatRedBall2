@@ -1,6 +1,9 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Sequences;
+using FlatRedBall2.AnimationEditorCommon;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -27,29 +30,56 @@ public partial class MainWindow
 
     private async Task WarnAboutBrokenSequencesAsync(string animationPath, RemovedChainNames removed)
     {
+        var files = await FindSequenceBlocksAsync(animationPath,
+            (sequences, path) => SeqjChainUsageScanner.FindMatches(sequences, path, animationPath, removed.Names));
+
+        // The tab may have closed meanwhile, and a failed save has its own banner: the file still has the chains.
+        var tab = _tabManager.Tabs.FirstOrDefault(open => open.Path == new FilePath(animationPath));
+        if (tab is null || _achxPane.HasFailedSave(tab)) return;
+
+        var message = BrokenSequenceNotice.Message(removed, files.Select(file => file with
+        {
+            Blocks = file.Blocks.Where(block => removed.Document.AnimationChains.All(chain => chain.Name != block.Chain)).ToList(), // not undone meanwhile
+        }));
+        if (message is not null) ShowProblem(message);
+    }
+
+    /// <summary>The names of the chains in the file at <paramref name="path"/>, read before it is removed; none when it cannot be read.</summary>
+    private static IReadOnlyCollection<string> ChainNamesIn(string path)
+    {
+        try { return AnimationFileLoader.Load(path).List.AnimationChains.Select(chain => chain.Name).ToList(); }
+        catch { return []; }
+    }
+
+    /// <summary>
+    /// The banner text naming the sequence blocks that played a chain of a file <paramref name="verb"/> (such as "Deleting")
+    /// just removed, or null when none did. <paramref name="removed"/> is each file's path and <see cref="ChainNamesIn"/>.
+    /// </summary>
+    private async Task<string?> BrokenByRemovedFilesAsync(string verb, IReadOnlyDictionary<string, IReadOnlyCollection<string>> removed)
+    {
+        if (removed.Count == 0) return null;
+        var files = await FindSequenceBlocksAsync(removed.Keys.First(), (sequences, path) => removed
+            .SelectMany(file => SeqjChainUsageScanner.FindMatches(sequences, path, file.Key, file.Value)).ToList());
+        return BrokenSequenceNotice.Message(verb, removed.Keys.ToList(), files);
+    }
+
+    private async Task<List<BrokenSequenceFile>> FindSequenceBlocksAsync(
+        string animationPath, Func<SequenceListSave, string, IReadOnlyList<SeqjChainMatch>> find)
+    {
         var projectFiles = _projectManager.ProjectFolderPath is null ? null
             : ProjectPanel.IncludedEntries.Select(entry => entry.File).OfType<DiskEditorFile>().Select(file => file.FullPath).ToList();
         var files = await Task.Run(async () =>
         {
             await BrokenSequenceScanGate;
             return BrokenSequenceNotice.FilesToScan(animationPath, projectFiles)
-                .Select(path => new BrokenSequenceFile(path, SeqjChainUsageScanner.FindMatches(path, animationPath, removed.Names)))
+                .Select(path => new BrokenSequenceFile(path, SeqjChainUsageScanner.FindMatches(path, sequences => find(sequences, path))))
                 .ToList();
         });
 
-        // The tab may have closed meanwhile, and a failed save has its own banner: the file still has the chains.
-        var tab = _tabManager.Tabs.FirstOrDefault(open => open.Path == new FilePath(animationPath));
-        if (tab is null || _achxPane.HasFailedSave(tab)) return;
-
         // A tab that now has unsaved edits stands for its file.
         var unsaved = _sequencePane.UnsavedDocuments.ToDictionary(open => open.Path);
-        var message = BrokenSequenceNotice.Message(removed, files.Select(file => file with
-        {
-            Blocks = (unsaved.TryGetValue(new FilePath(file.Path), out var open)
-                    ? SeqjChainUsageScanner.FindMatches(open.Save, file.Path, animationPath, removed.Names)
-                    : file.Blocks)
-                .Where(block => removed.Document.AnimationChains.All(chain => chain.Name != block.Chain)).ToList(), // not undone meanwhile
-        }));
-        if (message is not null) ShowProblem(message);
+        return files.Select(file => unsaved.TryGetValue(new FilePath(file.Path), out var open)
+            ? file with { Blocks = find(open.Save, file.Path) }
+            : file).ToList();
     }
 }

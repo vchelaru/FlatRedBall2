@@ -1,6 +1,8 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
+using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using System.Collections.Generic;
@@ -206,8 +208,11 @@ public class CutPasteTests
         Assert.Equal(CutCompletion.None, cut.ResolveCompletion(ctxA.Acls));
     }
 
+    private static bool CutFromBackgroundTab(TestServices ctx, PendingCutState cut) =>
+        ctx.AppCommands.CutFromBackgroundTab(new TabEntry(new FilePath("source.achx")) { CachedEditorModel = cut.SourceDocument }, cut);
+
     [Fact]
-    public void RemoveSourcesFrom_Chain_RemovesFromGivenDocumentEvenWhenNotActive()
+    public void CutFromBackgroundTab_Chain_RemovesFromGivenDocumentEvenWhenNotActive()
     {
         // Simulates a cut made in tab A while tab B is now the active document (#1026):
         // the source chain lives in A's document, not the currently active one.
@@ -216,14 +221,14 @@ public class CutPasteTests
         var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
         cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
 
-        bool removed = cut.RemoveSourcesFrom(cut.SourceDocument!);
+        bool removed = CutFromBackgroundTab(ctxA, cut);
 
         Assert.True(removed);
         Assert.DoesNotContain(chain, ctxA.Acls.AnimationChains);
     }
 
     [Fact]
-    public void RemoveSourcesFrom_Frame_RemovesFromChainInGivenDocument()
+    public void CutFromBackgroundTab_Frame_RemovesFromChainInGivenDocument()
     {
         var cut = new PendingCutState();
         var ctxA = TestHelpers.SetupFreshAcls();
@@ -231,7 +236,7 @@ public class CutPasteTests
         var frame = chain.Frames[0];
         cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } }, ctxA.Acls);
 
-        bool removed = cut.RemoveSourcesFrom(cut.SourceDocument!);
+        bool removed = CutFromBackgroundTab(ctxA, cut);
 
         Assert.True(removed);
         Assert.DoesNotContain(frame, chain.Frames);
@@ -242,7 +247,7 @@ public class CutPasteTests
     [InlineData(CopySelectionKind.Chain, true)]
     [InlineData(CopySelectionKind.Frame, false)]
     [InlineData(CopySelectionKind.Shape, false)]
-    public void RemoveSourcesFrom_LockedChain_KeepsItsFramesAndShapes(CopySelectionKind kind, bool expectedRemoved)
+    public void CutFromBackgroundTab_LockedChain_KeepsItsFramesAndShapes(CopySelectionKind kind, bool expectedRemoved)
     {
         var cut = new PendingCutState();
         var ctx = TestHelpers.SetupFreshAcls();
@@ -254,7 +259,7 @@ public class CutPasteTests
         chain.IsLocked = true;
         cut.Set(new CopySelectionPayload { Kind = kind, Chains = [chain], Frames = [frame], Shapes = [shape] }, ctx.Acls);
 
-        cut.RemoveSourcesFrom(ctx.Acls).ShouldBe(expectedRemoved);
+        CutFromBackgroundTab(ctx, cut).ShouldBe(expectedRemoved);
 
         chain.Frames.ShouldBe([frame]);
         frame.ShapesSave.Shapes.ShouldBe([shape]);

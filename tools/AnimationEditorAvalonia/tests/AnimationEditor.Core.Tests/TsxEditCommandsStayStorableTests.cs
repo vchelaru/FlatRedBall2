@@ -210,7 +210,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
     [
         // Remove, clear, reorder or name.
         nameof(IAppCommands.DeleteAnimationChains), nameof(IAppCommands.DeleteCircle), nameof(IAppCommands.DeleteAxisAlignedRectangle),
-        nameof(IAppCommands.DeleteShapes), nameof(IAppCommands.DeleteFrames), nameof(IAppCommands.DeleteSelection),
+        nameof(IAppCommands.DeleteShapes), nameof(IAppCommands.DeleteFrames), nameof(IAppCommands.DeleteSelection), nameof(IAppCommands.CutFromBackgroundTab),
         nameof(IAppCommands.RemoveFrameEvent), nameof(IAppCommands.ClearFrameColorValues),
         nameof(IAppCommands.AddAnimationChain), nameof(IAppCommands.AddAnimationChainWithName),
         nameof(IAppCommands.AddNewAnimationChain), nameof(IAppCommands.RenameChain), nameof(IAppCommands.SetChainLocked),

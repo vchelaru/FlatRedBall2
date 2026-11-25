@@ -4,6 +4,7 @@ using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -21,7 +22,9 @@ namespace AnimationEditor.App.Controls;
 /// Go to Definition are for one item. Every commit is one edit on the <see cref="SequenceDocument"/>, so one undo
 /// entry; a refused value (an empty or taken name, a length of 0) goes out through <see cref="ErrorRaised"/> and the field
 /// goes back to the document's value. The host calls <see cref="Show"/> whenever the selection or the document changes
-/// (including each step of a drag), which rewrites every field except the one being typed in.
+/// (including each step of a drag), which rewrites every field except the one being typed in. Typed text only
+/// ever applies to what it was typed for: selecting another item commits it there first, and it is dropped when a change
+/// outside the editor or an undo left another item in its place.
 /// </summary>
 public partial class SequenceInspectorControl : UserControl
 {
@@ -35,6 +38,7 @@ public partial class SequenceInspectorControl : UserControl
     private IReadOnlyList<int> _tracks = Array.Empty<int>();
     private bool _canRenameSequence = true;
     private bool _refreshing;
+    private Shown? _shown;
 
     // The relative edit ("+ 4") being applied to a mixed field, which EditOf hands to that field's commit.
     private (Control Field, NumericEdit Edit)? _relativeEdit;
@@ -157,6 +161,7 @@ public partial class SequenceInspectorControl : UserControl
     public void Show(SequenceDocument? document, int sequence, IUndoManager? undo, TimelineChainId? chain, int? track,
         IReadOnlyList<TimelineChainId>? chains = null, IReadOnlyList<int>? tracks = null, bool canRenameSequence = true)
     {
+        var before = _shown;
         _chains = chains ?? Array.Empty<TimelineChainId>();
         _tracks = tracks ?? Array.Empty<int>();
         _canRenameSequence = canRenameSequence;
@@ -165,7 +170,141 @@ public partial class SequenceInspectorControl : UserControl
         _undo = undo;
         _chain = chain;
         _track = track;
+        _shown = Snapshot();
+        if (TypingField() is { } field && !SameItem(field, before, _shown))
+        {
+            string text = TextOf(field);
+            DiscardTypedText();
+            // The data is the one the text was typed over, so the user selected something else: the text goes to the item it
+            // was typed for, as a focus loss would commit it. After any other change that item is not the one shown any more.
+            if (before is not null && _shown is not null && ReferenceEquals(before.Save, _shown.Save))
+                CommitLater(field, text, before);
+        }
         Refresh(force: false);
+    }
+
+    // What the fields edit and everything around it that tells whether a later Show still shows the same thing: a change
+    // outside the editor, or an undo, can put another item at an index.
+    private sealed record Shown(SequenceDocument Document, SequenceListSave Save, int Sequence, TimelineChainId? Chain, int? Track,
+        IReadOnlyList<TimelineChainId> Chains, IReadOnlyList<int> Tracks, bool CanRenameSequence,
+        IReadOnlyList<string> SequenceNames, IReadOnlyList<ShownTrack> TrackData)
+    {
+        public IReadOnlyList<string> TrackNames { get; } = TrackData.Select(track => track.Name).ToList();
+
+        // The selected blocks, primary included.
+        public IReadOnlyList<TimelineChainId> Blocks { get; } = (Chain is { } chain ? Chains.Append(chain) : Chains).Distinct().ToList();
+
+        public ShownTrack? TrackAt(int index) => index >= 0 && index < TrackData.Count ? TrackData[index] : null;
+    }
+
+    private sealed record ShownTrack(string Name, IReadOnlyList<(string Source, string Chain, double Start, double? Length)> Blocks,
+        IReadOnlyList<(string Sequence, double Start, double? Length)> Clips, int FirstClip);
+
+    private Shown? Snapshot()
+    {
+        if (_document is not { } document || CurrentSequence is not { } sequence) return null;
+        var tracks = sequence.Tracks.Select(track => new ShownTrack(track.Name,
+            track.Chains.Select(block => (block.Source, block.Chain, block.Start, block.Length)).ToList(),
+            (track.References ?? []).Select(clip => (clip.Sequence, clip.Start, clip.Length)).ToList(),
+            SequenceTimeline.OrderedClips(track).FirstOrDefault() is { } first ? track.References!.IndexOf(first) : -1)).ToList();
+        // Copies: the lists are the timeline's own, which the next selection changes.
+        return new Shown(document, document.Save, _sequence, _chain, _track, _chains.ToList(), _tracks.ToList(), _canRenameSequence,
+            document.Save.Sequences.Select(s => s.Name).ToList(), tracks);
+    }
+
+    // Whether what field edits is the same item in both. Its other values may have changed (an undo, an edit outside).
+    private bool SameItem(Control field, Shown? before, Shown? now)
+    {
+        if (before is null || now is null || !(ReferenceEquals(before.Document, now.Document) || before.Document.Path == now.Document.Path))
+            return false;
+        if (field == SequenceNameBox)
+            return Same(before.SequenceNames, before.Sequence, now.SequenceNames, now.Sequence, (_, _) => false)
+                && before.Blocks.Count + now.Blocks.Count == 0 && before.Track is null && now.Track is null;
+        if (!Same(before.SequenceNames, before.Sequence, now.SequenceNames, now.Sequence, (_, _) => true)) return false;
+        bool SameTrack(int from, int to, bool renamed) =>
+            before.TrackAt(from) is not null && now.TrackAt(to) is not null && Same(before.TrackNames, from, now.TrackNames, to, (_, _) => renamed);
+
+        if (field == ChainStartField || field == ChainLengthField)
+        {
+            return before.Blocks.Count > 0 && before.Blocks.Count == now.Blocks.Count && before.Blocks.Zip(now.Blocks).All(pair =>
+                SameTrack(pair.First.Track, pair.Second.Track, renamed: true)
+                && Same(before.TrackData[pair.First.Track].Blocks, pair.First.Chain, now.TrackData[pair.Second.Track].Blocks, pair.Second.Chain,
+                    (was, isNow) => was.Source == isNow.Source && was.Chain == isNow.Chain));
+        }
+        if (before.Blocks.Count + now.Blocks.Count > 0 || before.Track is not { } fromTrack || now.Track is not { } toTrack) return false;
+        if (field == TrackNameBox) return SameTrack(fromTrack, toTrack, renamed: false);
+        return SameTrack(fromTrack, toTrack, renamed: true)
+            && Same(before.TrackData[fromTrack].Clips, before.TrackData[fromTrack].FirstClip, now.TrackData[toTrack].Clips, now.TrackData[toTrack].FirstClip,
+                (was, isNow) => was.Sequence == isNow.Sequence);
+    }
+
+    // Items have no identity of their own: the same item has the same content (and no double that could be it instead), or
+    // is at the same place of a list no item came or went from, with its content edited.
+    private static bool Same<T>(IReadOnlyList<T> before, int from, IReadOnlyList<T> now, int to, Func<T, T, bool> edited)
+    {
+        if (from < 0 || from >= before.Count || to < 0 || to >= now.Count) return false;
+        bool samePlace = from == to && before.Count == now.Count;
+        if (Equals(before[from], now[to]))
+            return samePlace || (before.Count(item => Equals(item, before[from])) == 1 && now.Count(item => Equals(item, before[from])) == 1);
+        return samePlace && !now.Contains(before[from]) && edited(before[from], now[to]);
+    }
+
+    // The field that has the focus and holds text not committed yet, or null.
+    private Control? TypingField()
+    {
+        foreach (var box in new[] { SequenceNameBox, TrackNameBox })
+            if (box.IsKeyboardFocusWithin && !Equals(box.Tag, box.Text)) return box;
+        return NumberFields.FirstOrDefault(field => field.IsKeyboardFocusWithin && field.HasTypedText);
+    }
+
+    private FlankerNumericField[] NumberFields => [ChainStartField, ChainLengthField, ReferenceStartField, ReferenceLengthField];
+
+    private static string TextOf(Control field) => field is FlankerNumericField number ? number.TypedText : ((TextBox)field).Text ?? string.Empty;
+
+    /// <summary>
+    /// Applies the text typed into the field that has the focus, as Enter would: for a way of leaving it that takes no focus (a
+    /// tab switch, a hotkey). Does nothing when none was typed.
+    /// </summary>
+    public void CommitTypedText()
+    {
+        if (TypingField() is { } field) CommitText(field, TextOf(field));
+    }
+
+    private void CommitText(Control field, string text)
+    {
+        if (field is FlankerNumericField number) number.CommitText(text);
+        else if (field == SequenceNameBox) Commit(document => CommitSequenceName(document, text));
+        else Commit(document => CommitTrackName(document, text));
+        _undo?.SealCoalescing();
+    }
+
+    // Waits for the click that selected the other item to finish: an edit rebuilds the list that click is still being handled by.
+    private void CommitLater(Control field, string text, Shown target) => Dispatcher.UIThread.Post(() =>
+    {
+        if (_shown is not { } current || !ReferenceEquals(current.Save, target.Save)) return;
+        target.Document.KeepSelection(() =>
+        {
+            Show(target);
+            CommitText(field, text);
+        });
+        Show(current);
+    });
+
+    private void Show(Shown item) => Show(item.Document, item.Sequence, _undo, item.Chain, item.Track, item.Chains, item.Tracks, item.CanRenameSequence);
+
+    private void DiscardTypedText()
+    {
+        _refreshing = true;
+        try
+        {
+            SequenceNameBox.Text = SequenceNameBox.Tag as string;
+            TrackNameBox.Text = TrackNameBox.Tag as string;
+            foreach (var field in NumberFields) field.DiscardTypedText();
+        }
+        finally
+        {
+            _refreshing = false;
+        }
     }
 
     /// <summary>
@@ -185,6 +324,8 @@ public partial class SequenceInspectorControl : UserControl
             TrackPanel.IsVisible = sequence is not null && reference is null && track is not null;
             SequencePanel.IsVisible = sequence is not null && !ChainPanel.IsVisible && !TrackPanel.IsVisible;
 
+            // Also while its section is hidden: a box losing the focus late still commits its text to the sequence shown.
+            if (sequence is not null) Put(SequenceNameBox, sequence.Name, force);
             if (SequencePanel.IsVisible)
                 ShowSequence(sequence!, force);
             else if (TrackPanel.IsVisible)
@@ -201,7 +342,6 @@ public partial class SequenceInspectorControl : UserControl
     private void ShowSequence(SequenceSave sequence, bool force)
     {
         var document = _document!;
-        Put(SequenceNameBox, sequence.Name, force);
         SequenceNameBox.IsEnabled = _canRenameSequence;
         SequenceLoopBox.IsChecked = sequence.Loop;
         SequenceLengthText.Text = Seconds(SequenceTimeline.Length(document.Save.Sequences, sequence, reference => document.CycleLength(reference) ?? 0));

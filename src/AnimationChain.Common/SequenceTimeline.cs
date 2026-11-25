@@ -38,7 +38,8 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// sampled at its own end is hidden. With Loop off such a time is the end, and holds.</item>
 /// </list>
 /// Cycle lengths come from the caller (a chain's frame lengths summed, doubled for ping-pong), so this class needs no
-/// chain data.
+/// chain data. Sum a length of up to 7 digits as the decimal the file holds: the float nearest 0.1 is a hair over it, and
+/// after a few hundred cycles a time on a frame's start would show the frame before. A longer one (1/60) is summed as its float.
 /// </summary>
 public static class SequenceTimeline
 {
@@ -130,7 +131,9 @@ public static class SequenceTimeline
     /// <paramref name="pass"/> (0 = the first run through, 1 = after the first wrap) begins: 0 for pass 0, and for a track
     /// that restarts at the wrap. At each wrap the carry becomes the playback time of the block playing at the <see cref="LastInstant"/>
     /// (<paramref name="sequenceLength"/> minus its start, plus its own carry when it is the first block), if that block
-    /// is the same chain (source and name) as the first block and the first block starts at 0; otherwise 0. Passes are
+    /// is the same chain (source and name) as the first block and the first block starts at 0; otherwise 0. The block at the
+    /// wrap is the same in every pass, so this is <paramref name="pass"/> times the sequence length when it is the first
+    /// block, and the same after every wrap when it is a later one. Passes are
     /// counted by the player: the number of times the looping sequence has wrapped.
     /// </summary>
     public static double CarryOver(SequenceTrackSave track, double sequenceLength, int pass,
@@ -141,19 +144,9 @@ public static class SequenceTimeline
         if (first.Start > Slack(0)) return 0;
 
         // The block playing just before the end of a pass: the wrap instant itself belongs to the next pass.
-        double endTime = LastInstant(sequenceLength);
-        double carry = 0;
-        for (int i = 0; i < pass; i++)
-        {
-            var atWrap = ActiveAt(track, endTime, cycleLength, out _);
-            if (atWrap is null || atWrap.Source != first.Source || atWrap.Chain != first.Chain)
-            {
-                carry = 0;
-                continue;
-            }
-            carry = (ReferenceEquals(atWrap, first) ? carry : 0) + (sequenceLength - atWrap.Start);
-        }
-        return carry;
+        var atWrap = ActiveAt(track, LastInstant(sequenceLength), cycleLength, out _);
+        if (atWrap is null || atWrap.Source != first.Source || atWrap.Chain != first.Chain) return 0;
+        return (ReferenceEquals(atWrap, first) ? pass : 1) * (sequenceLength - atWrap.Start);
     }
 
     /// <summary>
@@ -323,7 +316,7 @@ public static class SequenceTimeline
     /// wrap, and unless all of these hold: the first clip starts at 0, its target loops (<paramref name="loops"/>), and the
     /// clip playing at the holder's <see cref="LastInstant"/> (<see cref="ActiveClipAt"/>) plays the same sequence as the first clip.
     /// At each wrap the carry becomes the time that clip has played (<paramref name="sequenceLength"/> minus its start, plus
-    /// its own carry when it is the first clip); otherwise 0. A clip that ends before the holder does is not playing at the
+    /// its own carry when it is the first clip, so <paramref name="pass"/> times that); otherwise 0. A clip that ends before the holder does is not playing at the
     /// wrap, so a default-length clip carries only when its target is as long as the holder; to carry a shorter looping
     /// target, set the clip's length to the holder's length. Only the first clip carries; every other clip restarts at the
     /// wrap. The chain rule is <see cref="CarryOver"/>.
@@ -336,19 +329,9 @@ public static class SequenceTimeline
         if (first.Start > Slack(0) || targetLength(first) <= 0 || !loops(first)) return 0;
 
         // The clip playing just before the end of a pass: the wrap instant itself belongs to the next pass.
-        double endTime = LastInstant(sequenceLength);
-        double carry = 0;
-        for (int i = 0; i < pass; i++)
-        {
-            var atWrap = ActiveClipAt(track, endTime, targetLength);
-            if (atWrap is null || atWrap.Sequence != first.Sequence)
-            {
-                carry = 0;
-                continue;
-            }
-            carry = (ReferenceEquals(atWrap, first) ? carry : 0) + (sequenceLength - atWrap.Start);
-        }
-        return carry;
+        var atWrap = ActiveClipAt(track, LastInstant(sequenceLength), targetLength);
+        if (atWrap is null || atWrap.Sequence != first.Sequence) return 0;
+        return (ReferenceEquals(atWrap, first) ? pass : 1) * (sequenceLength - atWrap.Start);
     }
 
     /// <summary>

@@ -260,7 +260,7 @@ public partial class App : Application
             new ObjectFinder(sp.GetRequiredService<IProjectManager>()));
         sc.AddSingleton<IObjectFinder>(sp => sp.GetRequiredService<ObjectFinder>());
 
-        sc.AddSingleton<UndoManager>();
+        sc.AddSingleton<UndoManager>(sp => new UndoManager(sp.GetRequiredService<IProjectManager>()));
         sc.AddSingleton<IUndoManager>(sp => sp.GetRequiredService<UndoManager>());
 
         sc.AddSingleton<PendingCutState>();

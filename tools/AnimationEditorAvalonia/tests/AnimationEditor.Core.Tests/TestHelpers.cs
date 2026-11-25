@@ -38,7 +38,7 @@ internal sealed class TestServices
         IoManager         = new IoManager(AppState, System.IO.Path.Combine(
             System.IO.Path.GetTempPath(), "AnimationEditorCoreTests", $"recovery_{Guid.NewGuid():N}.achx"));
         ObjectFinder      = new ObjectFinder(ProjectManager);
-        UndoManager       = new UndoManager();
+        UndoManager       = new UndoManager(ProjectManager);
         AppCommands       = new AppCommands(ProjectManager, SelectedState, ApplicationEvents,
                                             IoManager, ObjectFinder, UndoManager);
 

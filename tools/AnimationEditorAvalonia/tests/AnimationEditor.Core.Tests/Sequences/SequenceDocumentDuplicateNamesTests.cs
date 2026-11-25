@@ -34,11 +34,11 @@ public class SequenceDocumentDuplicateNamesTests
 
         var document = SequenceDocument.Load(path);
 
-        document.Save.Sequences.Select(sequence => sequence.Name).ShouldBe(new[] { "Idle", "Idle 2", "idle 3" });
+        document.Save.Sequences.Select(sequence => sequence.Name).ShouldBe(new[] { "Idle", "Idle 2", "idle" });
         document.Save.Sequences[1].Tracks.Single().Name.ShouldBe("OnlyInSecond");
         document.DuplicateNamesNotice.ShouldNotBeNull();
         document.DuplicateNamesNotice.ShouldContain("'Idle' as 'Idle 2'");
-        document.DuplicateNamesNotice.ShouldContain("'idle' as 'idle 3'");
+        document.DuplicateNamesNotice.ShouldNotContain("'idle'", Case.Sensitive);
     }
 
     [Fact]

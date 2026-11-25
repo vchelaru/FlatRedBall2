@@ -83,16 +83,16 @@ internal sealed class VelopackApplicationUpdater : IApplicationUpdater
         Action<int>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var updateManager = CreateUpdateManager();
-        AppLog.Info($"Update check started (source {_updateSource}, installed version {updateManager.CurrentVersion?.ToString() ?? "none: not a managed install"}).");
-
-        // Local development builds and the legacy archive distribution are not managed installs.
-        // Their normal behavior is unchanged: they never attempt to overwrite themselves.
-        if (updateManager.CurrentVersion is null)
-            return ApplicationUpdateResult.NoUpdate;
-
         try
         {
+            var updateManager = CreateUpdateManager();
+            AppLog.Info($"Update check started (source {_updateSource}, installed version {updateManager.CurrentVersion?.ToString() ?? "none: not a managed install"}).");
+
+            // Local development builds and the legacy archive distribution are not managed installs.
+            // Their normal behavior is unchanged: they never attempt to overwrite themselves.
+            if (updateManager.CurrentVersion is null)
+                return ApplicationUpdateResult.NoUpdate;
+
             var update = await updateManager.CheckForUpdatesAsync().ConfigureAwait(false);
             if (update is null)
             {

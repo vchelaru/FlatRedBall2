@@ -38,6 +38,7 @@ public partial class FilesPanelControl : UserControl
     private Window? _ownerWindow;
     private Action<string>? _showError;
     private Action<string>? _openPng;
+    private Action<string>? _copyText;
     private PointerPressedEventArgs? _dragPressEvent;
     private string? _dragPath;
     private PngFilesTreeNodeVm? _dragSourceNode;
@@ -109,12 +110,13 @@ public partial class FilesPanelControl : UserControl
     }
 
     public void Initialize(ThumbnailService thumbnailService, Window ownerWindow,
-        Action<string>? showError = null, Action<string>? openPng = null)
+        Action<string>? showError = null, Action<string>? openPng = null, Action<string>? copyText = null)
     {
         _thumbnailService = thumbnailService;
         _ownerWindow = ownerWindow;
         _showError = showError;
         _openPng = openPng;
+        _copyText = copyText;
     }
 
     /// <param name="filesRoot">
@@ -227,7 +229,7 @@ public partial class FilesPanelControl : UserControl
         foreach (var command in ProjectTreeMenuLayout.ForImageRow(node.IsFolder))
         {
             var (header, onClick) = command == ProjectTreeMenuCommand.CopyFullPath
-                ? ("Copy Full Path", (Action)(() => _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(path)))
+                ? ("Copy Full Path", (Action)(() => _copyText?.Invoke(path)))
                 : (node.IsFolder ? "Reveal in File Manager" : "Open Containing Folder", () => RevealInExplorer(path, node.IsFolder));
             FilesTree.ContextMenu.Items.Add(Views.Controls.TreeMenuRenderer.CreateMenuItem(
                 header, onClick, ProjectTreeMenuLayout.Icon(command)));

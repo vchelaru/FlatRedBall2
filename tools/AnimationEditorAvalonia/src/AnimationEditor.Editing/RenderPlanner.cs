@@ -199,7 +199,12 @@ public static class RenderPlanner
             return -1;
         }
         int found = names.ToList().FindIndex(n => n == name);
-        if (found < 0) found = names.ToList().FindIndex(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+        if (found < 0)
+        {
+            // Names may differ only by case, so a name in another case is used only when it can mean one item.
+            var inAnyCase = Enumerable.Range(0, names.Count).Where(i => string.Equals(names[i], name, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (inAnyCase.Count == 1) found = inAnyCase[0];
+        }
         if (found >= 0) return found;
         error = $"No {kind} named '{name}'." + NameHints.For(name, names, plural);
         return -1;

@@ -12,7 +12,7 @@ namespace AnimationEditor.Core.Sequences;
 /// <param name="Sources">The distinct absolute source paths the sequences use, in first-use order.</param>
 public sealed record SequenceClipboardContent(IReadOnlyList<SequenceSave> Sequences, IReadOnlyList<string> Sources);
 
-/// <summary>What <see cref="SequenceDocument.PasteSequences"/> did: the pasted sequences' names in order, and a message for each source refused.</summary>
+/// <summary>What <see cref="SequenceDocument.PasteSequences"/> or <see cref="SequenceDocument.DuplicateSequences"/> did: the new sequences' names in order, and a message for each source, or the whole edit, refused.</summary>
 public sealed record SequencePasteResult(IReadOnlyList<string> Names, IReadOnlyList<string> Errors);
 
 /// <summary>

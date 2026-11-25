@@ -25,7 +25,7 @@ public sealed class EditSession
     public ProjectManager ProjectManager => _projectManager;
     public AppCommands Commands => _commands;
     public ObjectFinder ObjectFinder { get; }
-    public UndoManager Undo { get; } = new();
+    public UndoManager Undo { get; }
 
     /// <summary>The files a batch wrote before its save, put back when it fails.</summary>
     public FileRollback Rollback { get; } = new();
@@ -42,6 +42,7 @@ public sealed class EditSession
         // The recovery file is only written when there is no file path, which a session never has.
         var io = new IoManager(appState, System.IO.Path.Combine(System.IO.Path.GetTempPath(), "aecli-recovery.achx"));
         ObjectFinder = new ObjectFinder(_projectManager);
+        Undo = new UndoManager(_projectManager);
         _commands = new AppCommands(_projectManager, selected, events, io, ObjectFinder, Undo) { AutosaveOnChange = false };
     }
 

@@ -52,6 +52,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private TimelineBlock? _dragBlock;
     private string? _gestureBefore;
 
+    // The document's data when the drag was pressed: a drag holds objects and indices of it, so it ends when that is replaced.
+    private SequenceListSave? _dragSave;
+
     // Snapping: the targets a move or resize snaps to, taken when the drag starts, and the one it is snapped to now.
     private IReadOnlyList<SnapTarget> _snapOthers = Array.Empty<SnapTarget>();
 
@@ -329,7 +332,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Shows sequence <paramref name="sequenceIndex"/> of <paramref name="document"/>, or nothing when null.</summary>
     public void Show(SequenceDocument? document, int sequenceIndex, IUndoManager? undo)
     {
-        if (!ReferenceEquals(document, _document) || sequenceIndex != _sequenceIndex)
+        bool sameSequence = ReferenceEquals(document, _document) && sequenceIndex == _sequenceIndex;
+        if (_drag != DragKind.None && (!sameSequence || !ReferenceEquals(document?.Save, _dragSave))) AbandonDrag();
+        if (!sameSequence)
         {
             EndTrackRename();
             SetSelection(null, null);
@@ -558,13 +563,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     }
 
     // The drop and "add without dragging" end the same way: one PlaceChain (so one undo entry, named alike) and the new chain selected.
-    private void PlaceAndSelect(LibraryChip chip, int? track, double start)
+    private string? PlaceAndSelect(LibraryChip chip, int? track, double start)
     {
-        _document!.PlaceChain(_undo!, _sequenceIndex, track, chip.Source, chip.Chain.Name, start);
+        if (_document!.PlaceChain(_undo!, _sequenceIndex, track, chip.Source, chip.Chain.Name, start) is { } refusal) return refusal;
         var sequence = Sequence!;
         int placed = track ?? 0; // a new track is the first one, in front
         SetSelection(new TimelineChainId(placed, sequence.Tracks[placed].Chains.Count - 1), null);
         Rebuild();
+        return null;
     }
 
     /// <summary>True when the selection names exactly one track, so <see cref="ChipAddMode.SelectedTrack"/> has somewhere to add.</summary>
@@ -574,14 +580,14 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>
     /// Adds <paramref name="chip"/>'s chain at the playhead without a drag: on a new track in front (the top of the list), or on the
     /// one selected track (see <see cref="ChipAddPlan"/>). The new chain is selected and scrolled into view, as a drop's is.
-    /// Returns null when added, else why nothing was (no sequence in the file, or no single selected track).
+    /// Returns null when added, else why nothing was (no sequence in the file, no single selected track, or one that plays a sequence).
     /// </summary>
     public string? AddChip(LibraryChip chip, ChipAddMode mode)
     {
         if (_document is null || _undo is null || Sequence is null) return "Add a sequence first: the file has none to put the chain on.";
         var plan = ChipAddPlan.For(mode, SelectedChains, SelectedTracks, _playhead);
         if (!plan.CanAdd) return plan.Refusal;
-        PlaceAndSelect(chip, plan.Track, plan.Start);
+        if (PlaceAndSelect(chip, plan.Track, plan.Start) is { } refusal) return refusal;
         RevealPlaced(plan.Start);
         return null;
     }
@@ -658,6 +664,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         }
         if (!properties.IsLeftButtonPressed) return;
         e.Handled = true;
+        _dragSave = _document.Save;
 
         if (TryBeginColumnResize(e, point)) return;
 
@@ -782,7 +789,6 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _snapOthers = TimelineSnapTargets.Others(_blocks, _dragItems.Select(item => item.Reference).ToList(), _playhead, _references);
         _frameBoundaries = _document.FindChain(block.Reference) is { } chain ? TimelineSnapTargets.FrameBoundaries(chain, _document.UnitOf(block.Reference)) : null;
         _dragRepeats = _document.FindChain(block.Reference)?.Loop ?? true;
-        _gestureBefore = _document.BeginGesture();
         e.Pointer.Capture(this);
         ShowCursor(point);
         InvalidateVisual();
@@ -839,6 +845,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         if (_drag == DragKind.Pending)
         {
             if (Math.Abs(point.X - _pressPoint.X) < DragThresholdPixels && Math.Abs(point.Y - _pressPoint.Y) < DragThresholdPixels) return;
+            _gestureBefore = _document!.BeginGesture();
             _drag = _pressedPart == TimelineHitPart.Edge ? DragKind.Edge : DragKind.Move;
         }
 
@@ -1076,37 +1083,34 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             e.Handled = true;
             return;
         }
-        if (e.Key == Key.Escape && _drag is DragKind.TrackPending or DragKind.Track)
-        {
-            // Nothing was applied while dragging, so cancelling is just forgetting the drag.
-            ResetDrag();
-            _dragPointer?.Capture(null);
-            ReleaseCursor();
-            InvalidateVisual();
-            e.Handled = true;
-            return;
-        }
-        if (e.Key == Key.Escape && _drag is DragKind.RefPending or DragKind.RefMove or DragKind.RefEdge && _document is not null && _gestureBefore is not null)
-        {
-            // Puts the reference clip back with no undo entry; the track stays selected.
-            string refBefore = _gestureBefore;
-            ResetDrag();
-            _document.CancelGesture(refBefore);
-            ReleaseCursor();
-            e.Handled = true;
-            return;
-        }
         if (HandleSelectionKey(e)) return;
-        if (e.Key != Key.Escape || _drag == DragKind.None || _document is null || _gestureBefore is null) return;
-        // Escape puts the dragged chain back with no undo entry.
-        string before = _gestureBefore;
+        if (e.Key == Key.Escape && CancelDrag()) e.Handled = true;
+    }
+
+    /// <summary>
+    /// Ends a drag of chains, a reference clip or a track header as Escape does: what it moved goes back, with no undo entry and
+    /// no write, and the release that follows does nothing. False when no such drag is in progress (a rubber band changes nothing).
+    /// </summary>
+    public bool CancelDrag()
+    {
+        if (_drag is DragKind.None or DragKind.MarqueePending or DragKind.Marquee) return false;
+        bool chains = _drag is DragKind.Pending or DragKind.Move or DragKind.Edge;
         var selectedBefore = _dragSelectionBefore;
         var primaryBefore = _dragPrimaryBefore;
+        AbandonDrag();
+        if (chains) NotifySelection(_model.SelectChains(selectedBefore, primaryBefore));
+        InvalidateVisual();
+        return true;
+    }
+
+    // Forgets the drag, whatever it is, and puts back what it moved unless the document's data was already replaced.
+    private void AbandonDrag()
+    {
+        string? before = _gestureBefore;
         ResetDrag();
-        _document.CancelGesture(before);
-        NotifySelection(_model.SelectChains(selectedBefore, primaryBefore));
+        _marqueeThrottle.Reset();
+        if (before is not null) _document?.CancelGesture(before);
         ReleaseCursor();
-        e.Handled = true;
     }
 
     private void EndDrag()
@@ -1197,6 +1201,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         _dragged = null;
         _dragBlock = null;
         _gestureBefore = null;
+        _dragSave = null;
         _snapGuide = null;
         _snapOthers = Array.Empty<SnapTarget>();
         _frameBoundaries = null;
@@ -1704,8 +1709,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
                 double markTop = block.IsMissing ? body.Top + 2 : top + TimelineLayout.FilmTop;
-                for (int k = 1; k * block.CycleLength < block.Played - 1e-9; k++)
+                foreach (int k in TimelineCulling.VisibleCycles(Viewport, block.Start, block.Played, block.CycleLength, Bounds.Width))
                 {
+                    if (k == 0) continue;
                     double x = Snap(left + k * block.CycleLength * pps);
                     context.DrawLine(mark, new Point(x, markTop), new Point(x, body.Bottom - 2));
                 }
