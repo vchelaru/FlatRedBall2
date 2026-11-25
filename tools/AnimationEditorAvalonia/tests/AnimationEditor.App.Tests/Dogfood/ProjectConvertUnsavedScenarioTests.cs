@@ -112,13 +112,13 @@ public class ProjectConvertUnsavedScenarioTests
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
         UnusualProjectScenarioTests.MakeWritable(hero);
-        // The live watcher's banner about the change can come after the convert's and replace it.
-        editor.Services.AppCommands.HotReloadWatcher.IsEnabled = false;
         File.AppendAllText(hero, "<!-- edited elsewhere -->");
         string heroText = File.ReadAllText(hero);
 
         PickFromRow(editor, "hero.achx", "Convert to .achj");
 
+        // Long enough for the live watcher to see the change, which the convert's banner already reports.
+        editor.Wait(TimeSpan.FromSeconds(2));
         editor.ProblemText!.ShouldStartWith("Converted 0, 1 problem: hero.achx: not converted, its unsaved edits could not be saved (");
         File.ReadAllText(hero).ShouldBe(heroText);
         File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();

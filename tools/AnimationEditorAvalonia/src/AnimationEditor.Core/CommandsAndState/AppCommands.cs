@@ -594,6 +594,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>The open document's <see cref="TabEntry.CachedDiskState"/>.</summary>
         private DiskState? _diskState;
 
+        /// <summary>The outside change <see cref="RefuseIfChangedOnDisk"/> last reported.</summary>
+        private DiskState? _reportedChange;
+
         // Null in the CLI: it has no tabs to switch back to, and hashing would slow its startup.
         private DiskState? ReadDiskState(string path) => AutosaveOnChange ? DiskState.Read(new FilePath(path)) : null;
 
@@ -619,6 +622,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var file = new FilePath(path);
             if (state == null || state.Path != file || !state.HasChanged(file)) return false;
+            _reportedChange = DiskState.Read(file);
             SaveFailed?.Invoke(SaveTarget.ChangedOnDiskMessage(path));
             return true;
         }
@@ -3015,7 +3019,9 @@ namespace AnimationEditor.Core.CommandsAndState
             // The document holds edits its file lacks; only File > Reload from Disk drops them.
             if (_undoManager.SaveState == SaveState.Failed)
             {
-                RefuseIfChangedOnDisk(path, _diskState);
+                // A refused save may have reported this change already, in a banner that says more (a convert's result).
+                if (_reportedChange is not { } reported || reported.Path != new FilePath(path) || reported.HasChanged(reported.Path))
+                    RefuseIfChangedOnDisk(path, _diskState);
                 return;
             }
             ReloadAchxFromDisk(path);
