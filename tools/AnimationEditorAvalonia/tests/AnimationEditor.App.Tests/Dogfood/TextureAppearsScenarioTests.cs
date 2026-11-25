@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using AnimationEditor.Views.Tests;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -28,6 +29,33 @@ public class TextureAppearsScenarioTests
         editor.Wireframe.BitmapSize.ShouldBe((128, 32));
         AnimationFrameSave saved = AnimationEditorHarness.ReadSaved(hero).AnimationChains.Single().Frames.Single();
         ((int)saved.LeftCoordinate, (int)saved.RightCoordinate).ShouldBe((4, 20));
+    }
+
+    // Nothing is selected: a refresh keeps the canvas, so it must not read the image and complain about it again.
+    [AvaloniaFact]
+    public async Task TilesetImageTooLarge_RefreshWithNothingSelected_SaysSoOnce()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string tsx = Path.Combine(editor.ProjectFolder, "tiles.tsx");
+        File.WriteAllText(tsx, """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="tiles" tilewidth="16" tileheight="16" tilecount="16" columns="4">
+             <image source="sheet.png" width="64" height="64"/>
+            </tileset>
+            """);
+        await editor.OpenAsync(tsx);
+        int errors = 0;
+        editor.Wireframe.TextureLoadError += _ => errors++;
+        File.Copy(PngHeaderFile.Write("huge.png", 24000, 24000), Path.Combine(editor.ProjectFolder, "sheet.png"), overwrite: true);
+        await editor.WaitUntilAsync(() => errors > 0, TimeSpan.FromSeconds(3));
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+        int afterReload = errors;
+
+        editor.Wireframe.RefreshAll();
+        editor.Wireframe.RefreshAll();
+
+        (afterReload, errors).ShouldBe((1, 1));
     }
 
     // Nothing is selected, so no frame says which texture the canvas shows.

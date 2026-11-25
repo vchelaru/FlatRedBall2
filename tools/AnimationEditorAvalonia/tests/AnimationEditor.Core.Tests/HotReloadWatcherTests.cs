@@ -271,6 +271,59 @@ public class HotReloadWatcherTests
         finally { Directory.Delete(root, true); }
     }
 
+    // A file that stays unreadable is reported after a while (its consumer says it cannot be read), not retried forever.
+    [Fact]
+    public async Task PngChangedOnDisk_FileStaysUnreadable_RaisedOnce()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var achx = Path.Combine(root, "hero.achx");
+            var png = Path.Combine(root, "sheet.png");
+            File.WriteAllText(achx, "");
+            File.WriteAllText(png, "one");
+            using var watcher = new HotReloadWatcher { UnreadableLimitMs = 500 };
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.PngChangedOnDisk += changed.Enqueue;
+            watcher.StartWatching(achx, new[] { png });
+
+            using (var held = new FileStream(png, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                held.Write(new byte[] { 4, 5, 6 });
+                held.Flush(true);
+                await Task.Delay(2500);
+                Assert.Single(changed);
+            }
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    // The main file's folder counts too: renamed away is the file deleted, renamed back is the file changed.
+    [Fact]
+    public async Task MainFilesFolder_RenamedAwayAndBack_RaisesDeletedThenChanged()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var project = Directory.CreateDirectory(Path.Combine(root, "project")).FullName;
+            var achx = Path.Combine(project, "hero.achx");
+            File.WriteAllText(achx, "one");
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            var deleted = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.AchxChangedOnDisk += changed.Enqueue;
+            watcher.AchxDeletedOnDisk += deleted.Enqueue;
+            watcher.StartWatching(achx, System.Array.Empty<string>());
+
+            Directory.Move(project, project + ".away");
+            Assert.True(await WaitForAsync(() => !deleted.IsEmpty));
+            Directory.Move(project + ".away", project);
+            Assert.True(await WaitForAsync(() => !changed.IsEmpty));
+            Assert.Single(deleted);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     public enum FolderChange { Created, DeletedAndCreatedAgain, DeletedThenCreatedAgainLater, RenamedOver }
 
     // #2087: a texture's folder that is not there when watching starts, or is not the same folder later (git checkout).

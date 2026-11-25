@@ -48,6 +48,13 @@ namespace AnimationEditor.Core.HotReload
 
         public bool IsEnabled { get; set; } = true;
 
+        /// <summary>How long a changed file may stay unreadable before its change is reported anyway.</summary>
+        internal long UnreadableLimitMs { get; set; } = 10_000;
+
+        // When each changed file was first found unreadable. Touched under _lock.
+        private readonly Dictionary<string, long> _unreadableSince =
+            new(StringComparer.OrdinalIgnoreCase);
+
         // ownSaveHashes[canonical path] = SHA-256 of the file as this editor last wrote it, or null
         // when it was unreadable right after the write (filled in on the first readable check).
         private readonly Dictionary<string, byte[]?> _ownSaveHashes =
@@ -148,9 +155,8 @@ namespace AnimationEditor.Core.HotReload
         {
             var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in WatchedFilesLocked())
+            foreach (var dir in WatchedFilesLocked().Select(Path.GetDirectoryName).Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                var dir = Path.GetDirectoryName(file);
                 if (string.IsNullOrEmpty(dir)) continue;
                 if (Directory.Exists(dir)) folders.Add(dir);
                 for (var parent = Path.GetDirectoryName(dir); !string.IsNullOrEmpty(parent); parent = Path.GetDirectoryName(parent))
@@ -215,6 +221,7 @@ namespace AnimationEditor.Core.HotReload
                 _achxPath = null;
                 _watchedPngPaths.Clear();
                 _watchedSourcePaths.Clear();
+                _unreadableSince.Clear();
             }
         }
 
@@ -287,18 +294,25 @@ namespace AnimationEditor.Core.HotReload
         /// <summary>False when <paramref name="path"/> still holds the content last seen, so the
         /// event is noise; otherwise records the new content and returns true. Null when the file
         /// exists but can't be read right now (its writer still holds it): the release raises no
-        /// event of its own, so the caller keeps this one until the file can be read.</summary>
-        private bool? ContentChangedSinceSeen(string path, WatcherChangeType type)
+        /// event of its own, so the caller keeps this one until the file can be read. True once that has
+        /// lasted <see cref="UnreadableLimitMs"/>, so a file that stays unreadable is not retried forever.</summary>
+        private bool? ContentChangedSinceSeen(string path, WatcherChangeType type, long nowMs)
         {
             lock (_lock)
             {
                 if (type == WatcherChangeType.Deleted)
                 {
                     _seenHashes.Remove(path);
+                    _unreadableSince.Remove(path);
                     return true;
                 }
                 var current = TryHash(path);
-                if (current is null && File.Exists(path)) return null;
+                if (current is null && File.Exists(path))
+                {
+                    if (!_unreadableSince.TryGetValue(path, out long since)) _unreadableSince[path] = since = nowMs;
+                    if (nowMs - since < UnreadableLimitMs) return null;
+                }
+                _unreadableSince.Remove(path);
                 if (current != null && _seenHashes.TryGetValue(path, out var seen) &&
                     current.AsSpan().SequenceEqual(seen))
                     return false;
@@ -435,7 +449,7 @@ namespace AnimationEditor.Core.HotReload
                 bool isPng = !isAchx && !isSource && pngPaths.Contains(normalizedPath);
 
                 if (!isAchx && !isSource && !isPng) continue;
-                var changed = ContentChangedSinceSeen(normalizedPath, type);
+                var changed = ContentChangedSinceSeen(normalizedPath, type, nowMs);
                 if (changed is null) _coalescer.Record(normalizedPath, type, nowMs);
                 if (changed != true) continue;
 
