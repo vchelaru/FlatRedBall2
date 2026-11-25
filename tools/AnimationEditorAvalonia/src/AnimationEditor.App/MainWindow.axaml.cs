@@ -920,7 +920,7 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
-        CommitPendingRename();
+        SettlePendingInput();
         if (_closeConfirmed || e.CloseReason == WindowCloseReason.OSShutdown
             || !(_sequencePane.HasUnsavedEdits || _achxPane.HasUnsavedEdits)) return;
 
@@ -8063,8 +8063,9 @@ public partial class MainWindow : Window
             if (match.ShouldSkip?.Invoke() == true) return;
 
             e.Handled = true;
-            // A command that runs while an in-place rename is open (Ctrl+S, Undo, Back) applies the typed name first.
-            CommitPendingRename();
+            // A command that runs while an in-place rename is open (Ctrl+S, Undo, Back) applies the typed name first, and one
+            // that runs during a sequence timeline drag cancels the drag first, so it acts on the document as saved.
+            SettlePendingInput();
             match.Action();
         }), RoutingStrategies.Tunnel);
 
@@ -8864,7 +8865,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Applies the name typed into an open ANIMATIONS-tree rename, as Enter would. The tree's own commit is the box
     /// losing focus, which a tab switch, a hotkey, undo, back/forward or a press on blank space does not cause; those
-    /// reach it through <see cref="CommitPendingRename"/>. A refused name shows the message and keeps the old one.
+    /// reach it through <see cref="SettlePendingInput"/>. A refused name shows the message and keeps the old one.
     /// </summary>
     private void CommitPendingTreeRename()
     {
