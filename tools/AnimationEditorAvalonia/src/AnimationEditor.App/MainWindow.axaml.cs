@@ -2505,6 +2505,7 @@ public partial class MainWindow : Window
             $"Delete \"{fileName}\"? This cannot be undone.", "Delete File");
         if (!confirmed) return;
 
+        var chains = ChainNamesIn(absolutePath);
         var error = DeleteToRecycleBin(absolutePath);
         if (error is not null)
         {
@@ -2518,7 +2519,7 @@ public partial class MainWindow : Window
         if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(absolutePath)) is { } openTab)
             CloseTabCore(openTab);
 
-        if (await BrokenByRemovedFilesAsync("Deleting", [absolutePath]) is { } broken) ShowProblem(broken);
+        if (await BrokenByRemovedFilesAsync("Deleting", new Dictionary<string, IReadOnlyCollection<string>> { [absolutePath] = chains }) is { } broken) ShowProblem(broken);
     }
 
     /// <summary>
@@ -2617,13 +2618,14 @@ public partial class MainWindow : Window
         }
 
         var batch = AchxToAchjBatch.Convert(ready);
-        var recycled = new List<string>();
+        var recycled = new Dictionary<string, IReadOnlyCollection<string>>();
         int skipped = batch.Skipped.Count();
         problems.AddRange(batch.Failed.Select(f => $"{new FilePath(f.SourcePath).NoPath}: {f.Error}"));
         foreach (var file in batch.Converted)
         {
             var source = file.SourcePath;
             var name = new FilePath(source).NoPath;
+            var chains = ChainNamesIn(source);
             var error = DeleteToRecycleBin(source);
             if (error is not null)
             {
@@ -2631,7 +2633,7 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            recycled.Add(source);
+            recycled[source] = chains;
             if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } openTab)
                 CloseTabCore(openTab);
         }

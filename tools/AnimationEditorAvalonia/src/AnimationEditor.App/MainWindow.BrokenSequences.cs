@@ -44,16 +44,23 @@ public partial class MainWindow
         if (message is not null) ShowProblem(message);
     }
 
-    /// <summary>
-    /// The banner text naming the sequence blocks that play the files at <paramref name="removedPaths"/>, which
-    /// <paramref name="verb"/> (such as "Deleting") just removed, or null when none does.
-    /// </summary>
-    private async Task<string?> BrokenByRemovedFilesAsync(string verb, IReadOnlyList<string> removedPaths)
+    /// <summary>The names of the chains in the file at <paramref name="path"/>, read before it is removed; none when it cannot be read.</summary>
+    private static IReadOnlyCollection<string> ChainNamesIn(string path)
     {
-        if (removedPaths.Count == 0) return null;
-        var files = await FindSequenceBlocksAsync(removedPaths[0],
-            (sequences, path) => SeqjChainUsageScanner.FindMatches(sequences, path, removedPaths));
-        return BrokenSequenceNotice.Message(verb, removedPaths, files);
+        try { return AnimationFileLoader.Load(path).List.AnimationChains.Select(chain => chain.Name).ToList(); }
+        catch { return []; }
+    }
+
+    /// <summary>
+    /// The banner text naming the sequence blocks that played a chain of a file <paramref name="verb"/> (such as "Deleting")
+    /// just removed, or null when none did. <paramref name="removed"/> is each file's path and <see cref="ChainNamesIn"/>.
+    /// </summary>
+    private async Task<string?> BrokenByRemovedFilesAsync(string verb, IReadOnlyDictionary<string, IReadOnlyCollection<string>> removed)
+    {
+        if (removed.Count == 0) return null;
+        var files = await FindSequenceBlocksAsync(removed.Keys.First(), (sequences, path) => removed
+            .SelectMany(file => SeqjChainUsageScanner.FindMatches(sequences, path, file.Key, file.Value)).ToList());
+        return BrokenSequenceNotice.Message(verb, removed.Keys.ToList(), files);
     }
 
     private async Task<List<BrokenSequenceFile>> FindSequenceBlocksAsync(

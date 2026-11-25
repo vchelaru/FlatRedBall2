@@ -25,6 +25,7 @@ public class ConvertSequenceSourceScenarioTests
         var track = new SequenceTrackSave { Name = "Body" };
         track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
         track.Chains.Add(new SequenceChainReferenceSave { Source = "enemy.achx", Chain = "Bite", Start = 1 });
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Gone", Start = 2 }); // already broken, so not counted
         string seqj = Path.Combine(editor.ProjectFolder, "Sprites", "attack.seqj");
         new SequenceListSave { Sources = { "hero.achx", "enemy.achx" }, Sequences = { new SequenceSave { Name = "Attack", Tracks = { track } } } }.Save(seqj);
         string before = File.ReadAllText(seqj);
