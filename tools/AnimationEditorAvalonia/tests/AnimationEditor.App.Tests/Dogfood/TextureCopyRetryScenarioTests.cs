@@ -73,6 +73,7 @@ public class TextureCopyRetryScenarioTests : IDisposable
     [InlineData("reload", "hero.achx")]
     [InlineData("delete", "gone")]
     [InlineData("undo", "gone")]
+    [InlineData("delete animation", "its animation is gone")]
     [InlineData("lock", "'Walk' is locked")]
     public async Task RetryOfADrop_WhenWhatItWasForChanged_OnlySaysWhy(string since, string reason)
     {
@@ -84,7 +85,7 @@ public class TextureCopyRetryScenarioTests : IDisposable
         var frame = walk.Frames[^1];
         AnswerCopy(editor);
         using (new FileStream(png, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-            (await Drop(editor, walk, frame, png)).ShouldBeFalse();
+            (await Drop(editor, walk, since == "delete animation" ? null : frame, png)).ShouldBeFalse();
         editor.ProblemText.ShouldNotBeNull().ShouldStartWith("Could not copy: ");
 
         switch (since)
@@ -94,6 +95,7 @@ public class TextureCopyRetryScenarioTests : IDisposable
             case "close": editor.CloseTab("hero.achx"); break;
             case "reload": await ReloadAsync(editor, hero); break;
             case "delete": editor.Services.AppCommands.DeleteFrames([frame]); break;
+            case "delete animation": editor.Services.AppCommands.DeleteAnimationChains([walk]); break;
             case "undo": editor.UndoManager.Undo(); break;
             case "lock": editor.Services.AppCommands.SetChainLocked(walk, true); break;
         }
