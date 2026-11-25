@@ -360,7 +360,12 @@ public class AppCommandsHotReloadTests : IDisposable
         public void UpdatePngList(IEnumerable<string> newPngPaths) { }
         public void UpdateSourceList(IEnumerable<string> sourcePaths) { }
         public void StopWatching() { }
-        public void RunOwnSave(string filePath, Action write) => write();
+        public readonly List<string> OwnSaves = new();
+        public void RunOwnSave(string filePath, Action write)
+        {
+            OwnSaves.Add(filePath);
+            write();
+        }
         public void Dispose() { }
     }
 }

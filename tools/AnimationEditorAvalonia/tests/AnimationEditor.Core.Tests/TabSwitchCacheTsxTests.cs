@@ -201,6 +201,24 @@ public class TabSwitchCacheTsxTests : IDisposable
         _ctx.AppCommands.LastSaveStored([chain]).ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task SaveDocument_WhenAListenerThrows_Fails()
+    {
+        string path = WriteTsx("Heroes.tsx");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        tab.CachedEditorModel!.AnimationChains[0].Loop = false;
+        var messages = new List<string>();
+        _ctx.AppCommands.SaveFailed += messages.Add;
+        _ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, _) => throw new InvalidOperationException("boom");
+
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
+
+        tab.SaveFailed.ShouldBeTrue();
+        messages.ShouldHaveSingleItem().ShouldContain("boom");
+    }
+
     // A pasted frame's texture is an absolute path, which must be matched against the tab's own folder.
     [Fact]
     public async Task SaveDocument_BackgroundTsxTabInAnotherFolder_StoresAChainWithAnAbsoluteTexture()

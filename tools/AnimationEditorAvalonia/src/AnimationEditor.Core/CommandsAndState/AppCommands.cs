@@ -676,10 +676,31 @@ namespace AnimationEditor.Core.CommandsAndState
                 return false;
             }
 
-            IReadOnlyList<string> tsxWarnings = [];
             try
             {
+                if (!isOpen && document.CachedEditorModel == null)
+                    throw new InvalidOperationException("it is not loaded.");
+                IReadOnlyList<string> tsxWarnings = [];
                 HotReloadWatcher.RunOwnSave(target, () => tsxWarnings = ProjectManager.WriteDocument(document, target));
+
+                if (document.CachedTsxState is ProjectManager.TsxState { File.LacksOutsideChange: true })
+                    HotReloadWatcher.ReportChange(target);
+                else
+                    document.CachedDiskState = ReadDiskState(target);
+                if (isOpen)
+                {
+                    _pm.RestoreTsxState(document.CachedTsxState);
+                    _diskState = document.CachedDiskState;
+                    _undoManager.MarkSaved();
+                }
+                else
+                    document.SaveFailed = false;
+
+                // A listener that throws fails the save too: escaping, it would keep the edit out of the undo history.
+                if (tsxWarnings.Count > 0)
+                    TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
+                if (isOpen)
+                    EditorProjectModelChanged?.Invoke(target);
             }
             catch (Exception ex)
             {
@@ -689,23 +710,6 @@ namespace AnimationEditor.Core.CommandsAndState
                 return false;
             }
 
-            if (document.CachedTsxState is ProjectManager.TsxState { File.LacksOutsideChange: true })
-                HotReloadWatcher.ReportChange(target);
-            else
-                document.CachedDiskState = ReadDiskState(target);
-            if (isOpen)
-            {
-                _pm.RestoreTsxState(document.CachedTsxState);
-                _diskState = document.CachedDiskState;
-                _undoManager.MarkSaved();
-            }
-            else
-                document.SaveFailed = false;
-
-            if (tsxWarnings.Count > 0)
-                TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
-            if (isOpen)
-                EditorProjectModelChanged?.Invoke(target);
             // A native tsx project has no achx to push from -- the achj-push feature
             // (issue #1133) doesn't apply to it.
             if (document.CachedTsxState == null)
@@ -787,7 +791,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 TiledSyncWarned?.Invoke([]);
             }
 
-            // A background document without tilesets says nothing about the open one's.
+            // A background push replaces the open document's warning only when it has something to say.
             if (isOpen) ClearWarning();
             if (acls == null) return;
 
@@ -802,7 +806,6 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
             if (tsxPaths.Count == 0) return;
-            ClearWarning();
 
             // Snapshot rather than hand the live model to the mapper: defensive even though this
             // runs synchronously today, so this stays safe if a future change backgrounds it.
@@ -818,6 +821,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
+            if (outcomes.Any(o => !o.Success || o.Changed || o.Warnings.Count > 0)) ClearWarning();
             foreach (var outcome in outcomes.Where(o => o.Success && o.Changed))
                 TiledSyncSucceeded?.Invoke(outcome.TsxPath, outcome.AppliedCount);
 

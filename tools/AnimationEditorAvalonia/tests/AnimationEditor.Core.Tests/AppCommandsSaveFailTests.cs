@@ -23,6 +23,26 @@ public class AppCommandsSaveFailTests
         Assert.Equal(SaveState.Failed, ctx.UndoManager.SaveState);
     }
 
+    // The edit is already made, so it must still reach the undo history.
+    [Fact]
+    public void SaveCurrentAnimationChainList_WhenAListenerThrows_FailsAndTheEditCanBeUndone()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        ctx.ProjectManager.FileName = Path.Combine(dir.Path, "file.achx");
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        string? message = null;
+        ctx.AppCommands.SaveFailed += text => message = text;
+        ctx.AppCommands.EditorProjectModelChanged += _ => throw new InvalidOperationException("boom");
+
+        ctx.AppCommands.RenameChain(chain, "Run");
+
+        Assert.Equal("boom", message);
+        Assert.Equal(SaveState.Failed, ctx.UndoManager.SaveState);
+        ctx.UndoManager.Undo();
+        Assert.Equal("Walk", chain.Name);
+    }
+
     [Fact]
     public void SaveCurrentAnimationChainList_SetsAutoSaveOn_WhenSaveSucceeds()
     {
