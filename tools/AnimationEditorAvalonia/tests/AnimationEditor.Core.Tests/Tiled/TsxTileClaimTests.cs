@@ -359,7 +359,7 @@ public class TsxTileClaimTests : IDisposable
     [Fact]
     public void RandomEdits_EveryAcceptedStateIsSaved_AndEveryChainIsOnDiskOrReported()
     {
-        for (var seed = 0; seed < 60; seed++)
+        for (var seed = 0; seed < 120; seed++)
             RunRandomEdits(seed, steps: 8);
     }
 
