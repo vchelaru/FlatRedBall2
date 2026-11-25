@@ -2547,7 +2547,8 @@ public partial class MainWindow : Window
     /// same folder under <see cref="NewAnimationFileNaming.SuggestDuplicateFileName"/>'s name, so
     /// texture paths (relative to the file) still resolve, then opens the copy the way "New
     /// Animation File" does. Companion files (<c>.aeproperties</c>, <c>.tiledsync</c>) are not
-    /// copied: a second file pushing into the same tilesets would fight the original. The folder
+    /// copied: a second file pushing into the same tilesets would fight the original. An open file whose last
+    /// save failed is saved first, and when that fails again nothing is copied. The folder
     /// watcher refreshes the tree, same as <see cref="DeleteProjectFileAsync"/>.
     /// </summary>
     internal async Task DuplicateProjectFileAsync(string relativePath)
@@ -2555,22 +2556,46 @@ public partial class MainWindow : Window
         var sourcePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (sourcePath is null) return;
 
+        var fileName = new FilePath(sourcePath).NoPath;
+        var (savedEdits, reason) = SaveFailedEditsOf(sourcePath);
+        if (reason is not null)
+        {
+            // Posted because the failed save's own banner is, and would replace this one.
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                ShowProblem($"⚠ Could not duplicate {fileName}: its unsaved edits could not be saved ({reason})"));
+            return;
+        }
+        if (savedEdits) Notifications.HideProblem(AutoSaveFailedPrefix);
+
         var folder = Path.GetDirectoryName(sourcePath)!;
-        var copyName = NewAnimationFileNaming.SuggestDuplicateFileName(
-            new FilePath(sourcePath).NoPath,
-            Directory.EnumerateFiles(folder).Select(f => new FilePath(f).NoPath));
-        var copyPath = Path.Combine(folder, copyName);
+        string copyPath;
         try
         {
+            var copyName = NewAnimationFileNaming.SuggestDuplicateFileName(
+                fileName,
+                Directory.EnumerateFiles(folder).Select(f => new FilePath(f).NoPath));
+            copyPath = Path.Combine(folder, copyName);
             File.Copy(sourcePath, copyPath, overwrite: false);
         }
         catch (Exception ex)
         {
-            ShowProblem($"⚠ Could not duplicate {new FilePath(sourcePath).NoPath}: {ex.Message}");
+            ShowProblem($"⚠ Could not duplicate {fileName}: {ex.Message}");
             return;
         }
 
         await LoadAnimationFileAsync(copyPath);
+    }
+
+    /// <summary>
+    /// Writes the edits a failed save left in the open tab of <paramref name="path"/>, for a command that reads the file.
+    /// Returns whether it wrote some, and why that failed again.
+    /// </summary>
+    private (bool Saved, string? Error) SaveFailedEditsOf(string path)
+    {
+        if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(path)) is not { } tab || !PaneFor(tab).HasFailedSave(tab))
+            return (false, null);
+        var error = PaneFor(tab).SaveFailedEdits(tab);
+        return (error is null, error);
     }
 
     /// <summary>
@@ -2625,15 +2650,13 @@ public partial class MainWindow : Window
         bool savedEdits = false;
         foreach (var source in sources)
         {
-            if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } tab && _achxPane.HasFailedSave(tab))
+            var (saved, reason) = SaveFailedEditsOf(source);
+            if (reason is not null)
             {
-                if (_achxPane.SaveFailedEdits(tab) is { } reason)
-                {
-                    problems.Add($"{new FilePath(source).NoPath}: not converted, its unsaved edits could not be saved ({reason})");
-                    continue;
-                }
-                savedEdits = true;
+                problems.Add($"{new FilePath(source).NoPath}: not converted, its unsaved edits could not be saved ({reason})");
+                continue;
             }
+            savedEdits |= saved;
             ready.Add(source);
         }
 

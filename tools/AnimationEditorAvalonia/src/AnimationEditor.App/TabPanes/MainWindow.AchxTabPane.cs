@@ -139,10 +139,6 @@ public partial class MainWindow
             return !HasFailedSave(tab);
         }
 
-        /// <summary>
-        /// Writes the edits a failed save left in <paramref name="tab"/> (<see cref="HasFailedSave"/>), without switching to it. Returns why that failed
-        /// again, or null when the file has them.
-        /// </summary>
         public string? SaveFailedEdits(TabEntry tab)
         {
             string? reason = null;
