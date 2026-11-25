@@ -1365,7 +1365,15 @@ public partial class MainWindow : Window
         _selectedState.SelectionChanged   += HandleSelectionChanged;
 
         _appCommands.ItemsDeleted += label =>
-            Dispatcher.UIThread.InvokeAsync(() => ShowItemDeleted(label));
+        {
+            _toastDeletion = (_tabManager.ActiveTab, _undoManager.UndoHistory.LastOrDefault());
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (IsToastDeletionLast()) ShowItemDeleted(label);
+            });
+        };
+        _undoManager.StackChanged += HideStaleDeletedToast;
+        _tabManager.TabsChanged   += HideStaleDeletedToast;
 
         _appCommands.ChainNamesRemoved += removed => WarnAboutBrokenSequences(_projectManager.FileName, removed);
 
@@ -1388,7 +1396,7 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"{AutoSaveFailedPrefix}{message}"));
         _appCommands.InfoRaised += message => Dispatcher.UIThread.InvokeAsync(() => ShowInfo(message));
 
-        Notifications.WireUndo(Undo);
+        Notifications.WireUndo(UndoToastDeletion);
 
         // Wire hot reload watcher
         _appCommands.HotReloadWatcher = new HotReloadWatcher();
@@ -8627,6 +8635,26 @@ public partial class MainWindow : Window
                 break;
             }
         }
+    }
+
+    /// <summary>The deletion the deleted toast is for: the undo step it added, and the tab in front then.</summary>
+    private (TabEntry? Tab, IUndoableCommand? Step)? _toastDeletion;
+
+    private bool IsToastDeletionLast() =>
+        _toastDeletion is { } deletion && deletion.Tab == _tabManager.ActiveTab && deletion.Step == _undoManager.UndoHistory.LastOrDefault();
+
+    // Its Undo would undo something else (#2183).
+    private void HideStaleDeletedToast()
+    {
+        if (_toastDeletion is null || IsToastDeletionLast()) return;
+        _toastDeletion = null;
+        Notifications.HideItemDeleted();
+    }
+
+    private void UndoToastDeletion()
+    {
+        SettlePendingInput(); // a name being typed becomes the last step
+        if (IsToastDeletionLast()) Undo();
     }
 
     private void ShowItemDeleted(string label) => Notifications.ShowItemDeleted(label);

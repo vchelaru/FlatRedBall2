@@ -52,8 +52,7 @@ public partial class EditorNotificationOverlay : UserControl
         ErrorBannerDismissBtn.Click += (_, _) => HideErrorBanner();
         ItemDeletedToastUndoBtn.Click += (_, _) =>
         {
-            _itemDeletedCts?.Cancel();
-            ItemDeletedToastPanel.IsVisible = false;
+            HideItemDeleted();
             _undoAction?.Invoke();
         };
 
@@ -81,6 +80,13 @@ public partial class EditorNotificationOverlay : UserControl
         ItemDeletedToastPanel.IsVisible = true;
 
         _ = AutoHideItemDeletedAsync(token);
+    }
+
+    /// <summary>Takes down the deleted toast, whose Undo no longer applies.</summary>
+    public void HideItemDeleted()
+    {
+        _itemDeletedCts?.Cancel();
+        ItemDeletedToastPanel.IsVisible = false;
     }
 
     /// <summary>
