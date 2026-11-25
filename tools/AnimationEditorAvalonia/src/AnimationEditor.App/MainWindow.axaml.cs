@@ -1196,7 +1196,7 @@ public partial class MainWindow : Window
 
     private void WireUpdateAvailableBanner()
     {
-        RestartForUpdateBtn.Click += (_, _) => _ = RestartToApplyUpdateAsync();
+        RestartForUpdateBtn.Click += (_, _) => _ = RunGuardedAsync(() => RestartToApplyUpdateAsync(), "Restart");
         RetryUpdateBtn.Click += (_, _) => _ = RunStartupUpdateDownloadAsync();
     }
 
@@ -3323,7 +3323,7 @@ public partial class MainWindow : Window
     {
         var window = BuildAboutWindowWithLiveRefresh(
             refresh: () => RunApplicationUpdateCheckAsync(),
-            onRestart: () => _ = RestartToApplyUpdateAsync());
+            onRestart: () => _ = RunGuardedAsync(() => RestartToApplyUpdateAsync(), "Restart"));
         await window.ShowDialog(this);
     }
 
