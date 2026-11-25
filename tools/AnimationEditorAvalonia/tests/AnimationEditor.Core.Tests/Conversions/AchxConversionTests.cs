@@ -112,9 +112,11 @@ public sealed class AchxConversionTests : IDisposable
             + "          ]\r\n        }\r\n      ]\r\n    }\r\n  ],\r\n  \"tool\": 7\r\n}\r\n";
         File.WriteAllText(attack, text);
         var plan = Plan(hero);
+        var doing = new List<string>();
 
-        var outcome = AchxConversion.Run(plan, Steps());
+        var outcome = AchxConversion.Run(plan, Steps() with { Progress = progress => doing.Add(progress.Text) });
 
+        doing.ShouldBe(["Converting 1 of 1", "Updating sequence 1 of 1", "Moving to the Recycle Bin 1 of 1", "Comparing"]);
         outcome.Differences.ShouldBeEmpty();
         outcome.Converted.ShouldBe([hero]);
         outcome.Updated.ShouldBe([attack]);

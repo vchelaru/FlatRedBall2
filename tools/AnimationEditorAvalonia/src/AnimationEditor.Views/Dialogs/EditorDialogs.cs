@@ -126,7 +126,7 @@ public static class EditorDialogs
     /// Cancel. Enter presses the focused button and never converts from elsewhere.
     /// </summary>
     public static async Task<T?> ShowConversionPlanAsync<T>(
-        IEditorDialogHost host, AchxConversionPlan plan, bool isNewPlan, Func<IProgress<string>, Task<T>> convert) where T : class
+        IEditorDialogHost host, AchxConversionPlan plan, bool isNewPlan, Func<IProgress<ConversionProgress>, Task<T>> convert) where T : class
     {
         var view = ConversionPlanView.Of(plan);
         ExceptionDispatchInfo? failure = null;
@@ -144,8 +144,8 @@ public static class EditorDialogs
             if (view.CanConvert)
             {
                 dialog.IsBusy = true;
-                content.ShowProgress("Checking the files");
-                try { result = await convert(new Progress<string>(content.ShowProgress)); }
+                content.ShowProgress(new ConversionProgress("Checking the files"));
+                try { result = await convert(new Progress<ConversionProgress>(content.ShowProgress)); }
                 catch (Exception ex) { failure = ExceptionDispatchInfo.Capture(ex); }
                 dialog.IsBusy = false;
             }

@@ -2692,7 +2692,7 @@ public partial class MainWindow : Window
     private TabEntry? OpenTabOf(string path) => _tabManager.Tabs.FirstOrDefault(open => open.Path == new FilePath(path));
 
     /// <summary>Runs <paramref name="plan"/> off the UI thread, and on it only what needs an open document.</summary>
-    private Task<ConversionOutcome> RunConversionAsync(AchxConversionPlan plan, IProgress<string> progress)
+    private Task<ConversionOutcome> RunConversionAsync(AchxConversionPlan plan, IProgress<ConversionProgress> progress)
     {
         var steps = new ConversionSteps(
             source => Dispatcher.UIThread.Invoke(() => SaveFailedEditsOf(source).Error),

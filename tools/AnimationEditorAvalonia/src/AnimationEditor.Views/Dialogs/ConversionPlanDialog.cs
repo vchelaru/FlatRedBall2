@@ -35,6 +35,7 @@ internal sealed class ConversionPlanDialog
         new("Convert to .achj", Width, SizeToContentHeight: true) { MaxHeight = 712, EnterConfirms = false };
 
     private readonly StackPanel _buttons = new() { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
+    private readonly ProgressBar _bar = new() { Width = 120, MinWidth = 0, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
     private readonly TextBlock _progress = Text("", 12, "InkMid");
     private readonly DockPanel _progressRow;
 
@@ -42,9 +43,11 @@ internal sealed class ConversionPlanDialog
     public Control Root { get; }
 
     /// <summary>Says what is being done, in place of taking any input.</summary>
-    public void ShowProgress(string text)
+    public void ShowProgress(ConversionProgress progress)
     {
-        _progress.Text = text;
+        _progress.Text = progress.Text;
+        _bar.Maximum = Math.Max(1, progress.Total);
+        _bar.Value = progress.Current;
         _progressRow.IsVisible = true;
         _buttons.IsEnabled = false;
     }
@@ -68,8 +71,8 @@ internal sealed class ConversionPlanDialog
 
         // The buttons come first, so the dialog opens with Convert focused.
         var root = new DockPanel { Margin = new Thickness(Gutter) };
-        var bar = new ProgressBar { IsIndeterminate = true, Width = 120, MinWidth = 0, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-        _progressRow = new DockPanel { IsVisible = false, Margin = new Thickness(Gutter, 0, 0, 0), Children = { bar, _progress } };
+        Bind(_bar, ProgressBar.ForegroundProperty, "Accent");
+        _progressRow = new DockPanel { IsVisible = false, Margin = new Thickness(Gutter, 0, 0, 0), Children = { _bar, _progress } };
         DockPanel.SetDock(_buttons, Dock.Right);
         var bottom = new DockPanel { Children = { _buttons, _progressRow } };
         DockPanel.SetDock(bottom, Dock.Bottom);

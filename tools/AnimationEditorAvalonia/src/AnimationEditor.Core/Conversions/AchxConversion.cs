@@ -25,7 +25,13 @@ public sealed record ConversionSteps(
     public Action<string> Recycled { get; init; } = _ => { };
 
     /// <summary>Called with what is being done.</summary>
-    public Action<string> Progress { get; init; } = _ => { };
+    public Action<ConversionProgress> Progress { get; init; } = _ => { };
+}
+
+/// <summary>What a conversion is doing, and how many of how many; a <paramref name="Total"/> of 0 is not counted.</summary>
+public sealed record ConversionProgress(string Doing, int Current = 0, int Total = 0)
+{
+    public string Text => Total == 0 ? Doing : $"{Doing} {Current} of {Total}";
 }
 
 /// <summary>What a conversion did.</summary>
@@ -58,19 +64,20 @@ public static class AchxConversion
         var differences = new List<string>();
         var converting = plan.Converted.ToList();
         var written = new List<PlannedFile>();
-        foreach (var file in converting)
+        for (int i = 0; i < converting.Count; i++)
         {
-            steps.Progress($"Converting {written.Count + 1} of {converting.Count}");
-            if (Write(file, steps, differences)) written.Add(file);
+            steps.Progress(new ConversionProgress("Converting", i + 1, converting.Count));
+            if (Write(converting[i], steps, differences)) written.Add(converting[i]);
         }
 
-        steps.Progress("Updating sequences");
         var ready = SequenceSourcePaths.FileSet(written.Select(file => file.Source));
         var kept = SequenceSourcePaths.FileSet([]);
         var updated = new List<string>();
         var failed = new HashSet<string>();
-        foreach (var sequence in plan.Updated)
+        var updating = plan.Updated.ToList();
+        foreach (var sequence in updating)
         {
+            steps.Progress(new ConversionProgress("Updating sequence", updated.Count + failed.Count + 1, updating.Count));
             var plays = sequence.Plays.Where(ready.Contains).ToList();
             if (plays.Count == 0) continue;
             var error = sequence.IsOpen
@@ -96,9 +103,11 @@ public static class AchxConversion
         }
 
         var converted = new List<string>();
-        foreach (var file in written.Where(file => !kept.Contains(new FilePath(file.Source).FullPath)))
+        var recycling = written.Where(file => !kept.Contains(new FilePath(file.Source).FullPath)).ToList();
+        for (int i = 0; i < recycling.Count; i++)
         {
-            steps.Progress($"Moving originals to the Recycle Bin, {converted.Count + 1} of {written.Count}");
+            var file = recycling[i];
+            steps.Progress(new ConversionProgress("Moving to the Recycle Bin", i + 1, recycling.Count));
             if (Recycle(file.Source, steps.Recycle) is { } error)
             {
                 differences.Add($"{Name(file.Source)}: converted, but the original could not be recycled ({error})");
@@ -108,7 +117,7 @@ public static class AchxConversion
             steps.Recycled(file.Source);
         }
 
-        steps.Progress("Comparing");
+        steps.Progress(new ConversionProgress("Comparing"));
         differences.AddRange(CompareSequences(plan, converted, updated));
         return new ConversionOutcome(converted, updated, differences);
     }
@@ -137,7 +146,7 @@ public static class AchxConversion
         {
             try
             {
-                using var free = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+                using var free = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.None);
                 return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

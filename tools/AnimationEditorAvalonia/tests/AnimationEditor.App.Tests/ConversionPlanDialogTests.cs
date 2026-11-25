@@ -23,7 +23,7 @@ public class ConversionPlanDialogTests
         [new PlannedSequence("/game/attack.seqj", ["/game/Character001.achx"], 2)]);
 
     private static (Window Owner, Window Dialog, Task<string?> Answer) Show(
-        AchxConversionPlan plan, double ownerHeight = 700, Func<IProgress<string>, Task<string>>? convert = null)
+        AchxConversionPlan plan, double ownerHeight = 700, Func<IProgress<ConversionProgress>, Task<string>>? convert = null)
     {
         var owner = new Window { Width = 900, Height = ownerHeight };
         owner.Show();
@@ -139,13 +139,17 @@ public class ConversionPlanDialogTests
     public async Task WhileItConverts_TheDialogStays_AndSaysWhatItIsDoing()
     {
         var work = new TaskCompletionSource<string>();
-        IProgress<string>? progress = null;
+        IProgress<ConversionProgress>? progress = null;
         int runs = 0;
         var (owner, dialog, answer) = Show(Plan(3), convert: report => { runs++; progress = report; return work.Task; });
 
         Press(dialog, Key.Enter);
-        progress!.Report("Converting 2 of 3");
+        ProgressBar bar = dialog.GetVisualDescendants().OfType<ProgressBar>().Single();
+        bar.Value.ShouldBe(0, "the files are checked, which is not counted");
+        progress!.Report(new ConversionProgress("Converting", 2, 3));
         Settle(dialog);
+        (bar.Value / bar.Maximum).ShouldBe(2 / 3d);
+        bar.GetVisualDescendants().OfType<Border>().Single(part => part.Name == "PART_Indicator").Bounds.Width.ShouldBe(bar.Bounds.Width * 2 / 3, 1);
         Shows(dialog, "Converting 2 of 3").ShouldBeTrue();
         Press(dialog, Key.Escape);
         Press(dialog, Key.Enter);
