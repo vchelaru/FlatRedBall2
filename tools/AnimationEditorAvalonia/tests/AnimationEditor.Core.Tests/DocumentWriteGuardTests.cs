@@ -44,12 +44,14 @@ public class DocumentWriteGuardTests
         ["MainWindow.RemoveCutSourcesAndSaveTheirDocument"] = [DocAction.CutChain, DocAction.CutChainATilesetCannotStore, DocAction.CutFrame, DocAction.CutShape],
         ["MainWindow.OnNewClick"] = [DocAction.SaveAs],
         ["MainWindow.ConvertToAchjAsync"] = [DocAction.ConvertOpenTabToAchj],
+        ["MainWindow.DuplicateProjectFileAsync"] = [DocAction.DuplicateWithUnsavedEdits],
         ["MainWindow.AchxTabPane.PrepareCloseAsync"] = [DocAction.CloseTabWithUnsavedEdits, DocAction.CloseWindowWithUnsavedEdits, DocAction.Detach],
         ["MainWindow.AchxTabPane.ConfirmFailedSaveAsync"] = [DocAction.CloseTabWithUnsavedEdits, DocAction.CloseWindowWithUnsavedEdits],
-        ["MainWindow.AchxTabPane.SaveFailedEdits"] = [DocAction.ConvertOpenTabToAchj],
+        ["MainWindow.AchxTabPane.SaveFailedEdits"] = [DocAction.ConvertOpenTabToAchj, DocAction.DuplicateWithUnsavedEdits],
         ["MainWindow.AchxTabPane.WriteRecoveryFiles"] = [DocAction.WriteRecovery],
         ["MainWindow.AchxTabPane.SaveAsync"] = [DocAction.Save],
         ["MainWindow.AchxTabPane.SaveAsAsync"] = [DocAction.SaveAs, DocAction.SaveAsOntoOpenTab],
+        ["MainWindow.SequenceTabPane.SaveFailedEdits"] = [DocAction.DuplicateWithUnsavedEdits],
         ["MainWindow.SequenceTabPane.SaveAsync"] = [DocAction.Save],
         ["MainWindow.SequenceTabPane.SaveAsAsync"] = [DocAction.SaveAs, DocAction.SaveAsOntoOpenTab],
         ["MainWindow.SequenceTabPane.ConfirmCloseAsync"] = [DocAction.CloseTabWithUnsavedEdits, DocAction.CloseWindowWithUnsavedEdits],
@@ -59,7 +61,6 @@ public class DocumentWriteGuardTests
     private static readonly Dictionary<string, string> WritesSomethingElse = new()
     {
         ["MainWindow.DeleteProjectFileAsync"] = "deletes a file the user confirmed",
-        ["MainWindow.DuplicateProjectFileAsync"] = "copies a file's bytes to a new name",
         ["MainWindow.ExportAnimatedImageAsync"] = "a GIF or WebP, read from the document",
         ["NewAnimationFileWriter.WriteEmpty"] = "a new, empty file",
         ["RecycleBin.MoveToLinuxTrash"] = "the recycle bin itself",
