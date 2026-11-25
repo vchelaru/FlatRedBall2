@@ -1,10 +1,9 @@
 using AnimationEditor.Core.Tiled;
+using AnimationEditor.SaveModel;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests.Tiled;
@@ -81,8 +80,8 @@ public class TsxLossyDataCheckTests
     {
         var data = new TheoryData<string, string>();
         foreach (var type in new[] { typeof(AnimationChainSave), typeof(AnimationFrameSave), typeof(FlatRedBall2.Animation.AnimationFrameEvent) })
-            foreach (var member in type.GetMembers(BindingFlags.Public | BindingFlags.Instance))
-                if (member is FieldInfo or PropertyInfo && !KeptByATsx.Contains($"{type.Name}.{member.Name}"))
+            foreach (var member in SaveModelFill.StoredMembers(type))
+                if (!KeptByATsx.Contains($"{type.Name}.{member.Name}"))
                     data.Add(type.Name, member.Name);
         return data;
     }
@@ -101,37 +100,11 @@ public class TsxLossyDataCheckTests
         };
         if (owner == frameEvent) chain.Frames[0].Events.Add(frameEvent);
 
-        SetToNonDefault(owner, memberName);
+        int counter = 100;
+        SaveModelFill.SetNonDefault(owner, SaveModelFill.StoredMembers(owner.GetType()).Single(m => m.Name == memberName), ref counter);
 
         TsxLossyDataCheck.Warnings(WithChain(chain)).Count.ShouldBe(1,
             $"{typeName}.{memberName} is lost in a .tsx save: report it in TsxLossyDataCheck, or add it to KeptByATsx if the save keeps it");
-    }
-
-    private static void SetToNonDefault(object owner, string memberName)
-    {
-        var member = owner.GetType().GetMember(memberName, BindingFlags.Public | BindingFlags.Instance).Single();
-        var field = member as FieldInfo;
-        var property = member as PropertyInfo;
-        var type = field?.FieldType ?? property!.PropertyType;
-        var current = field != null ? field.GetValue(owner) : property!.GetValue(owner);
-        if (current is List<FlatRedBall2.Animation.AnimationFrameEvent> events)
-        {
-            events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Footstep" });
-            return;
-        }
-        var shapes = new ShapesSave();
-        shapes.Add(new CircleSave { Name = "Hit" });
-        var underlying = Nullable.GetUnderlyingType(type) ?? type;
-        object value =
-            underlying == typeof(bool) ? !(bool)current!
-            : underlying == typeof(int) ? 5
-            : underlying == typeof(float) ? 3f
-            : underlying == typeof(string) ? "Linear"
-            : underlying.IsEnum ? Enum.GetValues(underlying).GetValue(1)!
-            : underlying == typeof(ShapesSave) ? shapes
-            : throw new NotSupportedException($"Give {memberName} ({type.Name}) a non-default value here");
-        if (field != null) field.SetValue(owner, value);
-        else property!.SetValue(owner, value);
     }
 
     [Theory]
@@ -197,5 +170,20 @@ public class TsxLossyDataCheckTests
         Assert.Contains("flip", warning);
         Assert.Contains("offset", warning);
         Assert.Contains("loop", warning);
+    }
+
+    [Fact]
+    public void Warnings_EverythingNonDefault_NamesEachDroppedKindOnce()
+    {
+        int counter = 100;
+        var chain = (AnimationChainSave)SaveModelFill.CreateFilled(typeof(AnimationChainSave), ref counter);
+        chain.Name = "Walk";
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.0004f });
+
+        TsxLossyDataCheck.Warnings(WithChain(chain)).ShouldBe(
+        [
+            "chain \"Walk\": flip, sprite offset, color, collision shape, event, keyframe, frame length under a millisecond, "
+            + "loop off, ping-pong, reverse can't be stored in a .tsx and was not saved.",
+        ]);
     }
 }
