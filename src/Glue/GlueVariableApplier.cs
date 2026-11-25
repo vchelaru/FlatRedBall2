@@ -348,7 +348,9 @@ internal static class GlueVariableApplier
             return;
         }
 
-        property.SetValue(target, converted);
+        if (!GlueMemberWriter.TrySetValue(property, target, converted, out string? refusal))
+            Warn(diagnostics, elementName,
+                $"'{variable.Name}' could not take the authored value '{variable.DefaultValue}'; the default was kept. {refusal}");
     }
 
     /// <summary>

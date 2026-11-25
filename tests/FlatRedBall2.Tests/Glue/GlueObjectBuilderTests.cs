@@ -450,4 +450,22 @@ public class GlueObjectBuilderTests
         circle.Parent.ShouldBeNull();
         circle.AbsoluteX.ShouldBe(7f);
     }
+
+    [Fact]
+    public void ApplyInstructions_NegativeAnimationSpeed_KeepsTheDefaultAndWarnsNamingIsReversed()
+    {
+        var (builder, diagnostics) = NewBuilder();
+        var sprite = new Sprite();
+        var save = Save(@"{
+            ""InstanceName"": ""SpriteInstance"",
+            ""InstructionSaves"": [
+                { ""Type"": ""float"", ""Member"": ""AnimationSpeed"", ""Value"": -1 }
+            ]
+        }");
+
+        builder.ApplyInstructions(sprite, save, elementName: null);
+
+        sprite.AnimationSpeed.ShouldBe(1f);
+        diagnostics.ShouldHaveSingleItem().Message.ShouldContain("IsReversed");
+    }
 }

@@ -56,6 +56,25 @@ internal static class GlueMemberWriter
         return MemberAliases.TryGetValue(glueMember, out string? alias) ? alias : glueMember;
     }
 
+    /// <summary>
+    /// Writes <paramref name="value"/>, or returns false with the reason when the property refuses it (an authored value can be
+    /// out of a member's range, such as FRB1's negative AnimationSpeed), so a load reports it instead of throwing.
+    /// </summary>
+    internal static bool TrySetValue(PropertyInfo property, object target, object? value, out string? refusal)
+    {
+        refusal = null;
+        try
+        {
+            property.SetValue(target, value);
+            return true;
+        }
+        catch (TargetInvocationException e) when (e.InnerException is ArgumentOutOfRangeException refused)
+        {
+            refusal = refused.Message;
+            return false;
+        }
+    }
+
     /// <summary>Finds a public instance property by its already-resolved FRB2 name.</summary>
     [DynamicDependency(Rooted, typeof(Collision.AARect))]
     [DynamicDependency(Rooted, typeof(Collision.Circle))]

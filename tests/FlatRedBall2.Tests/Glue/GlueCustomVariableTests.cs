@@ -358,4 +358,25 @@ public class GlueCustomVariableTests
 
         entity.Get<float>("Nope").ShouldBe(0f);
     }
+
+    [Fact]
+    public void BuildObjects_VariableTunnelingToANegativeAnimationSpeed_KeepsTheDefaultAndWarnsNamingIsReversed()
+    {
+        var entity = new GlueEntity
+        {
+            Save = EntityOf(@"{
+                ""Name"": ""Entities/Test"",
+                ""NamedObjects"": [ { ""InstanceName"": ""SpriteInstance"", ""SourceClassType"": ""FlatRedBall.Sprite"", ""SourceType"": 2, ""Instantiate"": true, ""AttachToContainer"": true } ],
+                ""CustomVariables"": [ {
+                    ""Name"": ""Speed"", ""DefaultValue"": -1, ""SourceObject"": ""SpriteInstance"", ""SourceObjectProperty"": ""AnimationSpeed"",
+                    ""Properties"": [ { ""Name"": ""Type"", ""Value"": ""float"" } ]
+                } ]
+            }"),
+        };
+
+        entity.BuildObjects();
+
+        ((FlatRedBall2.Rendering.Sprite)entity.Objects["SpriteInstance"]).AnimationSpeed.ShouldBe(1f);
+        entity.BuildDiagnostics.ShouldContain(d => d.Message.Contains("IsReversed"));
+    }
 }

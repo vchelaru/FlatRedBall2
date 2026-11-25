@@ -39,4 +39,28 @@ public class GlueAnimationLayerEndToEndTests
         // sidecar's CharacterRun layer (velocity is 0, below its MinXVelocityAbsolute of 140).
         sprite.CurrentAnimation?.Name.ShouldBe("CharacterIdleRight");
     }
+
+    [Fact]
+    public void BuildObjects_LayerScalesByANegativeMaxSpeed_ReportsTheRow()
+    {
+        var content = new ContentLoader
+        {
+            StreamProvider = path => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(path.EndsWith(".json")
+                ? """{ "Values": [ { "AnimationName": "Walk", "AnimationSpeedAssignment": 3, "MaxSpeedRatioMultiplier": 1 } ] }"""
+                : "Name (required),MaxSpeed (float)\nSlow,-50\n")),
+        };
+        var entity = new GlueEntity
+        {
+            Save = System.Text.Json.JsonSerializer.Deserialize("""
+                { "Name": "Entities/Test",
+                  "Properties": [ { "Name": "IsTopDown", "Value": true } ],
+                  "ReferencedFiles": [ { "Name": "Entities/Test/TopDownValuesStatic.csv" } ] }
+                """, GlueJsonContext.Default.EntitySave)!,
+            Content = new GlueContentSource(content, "Content"),
+        };
+
+        entity.BuildObjects();
+
+        entity.BuildDiagnostics.ShouldContain(d => d.Message.Contains("Slow") && d.Message.Contains("MaxSpeed -50"));
+    }
 }

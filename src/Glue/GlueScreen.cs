@@ -769,6 +769,21 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
         LoadAnimationLayers();
     }
 
+    private IEnumerable<(string Row, string Member, float Value)> PlatformerMaxSpeeds()
+    {
+        foreach (var (slot, slotValues) in new (string, Movement.PlatformerValues?)[]
+                 {
+                     ("GroundMovement", Platformer.GroundMovement), ("AirMovement", Platformer.AirMovement),
+                     ("AfterDoubleJump", Platformer.AfterDoubleJump), ("ClimbingMovement", Platformer.ClimbingMovement),
+                 })
+        {
+            if (slotValues is not { } values) continue;
+            string row = _platformerMovementSlotNames.GetValueOrDefault(slot, slot);
+            yield return (row, "MaxSpeedX", values.MaxSpeedX);
+            yield return (row, "MaxFallSpeed", values.MaxFallSpeed);
+        }
+    }
+
     /// <summary>
     /// Loads this entity's <c>.PlatformerAnimations.json</c> / <c>.TopDownAnimations.json</c> sidecar,
     /// if one exists next to its <c>.glej</c>, and caches the object <see cref="Rendering.Sprite"/>
@@ -802,6 +817,12 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
 
         if (topDownJson is not null)
             _topDownAnimationLayers = GlueAnimationLayerLoader.ParseTopDown(topDownJson, elementName, _buildDiagnostics);
+
+        GlueAnimationLayerLoader.WarnInvalidMaxSpeeds(
+            (_platformerAnimationLayers ?? []).Select(layer => layer.AnimationSpeedAssignment), PlatformerMaxSpeeds(), elementName, _buildDiagnostics);
+        GlueAnimationLayerLoader.WarnInvalidMaxSpeeds(
+            (_topDownAnimationLayers ?? []).Select(layer => layer.AnimationSpeedAssignment),
+            (_topDownMovements ?? []).Select(row => (row.Key, "MaxSpeed", row.Value.MaxSpeed)), elementName, _buildDiagnostics);
 
         foreach (var built in _objects.Values)
         {

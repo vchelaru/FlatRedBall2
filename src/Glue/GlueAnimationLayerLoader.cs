@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 
 namespace FlatRedBall2.Glue;
@@ -44,7 +45,14 @@ public static class GlueAnimationLayerLoader
         }
 
         foreach (var layer in layers)
+        {
             WarnUnsupported(layer.AnimationName, layer.CustomCondition, layer.AnimationSpeedAssignment, elementName, diagnostics);
+            WarnInvalidMultiplier(layer.AnimationName, layer.AnimationSpeedAssignment, elementName, diagnostics,
+                (GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier, nameof(layer.AbsoluteXVelocityAnimationSpeedMultiplier), layer.AbsoluteXVelocityAnimationSpeedMultiplier),
+                (GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier, nameof(layer.AbsoluteYVelocityAnimationSpeedMultiplier), layer.AbsoluteYVelocityAnimationSpeedMultiplier),
+                (GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, nameof(layer.MaxSpeedXRatioMultiplier), layer.MaxSpeedXRatioMultiplier),
+                (GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, nameof(layer.MaxSpeedYRatioMultiplier), layer.MaxSpeedYRatioMultiplier));
+        }
 
         return layers;
     }
@@ -67,7 +75,12 @@ public static class GlueAnimationLayerLoader
         }
 
         foreach (var layer in layers)
+        {
             WarnUnsupported(layer.AnimationName, layer.CustomCondition, layer.AnimationSpeedAssignment, elementName, diagnostics);
+            WarnInvalidMultiplier(layer.AnimationName, layer.AnimationSpeedAssignment, elementName, diagnostics,
+                (GlueAnimationSpeedAssignment.BasedOnVelocityMultiplier, nameof(layer.AbsoluteVelocityAnimationSpeedMultiplier), layer.AbsoluteVelocityAnimationSpeedMultiplier),
+                (GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier, nameof(layer.MaxSpeedRatioMultiplier), layer.MaxSpeedRatioMultiplier));
+        }
 
         return layers;
     }
@@ -91,6 +104,33 @@ public static class GlueAnimationLayerLoader
                 $"'{speedAssignment}', which this build does not evaluate — Sprite.AnimationSpeed " +
                 "is left untouched, as if NoAssignment were set.");
         }
+    }
+
+    private static void WarnInvalidMultiplier(
+        string? animationName, GlueAnimationSpeedAssignment speedAssignment, string? elementName, List<GlueLoadDiagnostic> diagnostics,
+        params (GlueAnimationSpeedAssignment UsedBy, string Name, float? Value)[] multipliers)
+    {
+        foreach (var (usedBy, name, value) in multipliers)
+            if (usedBy == speedAssignment && value is float v && !(v >= 0f && float.IsFinite(v)))
+                Warn(diagnostics, elementName,
+                    $"Animation layer '{animationName}' has {name} {v}, which is negative or not a number; Sprite.AnimationSpeed " +
+                    "is left untouched. Set IsReversed to play backward.");
+    }
+
+    /// <summary>
+    /// Reports a movement row whose max speed is negative (or not a number) when a layer divides by it
+    /// (<see cref="GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier"/>): the layer then leaves Sprite.AnimationSpeed untouched.
+    /// </summary>
+    internal static void WarnInvalidMaxSpeeds(
+        IEnumerable<GlueAnimationSpeedAssignment> assignments, IEnumerable<(string Row, string Member, float Value)> maxSpeeds,
+        string? elementName, List<GlueLoadDiagnostic> diagnostics)
+    {
+        if (!assignments.Contains(GlueAnimationSpeedAssignment.BasedOnMaxSpeedRatioMultiplier)) return;
+        foreach (var (row, member, value) in maxSpeeds)
+            if (!(value >= 0f))
+                Warn(diagnostics, elementName,
+                    $"Movement '{row}' has {member} {value}, which is negative or not a number; animation layers that scale " +
+                    "Sprite.AnimationSpeed by it leave the speed untouched.");
     }
 
     private static void Warn(List<GlueLoadDiagnostic> diagnostics, string? elementName, string message) =>
