@@ -495,7 +495,7 @@ public class DocumentWriteMatrixTests
 
         public void Dispose()
         {
-            Ctx.IoManager.DeleteRecoveryFile();
+            Ctx.IoManager.DeleteRecoveryFiles();
             _dir.Dispose();
         }
     }
