@@ -135,6 +135,26 @@ public class TsxFrameSizeScenarioTests
         File.ReadAllText(other).ShouldBe(otherBefore);
     }
 
+    /// <summary>A whole animation arrives as it was copied; the save says it was not stored, and the cut keeps its source.</summary>
+    [AvaloniaFact]
+    public async Task AnimationOfTwoSizesCutFromAnotherTab_StaysInItsFile()
+    {
+        using var editor = new AnimationEditorHarness();
+        editor.WritePng("Heroes.png", 64, 64);
+        string other = editor.WriteAchx("Other.achx", AnimationEditorHarness.Chain("Mixed", "Heroes.png", (0, 0, 16, 16), (0, 0, 32, 16)));
+        await editor.OpenAsync(other);
+        string otherBefore = File.ReadAllText(other);
+        editor.ClickRow(editor.ChainNamed("Mixed"));
+        Press(editor, Key.X);
+        string path = await OpenTsxAsync(editor);
+
+        Press(editor, Key.V);
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("Mixed");
+        File.ReadAllText(other).ShouldBe(otherBefore);
+        Documents.TileAnimations(path).Count.ShouldBe(3);
+    }
+
     [AvaloniaFact]
     public async Task FrameDraggedOntoAnotherAnimation_ShowsNoDropLine_AndIsRefused()
     {

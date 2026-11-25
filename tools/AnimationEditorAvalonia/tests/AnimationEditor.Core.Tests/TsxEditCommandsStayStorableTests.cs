@@ -240,7 +240,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
     ];
 
     /// <summary>
-    /// A pasted chain or frame arrives as it was copied: the save says what the file did not keep
+    /// A pasted chain, or a frame of the size the chain holds (see TsxFrameSizeTests), arrives as it was copied: the save says what the file did not keep
     /// (<see cref="TsxLossyDataCheck"/>), and a cut then keeps its source.
     /// </summary>
     private static readonly string[] KeepsWhatItIsGiven =
