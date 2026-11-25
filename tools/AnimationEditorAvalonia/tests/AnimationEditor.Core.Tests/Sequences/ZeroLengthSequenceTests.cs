@@ -360,4 +360,51 @@ public class ZeroLengthSequenceTests
         sprite.Sample().OffsetX.ShouldBe(11);
         Keyframes.KeyframeSampler.SampleShape(chain, Sec, sprite.FrameIndex, sprite.ElapsedInFrame, (ShapeSave)chain.Frames[1].ShapesSave!.Shapes[0]).X.ShouldBe(21);
     }
+
+    // A chain that does not loop ends on its last frame even when that frame has no length: the game holds it, so the strip,
+    // the scene and the step keys do too.
+    [Theory]
+    [InlineData(false, false, 2)]
+    [InlineData(false, true, 0)]
+    [InlineData(true, false, 0)]
+    [InlineData(true, true, 2)]
+    public void NonLoopingChain_EndFrameOfNoLength_IsTheOneHeld(bool pingPong, bool reverse, int held)
+    {
+        var chain = Chain("A", pingPong, reverse, 0f, 0.5f, 0f);
+        chain.Loop = false;
+        double cycle = ChainClock.TotalLength(chain, Sec), played = cycle + 1;
+        var runtime = new AnimationChain<Frame> { Name = "A", Loop = false, PingPong = pingPong, Reversed = reverse };
+        foreach (var from in chain.Frames)
+        {
+            var frame = new Frame { FrameLength = from.GetDuration(TimeMeasurementUnit.Second) };
+            frame.Events.AddRange(from.Events);
+            runtime.Add(frame);
+        }
+        var raised = new List<string>();
+        var player = new AnimationPlayer<Frame>(new AnimationChainList<Frame> { runtime });
+        player.FrameEventRaised += e => raised.Add(e.Name);
+        player.Play("A");
+        for (int i = 0; i < 300; i++) player.Update(TimeSpan.FromSeconds(0.01));
+
+        var cells = FilmstripLayout.Cells(FilmstripLayout.FramesOf(chain, Sec, _ => true), pingPong, reverse, played, 100, 25, loop: false);
+
+        player.CurrentFrameIndex.ShouldBe(held);
+        ChainClock.Locate(chain, cycle + 0.5, Sec).FrameIndex.ShouldBe(held);
+        cells.Select(c => c.Frame).ShouldBe([1, held]);
+        (cells[1].X, cells[1].Width, cells[1].Visits.Single().IsHold).ShouldBe((cycle * 100, 100, true));
+        EventMarkers.Occurrences(EventMarkers.FramesOf(chain, Sec), pingPong, reverse, played, loop: false).Select(o => o.Name).ShouldBe(raised);
+        var sequence = new SequenceSave { Tracks = { Blocks("A", played) } };
+        PlayheadSteps.Boundaries([sequence], sequence, _ => chain, _ => Sec).ShouldBe([0, cycle, played]);
+    }
+
+    // The end frame that has a length is already showing, so the hold is no step.
+    [Fact]
+    public void PlayheadSteps_HoldOfAFrameWithALength_IsNoBoundary()
+    {
+        var chain = Chain(0.5f, 0.5f);
+        chain.Loop = false;
+        var sequence = new SequenceSave { Tracks = { Blocks("A", 3) } };
+
+        PlayheadSteps.Boundaries([sequence], sequence, _ => chain, _ => Sec).ShouldBe([0, 0.5, 3]);
+    }
 }

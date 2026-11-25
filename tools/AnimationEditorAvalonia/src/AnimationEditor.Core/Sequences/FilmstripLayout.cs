@@ -129,12 +129,14 @@ public static class FilmstripLayout
         }
 
         // A chain that does not loop holds its final showing: that cell stretches to the end of the block.
-        if (!loop && played > cycle + 1e-9 && units.Count > 0)
+        // The end frame may have no length, and is held all the same.
+        if (!loop && cycle > 0 && played > cycle + 1e-9 && units.Count > 0)
         {
+            int held = PlaybackTimeline.Locate(frames, frame => frame.Duration, cycle, pingPong, reverse).FrameIndex;
+            if (units[^1].Frame != held) units.Add(new Unit(new FilmstripVisit(held, cycle, played, 0), played));
             var last = units[^1];
             var visits = last.Visits;
-            var held = visits[^1];
-            visits[^1] = held with { End = played, IsHold = true };
+            visits[^1] = visits[^1] with { End = played, IsHold = true };
             last.End = played;
             last.NaturalEnd = played;
         }

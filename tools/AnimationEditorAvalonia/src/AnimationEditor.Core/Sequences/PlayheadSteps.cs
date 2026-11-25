@@ -1,3 +1,4 @@
+using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
@@ -48,6 +49,11 @@ public static class PlayheadSteps
         {
             if (block.IsStandIn) continue;
             if (!sequence.Tracks[block.Track].Visible || chainOf(block.Reference) is not { } chain) continue;
+            // The frame a chain that does not loop holds first shows at the cycle's end when it has no length of its own.
+            double cycleEnd = block.Start + block.CycleLength;
+            if (!chain.Loop && cycleEnd < block.PlayedEnd - Tolerance
+                && unitOf(block.Reference) is var unit && PlaybackController.FrameSeconds(chain.Frames[ChainClock.Locate(chain, block.CycleLength, unit).FrameIndex], unit) <= 0)
+                times.Add(cycleEnd);
             AddCycles(times, block.Start, block.Played, block.CycleLength, chain.Loop,
                 TimelineSnapTargets.FrameBoundaries(chain, unitOf(block.Reference)));
         }
