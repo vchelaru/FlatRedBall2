@@ -19,7 +19,6 @@ public class FrameLengthUnitGuardTests
         "Core/CommandsAndState/SetTimeUnitCommand.cs", // converts every length between units
         "Editing/PropertyEdit.cs", // range-checks via FrameLengthUnit; reads the raw value only to skip a no-op
         "Core/Rendering/BatchFrameBuilder.cs",
-        "Core/IO/AnimationCloneHelper.cs",
         "Core/IO/ClipboardPayload.cs",
         "Core/Export/GodotSpriteFramesExporter.cs",
         "Core/Tiled/MultiTileToTiledAnimationMapper.cs",

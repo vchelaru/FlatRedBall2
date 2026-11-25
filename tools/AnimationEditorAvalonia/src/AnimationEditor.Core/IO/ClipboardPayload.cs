@@ -12,9 +12,7 @@ namespace AnimationEditor.Core.IO;
 ///   • TypeName is the simple C# type name, e.g.
 ///     "List&lt;AnimationChainSave&gt;", "List&lt;AnimationFrameSave&gt;",
 ///     "ShapesSave", "AARectSave", or "CircleSave".
-///   • Chains, frames, and multi-shape payloads use the engine's .achx serializer.
-///   • A single rectangle or circle is a flat POCO on the simple <see cref="XmlFile"/> path;
-///     a polygon (its points are a nested list) always goes through the multi-shape path.
+///   • Every payload is written by the engine's .achx serializer, so it keeps what a save keeps.
 /// </summary>
 public static class ClipboardPayload
 {
@@ -38,7 +36,9 @@ public static class ClipboardPayload
         return $"{TypeName<List<AnimationFrameSave>>()}:{acls.ToXmlString()}";
     }
 
-    public static string SerializeShapes(IReadOnlyList<object> shapes)
+    public static string SerializeShapes(IReadOnlyList<object> shapes) => $"{ShapesTypeName}:{ShapesXml(shapes)}";
+
+    private static string ShapesXml(IReadOnlyList<object> shapes)
     {
         var frame = new AnimationFrameSave { TextureName = "_", ShapesSave = new ShapesSave() };
         foreach (var shape in shapes)
@@ -47,14 +47,14 @@ public static class ClipboardPayload
         var chain = new AnimationChainSave();
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
-        return $"{ShapesTypeName}:{acls.ToXmlString()}";
+        return acls.ToXmlString();
     }
 
     public static string Serialize(AARectSave rectangle)
-        => Encode(rectangle);
+        => $"{nameof(AARectSave)}:{ShapesXml([rectangle])}";
 
     public static string Serialize(CircleSave circle)
-        => Encode(circle);
+        => $"{nameof(CircleSave)}:{ShapesXml([circle])}";
 
     /// <param name="payload">The items to serialize.</param>
     /// <param name="sourceAchxFolder">
@@ -172,7 +172,7 @@ public static class ClipboardPayload
                 ConvertLengths(frames, FrameLengthUnit.Of(frameList), destinationUnit);
                 return true;
             }
-            if (typeName == ShapesTypeName)
+            if (typeName is ShapesTypeName or nameof(AARectSave) or nameof(CircleSave))
             {
                 shapes = AnimationChainListSave.FromString(payload)
                     .AnimationChains.SelectMany(c => c.Frames)
@@ -180,20 +180,6 @@ public static class ClipboardPayload
                     .Where(s => s is ShapeSave)
                     .ToList();
                 return shapes.Count > 0;
-            }
-            if (typeName == nameof(AARectSave))
-            {
-                var rect = XmlFile.DeserializeFromString<AARectSave>(payload);
-                if (rect is null) return false;
-                shapes = new List<object> { rect };
-                return true;
-            }
-            if (typeName == nameof(CircleSave))
-            {
-                var circle = XmlFile.DeserializeFromString<CircleSave>(payload);
-                if (circle is null) return false;
-                shapes = new List<object> { circle };
-                return true;
             }
         }
         catch
@@ -211,12 +197,6 @@ public static class ClipboardPayload
     {
         foreach (var frame in frames)
             frame.FrameLength = destination.Convert(frame.FrameLength, source);
-    }
-
-    private static string Encode<T>(T obj)
-    {
-        XmlFile.SerializeToString(obj, out string xml);
-        return $"{TypeName<T>()}:{xml}";
     }
 
     private static string TypeName<T>()
