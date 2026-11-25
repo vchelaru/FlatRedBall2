@@ -962,7 +962,7 @@ public class AnimationChainListSave
     {
         var el = parent.Element(name);
         if (el == null) return defaultValue;
-        return float.TryParse(el.Value, CultureInfo.InvariantCulture, out var value) ? value : throw Wrong(el, "a number");
+        return float.TryParse(el.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : throw Wrong(el, "a number");
     }
 
     private static bool BoolEl(XElement parent, string name, bool defaultValue = false)

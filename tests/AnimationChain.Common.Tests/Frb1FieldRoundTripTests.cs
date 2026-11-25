@@ -162,4 +162,12 @@ public class Frb1FieldRoundTripTests : IDisposable
 
         save.ToXmlString().ShouldContain("<Name>Walk</Name>");
     }
+
+    [Theory]
+    [InlineData("0,5")]
+    [InlineData("1,25")]
+    public void FromString_CommaDecimal_IsRefused(string length) =>
+        Should.Throw<InvalidDataException>(() => AnimationChainListSave.FromString(
+            $"<AnimationChainArraySave><AnimationChain><Name>A</Name><Frame><FrameLength>{length}</FrameLength></Frame></AnimationChain></AnimationChainArraySave>"))
+            .Message.ShouldContain($"FrameLength '{length}'");
 }
