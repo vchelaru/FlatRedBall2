@@ -116,8 +116,6 @@ public partial class MainWindow
         _pendingChainDrag = null;
         _pendingShapeDrag = null;
         ClearFrameDragCandidate();
-        ClearChainDragCandidate();
-        ClearShapeDragCandidate();
         RemoveFrameDropIndicators();
     }
 

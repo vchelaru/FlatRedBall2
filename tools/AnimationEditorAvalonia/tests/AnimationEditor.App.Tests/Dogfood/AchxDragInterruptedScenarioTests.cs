@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.App.Controls;
 using FlatRedBall2.AnimationEditorCommon;
@@ -290,10 +291,44 @@ public class AchxDragInterruptedScenarioTests
         editor.ChainNamed("Idle").Frames.Count.ShouldBe(2);
     }
 
+    [AvaloniaFact]
+    public async Task RowDrag_FileRewrittenOutside_RemovesTheDropLine()
+    {
+        var (editor, path) = await OpenAsync(WireframeMove);
+        using var _ = editor;
+        var walk = editor.ChainNamed("Walk");
+        var overlay = editor.Control<Canvas>("DragOverlayCanvas");
+        Set(editor, "_pendingFrameDrag", new FrameDragSource(new[] { walk.Frames[0] }, walk, FrameDragValidity.Valid));
+        Raise(editor, DragDrop.DragOverEvent, "Frame", editor.ChainNamed("Idle"));
+        overlay.Children.Count.ShouldBe(1);
+
+        await RewriteOutsideAsync(editor, path);
+
+        overlay.Children.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task PressedFrameRow_FileRewrittenOutside_MovingDoesNotRefuseADrag()
+    {
+        var (editor, path) = await OpenAsync(WireframeMove);
+        using var _ = editor;
+        Control row = editor.RowFor(editor.ChainNamed("Walk").Frames[0]);
+        Point press = editor.PointIn(row, row.Bounds.Width / 2, 8);
+        editor.DragHold(press, press);
+
+        await RewriteOutsideAsync(editor, path);
+        ContinueAndRelease(editor, press);
+
+        editor.ProblemText.ShouldBeNull("the pressed row is gone, so there is no drag to refuse");
+    }
+
     private static void Set(AnimationEditorHarness editor, string field, object value) =>
         typeof(MainWindow).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(editor.Window, value);
 
-    private static void Drop(AnimationEditorHarness editor, string kind, AnimationChainSave target)
+    private static void Drop(AnimationEditorHarness editor, string kind, AnimationChainSave target) =>
+        Raise(editor, DragDrop.DropEvent, kind, target);
+
+    private static void Raise(AnimationEditorHarness editor, RoutedEvent<DragEventArgs> dragEvent, string kind, AnimationChainSave target)
     {
         var format = typeof(MainWindow).GetField($"{kind}DragDataFormat", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
         var data = new DataTransfer();
@@ -301,7 +336,7 @@ public class AchxDragInterruptedScenarioTests
         editor.Layout();
         Control row = editor.RowFor(target);
         Point point = row.TranslatePoint(new Point(row.Bounds.Width / 2, 8), editor.AnimTree)!.Value;
-        Should.NotThrow(() => editor.AnimTree.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, data, editor.AnimTree, point, KeyModifiers.None)));
+        Should.NotThrow(() => editor.AnimTree.RaiseEvent(new DragEventArgs(dragEvent, data, editor.AnimTree, point, KeyModifiers.None)));
         editor.Layout();
     }
 
@@ -332,6 +367,25 @@ public class AchxDragInterruptedScenarioTests
             editor.Layout();
         }
         editor.Preview.HGuides.Single().ShouldBe(guide);
+    }
+
+    [AvaloniaFact]
+    public async Task NewGuideDrag_FileRewrittenOutside_ReleaseDoesNotThrow_AndTheGuideIsGone()
+    {
+        var (editor, path) = await OpenAsync(PreviewChain);
+        using var _ = editor;
+        // Leaving the tab saves the companion, with no guides for the reload to put back.
+        await editor.OpenAsync(Path.Combine(editor.ProjectFolder, "other.achx"));
+        editor.ClickTab("hero.achx");
+        editor.Layout();
+        Point to = editor.PointIn(editor.Preview, 60, 140);
+        editor.DragHold(editor.PointIn(editor.Preview, 2, 120), to);
+        editor.Preview.HGuideCount.ShouldBe(1);
+
+        await RewriteOutsideAsync(editor, path);
+        ContinueAndRelease(editor, to);
+
+        editor.Preview.HGuideCount.ShouldBe(0);
     }
 
     [AvaloniaFact]
