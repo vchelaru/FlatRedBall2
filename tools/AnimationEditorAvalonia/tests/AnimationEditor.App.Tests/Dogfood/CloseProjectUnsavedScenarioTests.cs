@@ -174,6 +174,43 @@ public class CloseProjectUnsavedScenarioTests
         }
     }
 
+    [AvaloniaTheory]
+    [InlineData("project")]
+    [InlineData("window")]
+    public async Task ClosingAgainWhileTheQuestionIsUp_AsksOnce_AndClosesNothing(string second)
+    {
+        using var editor = new AnimationEditorHarness();
+        string path = await OpenAndFailASaveAsync(editor, "achx");
+        try
+        {
+            var answer = new TaskCompletionSource<SaveDiscardCancelChoice>();
+            int asked = 0;
+            editor.Window.ShowSaveDiscardCancelDialogAsync = (_, _) => { asked++; return answer.Task; };
+            await CloseProject(editor);
+
+            if (second == "project") await CloseProject(editor);
+            else editor.Window.Close();
+            await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+            asked.ShouldBe(1);
+            editor.Window.IsVisible.ShouldBeTrue();
+            answer.SetResult(SaveDiscardCancelChoice.Cancel);
+            await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+            ProjectIsOpen(editor).ShouldBeTrue();
+            editor.TabLabels.ShouldBe(["outside.achx", "hero.achx"]);
+
+            // The answer ends it: the next close asks again.
+            editor.Window.ShowSaveDiscardCancelDialogAsync = editor.Dialogs.SaveDiscardCancelAsync;
+            editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Discard);
+            await CloseProject(editor);
+            editor.TabLabels.ShouldBe(["outside.achx"]);
+        }
+        finally
+        {
+            UnusualProjectScenarioTests.MakeWritable(path);
+        }
+    }
+
     [AvaloniaFact]
     public async Task ATypedLengthThatCannotBeSaved_IsAskedAbout()
     {
