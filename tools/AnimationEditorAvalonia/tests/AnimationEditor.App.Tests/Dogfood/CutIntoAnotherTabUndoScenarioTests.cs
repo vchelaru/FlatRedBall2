@@ -121,7 +121,7 @@ public class CutIntoAnotherTabUndoScenarioTests
         Saved().ShouldBe(["One", "Two"]);
     }
 
-    // A background save of a .tsx decides the tiles anew.
+    // The copy waits for the tile and takes it at the background save.
     [AvaloniaFact]
     public async Task CutAnimationOutOfATileset_UndoInTheSource_LeavesTheFileAsItWas()
     {
@@ -135,7 +135,7 @@ public class CutIntoAnotherTabUndoScenarioTests
              <image source="sheet.png" width="64" height="64"/>
              <tile id="7">
               <animation>
-               <frame tileid="8" duration="100"/>
+               <frame tileid="7" duration="100"/>
                <frame tileid="9" duration="100"/>
               </animation>
              </tile>
