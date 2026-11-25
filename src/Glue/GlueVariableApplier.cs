@@ -243,7 +243,8 @@ internal static class GlueVariableApplier
             return false;
         }
 
-        property.SetValue(target, converted);
+        // A setter's refusal reaches the caller as itself.
+        property.SetValue(target, converted, System.Reflection.BindingFlags.DoNotWrapExceptions, null, null, null);
         return true;
     }
 

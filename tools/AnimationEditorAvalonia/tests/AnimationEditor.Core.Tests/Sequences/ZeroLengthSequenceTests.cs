@@ -407,4 +407,22 @@ public class ZeroLengthSequenceTests
 
         PlayheadSteps.Boundaries([sequence], sequence, _ => chain, _ => Sec).ShouldBe([0, 0.5, 3]);
     }
+
+    // A ping-pong that shows one frame never changes picture, so it is one cell to the end of the block, however many cycles.
+    [Theory(Timeout = TimeLimit)]
+    [InlineData(0.01, 5000)]
+    [InlineData(Tiny, 36000)]
+    public async Task Filmstrip_LoopingPingPongOfOneShownFrame_IsOneCellToTheEndOfTheBlock(double duration, double played)
+    {
+        FilmstripFrame[] alone = [new(duration, 8, 8)];
+        FilmstripFrame[] amongSkipped = [new(0, 8, 8), new(duration, 8, 8), new(0, 8, 8)];
+
+        foreach (var frames in new[] { alone, amongSkipped })
+        {
+            var cells = await Task.Run(() => FilmstripLayout.Cells(frames, true, false, played, 120, 25));
+
+            var cell = cells.ShouldHaveSingleItem();
+            (cell.X, cell.End, cell.Width).ShouldBe((0, played, played * 120));
+        }
+    }
 }

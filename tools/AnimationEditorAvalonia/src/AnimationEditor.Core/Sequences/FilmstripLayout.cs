@@ -4,6 +4,7 @@ using AnimationEditor.Core.Rendering;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Sequences;
 
@@ -94,7 +95,9 @@ public static class FilmstripLayout
 
         double cycle = PlaybackTimeline.CycleLength(forward, pingPong);
         int visitsPerCycle = PlaybackTimeline.VisitCount(count, pingPong);
-        int cycles = cycle <= 0 ? 0 : loop ? (int)Math.Min(MaxUnits, Math.Ceiling(played / cycle - 1e-9)) : 1;
+        // A ping-pong that shows one frame is one cell over all its cycles, so counting units never stops it.
+        bool oneCell = pingPong && loop && frames.Count(frame => frame.Duration > 0) == 1;
+        int cycles = cycle <= 0 ? 0 : loop ? (int)Math.Min(oneCell ? MaxUnits : int.MaxValue, Math.Ceiling(played / cycle - 1e-9)) : 1;
 
         var units = new List<Unit>();
         if (cycle <= 0)
@@ -127,6 +130,8 @@ public static class FilmstripLayout
                 start = end;
             }
         }
+
+        if (oneCell && units[0].End < played) units[0].End = units[0].NaturalEnd = played;
 
         // A chain that does not loop holds its final showing: that cell stretches to the end of the block.
         // The end frame may have no length, and is held all the same.

@@ -379,4 +379,23 @@ public class GlueCustomVariableTests
         ((FlatRedBall2.Rendering.Sprite)entity.Objects["SpriteInstance"]).AnimationSpeed.ShouldBe(1f);
         entity.BuildDiagnostics.ShouldContain(d => d.Message.Contains("IsReversed"));
     }
+
+    [Fact]
+    public void Indexer_WritesANegativeAnimationSpeed_ThrowsTheRefusalItself()
+    {
+        var entity = new GlueEntity
+        {
+            Save = EntityOf(@"{
+                ""Name"": ""Entities/Test"",
+                ""NamedObjects"": [ { ""InstanceName"": ""SpriteInstance"", ""SourceClassType"": ""FlatRedBall.Sprite"", ""SourceType"": 2, ""Instantiate"": true, ""AttachToContainer"": true } ],
+                ""CustomVariables"": [ {
+                    ""Name"": ""AnimationSpeed"", ""SourceObject"": ""SpriteInstance"", ""SourceObjectProperty"": ""AnimationSpeed"",
+                    ""Properties"": [ { ""Name"": ""Type"", ""Value"": ""float"" } ]
+                } ]
+            }"),
+        };
+        entity.BuildObjects();
+
+        Should.Throw<ArgumentOutOfRangeException>(() => entity["AnimationSpeed"] = -1f).Message.ShouldContain("IsReversed");
+    }
 }
