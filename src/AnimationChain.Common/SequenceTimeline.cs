@@ -38,8 +38,8 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// sampled at its own end is hidden. With Loop off such a time is the end, and holds.</item>
 /// </list>
 /// Cycle lengths come from the caller (a chain's frame lengths summed, doubled for ping-pong), so this class needs no
-/// chain data. Sum each length as the decimal the file holds: the float nearest 0.1 is a hair over it, and after a few
-/// hundred cycles a time on a frame's start would show the frame before.
+/// chain data. Sum a length of up to 7 digits as the decimal the file holds: the float nearest 0.1 is a hair over it, and
+/// after a few hundred cycles a time on a frame's start would show the frame before. A longer one (1/60) is summed as its float.
 /// </summary>
 public static class SequenceTimeline
 {

@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -49,6 +50,23 @@ public class FrameLengthUnitTests
         Assert.Equal(0.1, FrameLengthUnit.Milliseconds.PlaybackSeconds(0), 6);
         Assert.Equal(0.2, FrameLengthUnit.Milliseconds.PlaybackSeconds(200), 6);
         Assert.Equal(0.2, FrameLengthUnit.Seconds.PlaybackSeconds(0.2f), 6);
+    }
+
+    [Fact]
+    public void PlaybackSeconds_IsTheDecimalTheFileHolds()
+    {
+        FrameLengthUnit.Seconds.PlaybackSeconds(0.1f).ShouldBe(0.1);
+        FrameLengthUnit.Milliseconds.PlaybackSeconds(16.667f).ShouldBe(0.016667);
+    }
+
+    // These need 8 or 9 digits, which a 7 digit decimal would round away from the file's value.
+    [Theory]
+    [InlineData(1 / 60f)]
+    [InlineData(1 / 24f)]
+    [InlineData(1 / 12f)]
+    public void PlaybackSeconds_OfALengthWithMoreDigits_IsTheFloat(float length)
+    {
+        FrameLengthUnit.Seconds.PlaybackSeconds(length).ShouldBe((double)length);
     }
 
     [Fact]
