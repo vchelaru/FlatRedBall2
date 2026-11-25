@@ -85,19 +85,17 @@ public sealed class AchxConversionTests : IDisposable
 
         Contents().ShouldBe(before);
         plan.Converted.Single().ShouldBe(new PlannedFile(hero, At("Sprites/hero.achj"), null, Animations: 1, Frames: 1, IsOpen: true, SavesEdits: true));
-        plan.Skipped.Select(file => (file.Source, file.SkipReason)).ShouldBe(
-        [
-            (taken, "an .achj with that name already exists"),
-            (At("Sprites/broken.achx"), plan.Files[2].SkipReason),
-            (stale, "its unsaved edits cannot be saved: it changed"),
-        ]);
-        plan.Files[2].SkipReason!.ShouldStartWith("it could not be read: ");
+        plan.Skipped.Select(file => (file.Source, file.Problem!.Why)).ShouldBe(
+            [(taken, "taken.achj exists"), (At("Sprites/broken.achx"), "Can't be read"), (stale, "Unsaved edits can't be saved")]);
+        plan.Files[2].Problem!.Detail.ShouldNotBeEmpty();
+        plan.Files[3].Problem!.Detail.ShouldBe("it changed");
         plan.Sequences.Select(sequence => (new FilePath(sequence.Path).NoPath, sequence.Blocks, sequence.IsOpen)).ShouldBe(
             [("attack.seqj", 2, false), ("damaged.seqj", 0, false), ("locked.seqj", 1, false), ("unsaved.seqj", 1, true)]);
         plan.Sequences[0].Problem.ShouldBeNull();
-        plan.Sequences[1].Problem!.ShouldStartWith("it could not be read, so what it plays is not known: ");
-        plan.Sequences[2].Problem.ShouldBe("it is read-only");
-        plan.Sequences[3].Problem.ShouldBe("it has edits that could not be saved");
+        plan.Sequences[1].Problem!.ShouldSatisfyAllConditions(
+            problem => problem.Why.ShouldBe("Can't be read"), problem => problem.Detail.ShouldStartWith("What it plays is not known. "));
+        plan.Sequences[2].Problem.ShouldBe(new ConversionProblem("Read-only", "The file is read-only."));
+        plan.Sequences[3].Problem!.Why.ShouldBe("Edits can't be saved");
     }
 
     [Fact]
@@ -310,33 +308,46 @@ public sealed class AchxConversionTests : IDisposable
             </AnimationChainArraySave>
             """);
 
-        Plan(At("old.achx")).Files.Single().SkipReason.ShouldBeNull();
+        Plan(At("old.achx")).Files.Single().Problem.ShouldBeNull();
     }
 
     [Fact]
-    public void PlanText_PutsWhatTheUserMayNotWantFirst()
+    public void View_HasACardPerKind_WithTheProblemsApart()
     {
         string hero = Achx("Sprites/hero.achx");
         Achx("Sprites/taken.achx");
         File.WriteAllText(At("Sprites/taken.achj"), "another file");
         Seqj("attack.seqj", "Sprites/hero.achx");
+        File.WriteAllText(At("damaged.seqj"), "{");
         File.SetAttributes(Seqj("locked.seqj", "Sprites/hero.achx"), FileAttributes.ReadOnly);
 
-        var text = ConversionPlanText.Of(Plan(hero, At("Sprites/taken.achx")));
+        var view = ConversionPlanView.Of(Plan(hero, At("Sprites/taken.achx")));
 
-        text.CanConvert.ShouldBeTrue();
-        text.Summary.Select(line => line.Text).ShouldBe(
+        view.CanConvert.ShouldBeTrue();
+        view.Animations.Issues.ShouldBe([new ConversionIssue(ConversionMark.LeftAlone, "Sprites/", "taken.achx", "taken.achj exists", "")]);
+        view.Animations.Items.ShouldBe([new ConversionItem("Sprites/", "hero.achx", "hero.achj", "", "1 animation", "1 frame")]);
+        (view.Animations.GroupTitle, view.Animations.GroupSummary).ShouldBe(("1 becomes .achj", "1 animation · 1 frame"));
+        view.Sequences!.Issues.Select(issue => (issue.Mark, issue.Name, issue.Why)).ShouldBe(
         [
-            "1 .achx file will become .achj.", "1 sequence file will be updated to keep playing.",
-            "1 sequence file will stop playing.", "1 .achx file will be left alone.",
+            (ConversionMark.StopsPlaying, "locked.seqj", "Read-only · 1 block stops playing"),
+            (ConversionMark.Unknown, "damaged.seqj", "Can't be read · Unknown"),
         ]);
-        text.Sections.Select(section => (section.Title, section.IsProblem, section.Rows.Single())).ShouldBe(
-        [
-            ("Sequences that will stop playing (1)", true, new ConversionRow("locked.seqj", "1 block, cannot be updated: it is read-only")),
-            ("Not converted (1)", true, new ConversionRow("Sprites/taken.achx", "An .achj with that name already exists")),
-            ("Converted (1)", false, new ConversionRow("Sprites/hero.achx → hero.achj", "1 animation, 1 frame")),
-            ("Sequences updated to play the .achj (1)", false, new ConversionRow("attack.seqj", "1 block")),
-        ]);
-        text.Notes[^1].ShouldStartWith($"Searched for sequences in {_dir.Path}.");
+        view.Sequences.Items.ShouldBe([new ConversionItem("", "attack.seqj", "", "", "1 block", "")]);
+        view.Facts.Select(fact => fact.Label).ShouldBe(["Check", "Originals", "Looks in", "Unchanged"]);
+        view.Facts[2].Value.ShouldBe(_dir.Path);
+    }
+
+    [Fact]
+    public void View_NothingConverts_HasNoSequencesAndNothingToAgreeTo()
+    {
+        string taken = Achx("taken.achx");
+        File.WriteAllText(At("taken.achj"), "another file");
+        Seqj("attack.seqj", "taken.achx");
+
+        var view = ConversionPlanView.Of(Plan(taken));
+
+        view.CanConvert.ShouldBeFalse();
+        view.Sequences.ShouldBeNull();
+        view.Facts.ShouldBeEmpty();
     }
 }

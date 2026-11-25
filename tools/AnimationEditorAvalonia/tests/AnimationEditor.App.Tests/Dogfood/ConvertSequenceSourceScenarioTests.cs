@@ -69,7 +69,7 @@ public class ConvertSequenceSourceScenarioTests
         string said = "";
         editor.Dialogs.AnswerNextEditorDialog(content =>
         {
-            said = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Inlines?.Text ?? block.Text));
+            said = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
             return true;
         });
 
@@ -80,9 +80,9 @@ public class ConvertSequenceSourceScenarioTests
         editor.Wait(TimeSpan.FromMilliseconds(100));
         Sources(seqj).ShouldBe(sources.Split(' '));
         editor.ProblemText.ShouldBeNull();
-        said.ShouldContain("1 sequence file will be updated to keep playing.");
-        said.ShouldContain("Sprites/hero.achx → hero.achj");
-        said.ShouldContain("Sprites/attack.seqj");
+        said.ShouldContain("hero.achx → ");
+        said.ShouldContain("attack.seqj");
+        said.ShouldContain("read"); // back the same, the check
         said.ShouldContain(Path.GetFullPath(editor.ProjectFolder));
     }
 

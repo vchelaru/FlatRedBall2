@@ -55,6 +55,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.CloseProject)]                       = Category.MutatingNotUndoable, // resets the project; clears the undo stack
         [nameof(IAppCommands.SaveCurrentAnimationChainList)]      = Category.MutatingNotUndoable, // writes a file; no model change
         [nameof(IAppCommands.SaveDocument)]                       = Category.MutatingNotUndoable, // writes another document's file; no model change
+        [nameof(IAppCommands.SaveRefusal)]                        = Category.NonMutating, // asks whether a save would be refused
         [nameof(IAppCommands.CutFromBackgroundTab)]               = Category.MutatingNotUndoable, // another tab's document; the entry goes into that tab's own history (CutIntoAnotherTabUndoScenarioTests)
         [nameof(IAppCommands.LastSaveStored)]                     = Category.NonMutating,
         [nameof(IAppCommands.SaveCurrentAnimationChainListAsync)] = Category.MutatingNotUndoable, // writes a file; no model change

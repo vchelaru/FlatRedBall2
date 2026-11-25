@@ -54,7 +54,7 @@ public class ProjectConvertUnsavedScenarioTests
         editor.Dialogs.Shown.Clear();
         editor.Dialogs.AnswerNextEditorDialog(content =>
         {
-            PlanText = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Inlines?.Text ?? block.Text));
+            PlanText = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
             return confirm;
         });
         editor.PickMenuItem(panel.ProjectTree.ContextMenu!, item);
@@ -127,7 +127,7 @@ public class ProjectConvertUnsavedScenarioTests
 
         PickFromRow(editor, "hero.achx", "Convert to .achj");
 
-        PlanText.ShouldContain("hero.achx   Its unsaved edits cannot be saved: ");
+        PlanText.ShouldContain("Unsaved edits can't be saved");
         File.ReadAllText(hero).ShouldBe(heroText);
         File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
         recycled.ShouldBeEmpty();
@@ -215,7 +215,7 @@ public class ProjectConvertUnsavedScenarioTests
         {
             PickFromRow(editor, "hero.achx", "Convert to .achj");
 
-            PlanText.ShouldContain("hero.achx   Its unsaved edits cannot be saved: ");
+            PlanText.ShouldContain("Unsaved edits can't be saved");
             File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
             recycled.ShouldBeEmpty();
             editor.TabLabels.ShouldContain("hero.achx");
@@ -239,7 +239,7 @@ public class ProjectConvertUnsavedScenarioTests
 
         PickFromRow(editor, "Sprites", "Convert Animations to .achj");
 
-        PlanText.ShouldContain("hero.achx   Its unsaved edits cannot be saved: ");
+        PlanText.ShouldContain("Unsaved edits can't be saved");
         File.ReadAllText(hero).ShouldBe(heroText);
         File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
         File.Exists(Path.ChangeExtension(boss, ".achj")).ShouldBeTrue();

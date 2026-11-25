@@ -54,6 +54,8 @@ public class DocumentWriteMatrixScenarioTests
             DocAction.LeaveDuringRename => background is DocType.Achx or DocType.Seqj,
             DocAction.ConvertOpenTabToAchj or DocAction.ConvertOpenPushSource => eitherPaneInFront && background == DocType.Achx,
             DocAction.DuplicateWithUnsavedEdits => eitherPaneInFront && background != DocType.Untitled,
+            // The sequence in front, and behind the other pane.
+            DocAction.ConvertSequenceSource => (front, background) is (DocType.Seqj, DocType.Achx) or (DocType.Achx, DocType.Seqj),
             // What was recovered is an Untitled document.
             DocAction.RecoverAtStartup => front == DocType.Untitled,
             _ => true,
@@ -229,6 +231,22 @@ public class DocumentWriteMatrixScenarioTests
                 editor.Tabs.ActiveTab!.Path.FullPath.ShouldBe(new FilePath(copy).FullPath);
                 Documents.ShouldHold(copy, back.Expected);
                 written.Add(copy);
+                break;
+            case DocAction.ConvertSequenceSource:
+                Tab sequence = tabs.Single(tab => tab.Type == DocType.Seqj);
+                editor.Services.ProjectManager.ProjectFolderPath = editor.ProjectFolder;
+                editor.Window.DeleteToRecycleBin = path =>
+                {
+                    File.Delete(path);
+                    return null;
+                };
+                editor.Dialogs.AnswerNextEditorDialog(_ => true);
+                await editor.Window.ConvertProjectFileToAchjAsync(Path.GetRelativePath(editor.ProjectFolder, Path.Combine(sequence.Folder, "clips.achx")).Replace('\\', '/'));
+                editor.Layout();
+                written.AddRange(["clips.achx", "clips.achj"]);
+                sequence.Expected.Sequences.Sources = sequence.Expected.Sequences.Sources.Select(source => Path.ChangeExtension(source, ".achj")).ToList();
+                foreach (var block in sequence.Expected.Sequences.Sequences.SelectMany(listed => listed.Tracks).SelectMany(track => track.Chains))
+                    block.Source = Path.ChangeExtension(block.Source, ".achj");
                 break;
             default:
                 throw new InvalidOperationException($"{action} has no case here.");

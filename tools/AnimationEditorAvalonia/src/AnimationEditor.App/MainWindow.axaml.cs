@@ -2589,7 +2589,7 @@ public partial class MainWindow : Window
         if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(absolutePath)) is { } openTab)
             await CloseTabCoreAsync(openTab);
 
-        if (await BrokenByRemovedFilesAsync("Deleting", new Dictionary<string, IReadOnlyCollection<string>> { [absolutePath] = chains }) is { } broken) ShowProblem(broken);
+        if (await BrokenByDeletedFileAsync(absolutePath, chains) is { } broken) ShowProblem(broken);
     }
 
     /// <summary>

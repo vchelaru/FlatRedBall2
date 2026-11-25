@@ -40,9 +40,23 @@ Any changes made on disk, such as copying an existing animation without using th
 
 To convert one file, right-click an `.achx` file in the **Animations** tab and select **Convert to .achj**. To convert every `.achx` file in a folder and its sub-folders, right-click the folder and select **Convert Animations to .achj**. Files under `bin` and `obj` folders are skipped.
 
-Conversion changes only the file format. After confirming, the AnimationEditor writes the `.achj` next to the original and moves the `.achx` to the Recycle Bin. If something goes wrong, restore the `.achx` from the Recycle Bin and delete the new `.achj`.
+Conversion changes only the file format. Before anything is written, a dialog shows what the conversion does:
 
-A file is skipped, and its `.achx` is left alone, if an `.achj` with the same name already exists.
+* **Animations** lists the files that become `.achj`, and the files that are left alone with the reason. A file is left alone if an `.achj` with the same name exists, if it can't be read, if its tab has unsaved edits that can't be saved, or if the `.achj` would not hold exactly the same data.
+* **Sequences** lists the `.seqj` files that play a converted file. The conversion points them at the `.achj`, so they keep playing. A `.seqj` that can't be updated, for example because it is read-only, is listed as one that stops playing.
+
+Click a row with an arrow to see its details. Click **Convert** to run what the dialog shows, or **Cancel** to leave every file as it is. If the result differs from what the dialog shows, the AnimationEditor tells you what is different.
+
+The AnimationEditor searches the project folder for sequences. Sequences in other folders, and game code that loads an `.achx` by name, are not changed.
+
+### Go Back to .achx
+
+The `.achx` files and the `.seqj` files that the conversion changes are moved to the Recycle Bin. To go back:
+
+1. Restore the `.achx` files and the `.seqj` files from the Recycle Bin. Replace the `.seqj` files that are there now.
+2. Delete the new `.achj` files.
+
+Edits made to a `.seqj` after the conversion are not in the restored file.
 
 ## Find Which Animations Use an Image
 
