@@ -50,10 +50,10 @@ public partial class MainWindow
         {
             if (MouseNavigationDirection(e.GetCurrentPoint(this).Properties.PointerUpdateKind) is not { } direction) return;
             e.Handled = true;
-            _ = NavigateHistoryAsync(back: direction < 0);
+            _ = RunGuardedAsync(() => NavigateHistoryAsync(back: direction < 0), direction < 0 ? "Back" : "Forward");
         }, RoutingStrategies.Tunnel);
-        MenuNavBack.Click += (_, _) => _ = NavigateHistoryAsync(back: true);
-        MenuNavForward.Click += (_, _) => _ = NavigateHistoryAsync(back: false);
+        MenuNavBack.Click += (_, _) => _ = RunGuardedAsync(() => NavigateHistoryAsync(back: true), "Back");
+        MenuNavForward.Click += (_, _) => _ = RunGuardedAsync(() => NavigateHistoryAsync(back: false), "Forward");
         _navigationHistory.Changed += UpdateNavigationMenuItems;
         UpdateNavigationMenuItems();
     }

@@ -837,11 +837,11 @@ public partial class MainWindow
             w.SequenceTimeline.ErrorRaised +=message => w.ShowProblem(message);
             w.SequenceTimeline.SelectionChanged += OnTimelineSelectionChanged;
             w.SequenceTimeline.ContentChanged += OnTimelineContentChanged;
-            w.SequenceTimeline.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceTimeline.GoToDefinitionRequested += reference => _ = _window.RunGuardedAsync(() => GoToDefinitionAsync(reference), "Go to Definition");
             w.SequenceTimeline.GoToSequenceRequested += GoToSequence;
             w.SequenceInspector.GoToSequenceRequested += GoToSequence;
             w.SequenceInspector.ErrorRaised += message => w.ShowProblem(message);
-            w.SequenceInspector.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceInspector.GoToDefinitionRequested += reference => _ = _window.RunGuardedAsync(() => GoToDefinitionAsync(reference), "Go to Definition");
             w.SequenceLibrary.ChipDragMoved += (chip, e) =>
             {
                 w.SequenceTimeline.UpdateChipDrag(chip, TimelinePoint(e), e.KeyModifiers.HasFlag(KeyModifiers.Alt));
@@ -872,16 +872,16 @@ public partial class MainWindow
                 LoadThumbnails();
             };
             w.SequenceLibrary.FilesDropped += AddSources;
-            w.SequenceLibrary.AddSourceRequested += () => _ = AddSourcesFromPickerAsync();
+            w.SequenceLibrary.AddSourceRequested += () => _ = _window.RunGuardedAsync(() => AddSourcesFromPickerAsync(), "Add Source");
             w.SequenceLibrary.AddChipRequested += AddChip;
             w.SequenceLibrary.CanAddToSelectedTrack = () => w.SequenceTimeline.CanAddToSelectedTrack;
             w.SequenceLibrary.RemoveSourceRequested += RemoveSource;
-            w.SequenceLibrary.ReplaceSourceRequested += source => _ = ReplaceSourceAsync(source);
+            w.SequenceLibrary.ReplaceSourceRequested += source => _ = _window.RunGuardedAsync(() => ReplaceSourceAsync(source), "Replace Source");
             w.SequenceLibrary.SourceMoveRequested += MoveSource;
             w.SequenceLibrary.ConnectDropLine(w.ShowDropLine, w.RemoveDropLine,
                 point => w.SequenceLibrary.GroupsPanel.TranslatePoint(point, w.DragOverlayCanvas));
             w.SequenceLibrary.CollapsedSources.Changed += StoreCollapsedSources;
-            w.SequenceLibrary.GoToDefinitionRequested += reference => _ = GoToDefinitionAsync(reference);
+            w.SequenceLibrary.GoToDefinitionRequested += reference => _ = _window.RunGuardedAsync(() => GoToDefinitionAsync(reference), "Go to Definition");
 
             w.MenuEnableHotReload.Click += (_, _) => _watcher.IsEnabled = w.MenuEnableHotReload.IsChecked != false;
             // The watcher's timer and folder watchers are rooted by the runtime, so they must not outlive the window.
