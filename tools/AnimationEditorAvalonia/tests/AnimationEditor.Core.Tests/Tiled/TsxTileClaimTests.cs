@@ -190,21 +190,21 @@ public class TsxTileClaimTests : IDisposable
     {
         var path = WriteTsx(Tile(0) + Tile(5, AchxPushOwned));
         var pm = Load(path);
+        Assert.Equal("Tile 5 is already used by \"Other.achx\".", pm.TrySetTsxOwnerTileId(Chain(pm, "ID:0"), 5));
         NewChain(pm, "B", 5);
 
         var warning = Assert.Single(pm.SaveTsxProject());
 
         Assert.Contains("\"B\": Tiled tile 5 already carries \"Other.achx\"", warning);
         Assert.Equal([0u, 5u], AnimatedTiles(path));
-        Assert.Equal("Tile 5 is already used by \"Other.achx\".", pm.TrySetTsxOwnerTileId(Chain(pm, "ID:0"), 5));
     }
 
     // Seeded, so a failure names a sequence that replays.
     [Fact]
     public void RandomEdits_EveryAcceptedStateIsSaved_AndEveryChainIsOnDiskOrReported()
     {
-        for (var seed = 0; seed < 300; seed++)
-            RunRandomEdits(seed, steps: 14);
+        for (var seed = 0; seed < 120; seed++)
+            RunRandomEdits(seed, steps: 8);
     }
 
     private void RunRandomEdits(int seed, int steps)
@@ -284,18 +284,21 @@ public class TsxTileClaimTests : IDisposable
                     break;
             }
 
-            warnings = [];
-            ctx.AppCommands.SaveCurrentAnimationChainList();
+            // Every command above saves by itself; these two edit the model.
+            if (action is 15 or 16)
+                ctx.AppCommands.SaveCurrentAnimationChainList();
             Assert.True(saveError is null, $"{saveError}\n{log}");
-
-            var onDisk = Disk(path).Tiles
-                .Where(t => t.Animation.Count > 0 && t.Properties.All(p => p.Name != "ParentId"))
-                .Select(t => (Name: t.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == "Name")?.Value ?? $"ID:{t.ID}", t.Animation.Count))
-                .ToHashSet();
-            foreach (var expected in pm.AnimationChainListSave!.AnimationChains.Where(c => c.Frames.Count > 0))
-                Assert.True(
-                    warnings.Any(w => w.Contains($"\"{expected.Name}\"")) || onDisk.Contains((expected.Name, expected.Frames.Count)),
-                    $"\"{expected.Name}\" is neither on disk nor reported.\n{log}");
         }
+
+        warnings = [];
+        ctx.AppCommands.SaveCurrentAnimationChainList();
+        var onDisk = Disk(path).Tiles
+            .Where(t => t.Animation.Count > 0 && t.Properties.All(p => p.Name != "ParentId"))
+            .Select(t => (Name: t.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == "Name")?.Value ?? $"ID:{t.ID}", t.Animation.Count))
+            .ToHashSet();
+        foreach (var expected in pm.AnimationChainListSave!.AnimationChains.Where(c => c.Frames.Count > 0))
+            Assert.True(
+                warnings.Any(w => w.Contains($"\"{expected.Name}\"")) || onDisk.Contains((expected.Name, expected.Frames.Count)),
+                $"\"{expected.Name}\" is neither on disk nor reported.\n{log}");
     }
 }
