@@ -26,6 +26,7 @@ using AnimationEditor.Views.Dialogs;
 using AnimationEditor.Views.Export;
 using AnimationEditor.Views.Services;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -419,6 +420,9 @@ public partial class MainWindow : Window
             Activated += (_, _) => wheelInput.Attach(this);
         }
 
+        OpenEditorWindows = () => Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.Windows.OfType<MainWindow>().ToList()
+            : [this];
         Opened += OnOpened;
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
         Closing += OnWindowClosing;
@@ -438,8 +442,9 @@ public partial class MainWindow : Window
                 () => _appSettings.WindowMaximized = WindowState == WindowState.Maximized,
                 SaveTabsToSettings,
                 // A normal close is not a crash -- clear any stray recovery file so the next
-                // launch doesn't falsely report "closed unexpectedly" (#894).
-                _appCommands.HandleApplicationClosing,
+                // launch doesn't falsely report "closed unexpectedly" (#894). An OS shutdown asked nothing,
+                // so the unsaved documents come back at the next launch (#2074).
+                () => { if (!_closingForOsShutdown) _appCommands.HandleApplicationClosing(); },
                 () => _appCommands.HotReloadWatcher.Dispose(),
                 () => PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged,
                 () => PreviewCtrl.IsPlayingChanged -= UpdatePlayPauseIcon,
@@ -955,6 +960,7 @@ public partial class MainWindow : Window
     /// </summary>
     private bool _closeConfirmed;
     private bool _confirmingClose;
+    private bool _closingForOsShutdown;
 
     /// <summary>
     /// Closing the window with a tab whose last save failed, or an Untitled tab with content, would drop its edits, so it asks first, once per such tab
@@ -964,27 +970,34 @@ public partial class MainWindow : Window
     {
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
         CommitPendingRename();
-        if (_closeConfirmed || e.CloseReason == WindowCloseReason.OSShutdown
+        _closingForOsShutdown = e.CloseReason == WindowCloseReason.OSShutdown;
+        if (_closeConfirmed || _closingForOsShutdown
             || !(_sequencePane.HasUnsavedEdits || _achxPane.HasUnsavedEdits)) return;
 
         e.Cancel = true;
-        if (_confirmingClose) return;
         _ = ConfirmWindowCloseAsync();
     }
 
     private async Task ConfirmWindowCloseAsync()
     {
+        if (!await ConfirmUnsavedEditsAsync()) return;
+        _closeConfirmed = true;
+        Close();
+    }
+
+    /// <summary>Asks about every tab whose edits no file has. Returns false when the user cancelled, or is being asked already.</summary>
+    private async Task<bool> ConfirmUnsavedEditsAsync()
+    {
+        if (_confirmingClose) return false;
         _confirmingClose = true;
         try
         {
-            if (!await _sequencePane.ConfirmWindowCloseAsync() || !await _achxPane.ConfirmWindowCloseAsync()) return;
-            _closeConfirmed = true;
+            return await _sequencePane.ConfirmWindowCloseAsync() && await _achxPane.ConfirmWindowCloseAsync();
         }
         finally
         {
             _confirmingClose = false;
         }
-        Close();
     }
 
     /// <summary>Closes the window without the unsaved-edits prompt. For tests that end with a failed save on purpose.</summary>
@@ -1191,19 +1204,30 @@ public partial class MainWindow : Window
 
     private void WireUpdateAvailableBanner()
     {
-        RestartForUpdateBtn.Click += (_, _) => RestartToApplyUpdate();
+        RestartForUpdateBtn.Click += (_, _) => _ = RestartToApplyUpdateAsync();
         RetryUpdateBtn.Click += (_, _) => _ = RunStartupUpdateDownloadAsync();
     }
 
     /// <summary>
     /// Applies a downloaded update and restarts. Shared by the persistent banner's Restart
     /// button and the About dialog's (issue #1033) — one restart action, not a copy per surface.
+    /// It ends the process, so every window first asks what closing it asks (#2074).
     /// </summary>
-    private void RestartToApplyUpdate()
+    private async Task RestartToApplyUpdateAsync()
     {
         try
         {
-            SaveTabsToSettings();
+            var windows = OpenEditorWindows();
+            foreach (var window in windows)
+            {
+                window.CommitPendingRename();
+                if (!await window.ConfirmUnsavedEditsAsync()) return;
+            }
+            foreach (var window in windows)
+            {
+                window.SaveTabsToSettings();
+                window._appCommands.HandleApplicationClosing();
+            }
             _applicationUpdater.ApplyUpdateAndRestart();
         }
         catch (Exception ex)
@@ -1212,6 +1236,9 @@ public partial class MainWindow : Window
             ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
         }
     }
+
+    /// <summary>The editor windows of this process. Tests, which have no desktop lifetime, replace it.</summary>
+    internal Func<IReadOnlyList<MainWindow>> OpenEditorWindows { get; set; }
 
     private void ShowUpdateDownloadFailure(string message)
     {
@@ -3296,7 +3323,7 @@ public partial class MainWindow : Window
     /// Opening the About dialog behaves as if its "Check for Updates" button were already clicked:
     /// it starts the real update check-and-download immediately and shows a spinner until the
     /// result is in. This is the exact same mechanism (<see cref="RunApplicationUpdateCheckAsync"/>)
-    /// and restart action (<see cref="RestartToApplyUpdate"/>) the persistent startup banner uses —
+    /// and restart action (<see cref="RestartToApplyUpdateAsync"/>) the persistent startup banner uses —
     /// About previously ran its own separate GitHub-release comparison whose "Get Update" button
     /// only opened a browser tab, so it never actually fetched anything (issue #1033).
     /// </summary>
@@ -3304,7 +3331,7 @@ public partial class MainWindow : Window
     {
         var window = BuildAboutWindowWithLiveRefresh(
             refresh: () => RunApplicationUpdateCheckAsync(),
-            onRestart: RestartToApplyUpdate);
+            onRestart: () => _ = RestartToApplyUpdateAsync());
         await window.ShowDialog(this);
     }
 
@@ -3532,7 +3559,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Builds the About dialog's "Restart Now" button once a download is ready — calls the
-    /// exact same <see cref="RestartToApplyUpdate"/> the persistent banner's button does (issue #1033).</summary>
+    /// exact same <see cref="RestartToApplyUpdateAsync"/> the persistent banner's button does (issue #1033).</summary>
     private static Button BuildRestartButton(Action onRestart)
     {
         var button = new Button { Name = "AboutRestartBtn", Content = "Restart Now" };

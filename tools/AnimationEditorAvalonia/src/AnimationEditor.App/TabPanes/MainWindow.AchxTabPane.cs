@@ -5,6 +5,7 @@ using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Dialogs;
 using FlatRedBall2.AnimationEditorCommon;
+using Avalonia.Threading;
 using System.Linq;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -90,8 +91,9 @@ public partial class MainWindow
                 return null; // Cancelled, refused or failed -- leave the tab open, nothing was written.
 
             // A successful save renames the sentinel tab in place (the CurrentFileChanged
-            // handler's Rename), which replaces the TabEntry instance -- re-resolve through
-            // ActiveTab rather than closing the now-stale `tab` reference.
+            // handler's queued Rename, waited for here), which replaces the TabEntry instance --
+            // re-resolve through ActiveTab rather than closing the now-stale `tab` reference.
+            await Dispatcher.UIThread.InvokeAsync(() => { });
             return _window._tabManager.ActiveTab ?? tab;
         }
 

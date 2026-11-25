@@ -29,7 +29,14 @@ internal sealed class FakeApplicationUpdater : IApplicationUpdater
         return Task.FromResult(Result);
     }
 
-    public void ApplyUpdateAndRestart() => RestartCount++;
+    /// <summary>Runs where the real updater ends the process.</summary>
+    public Action? Restarting { get; set; }
+
+    public void ApplyUpdateAndRestart()
+    {
+        RestartCount++;
+        Restarting?.Invoke();
+    }
 }
 
 /// <summary>
