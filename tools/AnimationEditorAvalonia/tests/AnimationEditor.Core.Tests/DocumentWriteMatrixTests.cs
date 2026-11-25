@@ -326,7 +326,7 @@ public class DocumentWriteMatrixTests
         {
             Ctx.AppCommands.SaveFailed += Messages.Add;
             Ctx.AppCommands.SaveAsRefused += Messages.Add;
-            Ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, warnings) => Messages.AddRange(warnings);
+            Ctx.AppCommands.SaveCompletedWithWarnings += (_, warnings) => Messages.AddRange(warnings);
             Ctx.AppCommands.LoadFailed += (path, ex) => Messages.Add($"{path}: {ex.Message}");
             Ctx.AppCommands.HotReloadFailed += (path, reason) => Messages.Add($"{path}: {reason}");
             Documents.Write(Folder, DocType.Achx, "bystander");

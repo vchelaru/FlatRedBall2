@@ -965,6 +965,21 @@ public class AnimationChainListSave
         target.Blue = FloatEl(el, "Blue", 1f);
     }
 
+    /// <summary>
+    /// Whether <paramref name="element"/> of an .achx is one of the FRB1 fields this type only carries (see the remarks of
+    /// <see cref="Save(string)"/>): read and written back as they are, with no place in an .achj. For the AnimationEditor's
+    /// conversions; reading and writing do not use it.
+    /// </summary>
+    internal static bool IsOnlyCarried(XElement element) => (element.Parent?.Name.LocalName, element.Name.LocalName) switch
+    {
+        ("AnimationChainArraySave", "FileName") => true,
+        ("AnimationChain", "ColorKey" or "ParentFile") => true,
+        ("AxisAlignedRectangleSave" or "CircleSave", "Parent") => true,
+        ("PolygonSave", "RotationZ") => true,
+        ("ShapeCollectionSave", "AxisAlignedCubeSaves" or "SphereSaves") => true,
+        _ => false,
+    };
+
     // A copy, so it does not keep the whole document it was read from.
     private static XElement? CarriedEl(XElement parent, string name) =>
         parent.Element(name) is { HasElements: true } el ? new XElement(el) : null;

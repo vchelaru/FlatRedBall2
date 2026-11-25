@@ -276,6 +276,42 @@ public sealed class AchxConversionTests : IDisposable
         AnimationListComparison.FirstDifference(List(0.1f), List(0.1f, radius: 5)).ShouldBe("animation 'Walk', frame 1");
     }
 
+    // Found by comparing with what the .achj reads back, so a field missing from the list of carried ones would show too.
+    [Fact]
+    public void OfSavingAsAchj_ListsWhatTheAchjDoesNotReadBack()
+    {
+        var list = AnimationChainListSave.FromString("<AnimationChainArraySave><AnimationChain><Name>Walk</Name><ColorKey>0</ColorKey><Frame><FrameLength>1</FrameLength><ShapeCollectionSave>"
+            + "<AxisAlignedCubeSaves><AxisAlignedCubeSave><X>1</X></AxisAlignedCubeSave></AxisAlignedCubeSaves><PolygonSaves><PolygonSave><Points /><Name>P</Name><RotationZ>1</RotationZ></PolygonSave></PolygonSaves>"
+            + "</ShapeCollectionSave></Frame></AnimationChain><AnimationChain><Name>Idle</Name></AnimationChain><FileName>a.achx</FileName></AnimationChainArraySave>");
+
+        ConversionDrop.Describe(ConversionLoss.OfSavingAsAchj(list)).ShouldBe(
+        [
+            "<ColorKey> in animation 'Walk' is not kept",
+            "<AxisAlignedCubeSaves> in animation 'Walk', frame 1 is not kept",
+            "<RotationZ> in animation 'Walk', frame 1 is not kept",
+            "<FileName> is not kept",
+        ]);
+        ConversionLoss.OfSavingAsAchj(AnimationChainListSave.FromJsonString(list.ToJsonString())).ShouldBeEmpty();
+    }
+
+    // Only what the .achj has no place for may be missing. A difference beside it still counts.
+    [Fact]
+    public void FirstDifference_WhatIsOnlyCarried_IsNotCompared()
+    {
+        string text = "<AnimationChainArraySave><AnimationChain><Name>Walk</Name><ColorKey>0</ColorKey><ParentFile>a.gif</ParentFile><Frame><FrameLength>1</FrameLength><ShapeCollectionSave>"
+            + "<AxisAlignedRectangleSaves><AxisAlignedRectangleSave><Name>A</Name><Parent>B</Parent></AxisAlignedRectangleSave></AxisAlignedRectangleSaves>"
+            + "<AxisAlignedCubeSaves><AxisAlignedCubeSave /></AxisAlignedCubeSaves><PolygonSaves><PolygonSave><RotationZ>1</RotationZ></PolygonSave></PolygonSaves>"
+            + "<CircleSaves><CircleSave><Radius>2</Radius><Parent>B</Parent></CircleSave></CircleSaves><SphereSaves><SphereSave /></SphereSaves></ShapeCollectionSave></Frame></AnimationChain>"
+            + "<FileName>a.achx</FileName></AnimationChainArraySave>";
+        var list = AnimationChainListSave.FromString(text);
+        var readBack = AnimationChainListSave.FromJsonString(list.ToJsonString());
+
+        AnimationListComparison.FirstDifference(list, readBack).ShouldBeNull();
+        readBack.AnimationChains[0].Frames[0].ShapesSave!.CircleSaves.Single().Radius = 3;
+        AnimationListComparison.FirstDifference(list, readBack).ShouldBe("animation 'Walk', frame 1");
+        AnimationListComparison.FirstDifferingElement(list, readBack).ShouldBe("<Radius>");
+    }
+
     private static ShapesSave WithCircle(float radius)
     {
         var shapes = new ShapesSave();
@@ -324,20 +360,71 @@ public sealed class AchxConversionTests : IDisposable
 
     // Cubes and spheres have no place in an .achj.
     [Theory]
-    [InlineData("<Custom>5</Custom>", "", "<Custom> would be lost")]
-    [InlineData("", "<Custom><Part>5</Part></Custom>", "<Custom> would be lost")]
-    [InlineData("", "<ShapeCollectionSave><CircleSaves><CircleSave><Radius>2</Radius><Custom>5</Custom></CircleSave></CircleSaves></ShapeCollectionSave>", "<Custom> would be lost")]
-    [InlineData("", "<Tagged by=\"me\" />", "<Tagged> would be lost")]
-    [InlineData("", "<RelativeX by=\"me\">4</RelativeX>", "the attribute by would be lost")]
-    [InlineData("", "<ShapeCollectionSave><SphereSaves><SphereSave><Radius>2</Radius></SphereSave></SphereSaves></ShapeCollectionSave>", "Not exact: animation 'Walk', frame 1")]
-    [InlineData("", "<ShapeCollectionSave><AxisAlignedCubeSaves><AxisAlignedCubeSave><X>1</X></AxisAlignedCubeSave></AxisAlignedCubeSaves></ShapeCollectionSave>", "Not exact: animation 'Walk', frame 1")]
+    [InlineData("<Custom>5</Custom>", "", "<Custom> is not kept")]
+    [InlineData("", "<Custom><Part>5</Part></Custom>", "<Custom> in animation 'Walk', frame 1 is not kept")]
+    [InlineData("", "<ShapeCollectionSave><CircleSaves><CircleSave><Radius>2</Radius><Custom>5</Custom></CircleSave></CircleSaves></ShapeCollectionSave>", "<Custom> in animation 'Walk', frame 1 is not kept")]
+    [InlineData("", "<Tagged by=\"me\" />", "<Tagged> in animation 'Walk', frame 1 is not kept")]
+    [InlineData("", "<RelativeX by=\"me\">4</RelativeX>", "the attribute by in animation 'Walk', frame 1 is not kept")]
+    [InlineData("", "<ShapeCollectionSave><SphereSaves><SphereSave><Radius>2</Radius></SphereSave></SphereSaves></ShapeCollectionSave>", "<SphereSaves> in animation 'Walk', frame 1 is not kept")]
+    [InlineData("", "<ShapeCollectionSave><AxisAlignedCubeSaves><AxisAlignedCubeSave><X>1</X></AxisAlignedCubeSave></AxisAlignedCubeSaves></ShapeCollectionSave>", "<AxisAlignedCubeSaves> in animation 'Walk', frame 1 is not kept")]
     [InlineData("<ProjectFile></ProjectFile><Custom />", "<FlipVertical>false</FlipVertical><RelativeY>0</RelativeY><Events />", null)]
-    public void Build_AnElementThatIsNotRead_IsLeftAlone(string inList, string inFrame, string? problem)
+    public void Build_WhatIsNotKept_IsListed_AndRunConvertsWithoutADifference(string inList, string inFrame, string? loss)
     {
         File.WriteAllText(At("a.achx"), $"<AnimationChainArraySave>{inList}<AnimationChain><Name>Walk</Name><Frame><TextureName>a.png</TextureName>{inFrame}<FrameLength>1</FrameLength></Frame></AnimationChain></AnimationChainArraySave>");
+        var plan = Plan(At("a.achx"));
 
-        Plan(At("a.achx")).Files.Single().Problem?.Why.ShouldBe(problem);
-        Plan(At("a.achx")).Files.Single().Converts.ShouldBe(problem is null);
+        ConversionPlanView.Of(plan).Animations.Items.Single().Losses.ShouldBe(loss ?? "");
+
+        var outcome = AchxConversion.Run(plan, Steps());
+        outcome.Differences.ShouldBeEmpty();
+        outcome.Converted.ShouldBe([At("a.achx")]);
+        AnimationChainListSave.FromJsonFile(At("a.achj")).AnimationChains.Single().Frames.Count.ShouldBe(1);
+    }
+
+    private string WithColorKey(string relative, params string[] chains)
+    {
+        File.WriteAllText(At(relative), $"<AnimationChainArraySave>{string.Concat(chains.Select(chain => $"<AnimationChain><Name>{chain}</Name><ColorKey>0</ColorKey></AnimationChain>"))}</AnimationChainArraySave>");
+        return At(relative);
+    }
+
+    [Fact]
+    public void View_AFileThatLosesSomething_ComesFirst_InAGroupThatIsOpen()
+    {
+        var files = Enumerable.Range(1, 7).Select(i => Achx($"Hero{i}.achx")).Append(WithColorKey("Old.achx", "Idle", "Walk")).ToArray();
+        File.WriteAllText(files[^1], File.ReadAllText(files[^1]).Replace("</AnimationChainArraySave>", "<FileName>a</FileName></AnimationChainArraySave>"));
+
+        var view = ConversionPlanView.Of(Plan(files));
+
+        view.Animations.ShowsItems.ShouldBeTrue();
+        view.Animations.Items.Select(item => item.Name).ShouldBe(["Old.achx", .. Enumerable.Range(1, 7).Select(i => $"Hero{i}.achx")]);
+        view.Animations.Items[0].Losses.ShouldBe("<ColorKey> in 2 animations ('Idle' and 'Walk') is not kept\n<FileName> is not kept");
+        view.Animations.Items[0].Note.ShouldBe("");
+        (view.Animations.GroupSummary, view.Animations.GroupWarning).ShouldBe(("9 animations · 7 frames", "1 loses data"));
+        view.Facts[0].Value.ShouldBe("All 8 read back the same from .achj, apart from what is not kept");
+        ConversionPlanView.Of(Plan(files[..7])).Animations.ShowsItems.ShouldBeFalse();
+    }
+
+    // Planned from the file without the edits: what they add to the list was not agreed to.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Run_SavedEditsThatLoseMoreThanThePlan_AreNotConverted(bool addsOne)
+    {
+        string hero = WithColorKey("hero.achx", "Idle");
+        var plan = AchxConversionPlan.Build([hero], _dir.Path, OpenDocuments.None with
+        {
+            Animations = new Dictionary<FilePath, (bool, string?)> { [new FilePath(hero)] = (true, null) },
+        });
+
+        var outcome = AchxConversion.Run(plan, Steps(saveEdits: _ =>
+        {
+            if (addsOne) WithColorKey("hero.achx", "Idle", "Walk");
+            return null;
+        }));
+
+        outcome.Differences.ShouldBe(addsOne ? ["hero.achx: not converted, with its edits saved it loses more than the plan says. Convert it again"] : []);
+        File.Exists(hero).ShouldBe(addsOne);
+        File.Exists(At("hero.achj")).ShouldBe(!addsOne);
     }
 
     [Fact]
@@ -356,6 +443,7 @@ public sealed class AchxConversionTests : IDisposable
     public void SameAs_IsTrueUntilWhatWouldRunDiffers()
     {
         string hero = Achx("hero.achx");
+        File.WriteAllText(hero, File.ReadAllText(hero).Replace("</Name>", "</Name><ColorKey>0</ColorKey>"));
         string boss = Achx("boss.achx");
         string attack = Seqj("attack.seqj", "hero.achx");
         var plan = Plan(hero, boss);
@@ -369,7 +457,9 @@ public sealed class AchxConversionTests : IDisposable
         }
 
         Same().ShouldBeTrue();
+        AchxConversionPlan.Build([hero, boss], _dir.Path, OpenDocuments.None).SameAs(plan).ShouldBeTrue("checked anew");
         Changes(hero, "Walk", "Run");
+        Changes(hero, "<ColorKey>0</ColorKey>", "");
         Changes(hero, "<Name>Walk</Name>", "");
         Changes(attack, "\"source\": \"hero.achx\"", "\"source\": \"gone.achx\"");
         Changes(attack, "\"hero.achx\"\r\n  ]".Replace("\r\n", Environment.NewLine), "\"hero.achx\", \"boss.achx\"]");

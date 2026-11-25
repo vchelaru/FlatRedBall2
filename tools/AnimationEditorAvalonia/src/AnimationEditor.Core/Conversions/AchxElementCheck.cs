@@ -8,76 +8,100 @@ using System.Xml.Linq;
 
 namespace AnimationEditor.Core.Conversions;
 
-/// <summary>Finds the parts of an <c>.achx</c> text that reading it leaves out. Safe to use from several threads.</summary>
+/// <summary>Finds the parts of an <c>.achx</c> text that an <c>.achj</c> does not keep. Safe to use from several threads.</summary>
 public sealed class AchxElementCheck
 {
     private static readonly XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
 
-    // The kinds of element found to be read, see KindOf.
+    // The kinds of element found to be read or not, see KindOf.
     private readonly ConcurrentDictionary<string, bool> _isRead = new();
 
     /// <summary>Whether <paramref name="source"/> has XML comments, which no save keeps.</summary>
     public static bool HasComments(XDocument source) => source.DescendantNodes().OfType<XComment>().Any();
 
     /// <summary>
-    /// The first element or attribute of <paramref name="source"/> that <paramref name="list"/>, read from it, does not hold:
-    /// "&lt;Custom&gt;", or null. An element without any content holds nothing to lose.
+    /// Every element, attribute and text of <paramref name="source"/> that <paramref name="list"/>, read from it, does not hold or
+    /// only carries. An element without any content holds nothing to lose.
     /// </summary>
-    public string? FirstUnread(XDocument source, AnimationChainListSave list) =>
-        FirstUnread(source.Root!, XElement.Parse(list.ToXmlString()));
-
-    private string? FirstUnread(XElement source, XElement written)
+    public IReadOnlyList<ConversionDrop> Drops(XDocument source, AnimationChainListSave list)
     {
-        if (UnreadAttribute(source) is { } unread) return unread;
+        var drops = new List<ConversionDrop>();
+        AddDrops(source.Root!, XElement.Parse(list.ToXmlString()), default, drops);
+        if (drops.Count == 0) return []; // so that two plans without any are equal
+        return drops;
+    }
+
+    private void AddDrops(XElement source, XElement written, ConversionPlace place, List<ConversionDrop> drops)
+    {
+        AddAttributes(source, place, drops);
+        // What is read from such an element is written in the place of its siblings, which are not read then.
+        bool replacesOthers = source.Elements().Any(element =>
+            element.HasElements && !AnimationChainListSave.IsOnlyCarried(element) && !written.Elements(element.Name).Any() && IsRead(element));
         foreach (var group in source.Elements().GroupBy(element => element.Name))
         {
             var pairs = written.Elements(group.Key).ToList();
-            int i = 0;
+            int number = 0;
             foreach (var element in group)
             {
-                // What is written back is compared inside. What is not is a default, left out, or in another element, when it is read at all.
-                if (i < pairs.Count)
-                {
-                    if (FirstUnread(element, pairs[i++]) is { } inside) return inside;
-                }
-                else if (HasContent(element))
-                {
-                    if (pairs.Count > 0) return Named(element);
-                    if (FirstUnreadByProbing(element) is { } inside) return inside;
-                }
+                number++;
+                var inside = PlaceOf(element, number, place);
+                if (pairs.Count == 0)
+                    // A default, left out, or written in another element, when it is read at all.
+                    AddDropsByProbing(element, inside, drops);
+                else if (number <= pairs.Count && !replacesOthers && !AnimationChainListSave.IsOnlyCarried(element))
+                    AddDrops(element, pairs[number - 1], inside, drops);
+                else
+                    AddIfContent(element, inside, drops);
             }
         }
-        // Elements read from another place are written in the place of these, so these were not compared with their own.
-        return source.Elements().Any(element => element.HasElements && !written.Elements(element.Name).Any())
-            && source.Elements().FirstOrDefault(element => HasContent(element) && written.Elements(element.Name).Any()) is { } replaced
-                ? Named(replaced)
-                : null;
     }
 
-    private string? FirstUnreadByProbing(XElement element)
+    private void AddDropsByProbing(XElement element, ConversionPlace place, List<ConversionDrop> drops)
     {
-        if (!IsRead(element)) return Named(element);
-        if (UnreadAttribute(element) is { } unread) return unread;
-        if (element.HasElements && element.Nodes().OfType<XText>().Any(text => !string.IsNullOrWhiteSpace(text.Value))) return $"the text in {Named(element)}";
-        return element.Elements().Where(HasContent).Select(FirstUnreadByProbing).FirstOrDefault(inside => inside is not null);
+        if (!HasContent(element)) return;
+        if (AnimationChainListSave.IsOnlyCarried(element) || !IsRead(element))
+        {
+            AddIfContent(element, place, drops);
+            return;
+        }
+        AddAttributes(element, place, drops);
+        if (element.HasElements && element.Nodes().OfType<XText>().Any(text => !string.IsNullOrWhiteSpace(text.Value)))
+            drops.Add(new ConversionDrop($"the text in {Named(element)}", place));
+        foreach (var inside in element.Elements()) AddDropsByProbing(inside, place, drops);
     }
 
-    private static string Named(XElement element) => $"<{element.Name.LocalName}>";
+    private static void AddIfContent(XElement element, ConversionPlace place, List<ConversionDrop> drops)
+    {
+        if (HasContent(element)) drops.Add(new ConversionDrop(Named(element), place));
+    }
 
-    private static string? UnreadAttribute(XElement element) =>
-        element.Attributes().FirstOrDefault(attribute => !attribute.IsNamespaceDeclaration && attribute.Name.Namespace != Xsi) is { } unread
-            ? $"the attribute {unread.Name.LocalName}"
-            : null;
+    private static void AddAttributes(XElement element, ConversionPlace place, List<ConversionDrop> drops) =>
+        drops.AddRange(UnreadAttributes(element).Select(attribute => new ConversionDrop($"the attribute {attribute.Name.LocalName}", place)));
 
-    private static bool HasContent(XElement element) => element.HasElements || element.HasAttributes || element.Value.Length > 0;
+    internal static ConversionPlace PlaceOf(XElement element, int number, ConversionPlace outer) => element.Name.LocalName switch
+    {
+        "AnimationChain" when !outer.IsInAnimation => new ConversionPlace(number, (string?)element.Element("Name") ?? "", 0),
+        "Frame" when outer is { IsInAnimation: true, IsInFrame: false } => outer with { Frame = number },
+        _ => outer,
+    };
+
+    internal static string Named(XElement element) => $"<{element.Name.LocalName}>";
+
+    private static IEnumerable<XAttribute> UnreadAttributes(XElement element) =>
+        element.Attributes().Where(attribute => !attribute.IsNamespaceDeclaration && attribute.Name.Namespace != Xsi);
+
+    private static bool HasContent(XElement element) => element.HasElements || element.Value.Length > 0 || UnreadAttributes(element).Any();
 
     private bool IsRead(XElement element)
     {
         string kind = KindOf(element);
-        if (_isRead.ContainsKey(kind)) return true;
-        // One that is not read ends the check of its file, so only the others are asked about again.
-        if (!ChangesWhatIsRead(element)) return false;
-        return _isRead[kind] = true;
+        if (_isRead.TryGetValue(kind, out bool known)) return known;
+        // Whether leaving elements out makes a difference depends on what they hold, so that it makes none is only known of these.
+        string exactKind = element.HasElements ? $"{kind} {string.Join(' ', element.Descendants().Select(part => part.Name).Distinct())}" : kind;
+        if (_isRead.ContainsKey(exactKind)) return false;
+        bool isRead = ChangesWhatIsRead(element);
+        _isRead[isRead ? kind : exactKind] = isRead;
+        return isRead;
     }
 
     // The path, such as "AnimationChainArraySave/AnimationChain/Frame/RelativeX". The first of a name is read where a repeat may

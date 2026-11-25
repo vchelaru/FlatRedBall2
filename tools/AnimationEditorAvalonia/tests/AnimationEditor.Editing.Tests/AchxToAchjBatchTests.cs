@@ -73,6 +73,21 @@ public class AchxToAchjBatchTests : IDisposable
         File.Exists(bad).ShouldBeTrue();
     }
 
+    [Fact]
+    public void Convert_WhatIsNotKept_IsAWarningOfItsFile_AndTheFileConverts()
+    {
+        string plain = Path.Combine(_root, "plain.achx"), old = Path.Combine(_root, "old.achx");
+        WriteAchx(plain);
+        WriteAchx(old);
+        File.WriteAllText(old, File.ReadAllText(old).Replace("</Name>", "</Name><ColorKey>0</ColorKey>"));
+
+        var batch = AchxToAchjBatch.Convert([plain, old]);
+
+        batch.Converted.Select(f => f.SourcePath).ShouldBe([plain, old]);
+        batch.Result.Success.ShouldBeTrue();
+        batch.Result.Warnings.ShouldBe(["old.achx: <ColorKey> in animation 'Walk' is not kept."]);
+    }
+
     // What one file holds says nothing about another that uses the same element.
     [Theory]
     [InlineData("text.achx", "shapes.achx")]
@@ -84,8 +99,8 @@ public class AchxToAchjBatchTests : IDisposable
 
         var batch = AchxToAchjBatch.Convert([Path.Combine(_root, first), Path.Combine(_root, second)]);
 
-        batch.Converted.Select(f => f.SourcePath).ShouldBe([Path.Combine(_root, "shapes.achx")]);
-        batch.Failed.Select(f => f.SourcePath).ShouldBe([Path.Combine(_root, "text.achx")]);
+        batch.Converted.Count().ShouldBe(2);
+        batch.Result.Warnings.ShouldBe(["text.achx: <Shapes> in animation 'Walk', frame 1 is not kept."]);
     }
 
     private static string WithShapes(string shapes) =>

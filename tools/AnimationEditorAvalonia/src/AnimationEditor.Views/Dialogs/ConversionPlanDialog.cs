@@ -199,7 +199,8 @@ internal sealed class ConversionPlanDialog
     {
         var path = FilePath(item.Folder, item.Becomes.Length == 0 ? item.Name : $"{item.Name} → {item.Becomes}", "Ink", 13);
         var parts = new[] { item.Amount, item.Frames, item.Note }.Where(part => part.Length > 0);
-        return RowBox(Row(Glyph(Arrow, "Ok", inCircle: true), path, string.Join(" · ", parts)));
+        var row = RowBox(Row(Glyph(Arrow, "Ok", inCircle: true), path, string.Join(" · ", parts)));
+        return item.Losses.Length == 0 ? row : new StackPanel { Children = { row, BuildLosses(item, new Thickness(37, 0, 33, 4)) } };
     }
 
     private static Control BuildGroup(ConversionCard card)
@@ -214,7 +215,7 @@ internal sealed class ConversionPlanDialog
             ItemTemplate = new FuncDataTemplate<ConversionItem>((item, _) => item is null ? null : BuildItem(item)),
             Margin = new Thickness(0, 0, 0, 4),
         };
-        var group = Expander(Row(Glyph(Arrow, "Ok", inCircle: true), title, card.GroupSummary), card.GroupTitle, items, card.ShowsItems);
+        var group = Expander(Row(Glyph(Arrow, "Ok", inCircle: true), title, card.GroupSummary, card.GroupWarning), card.GroupTitle, items, card.ShowsItems);
         if (card.Issues.Count == 0) return group;
         var line = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Margin = new Thickness(0, 6, 0, 0), Padding = new Thickness(0, 6, 0, 0), Child = group };
         Bind(line, Border.BorderBrushProperty, "LineBrush");
@@ -225,7 +226,7 @@ internal sealed class ConversionPlanDialog
     {
         var grid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto,78,60"), RowDefinitions = new RowDefinitions($"{RowHeight},Auto"),
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,78,60"), RowDefinitions = new RowDefinitions($"{RowHeight},Auto,Auto"),
             ColumnSpacing = 8, Margin = new Thickness(37, 0, 33, 0),
         };
         grid.Children.Add(FilePath(item.Folder, item.Becomes.Length == 0 ? item.Name : $"{item.Name} → {Path.GetExtension(item.Becomes)}", "Ink", 12));
@@ -239,6 +240,13 @@ internal sealed class ConversionPlanDialog
             grid.Children.Add(below);
             note = "";
         }
+        if (item.Losses.Length > 0)
+        {
+            var losses = BuildLosses(item, new Thickness(0, 0, 0, 5));
+            Grid.SetRow(losses, 2);
+            Grid.SetColumnSpan(losses, 4);
+            grid.Children.Add(losses);
+        }
         // A sequence has one amount, in the last column.
         var amounts = item.Frames.Length == 0 ? new[] { note, "", item.Amount } : new[] { note, item.Amount, item.Frames };
         for (int i = 0; i < amounts.Length; i++)
@@ -251,10 +259,21 @@ internal sealed class ConversionPlanDialog
         return grid;
     }
 
-    private static Grid Row(Control glyph, Control name, string why)
+    private static TextBlock BuildLosses(ConversionItem item, Thickness margin)
+    {
+        var losses = Text(item.Losses, 12, "AccentSoft");
+        losses.TextWrapping = TextWrapping.Wrap;
+        losses.Margin = margin;
+        return losses;
+    }
+
+    /// <param name="warning">Shown after <paramref name="why"/> in the colour of a file left alone; empty for none.</param>
+    private static Grid Row(Control glyph, Control name, string why, string warning = "")
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("14,*,Auto"), ColumnSpacing = 9, MinHeight = 28 };
-        var reason = Text(why, 12, "InkMid");
+        Control reason = Text(why, 12, "InkMid");
+        if (warning.Length > 0)
+            reason = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { reason, Text($" · {warning}", 12, "AccentSoft") } };
         Grid.SetColumn(name, 1);
         Grid.SetColumn(reason, 2);
         grid.Children.AddRange([glyph, name, reason]);

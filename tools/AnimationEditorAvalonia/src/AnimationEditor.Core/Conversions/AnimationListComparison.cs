@@ -1,11 +1,15 @@
 using FlatRedBall2.AnimationEditorCommon;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
 namespace AnimationEditor.Core.Conversions;
 
-/// <summary>Compares two animation lists field by field, as the <c>.achx</c> format writes them.</summary>
+/// <summary>
+/// Compares two animation lists field by field, as the <c>.achx</c> format writes them. What an <c>.achx</c> only carries
+/// (<c>AnimationChainListSave.IsOnlyCarried</c>) is not compared, except by <see cref="Lost"/>.
+/// </summary>
 public static class AnimationListComparison
 {
     /// <summary>Where <paramref name="other"/> first differs from <paramref name="original"/> ("animation 'Walk', frame 2"), or null when it does not.</summary>
@@ -68,10 +72,47 @@ public static class AnimationListComparison
         return inside.FirstOrDefault(node => node is not null) ?? from;
     }
 
-    // An .achx writes an empty text as an empty element or as none, whichever it was read as, and both mean the same.
-    private static XElement Fields(AnimationChainListSave list)
+    /// <summary>
+    /// Every element of <paramref name="original"/>, as an <c>.achx</c> writes it, that <paramref name="other"/> lacks or holds
+    /// otherwise: what is lost going from one to the other, whatever it is.
+    /// </summary>
+    internal static IReadOnlyList<ConversionDrop> Lost(AnimationChainListSave original, AnimationChainListSave other)
+    {
+        var lost = new List<ConversionDrop>();
+        AddLost(Fields(original, withCarried: true), Fields(other, withCarried: true), default, lost);
+        return lost;
+    }
+
+    private static void AddLost(XElement from, XElement to, ConversionPlace place, List<ConversionDrop> lost)
+    {
+        foreach (var group in from.Elements().GroupBy(element => element.Name))
+        {
+            var pairs = to.Elements(group.Key).ToList();
+            int number = 0;
+            foreach (var element in group)
+            {
+                var inside = AchxElementCheck.PlaceOf(element, ++number, place);
+                var pair = number <= pairs.Count ? pairs[number - 1] : null;
+                if (pair is null || element.HasElements != pair.HasElements || (!element.HasElements && element.Value != pair.Value))
+                    lost.Add(new ConversionDrop(AchxElementCheck.Named(element), inside));
+                else if (element.HasElements)
+                    AddLost(element, pair, inside, lost);
+            }
+        }
+    }
+
+    // An .achx writes an empty text as an empty element or as none, whichever it was read as, and both mean the same. So does
+    // a polygon's name before its points or after.
+    private static XElement Fields(AnimationChainListSave list, bool withCarried = false)
     {
         var root = XElement.Parse(list.ToXmlString());
+        if (!withCarried) root.Descendants().Where(AnimationChainListSave.IsOnlyCarried).Remove();
+        foreach (var name in root.Descendants("PolygonSave").Elements("Name").ToList())
+        {
+            var polygon = name.Parent!;
+            name.Remove();
+            polygon.AddFirst(name);
+        }
         root.Descendants().Where(element => element is { HasElements: false, Value.Length: 0 }).Remove();
         return root;
     }

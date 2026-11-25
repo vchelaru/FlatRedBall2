@@ -99,7 +99,7 @@ public sealed class EditSession
         void OnFailed(string message) => errors.Add(message);
         void OnTsxWarnings(string tsx, IReadOnlyList<string> notes) => warnings.AddRange(notes);
         _commands.SaveFailed += OnFailed;
-        _commands.TsxSaveCompletedWithWarnings += OnTsxWarnings;
+        _commands.SaveCompletedWithWarnings += OnTsxWarnings;
         try
         {
             _commands.SaveCurrentAnimationChainList(Path);
@@ -107,7 +107,7 @@ public sealed class EditSession
         finally
         {
             _commands.SaveFailed -= OnFailed;
-            _commands.TsxSaveCompletedWithWarnings -= OnTsxWarnings;
+            _commands.SaveCompletedWithWarnings -= OnTsxWarnings;
         }
         return errors.Count == 0
             ? new EditResult([Path], [], warnings)

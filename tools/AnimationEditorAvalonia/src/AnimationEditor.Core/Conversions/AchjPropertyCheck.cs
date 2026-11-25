@@ -10,6 +10,7 @@ namespace AnimationEditor.Core.Conversions;
 public sealed class AchjPropertyCheck
 {
     private readonly JsonObject _source;
+    private readonly List<ConversionDrop> _drops = new();
 
     // By the property's path without indexes, such as "/animationChains/frames/relativeX".
     private readonly Dictionary<string, bool> _isRead = new();
@@ -17,21 +18,28 @@ public sealed class AchjPropertyCheck
     private AchjPropertyCheck(JsonObject source) => _source = source;
 
     /// <summary>
-    /// The path of the first property of <paramref name="source"/> that <paramref name="list"/>, read from it, does not hold:
-    /// "animationChains[0].custom", or null. A property without any content holds nothing to lose.
+    /// Every property of <paramref name="source"/> that <paramref name="list"/>, read from it, does not hold. One without any
+    /// content holds nothing to lose.
     /// </summary>
-    public static string? FirstUnread(JsonObject source, AnimationChainListSave list)
+    public static IReadOnlyList<ConversionDrop> Drops(JsonObject source, AnimationChainListSave list)
     {
         var copy = (JsonObject)source.DeepClone();
-        return new AchjPropertyCheck(copy).FirstUnread(copy, JsonNode.Parse(list.ToJsonString())!, "");
+        var check = new AchjPropertyCheck(copy);
+        check.AddDrops(copy, JsonNode.Parse(list.ToJsonString())!, "", default);
+        return check._drops;
     }
 
-    private string? FirstUnread(JsonNode source, JsonNode written, string path)
+    private void AddDrops(JsonNode source, JsonNode written, string path, ConversionPlace place)
     {
-        // A null item is skipped when it is read.
         if (source is JsonArray items && written is JsonArray writtenItems)
-            return items.OfType<JsonNode>().Zip(writtenItems, (item, other) => FirstUnread(item, other!, path)).FirstOrDefault(unread => unread is not null);
-        if (source is not JsonObject properties || written is not JsonObject writtenProperties) return null;
+        {
+            int number = 0;
+            // A null item is skipped when it is read.
+            foreach (var (item, other) in items.OfType<JsonNode>().Zip(writtenItems))
+                AddDrops(item, other!, path, PlaceOf(other!, ++number, path, place));
+            return;
+        }
+        if (source is not JsonObject properties || written is not JsonObject writtenProperties) return;
 
         foreach (var (name, value) in properties.ToList())
         {
@@ -39,16 +47,18 @@ public sealed class AchjPropertyCheck
             string inside = $"{path}/{name}";
             // What is written back is compared inside. What is not is a default, left out, when it is read at all.
             if (writtenProperties[name] is { } other)
-            {
-                if (FirstUnread(value, other, inside) is { } unread) return unread;
-            }
+                AddDrops(value, other, inside, place);
             else if (HasContent(value) && !IsRead(value, name, inside))
-            {
-                return value.GetPath()[2..];
-            }
+                _drops.Add(new ConversionDrop($"\"{name}\"", place));
         }
-        return null;
     }
+
+    private static ConversionPlace PlaceOf(JsonNode item, int number, string path, ConversionPlace outer) => path switch
+    {
+        "/animationChains" => new ConversionPlace(number, (string)item["name"]!, 0),
+        "/animationChains/frames" => outer with { Frame = number },
+        _ => outer,
+    };
 
     private static bool HasContent(JsonNode value) => value switch
     {

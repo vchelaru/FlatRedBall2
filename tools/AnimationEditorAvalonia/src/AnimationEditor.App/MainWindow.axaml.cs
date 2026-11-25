@@ -1392,9 +1392,10 @@ public partial class MainWindow : Window
                     : $"Exported {name} — {string.Join(" ", warnings)}");
             });
 
-        _appCommands.TsxSaveCompletedWithWarnings += (path, warnings) =>
+        _appCommands.SaveCompletedWithWarnings += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
-                ShowProblem($"Saved {new FilePath(path).NoPath}, but not every change applied — {string.Join(" ", warnings)}"));
+                ShowProblem($"Saved {new FilePath(path).NoPath}, but {(new FilePath(path).Extension == "tsx" ? "not every change applied" : "not everything is kept")}"
+                    + $" — {string.Join(" ", warnings)}"));
         _appCommands.IsPathOpenInAnotherTab = path => IsOpenInTabOtherThan(_tabManager.ActiveTab, path);
         _appCommands.IsDocumentTabInFront = IsDocumentTabInFront;
         _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));

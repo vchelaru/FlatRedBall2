@@ -29,9 +29,9 @@ public sealed record OpenDocuments(
 public sealed record ConversionProblem(string Why, string Detail = "");
 
 /// <summary>
-/// One <c>.achx</c> of a plan. One that converts holds only elements the AnimationEditor reads (<see cref="AchxElementCheck"/>),
-/// and what was read from it equals what is read back from its <c>.achj</c>, made in memory (<see cref="AnimationListComparison"/>).
-/// One that does not is left alone.
+/// One <c>.achx</c> of a plan. When it converts, what the AnimationEditor reads from it equals what is read back from its
+/// <c>.achj</c>, made in memory (<see cref="AnimationListComparison"/>), and <see cref="Drops"/> is the rest of it.
+/// One that does not convert is left alone.
 /// </summary>
 /// <param name="Problem">Why the file is left alone, or null when it is converted.</param>
 /// <param name="IsOpen">Its tab closes.</param>
@@ -43,6 +43,9 @@ public sealed record PlannedFile(
     bool HasComments = false, string Content = "")
 {
     public bool Converts => Problem is null;
+
+    /// <summary>What the <c>.achj</c> does not keep, besides comments. <see cref="Content"/> says the same, so it is not compared.</summary>
+    public IReadOnlyList<ConversionDrop> Drops { get; init; } = [];
 }
 
 /// <summary>One <c>.seqj</c> that uses a file of a plan, or that could not be read to tell.</summary>
@@ -72,7 +75,9 @@ public sealed record AchxConversionPlan(
 
     /// <summary>Whether running <paramref name="other"/> is what running this plan is.</summary>
     public bool SameAs(AchxConversionPlan other) =>
-        SearchedFolder == other.SearchedFolder && Files.SequenceEqual(other.Files) && Sequences.Select(Key).SequenceEqual(other.Sequences.Select(Key));
+        SearchedFolder == other.SearchedFolder && Files.Select(Key).SequenceEqual(other.Files.Select(Key)) && Sequences.Select(Key).SequenceEqual(other.Sequences.Select(Key));
+
+    private static PlannedFile Key(PlannedFile file) => file with { Drops = [] };
 
     private static (string, string, int, bool, ConversionProblem?) Key(PlannedSequence sequence) =>
         (sequence.Path, string.Join('|', sequence.Plays.Order(StringComparer.Ordinal)), sequence.Blocks, sequence.IsOpen, sequence.Problem);
@@ -105,15 +110,14 @@ public sealed record AchxConversionPlan(
 
             var list = AnimationFileLoader.Parse(text, new FilePath(source));
             var document = XDocument.Parse(text);
-            if (ConversionLoss.ToAchj(document, list, check) is { } loss)
-                return skipped with
-                {
-                    Problem = loss.Where is null
-                        ? new($"{loss.What} would be lost", $"The AnimationEditor does not read {loss.What}, so the .achj would not hold it.")
-                        : new($"Not exact: {loss.Where}", "The .achj would not hold the same data there."),
-                };
+            var loss = ConversionLoss.ToAchj(document, list, check);
+            if (loss.Difference is { } difference)
+                return skipped with { Problem = new($"Not exact: {difference.Where}", "The .achj would not hold the same data there.") };
             return new PlannedFile(source, target, null, list.AnimationChains.Count,
-                list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits, AchxElementCheck.HasComments(document), content);
+                list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits, AchxElementCheck.HasComments(document), content)
+            {
+                Drops = loss.Drops,
+            };
         }
         catch (Exception ex)
         {

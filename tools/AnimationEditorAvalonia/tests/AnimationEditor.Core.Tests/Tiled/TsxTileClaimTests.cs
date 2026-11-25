@@ -409,7 +409,7 @@ public class TsxTileClaimTests : IDisposable
         var pm = ctx.ProjectManager;
         pm.LoadTsxProject(new FilePath(path));
         IReadOnlyList<string> warnings = [];
-        ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, w) => warnings = w;
+        ctx.AppCommands.SaveCompletedWithWarnings += (_, w) => warnings = w;
         string? saveError = null;
         ctx.AppCommands.SaveFailed += e => saveError = e;
         var log = new StringBuilder($"seed {seed}");

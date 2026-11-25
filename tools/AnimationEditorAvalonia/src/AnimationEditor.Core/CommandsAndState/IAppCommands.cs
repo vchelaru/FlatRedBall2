@@ -58,9 +58,11 @@ namespace AnimationEditor.Core.CommandsAndState
         /// cref="ProjectManager.WriteDocument"/>). The chain's previously-written tile is left
         /// untouched rather than cleared, but the edit that caused the failure was NOT written; the
         /// app layer should surface these as a toast so the user knows the save didn't fully apply.
-        /// Never raised for an achx/achj save or a tsx save with no warnings. The first argument is the tsx path.
+        /// Also raised after <see cref="SaveCurrentAnimationChainListAsync"/> saves an achj that does not keep what the document
+        /// holds and the achj does not read back (<see cref="Conversions.ConversionLoss.OfSavingAsAchj"/>). Never raised with no warnings.
+        /// The first argument is the saved path.
         /// </summary>
-        event Action<string, IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
+        event Action<string, IReadOnlyList<string>>? SaveCompletedWithWarnings;
 
         /// <summary>
         /// Raised when <see cref="SaveCurrentAnimationChainList"/> could not write the file at all
