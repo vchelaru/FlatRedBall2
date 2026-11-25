@@ -441,6 +441,28 @@ public partial class MainWindow
         /// <summary>Whether any open .seqj holds edits its file lacks (a failed save), for the window-close check.</summary>
         public bool HasUnsavedEdits => UnsavedDocuments.Any();
 
+        /// <summary>Every open document.</summary>
+        public IEnumerable<SequenceDocument> Documents => _documents.Values;
+
+        /// <summary>Has every open document hold what its file does, live reload or not, except one with edits its file lacks.</summary>
+        public void CatchUpWithDisk()
+        {
+            foreach (var document in _documents.Values.Where(document => !document.HasUnsavedEdits).ToList())
+            {
+                if (document == _document) ReloadShownFromDisk(document);
+                else if (_window._tabManager.Tabs.FirstOrDefault(open => open.Path == document.Path) is { } tab) CatchUpWithDisk(tab, document);
+            }
+        }
+
+        /// <summary><see cref="SequenceDocument.ChangeSourceExtension"/> on the open document at <paramref name="path"/>, in front or not.</summary>
+        public string? ChangeSourceExtension(string path, IReadOnlyCollection<string> files, string extension, Func<SequenceListSave, string, string?> write)
+        {
+            var document = _documents[new FilePath(path)];
+            return document.HasChangedOnDisk
+                ? "it is not the file the plan is for any more"
+                : document.ChangeSourceExtension(files, extension, write);
+        }
+
         /// <summary>The open documents holding edits their files lack.</summary>
         public IEnumerable<SequenceDocument> UnsavedDocuments => _documents.Values.Where(document => document.HasUnsavedEdits);
 
@@ -628,11 +650,12 @@ public partial class MainWindow
             if (_document is not { } document) return;
             var surface = Surface;
             if (RefusedForNothingSelected("copy", surface, clearClipboard: true)) return;
-            string? text = surface == EditSurface.List
-                ? document.CopySequences(document.SelectedIndices)
-                : _window.SequenceTimeline.CopySelectionText();
-            if (text is not null) _window.CopyTextToClipboard(text);
+            if (SelectionText(document, surface) is { } text) _window.CopyTextToClipboard(text);
         }
+
+        private string? SelectionText(SequenceDocument document, EditSurface surface) => surface == EditSurface.List
+            ? document.CopySequences(document.SelectedIndices)
+            : _window.SequenceTimeline.CopySelectionText();
 
         /// <summary>
         /// Ctrl+V and Edit &gt; Paste read the clipboard and paste what it holds, whichever pane owns the edit hotkeys
@@ -645,12 +668,24 @@ public partial class MainWindow
             _ = _window.RunGuardedAsync(() => PasteAsync(document), "Paste");
         }
 
-        /// <summary>Ctrl+X and Edit &gt; Cut: copies, then removes, as one undo entry for the removal.</summary>
+        /// <summary>
+        /// Ctrl+X and Edit &gt; Cut: copies, then removes, as one undo entry for the removal. Nothing is removed when the copy
+        /// did not reach the clipboard, which another program may hold.
+        /// </summary>
         public void CutSelection()
         {
+            if (_document is not { } document) return;
             var surface = Surface;
             if (RefusedForNothingSelected("cut", surface, clearClipboard: true)) return;
-            CopySelection();
+            _ = _window.RunGuardedAsync(() => CutAsync(document, surface), "Cut");
+        }
+
+        private async Task CutAsync(SequenceDocument document, EditSurface surface)
+        {
+            if (TopLevel.GetTopLevel(_window)?.Clipboard is not { } clipboard || SelectionText(document, surface) is not { } text) return;
+            await clipboard.SetTextAsync(text);
+            _window.Notifications.HideProblem("⚠ Cut failed");
+            if (document != _document || SelectionText(document, surface) != text) return; // only what was copied is removed
             if (surface == EditSurface.List)
             {
                 DeleteSelected();

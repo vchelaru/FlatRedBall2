@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Numerics;
 
 namespace AnimationEditor.Core.Utilities;
 
-// Ported verbatim from FRB1's FlatRedBall.Utilities.StringFunctions; only the
-// MakeStringUnique overloads (and the GetNumberAtEnd/IncrementNumberAtEnd
-// helpers they depend on) are kept.
+// Ported from FRB1's FlatRedBall.Utilities.StringFunctions; only the
+// MakeStringUnique overloads (and the helpers they depend on) are kept.
 public static class StringFunctions
 {
     public static string MakeStringUnique(string stringToMakeUnique, List<string> stringList)
@@ -31,45 +32,22 @@ public static class StringFunctions
         return stringToMakeUnique;
     }
 
-    private static int GetNumberAtEnd(string stringToGetNumberFrom)
+    private static BigInteger GetNumberAtEnd(string name) =>
+        BigInteger.Parse(name.AsSpan(NumberStart(name)), NumberStyles.None, CultureInfo.InvariantCulture);
+
+    private static string IncrementNumberAtEnd(string name)
     {
-        int letterChecking = stringToGetNumberFrom.Length;
-        do
-        {
-            letterChecking--;
-        } while (letterChecking > -1 && char.IsDigit(stringToGetNumberFrom[letterChecking]));
-
-        if (letterChecking == stringToGetNumberFrom.Length - 1 && !char.IsDigit(stringToGetNumberFrom[letterChecking]))
-        {
-            throw new ArgumentException("The argument string has no number at the end.");
-        }
-
-        return Convert.ToInt32(
-            stringToGetNumberFrom.Substring(letterChecking + 1, stringToGetNumberFrom.Length - letterChecking - 1));
+        int start = NumberStart(name);
+        if (start == name.Length) return name + "1";
+        string number = (GetNumberAtEnd(name) + 1).ToString(CultureInfo.InvariantCulture);
+        return name[..start] + number.PadLeft(name.Length - start, '0');
     }
 
-    private static string IncrementNumberAtEnd(string originalString)
+    // Only 0-9 count as a number, of any length.
+    private static int NumberStart(string name)
     {
-        if (string.IsNullOrEmpty(originalString))
-        {
-            return "1";
-        }
-
-        int letterChecking = originalString.Length;
-        do
-        {
-            letterChecking--;
-        } while (letterChecking > -1 && char.IsDigit(originalString[letterChecking]));
-
-        if (letterChecking == originalString.Length - 1 && !char.IsDigit(originalString[letterChecking]))
-        {
-            originalString = originalString + 1.ToString();
-            return originalString;
-        }
-        string numAtEnd = originalString.Substring(letterChecking + 1, originalString.Length - letterChecking - 1);
-        string baseString = originalString.Remove(letterChecking + 1, originalString.Length - letterChecking - 1);
-        int numAtEndAsInt = Convert.ToInt32(numAtEnd);
-        numAtEndAsInt++;
-        return baseString + numAtEndAsInt.ToString().PadLeft(numAtEnd.Length, '0');
+        int start = name.Length;
+        while (start > 0 && char.IsAsciiDigit(name[start - 1])) start--;
+        return start;
     }
 }

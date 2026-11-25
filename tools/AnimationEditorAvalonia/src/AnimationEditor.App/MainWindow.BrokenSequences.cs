@@ -52,16 +52,12 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// The banner text naming the sequence blocks that played a chain of a file <paramref name="verb"/> (such as "Deleting")
-    /// just removed, or null when none did. <paramref name="removed"/> is each file's path and <see cref="ChainNamesIn"/>.
+    /// The banner text naming the sequence blocks that played a chain of the file just deleted at <paramref name="path"/>,
+    /// or null when none did. <paramref name="chains"/> is its <see cref="ChainNamesIn"/>.
     /// </summary>
-    private async Task<string?> BrokenByRemovedFilesAsync(string verb, IReadOnlyDictionary<string, IReadOnlyCollection<string>> removed)
-    {
-        if (removed.Count == 0) return null;
-        var files = await FindSequenceBlocksAsync(removed.Keys.First(), (sequences, path) => removed
-            .SelectMany(file => SeqjChainUsageScanner.FindMatches(sequences, path, file.Key, file.Value)).ToList());
-        return BrokenSequenceNotice.Message(verb, removed.Keys.ToList(), files);
-    }
+    private async Task<string?> BrokenByDeletedFileAsync(string path, IReadOnlyCollection<string> chains) =>
+        BrokenSequenceNotice.Message("Deleting", path, await FindSequenceBlocksAsync(path,
+            (sequences, seqj) => SeqjChainUsageScanner.FindMatches(sequences, seqj, path, chains)));
 
     private async Task<List<BrokenSequenceFile>> FindSequenceBlocksAsync(
         string animationPath, Func<SequenceListSave, string, IReadOnlyList<SeqjChainMatch>> find)

@@ -48,7 +48,8 @@ public static class RecycleBin
                 MoveToLinuxTrash(absolutePath);
             }
 
-            return null;
+            // A platform call that reports no failure (osascript's exit code) may still have moved nothing.
+            return File.Exists(absolutePath) ? $"Could not move to recycle bin: {absolutePath} is still there." : null;
         }
         catch (Exception ex)
         {

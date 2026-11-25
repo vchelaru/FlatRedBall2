@@ -44,6 +44,34 @@
     <Style Selector="Button.flanker:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource BgActive}"/>
     </Style>
+    <!-- The button that does what a dialog is for, in the app's accent in both themes. -->
+    <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Opacity" Value="0.9"/>
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Opacity" Value="0.8"/>
+    </Style>
+    <!-- A row that opens and closes what is under it. -->
+    <Style Selector="Button.expander">
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="14,0"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.expander /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.expander:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource BgHover}"/>
+    </Style>
+    <Style Selector="Button.expander:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource BgActive}"/>
+    </Style>
     <!-- NumericUpDown: compact, and no chevron spinner anywhere (the app-wide rule; arrow keys and the wheel still step). A field that really needs one opts in with Classes="spinner" and joins the allowlist in NumericSpinnerRuleScenarioTests, never a per-control ShowButtonSpinner. -->
     <Style Selector="NumericUpDown">
         <Setter Property="ShowButtonSpinner" Value="False"/>

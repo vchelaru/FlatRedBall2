@@ -35,7 +35,12 @@ public static class AnimationFileLoader
         if (!path.Exists())
             throw new FileNotFoundException($"Animation chain file not found: {path.FullPath}", path.FullPath);
 
-        var rawContent = File.ReadAllText(path.FullPath);
+        return Parse(File.ReadAllText(path.FullPath), path);
+    }
+
+    /// <summary><see cref="Read"/> of <paramref name="rawContent"/>, the text of the file at <paramref name="path"/>.</summary>
+    internal static AnimationChainListSave Parse(string rawContent, FilePath path)
+    {
         if (AchxConflictMarkerDetector.HasConflictMarkers(rawContent))
             throw new InvalidDataException($"{AchxConflictMarkerDetector.ConflictMarkerMessage} ({path.FullPath})");
 
