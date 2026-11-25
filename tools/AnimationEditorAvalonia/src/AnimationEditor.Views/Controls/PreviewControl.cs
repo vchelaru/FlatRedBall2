@@ -1844,8 +1844,6 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// </summary>
     internal void SetGuides(IReadOnlyList<float> hGuides, IReadOnlyList<float> vGuides)
     {
-        // A guide drag indexes the lists this replaces.
-        _draggedGuideIdx = -1;
         _hGuides.Clear();
         _hGuides.AddRange(hGuides);
         _vGuides.Clear();

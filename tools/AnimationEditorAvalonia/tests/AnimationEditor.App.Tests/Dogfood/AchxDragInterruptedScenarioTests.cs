@@ -312,6 +312,7 @@ public class AchxDragInterruptedScenarioTests
     {
         var (editor, path) = await OpenAsync(WireframeMove);
         using var _ = editor;
+        await editor.WaitAsync(TimeSpan.FromSeconds(0.7)); // past the double-click time, so the press is a click of its own
         Control row = editor.RowFor(editor.ChainNamed("Walk").Frames[0]);
         Point press = editor.PointIn(row, row.Bounds.Width / 2, 8);
         editor.DragHold(press, press);
