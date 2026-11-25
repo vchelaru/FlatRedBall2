@@ -54,9 +54,9 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
                         issues.Add(new(CheckSeverity.Warning, "region-outside-texture", $"Frame {chain.Name}/{f}: {problem}"));
                 }
 
-                if (chain.Frames.Count > 1 && !(frame.FrameLength > 0))
+                if (chain.Frames.Count > 1 && !(frame.FrameLength is > 0 and < float.PositiveInfinity))
                     issues.Add(new(CheckSeverity.Warning, "zero-length-frame",
-                        $"Frame {chain.Name}/{f} has a length of 0 or less in a chain of {chain.Frames.Count} frames."));
+                        $"Frame {chain.Name}/{f} has no length (0, less, or not a number) in a chain of {chain.Frames.Count} frames."));
 
                 var shapes = (frame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? []).ToList();
                 foreach (var shape in shapes)

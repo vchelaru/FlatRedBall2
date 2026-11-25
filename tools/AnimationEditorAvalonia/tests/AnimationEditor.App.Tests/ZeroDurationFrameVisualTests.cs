@@ -15,12 +15,12 @@ namespace AnimationEditor.App.Tests;
 /// <summary>
 /// Visual regression tests for animation frames that have <see cref="AnimationFrameSave.FrameLength"/> = 0.
 ///
-/// The <see cref="PlaybackController"/> handles zero-duration frames by substituting a 0.1 s
-/// fallback so that playback never hangs or crashes. These tests exercise the end-to-end
+/// The <see cref="PlaybackController"/> skips zero-duration frames, as the game does, and never hangs
+/// or crashes. These tests exercise the end-to-end
 /// path through <see cref="PreviewControl"/> to confirm that:
 ///
 ///   1. A single zero-duration frame still renders its texture (not just blank background).
-///   2. A multi-frame chain with all zero-duration frames advances frames correctly.
+///   2. A multi-frame chain with all zero-duration frames shows its last frame, as the game does.
 ///   3. Repeated advances (simulating timer ticks) never crash, even with all-zero durations.
 ///
 /// Important pattern: after calling <c>ctrl.PauseAutoPlayback()</c>, the playback state is
@@ -51,7 +51,6 @@ public class ZeroDurationFrameVisualTests
 
     /// <summary>
     /// A single frame with FrameLength=0 must still render the texture.
-    /// The PlaybackController fallback means this frame is treated as lasting 0.1 s.
     /// Since there is only one frame, playback stays on frame 0 and the texture
     /// should be visible at the canvas centre.
     /// </summary>
@@ -99,13 +98,11 @@ public class ZeroDurationFrameVisualTests
     }
 
     /// <summary>
-    /// A two-frame chain where both frames have FrameLength=0. The PlaybackController
-    /// applies a 0.1 s fallback per frame, giving a total cycle of 0.2 s.
-    /// Advancing 0.15 s should move to frame 1, and RenderToBitmap should show
-    /// frame 1's texture (green), not frame 0's (red).
+    /// A two-frame chain where both frames have FrameLength=0 has no length. Playback shows
+    /// its last frame, as the game does: frame 1's texture (green), not frame 0's (red).
     /// </summary>
     [AvaloniaFact]
-    public void Preview_ZeroDurationMultiFrameChain_Advance_MovesToNextFrame()
+    public void Preview_ZeroDurationMultiFrameChain_ShowsTheLastFrame()
     {
         var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -145,7 +142,7 @@ public class ZeroDurationFrameVisualTests
             ctrl.PauseAutoPlayback();
             ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             ctrl.Playback.Play();               // re-enable after PauseAutoPlayback()
-            ctrl.Playback.Advance(0.15);        // 0.15 > 0.1 fallback → frame 1
+            ctrl.Playback.Advance(0.15);
 
             Assert.Equal(1, ctrl.Playback.CurrentFrameIndex);
 
@@ -154,7 +151,7 @@ public class ZeroDurationFrameVisualTests
             var px = bm.GetPixel(42, 42);
             // LimeGreen = (50, 205, 50). Check green dominates and blue channel is also low.
             Assert.True(px.Green > 150 && px.Blue < 100,
-                $"After advancing past frame 0's fallback duration, centre should be green; R={px.Red} G={px.Green} B={px.Blue}");
+                $"The last frame of a chain of no length: centre should be green; R={px.Red} G={px.Green} B={px.Blue}");
         }
         finally
         {
@@ -167,7 +164,7 @@ public class ZeroDurationFrameVisualTests
 
     /// <summary>
     /// Simulates 100 timer ticks on a chain where both frames have FrameLength=0.
-    /// The fallback handling must keep the loop well-behaved: no exception,
+    /// The loop must be well-behaved: no exception,
     /// no infinite loop, and the frame index always stays within valid bounds.
     /// </summary>
     [AvaloniaFact]
@@ -193,8 +190,7 @@ public class ZeroDurationFrameVisualTests
 
     /// <summary>
     /// A mix: frame 0 has a normal duration (0.1 s) and frame 1 has FrameLength=0
-    /// (which falls back to 0.1 s). Advancing just past frame 1's window should
-    /// loop back to frame 0 and render frame 0's texture (red), not frame 1's.
+    /// (which is skipped). Playback should always render frame 0's texture (red), not frame 1's.
     /// </summary>
     [AvaloniaFact]
     public void Preview_ZeroDurationSecondFrame_LoopBackToFirstFrame()
@@ -237,8 +233,7 @@ public class ZeroDurationFrameVisualTests
             ctrl.Playback.SetChain(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
             ctrl.Playback.Play();
 
-            // Total cycle = 0.1 + 0.1(fallback) = 0.2 s
-            // Advance 0.22 s → wraps to animTime = 0.02 → frame 0 again
+            // The cycle is frame 0's 0.1 s, so 0.22 s is 0.02 s into it.
             ctrl.Playback.Advance(0.22);
 
             Assert.Equal(0, ctrl.Playback.CurrentFrameIndex);
