@@ -70,4 +70,20 @@ public class UnreadableFolderScenarioTests
 
         editor.Control<ProjectPanelControl>("ProjectPanel").TreeRoots.Select(node => node.Name).ShouldContain("hero.achx");
     }
+
+    /// <summary>On Linux the watcher reports an error for the subfolder each time it starts.</summary>
+    [AvaloniaFact]
+    public async Task RescanningAProjectFolder_HoldingAnUnreadableFolder_Ends()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WriteAchx("hero.achx");
+        using var denied = new UnlistableFolder(Path.Combine(editor.ProjectFolder, "denied"));
+        await editor.OpenProjectFolderAsync();
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+        Task last = editor.Window.LastProjectFolderWatcherHandledTask;
+
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        editor.Window.LastProjectFolderWatcherHandledTask.ShouldBeSameAs(last);
+    }
 }

@@ -23,6 +23,32 @@ public class FolderWatcherTests
         return completed == tcs.Task ? tcs.Task.Result : null;
     }
 
+    // Windows stops a watcher whose folder goes away; a share that drops out and comes back does the same.
+    [Fact]
+    public async Task RestartIfStopped_FolderCameBack_IsWatchedAgain()
+    {
+        if (!OperatingSystem.IsWindows()) return; // only Windows stops the watcher
+        string dir = Directory.CreateTempSubdirectory("ae-watch").FullName;
+        using var watcher = new FolderWatcher(AchxFolderScanner.IsAchxPath);
+        var stopped = new TaskCompletionSource();
+        var changed = new TaskCompletionSource();
+        watcher.Overflowed += () => stopped.TrySetResult();
+        watcher.Changed += _ => changed.TrySetResult();
+        watcher.Watch(dir);
+        Directory.Delete(dir);
+        await stopped.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        while (Directory.Exists(dir)) await Task.Delay(10);
+        Directory.CreateDirectory(dir);
+        await Task.Delay(50);
+
+        watcher.RestartIfStopped();
+        File.WriteAllText(Path.Combine(dir, "a.achx"), "");
+
+        await changed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        watcher.Dispose();
+        Directory.Delete(dir, recursive: true);
+    }
+
     [Fact]
     public async Task Changed_DeletingMatchingFile_RaisesDeleted()
     {

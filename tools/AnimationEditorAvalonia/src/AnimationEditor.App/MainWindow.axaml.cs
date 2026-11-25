@@ -3181,6 +3181,11 @@ public partial class MainWindow : Window
     {
         _projectManager.ProjectFolderPath = path;
         _projectFolderWatcher.Watch(path);
+        return await ScanProjectFolderAsync(path);
+    }
+
+    private async Task<int> ScanProjectFolderAsync(string path)
+    {
         var rootFolder = new DiskEditorFolder(path);
         var scan = await AchxFolderScanner.ScanProjectAsync(rootFolder);
         var entries = scan.Files;
@@ -3233,7 +3238,7 @@ public partial class MainWindow : Window
         if (_projectManager.ProjectFolderPath is null) return;
 
         // A create or delete changes tree *structure*, not just a thumbnail -- and a full rescan
-        // is exactly what LoadProjectFolderAsync already does on every Open Project Folder, so
+        // is exactly what ScanProjectFolderAsync already does on every Open Project Folder, so
         // reuse it rather than hand-rolling incremental tree add/remove. Detected from ground
         // truth (does the path exist on disk / is it already a tree node) rather than the
         // coalesced WatcherChangeType: a brand-new file's Create is immediately followed by a
@@ -3245,7 +3250,8 @@ public partial class MainWindow : Window
             !File.Exists(c.Path) || FindProjectPanelEntry(ProjectPanel.TreeRoots, c.Path) is null);
         if (structureChanged)
         {
-            await LoadProjectFolderAsync(_projectManager.ProjectFolderPath);
+            _projectFolderWatcher.RestartIfStopped();
+            await ScanProjectFolderAsync(_projectManager.ProjectFolderPath);
             return;
         }
 
