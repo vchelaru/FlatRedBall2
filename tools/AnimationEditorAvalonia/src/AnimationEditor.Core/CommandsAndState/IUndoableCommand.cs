@@ -43,6 +43,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// </summary>
         string? CoalesceGroup => null;
 
+        /// <summary>Whether the edit is to the open animation document. False for a sequence, which leaves that document open behind it.</summary>
+        bool EditsAnimations => true;
+
         /// <summary>
         /// Called on the command that was just executed (<c>this</c>, already applied via
         /// <see cref="Do"/>) when it shares <see cref="CoalesceGroup"/> with the command still on

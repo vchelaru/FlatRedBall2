@@ -8,10 +8,14 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// Manages unlimited undo/redo history for the animation editor.
     /// Mutate project state by passing a command to <see cref="Execute"/>.
     /// </summary>
-    public class UndoManager : IUndoManager
+    /// <param name="projectManager">
+    /// Whose native-tsx state every animation edit's undo and redo bring back: which tile each animation is on is
+    /// decided at every save, so undoing only the edit would not give a tile back. Null when only sequences are edited.
+    /// </param>
+    public class UndoManager(IProjectManager? projectManager = null) : IUndoManager
     {
-        private readonly Stack<IUndoableCommand> _undoStack = new();
-        private readonly Stack<IUndoableCommand> _redoStack = new();
+        private readonly Stack<UndoEntry> _undoStack = new();
+        private readonly Stack<UndoEntry> _redoStack = new();
         private SaveState _saveState = SaveState.Unsaved;
         private string? _openCoalesceGroup;
 
@@ -20,10 +24,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public SaveState SaveState => _saveState;
 
         /// <inheritdoc cref="IUndoManager.UndoHistory"/>
-        public IReadOnlyList<IUndoableCommand> UndoHistory => _undoStack.Reverse().ToList();
+        public IReadOnlyList<IUndoableCommand> UndoHistory => _undoStack.Reverse().Select(e => e.Command).ToList();
 
         /// <inheritdoc cref="IUndoManager.RedoHistory"/>
-        public IReadOnlyList<IUndoableCommand> RedoHistory => _redoStack.ToList();
+        public IReadOnlyList<IUndoableCommand> RedoHistory => _redoStack.Select(e => e.Command).ToList();
 
         /// <summary>Raised after <see cref="Execute"/>, <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
         public event Action? StackChanged;
@@ -31,23 +35,35 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// <inheritdoc cref="IUndoManager.Execute"/>
         public void Execute(IUndoableCommand cmd)
         {
+            var tsxBefore = CaptureTsx(cmd);
             if (!cmd.Do()) return;
 
             if (cmd.CoalesceGroup is { } group && group == _openCoalesceGroup &&
-                _undoStack.Count > 0 && _undoStack.Peek().CoalesceGroup == group)
+                _undoStack.Count > 0 && _undoStack.Peek().Command.CoalesceGroup == group)
             {
-                cmd = cmd.CoalesceWith(_undoStack.Pop());
+                var previous = _undoStack.Pop();
+                cmd = cmd.CoalesceWith(previous.Command);
+                tsxBefore = previous.TsxBefore;
             }
             _openCoalesceGroup = cmd.CoalesceGroup;
-            Record(cmd);
+            Push(cmd, tsxBefore);
         }
 
         /// <inheritdoc cref="IUndoManager.Record"/>
-        public void Record(IUndoableCommand cmd)
+        public void Record(IUndoableCommand cmd) => Push(cmd, CaptureTsx(cmd));
+
+        private void Push(IUndoableCommand cmd, object? tsxBefore)
         {
-            _undoStack.Push(cmd);
+            _undoStack.Push(new UndoEntry(cmd, tsxBefore));
             _redoStack.Clear();
             StackChanged?.Invoke();
+        }
+
+        private object? CaptureTsx(IUndoableCommand cmd) => cmd.EditsAnimations ? projectManager?.CaptureTsxState() : null;
+
+        private void RestoreTsx(object? state)
+        {
+            if (state is not null) projectManager!.RestoreTsxState(state);
         }
 
         /// <inheritdoc cref="IUndoManager.SealCoalescing"/>
@@ -57,9 +73,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public void Undo()
         {
             if (!CanUndo) return;
-            var cmd = _undoStack.Pop();
-            cmd.Undo();
-            _redoStack.Push(cmd);
+            var entry = _undoStack.Pop();
+            var tsxAfter = CaptureTsx(entry.Command);
+            // First, because the command saves the document.
+            RestoreTsx(entry.TsxBefore);
+            entry.Command.Undo();
+            _redoStack.Push(entry with { TsxAfter = tsxAfter });
             _openCoalesceGroup = null;
             StackChanged?.Invoke();
         }
@@ -68,9 +87,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public void Redo()
         {
             if (!CanRedo) return;
-            var cmd = _redoStack.Pop();
-            cmd.Redo();
-            _undoStack.Push(cmd);
+            var entry = _redoStack.Pop();
+            RestoreTsx(entry.TsxAfter);
+            entry.Command.Redo();
+            _undoStack.Push(entry);
             _openCoalesceGroup = null;
             StackChanged?.Invoke();
         }
@@ -93,8 +113,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             _undoStack.Clear();
             // UndoStack is oldest-first; pushing in that order leaves newest on top.
-            foreach (var cmd in snapshot.UndoStack)
-                _undoStack.Push(cmd);
+            foreach (var entry in snapshot.UndoStack)
+                _undoStack.Push(entry);
             _redoStack.Clear();
             // RedoStack is stored LIFO (next-to-redo first); push in reverse to restore that order.
             for (int i = snapshot.RedoStack.Count - 1; i >= 0; i--)

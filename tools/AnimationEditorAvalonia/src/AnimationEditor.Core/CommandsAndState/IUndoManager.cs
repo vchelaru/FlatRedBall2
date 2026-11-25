@@ -55,7 +55,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// redo stack. Reserved for interactive-gesture commands (shape drag/resize, region
         /// drag) whose mutation is applied incrementally during the gesture and committed on
         /// release — for those, <see cref="Execute"/> does not fit. Everything else must go
-        /// through <see cref="Execute"/>.
+        /// through <see cref="Execute"/>. Call it before anything saves the document.
         /// </summary>
         void Record(IUndoableCommand cmd);
 
