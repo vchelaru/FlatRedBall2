@@ -8251,10 +8251,6 @@ public partial class MainWindow : Window
             SyncPendingCutHighlights();
         }
 
-        bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit, _projectManager.GetTextureSizeInPixels,
-            out var chains, out var frames, out var shapes);
-        if (!ok) return;
-
         var acls = _projectManager.AnimationChainListSave;
         if (acls is null) return;
 
@@ -8267,6 +8263,14 @@ public partial class MainWindow : Window
             _pendingCutState.Clear();
             SyncPendingCutHighlights();
         }
+        // The cut items may have been edited since: they move as they are now, not as the clipboard has them.
+        if (completingCutAcrossDocuments && CutSourceTab() is { } sourceTab)
+            text = ClipboardPayload.SerializeFromPayload(_pendingCutState.Payload!, FrameLengthUnit.Of(_pendingCutState.SourceDocument),
+                IsUntitledTab(sourceTab) ? null : sourceTab.Path.GetDirectoryContainingThis().FullPath);
+
+        bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit, _projectManager.GetTextureSizeInPixels,
+            out var chains, out var frames, out var shapes);
+        if (!ok) return;
 
         if (chains is { Count: > 0 })
         {
@@ -8355,7 +8359,7 @@ public partial class MainWindow : Window
     {
         if (!_appCommands.LastSaveStored(pastedInto)) return;
         var source = _pendingCutState.SourceDocument;
-        var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
+        var sourceTab = CutSourceTab();
         if (source is null || sourceTab is null) return;
         var namesBefore = source.AnimationChains.Select(chain => chain.Name).ToList();
         if (!_appCommands.CutFromBackgroundTab(sourceTab, _pendingCutState)) return; // all of them in locked chains
@@ -8365,6 +8369,11 @@ public partial class MainWindow : Window
         WarnAboutBrokenSequences(sourceTab.Path.FullPath, new RemovedChainNames(source, "Cutting",
             namesBefore.Except(source.AnimationChains.Select(chain => chain.Name)).ToList()));
     }
+
+    /// <summary>The background tab the pending cut was made in, or null when it was closed since.</summary>
+    private TabEntry? CutSourceTab() => _pendingCutState.SourceDocument is { } source
+        ? _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source))
+        : null;
 
     private void SyncPendingCutHighlights()
     {

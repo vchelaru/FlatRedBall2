@@ -38,6 +38,7 @@ public interface IPendingCutState
     event Action? Changed;
 
     bool IsActive { get; }
+    CopySelectionPayload? Payload { get; }
     CopySelectionKind? Kind { get; }
     IReadOnlyList<AnimationChainSave> Chains { get; }
     IReadOnlyList<AnimationFrameSave> Frames { get; }
@@ -79,34 +80,34 @@ public interface IPendingCutState
 
 public sealed class PendingCutState : IPendingCutState
 {
-    private CopySelectionPayload? _payload;
     private string? _clipboardText;
 
     public event Action? Changed;
 
-    public bool IsActive => _payload is not null;
-    public CopySelectionKind? Kind => _payload?.Kind;
-    public IReadOnlyList<AnimationChainSave> Chains => _payload?.Chains ?? [];
-    public IReadOnlyList<AnimationFrameSave> Frames => _payload?.Frames ?? [];
-    public IReadOnlyList<object> Shapes => _payload?.Shapes ?? [];
+    public CopySelectionPayload? Payload { get; private set; }
+    public bool IsActive => Payload is not null;
+    public CopySelectionKind? Kind => Payload?.Kind;
+    public IReadOnlyList<AnimationChainSave> Chains => Payload?.Chains ?? [];
+    public IReadOnlyList<AnimationFrameSave> Frames => Payload?.Frames ?? [];
+    public IReadOnlyList<object> Shapes => Payload?.Shapes ?? [];
     public AnimationChainListSave? SourceDocument { get; private set; }
 
     public IReadOnlyList<AnimationFrameSave> WireframeFrames =>
-        _payload?.Kind switch
+        Payload?.Kind switch
         {
-            CopySelectionKind.Chain => _payload.Chains.SelectMany(c => c.Frames).ToList(),
-            CopySelectionKind.Frame => _payload.Frames,
+            CopySelectionKind.Chain => Payload.Chains.SelectMany(c => c.Frames).ToList(),
+            CopySelectionKind.Frame => Payload.Frames,
             _ => [],
         };
 
     public IReadOnlyList<object> WireframeShapes =>
-        _payload?.Kind == CopySelectionKind.Shape ? _payload.Shapes : [];
+        Payload?.Kind == CopySelectionKind.Shape ? Payload.Shapes : [];
 
-    public bool IsOnClipboard(string? clipboardText) => _payload is not null && clipboardText == _clipboardText;
+    public bool IsOnClipboard(string? clipboardText) => Payload is not null && clipboardText == _clipboardText;
 
     public void Set(CopySelectionPayload payload, AnimationChainListSave sourceDocument, string clipboardText)
     {
-        _payload = payload;
+        Payload = payload;
         _clipboardText = clipboardText;
         SourceDocument = sourceDocument;
         Changed?.Invoke();
@@ -114,37 +115,37 @@ public sealed class PendingCutState : IPendingCutState
 
     public void Clear()
     {
-        if (_payload is null) return;
-        _payload = null;
+        if (Payload is null) return;
+        Payload = null;
         _clipboardText = null;
         SourceDocument = null;
         Changed?.Invoke();
     }
 
     public bool Contains(object data) =>
-        _payload?.Kind switch
+        Payload?.Kind switch
         {
-            CopySelectionKind.Chain => data is AnimationChainSave c && _payload.Chains.Contains(c),
-            CopySelectionKind.Frame => data is AnimationFrameSave f && _payload.Frames.Contains(f),
-            CopySelectionKind.Shape => _payload.Shapes.Contains(data),
+            CopySelectionKind.Chain => data is AnimationChainSave c && Payload.Chains.Contains(c),
+            CopySelectionKind.Frame => data is AnimationFrameSave f && Payload.Frames.Contains(f),
+            CopySelectionKind.Shape => Payload.Shapes.Contains(data),
             _ => false,
         };
 
     public bool SourcesBelongToProject(AnimationChainListSave? acls)
     {
-        if (_payload is null || acls is null) return false;
-        return _payload.Kind switch
+        if (Payload is null || acls is null) return false;
+        return Payload.Kind switch
         {
-            CopySelectionKind.Chain => _payload.Chains.All(acls.AnimationChains.Contains),
-            CopySelectionKind.Frame => _payload.Frames.All(f => ChainContaining(acls, f) is not null),
-            CopySelectionKind.Shape => _payload.Shapes.All(s => FrameContaining(acls, s) is not null),
+            CopySelectionKind.Chain => Payload.Chains.All(acls.AnimationChains.Contains),
+            CopySelectionKind.Frame => Payload.Frames.All(f => ChainContaining(acls, f) is not null),
+            CopySelectionKind.Shape => Payload.Shapes.All(s => FrameContaining(acls, s) is not null),
             _ => false,
         };
     }
 
     public CutCompletion ResolveCompletion(AnimationChainListSave? activeAcls)
     {
-        if (_payload is null) return CutCompletion.None;
+        if (Payload is null) return CutCompletion.None;
         if (SourcesBelongToProject(activeAcls)) return CutCompletion.SameDocument;
         if (SourceDocument is { } src && !ReferenceEquals(src, activeAcls) && SourcesBelongToProject(src))
             return CutCompletion.CrossDocument;
