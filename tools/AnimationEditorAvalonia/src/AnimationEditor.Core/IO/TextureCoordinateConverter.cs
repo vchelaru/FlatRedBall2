@@ -97,8 +97,21 @@ internal static class TextureCoordinateConverter
         return TryReadPngSize(path);
     };
 
-    private static FrameRegion ToPixels(FrameRegion uv, (int Width, int Height) size) =>
-        new(uv.Left * size.Width, uv.Top * size.Height, uv.Right * size.Width, uv.Bottom * size.Height);
+    private static FrameRegion ToPixels(FrameRegion uv, (int Width, int Height) size)
+    {
+        return new(Edge(uv.Left, size.Width), Edge(uv.Top, size.Height), Edge(uv.Right, size.Width), Edge(uv.Bottom, size.Height));
+
+        // A whole pixel's fraction is a rounded float, so it multiplies back to a little off that pixel (#2190). One rounding
+        // is off by at most 2^-24 of the texture (of the edge, when that is past it). Two are allowed: an edge stored as
+        // left + width has both. Anything further off was stored as a fraction of a pixel.
+        static float Edge(float fraction, int length)
+        {
+            double pixel = (double)fraction * length;
+            double whole = Math.Round(pixel);
+            double floatError = Math.Max(length, Math.Abs(pixel)) * Math.Pow(2, -23);
+            return (float)(Math.Abs(pixel - whole) <= floatError ? whole : pixel);
+        }
+    }
 
     private static FrameRegion ToUv(FrameRegion pixels, (int Width, int Height) size) =>
         new(pixels.Left / size.Width, pixels.Top / size.Height, pixels.Right / size.Width, pixels.Bottom / size.Height);

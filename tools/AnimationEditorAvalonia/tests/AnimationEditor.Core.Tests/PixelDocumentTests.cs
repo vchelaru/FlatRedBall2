@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -292,6 +293,92 @@ public class PixelDocumentTests : IDisposable
         var recovered = _ctx.IoManager.TryReadRecoveryFile(_ctx.IoManager.RecoveryFilePath)!;
 
         Region(recovered.AnimationChains[0].Frames[0]).ShouldBe((16f, 0f, 32f, 24f));
+    }
+
+    // #2190: pixel 32 as a fraction of these sizes comes back as 31.999998.
+    [Theory]
+    [InlineData(41, 47)]
+    [InlineData(100, 83)]
+    [InlineData(164, 97)]
+    [InlineData(300, 1023)]
+    [InlineData(64, 110)]
+    public async Task OpenAchxWorkflowAsync_UvFileConverted_SavesWholePixels(int width, int height)
+    {
+        WritePng("sheet.png", width, height);
+        (float, float, float, float)[] regions = [(5, 7, 15, 32), (13, 14, 27, 30), (32, 32, 41, 47)];
+        var path = PathOf("old.achx");
+        UvList([.. regions.Select(r => Frame("sheet.png",
+            r.Item1 / width, r.Item2 / height, r.Item3 / width, r.Item4 / height))]).Save(path);
+        _ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+
+        (await _ctx.AppCommands.OpenAchxWorkflowAsync(path)).ShouldBeTrue();
+
+        SaveAndRead(path).Select(Region).ShouldBe(regions);
+        File.ReadAllText(path).ShouldNotContain(".99999");
+    }
+
+    // Edges past the texture count too, and one built as left + width, the way FRB1's Aseprite import does.
+    [Theory]
+    [InlineData(48)]
+    [InlineData(97)]
+    [InlineData(1000)]
+    [InlineData(1023)]
+    [InlineData(4096)]
+    [InlineData(5000)]
+    public void ToPixels_EveryWholePixelEdge_IsThatPixel(int size)
+    {
+        int[] pixels = [.. Enumerable.Range(-size, 3 * size)];
+        var list = UvList([.. pixels.Select(p =>
+            Frame("sheet.png", (float)p / size, 1f - (float)p / size, (float)p / size + 7f / size, 0f))]);
+
+        TextureCoordinateConverter.ToPixels(list, _ => (size, size));
+
+        list.AnimationChains[0].Frames.Select(Region).ShouldBe(pixels.Select(p => ((float)p, (float)(size - p), (float)(p + 7), 0f)));
+    }
+
+    [Theory]
+    [InlineData(64, 96)]
+    [InlineData(37, 53)]
+    [InlineData(1023, 5000)]
+    public void SaveAnimationChainList_PixelsWrittenAsUv_AreTheSamePixelsWhenReopened(int width, int height)
+    {
+        WritePng("sheet.png", width, height);
+        AnimationFrameSave[] frames = [.. Enumerable.Range(0, Math.Max(width, height) + 1)
+            .Select(p => Frame("sheet.png", Math.Min(p, width), Math.Min(p, height), width, height))];
+        var path = WriteFile("hero.achx", frames);
+        Open(path);
+
+        _ctx.ProjectManager.OnDiskCoordinateType = TextureCoordinateType.UV;
+        _ctx.ProjectManager.SaveAnimationChainList(path);
+
+        AnimationChainListSave.FromFile(path).CoordinateType.ShouldBe(TextureCoordinateType.UV);
+        Open(path).Select(Region).ShouldBe(frames.Select(Region));
+    }
+
+    // The 3-decimal fraction is the rounding of 32 / 96 by hand, not float error.
+    [Theory]
+    [InlineData(12.5f / 64, 64, 12.5f)]
+    [InlineData(12.3f / 64, 64, 12.3f)]
+    [InlineData(31.999f / 64, 64, 31.999f)]
+    [InlineData(2000.01f / 4096, 4096, 2000.01f)]
+    [InlineData(0.333f, 96, 0.333f * 96)]
+    [InlineData(0.33333f, 96, 0.33333f * 96)]
+    public void ToPixels_FractionalEdge_KeepsItsValue(float uv, int size, float pixels)
+    {
+        var list = UvList(Frame("sheet.png", uv, uv, uv, uv));
+
+        TextureCoordinateConverter.ToPixels(list, _ => (size, size));
+
+        Region(list.AnimationChains[0].Frames[0]).ShouldBe((pixels, pixels, pixels, pixels));
+    }
+
+    private static AnimationChainListSave UvList(params AnimationFrameSave[] frames)
+    {
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.AddRange(frames);
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        list.AnimationChains.Add(chain);
+        return list;
     }
 
     // ── Clipboard ──
