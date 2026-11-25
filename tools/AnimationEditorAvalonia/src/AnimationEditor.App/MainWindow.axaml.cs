@@ -485,6 +485,13 @@ public partial class MainWindow : Window
         _undoManager.StackChanged += () =>
         {
             if (_suppressPreviewPromotion) return;
+            // The first edit with no tab open (Add Animation, a paste) is a new document. Without its tab it would be
+            // in no list, and every way out would drop it without asking (#898, #2184).
+            if (_tabManager.ActiveTab is null)
+            {
+                _tabController.EnsureCurrentDocumentHasTab(_projectManager);
+                WireframeCtrl.RememberLiveCamera(); // the document stays on screen, so its tab starts with this camera
+            }
             if (_tabManager.ActiveTab is { IsPreview: true } active)
             {
                 _tabManager.Promote(active.Path);
@@ -754,12 +761,9 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Snapshots the active tab before another one replaces it, and returns it for <see cref="ShowActiveTabAsync"/>.
-    /// Content made with no tab open (a paste, a dropped image) gets its tab first, so it is snapshotted too.
     /// </summary>
     private TabEntry? CaptureLeavingActiveTab()
     {
-        if (_tabManager.ActiveTab is null)
-            _tabController.EnsureCurrentDocumentHasTab(_projectManager);
         if (_tabManager.ActiveTab is { } leaving)
             PaneFor(leaving).CaptureLeaving(leaving);
         return _tabManager.ActiveTab;
@@ -3065,9 +3069,6 @@ public partial class MainWindow : Window
 
     private async Task CloseProjectFolderAsync()
     {
-        // Content made with no tab open is an Untitled document: it stays, with its recovery file.
-        if (_tabManager.ActiveTab is null)
-            _tabController.EnsureCurrentDocumentHasTab(_projectManager);
         if (_projectManager.ProjectFolderPath is { } folder)
         {
             if (_confirmingClose) return;
@@ -4058,11 +4059,6 @@ public partial class MainWindow : Window
 
         var chain = _appCommands.AddNewAnimationChain();
         if (chain is null) return;
-
-        // #898: a project with zero open tabs (empty Open Project Folder, or the last tab was
-        // just closed) would otherwise add this chain with no tab visible for it.
-        _tabController.EnsureCurrentDocumentHasTab(_projectManager);
-        RebuildTabStrip();
 
         Dispatcher.UIThread.Post(() =>
         {
