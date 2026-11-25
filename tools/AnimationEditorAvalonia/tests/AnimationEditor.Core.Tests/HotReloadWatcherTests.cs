@@ -1,6 +1,7 @@
 using AnimationEditor.Core.HotReload;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -266,6 +267,123 @@ public class HotReloadWatcherTests
             File.WriteAllText(source, "two");
 
             Assert.True(await WaitForAsync(() => !changed.IsEmpty));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    // A file that stays unreadable is reported after a while (its consumer says it cannot be read), not retried forever.
+    [Fact]
+    public async Task PngChangedOnDisk_FileStaysUnreadable_RaisedOnce()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var achx = Path.Combine(root, "hero.achx");
+            var png = Path.Combine(root, "sheet.png");
+            File.WriteAllText(achx, "");
+            File.WriteAllText(png, "one");
+            using var watcher = new HotReloadWatcher { UnreadableLimitMs = 500 };
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.PngChangedOnDisk += changed.Enqueue;
+            watcher.StartWatching(achx, new[] { png });
+
+            using (var held = new FileStream(png, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                held.Write(new byte[] { 4, 5, 6 });
+                held.Flush(true);
+                await Task.Delay(2500);
+                Assert.Single(changed);
+            }
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    // The main file's folder counts too: renamed away is the file deleted, renamed back is the file changed.
+    [Fact]
+    public async Task MainFilesFolder_RenamedAwayAndBack_RaisesDeletedThenChanged()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var project = Directory.CreateDirectory(Path.Combine(root, "project")).FullName;
+            var achx = Path.Combine(project, "hero.achx");
+            File.WriteAllText(achx, "one");
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            var deleted = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.AchxChangedOnDisk += changed.Enqueue;
+            watcher.AchxDeletedOnDisk += deleted.Enqueue;
+            watcher.StartWatching(achx, System.Array.Empty<string>());
+
+            Directory.Move(project, project + ".away");
+            Assert.True(await WaitForAsync(() => !deleted.IsEmpty));
+            Directory.Move(project + ".away", project);
+            Assert.True(await WaitForAsync(() => !changed.IsEmpty));
+            Assert.Single(deleted);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    public enum FolderChange { Created, DeletedAndCreatedAgain, DeletedThenCreatedAgainLater, RenamedOver }
+
+    // #2087: a texture's folder that is not there when watching starts, or is not the same folder later (git checkout).
+    [Theory]
+    [InlineData("art", FolderChange.Created)]
+    [InlineData("art/heroes", FolderChange.Created)]
+    [InlineData("art", FolderChange.DeletedAndCreatedAgain)]
+    [InlineData("art/heroes", FolderChange.DeletedAndCreatedAgain)]
+    [InlineData("art/heroes", FolderChange.DeletedThenCreatedAgainLater)]
+    [InlineData("art", FolderChange.RenamedOver)]
+    public async Task WatchedFolder_ThatChanges_ItsFilesAreWatched(string folder, FolderChange change)
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var seqj = Path.Combine(root, "boss.seqj");
+            File.WriteAllText(seqj, "{}");
+            var art = Path.Combine(root, folder);
+            var png = Path.Combine(art, "sheet.png");
+            var source = Path.Combine(art, "hero.achj");
+            if (change != FolderChange.Created) WriteBoth("one");
+            using var watcher = new HotReloadWatcher();
+            var changed = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            watcher.PngChangedOnDisk += changed.Enqueue;
+            watcher.SourceChangedOnDisk += changed.Enqueue;
+            watcher.StartWatching(seqj, new[] { png });
+            watcher.UpdateSourceList(new[] { source });
+
+            if (change == FolderChange.RenamedOver)
+            {
+                Directory.Move(art, art + ".old");
+                Directory.CreateDirectory(art + ".new");
+                File.WriteAllText(Path.Combine(art + ".new", "sheet.png"), "two");
+                File.WriteAllText(Path.Combine(art + ".new", "hero.achj"), "two");
+                Directory.Move(art + ".new", art);
+            }
+            else
+            {
+                if (change != FolderChange.Created) Directory.Delete(Path.Combine(root, "art"), true);
+                if (change == FolderChange.DeletedThenCreatedAgainLater)
+                {
+                    await Task.Delay(800);
+                    changed.Clear();
+                }
+                WriteBoth("two");
+            }
+            Assert.True(await WaitForAsync(BothChanged), "the files of the new folder are new");
+            await Task.Delay(600);
+            changed.Clear();
+
+            WriteBoth("three");
+            Assert.True(await WaitForAsync(BothChanged), "the new folder is watched");
+
+            bool BothChanged() => changed.Any(f => f.EndsWith("sheet.png")) && changed.Any(f => f.EndsWith("hero.achj"));
+            void WriteBoth(string content)
+            {
+                Directory.CreateDirectory(art);
+                File.WriteAllText(png, content);
+                File.WriteAllText(source, content);
+            }
         }
         finally { Directory.Delete(root, true); }
     }

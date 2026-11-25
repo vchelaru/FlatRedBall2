@@ -34,7 +34,7 @@ public class AppCommandsLoadTests : IDisposable
     private string WriteAchxWithFrame(string chainName, string textureName)
     {
         var path = Path.Combine(_dir.Path, "test.achx");
-        var acls = new AnimationChainListSave();
+        var acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         var chain = new AnimationChainSave { Name = chainName };
         chain.Frames.Add(new AnimationFrameSave { TextureName = textureName, FrameLength = 0.1f });
         acls.AnimationChains.Add(chain);

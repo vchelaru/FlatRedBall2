@@ -77,6 +77,35 @@ public class TextureCopyScenarioTests : IDisposable
         File.ReadAllBytes(existing).ShouldBe(File.ReadAllBytes(outside));
     }
 
+    // #2076: the two files cannot be compared, so the failure comes before the copy question.
+    [AvaloniaFact]
+    public async Task PngDrop_SameNamedFileBesideAchxInUse_SaysSo_AndRetryAsksAndApplies()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string outside = WriteOutsidePng("hero.png", SKColors.Blue);
+        string existing = Path.Combine(editor.ProjectFolder, "hero.png");
+        // The same length, so the bytes are compared.
+        File.Copy(outside, existing);
+        string path = editor.WriteAchx("anim.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        await editor.OpenAsync(path);
+        AnimationChainSave walk = editor.ChainNamed("Walk");
+        MethodInfo drop = typeof(MainWindow).GetMethod("HandlePngDropAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        using (new FileStream(existing, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            (await (Task<bool>)drop.Invoke(editor.Window, new object?[] { walk, walk.Frames[0], outside, false })!).ShouldBeFalse();
+        string? problem = editor.ProblemText;
+        string textureWhileInUse = walk.Frames[0].TextureName;
+        editor.Dialogs.AnswerNextEditorDialog(content => ClickButton(content, "Use the identical", new List<string>()));
+        editor.Layout();
+        editor.Click(editor.Notifications.ErrorBannerRetryBtn);
+        await editor.WaitUntilAsync(() => walk.Frames[0].TextureName == "hero.png", TimeSpan.FromSeconds(5));
+
+        problem.ShouldNotBeNull().ShouldStartWith("Could not copy: ");
+        textureWhileInUse.ShouldBe("sheet.png");
+        walk.Frames[0].TextureName.ShouldBe("hero.png");
+    }
+
     private string WriteOutsidePng(string name, SKColor color)
     {
         Directory.CreateDirectory(_outsideFolder);
