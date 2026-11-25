@@ -4061,9 +4061,9 @@ public partial class MainWindow : Window
             var target = ResolveFrameDrop(e, drag);
             if (target.IsValid)
             {
-                // Another size stays droppable so the drop can explain why it is refused.
+                // A refused frame stays droppable so the drop can explain why.
                 e.DragEffects = DragDropEffects.Move;
-                if (TsxEdit.CheckFrameSize(_projectManager, target.Chain!, drag.Frames) is null) ShowFrameDropIndicator(e);
+                if (TsxEdit.CheckFrameDrag(_projectManager, drag.SourceChain!, target.Chain!, drag.Frames, target.InsertIndex) is null) ShowFrameDropIndicator(e);
                 else RemoveFrameDropIndicators();
             }
             else
@@ -4138,8 +4138,8 @@ public partial class MainWindow : Window
             var target = ResolveFrameDrop(e, drag);
             if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
             {
-                if (TsxEdit.CheckFrameSize(_projectManager, target.Chain, drag.Frames) is { } otherSize)
-                    ShowProblem($"⚠ {otherSize.Errors[0]}");
+                if (TsxEdit.CheckFrameDrag(_projectManager, drag.SourceChain, target.Chain, drag.Frames, target.InsertIndex) is { } refused)
+                    ShowProblem($"⚠ {refused.Errors[0]}");
                 else
                     _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
             }
@@ -8275,10 +8275,12 @@ public partial class MainWindow : Window
                 acls, selectedData, _objectFinder, _selectedState);
             if (targetChain is null) return;
 
-            IReadOnlyList<AnimationFrameSave> incoming = cutCompletion == CutCompletion.SameDocument ? _pendingCutState.Frames : frames;
-            if (TsxEdit.CheckFrameSize(_projectManager, targetChain, incoming) is { } otherSize)
+            EditResult? refused = cutCompletion == CutCompletion.SameDocument
+                ? TsxEdit.CheckFrameMove(_projectManager, targetChain, _pendingCutState.Frames, insertIndex ?? targetChain.Frames.Count)
+                : TsxEdit.CheckFrameSize(_projectManager, targetChain, frames);
+            if (refused is not null)
             {
-                ShowProblem($"⚠ {otherSize.Errors[0]}");
+                ShowProblem($"⚠ {refused.Errors[0]}");
                 return;
             }
 

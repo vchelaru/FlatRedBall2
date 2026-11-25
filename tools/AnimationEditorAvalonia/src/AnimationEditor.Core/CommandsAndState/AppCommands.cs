@@ -206,6 +206,9 @@ namespace AnimationEditor.Core.CommandsAndState
         private bool IsFrameSizeBlocked(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames) =>
             Tiled.TsxFrameSize.Refusal(_pm, chain, frames) is not null;
 
+        private bool IsMoveBlocked(AnimationChainSave target, IReadOnlyList<AnimationFrameSave> frames, int insertIndex) =>
+            Tiled.TsxFrameMove.Refusal(_pm, target, frames, insertIndex) is not null;
+
         /// <summary>A frame showing the open tsx's tile 0, or null in an achx/achj project.</summary>
         private AnimationFrameSave? FirstTsxTileFrame()
         {
@@ -1488,7 +1491,8 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveFrames(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave sourceChain, AnimationChainSave targetChain, int insertIndex)
         {
-            if (frames.Count == 0 || IsChainLocked(sourceChain) || IsChainLocked(targetChain) || IsFrameSizeBlocked(targetChain, frames)) return;
+            if (frames.Count == 0 || IsChainLocked(sourceChain) || IsChainLocked(targetChain)) return;
+            if (IsMoveBlocked(targetChain, MoveFramesCommand.InOrder(frames, sourceChain), insertIndex)) return;
             _undoManager.Execute(new MoveFramesCommand(
                 frames, sourceChain, targetChain, insertIndex, this, _events, _selectedState));
         }
@@ -2884,7 +2888,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
                 .Where(x => x.Chain is not null)
                 .ToList();
-            if (sources.Count == 0 || IsChainLocked(targetChain) || IsFrameSizeBlocked(targetChain, frames)) return;
+            if (sources.Count == 0 || IsChainLocked(targetChain) || IsMoveBlocked(targetChain, frames, insertIndex ?? targetChain.Frames.Count)) return;
 
             // A locked chain keeps its frames, so the paste gets copies of them.
             var block = sources

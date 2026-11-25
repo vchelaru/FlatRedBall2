@@ -515,23 +515,13 @@ namespace AnimationEditor.Core
         /// </summary>
         public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => _tsx?.ChainsNotFullySaved ?? new HashSet<AnimationChainSave>();
 
-        /// <summary>
-        /// Writes a tsx document to <paramref name="target"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and
-        /// <see cref="Tiled.NativeTsxAnimationSync"/>. Returns its state after the save. <paramref name="warnings"/>: every chain's mapping warning -- a
-        /// chain that couldn't be mapped (bad geometry, wrong texture, etc.) keeps whatever it last wrote to its tile
-        /// untouched rather than being cleared -- plus one per chain carrying data the format
-        /// can't hold (<see cref="Tiled.TsxLossyDataCheck"/>; that chain IS written, minus that
-        /// data). A caller should surface these to the user instead of assuming the save fully
-        /// captured every edit.
-        /// </summary>
-        /// <remarks>Same all-or-nothing invariant as <see cref="LoadTsxProject"/>: <see
-        /// cref="Tiled.NativeTsxAnimationSync.Apply"/> runs against a working copy (<see
-        /// cref="Tiled.NativeTsxAnimationSync.CloneForSave"/>), which is in the returned state only
-        /// after <see cref="Tiled.TsxWriter"/> has actually
-        /// succeeded -- so a write failure (a disk/permissions error)
-        /// can't leave the in-memory tileset reflecting computed-but-never-persisted state.</remarks>
-        private static TsxState SaveTsx(
-            AnimationChainListSave acls, TsxState state, FilePath target, out IReadOnlyList<string> warnings)
+        /// <inheritdoc/>
+        public IReadOnlyList<Tiled.MultiTileMappingResult> MapTsxForSave() =>
+            _tsx == null || AnimationChainListSave == null ? [] : MapForSave(AnimationChainListSave, _tsx, out _);
+
+        /// <summary>What a save would write for each chain.</summary>
+        private static IReadOnlyList<Tiled.MultiTileMappingResult> MapForSave(
+            AnimationChainListSave acls, TsxState state, out HashSet<AnimationChainSave> releasedHints)
         {
             // Revives a dormant hint for this save's Map() call, but only for a chain whose
             // current Frames are reference-sequence-identical to the ones captured when that hint
@@ -559,7 +549,28 @@ namespace AnimationEditor.Core
             // fact. Resizing/moving frame 0's rect never relocates it -- only an explicit
             // TrySetTsxOwnerTileId call (or the Sync-to-First-Frame button, which just calls that
             // with frame 0's current tile) changes which tile a chain owns.
-            mapped = YieldCollidingClaims(mapped, satelliteHintsForMap, state, out var releasedHints);
+            return YieldCollidingClaims(mapped, satelliteHintsForMap, state, out releasedHints);
+        }
+
+        /// <summary>
+        /// Writes a tsx document to <paramref name="target"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and
+        /// <see cref="Tiled.NativeTsxAnimationSync"/>. Returns its state after the save. <paramref name="warnings"/>: every chain's mapping warning -- a
+        /// chain that couldn't be mapped (bad geometry, wrong texture, etc.) keeps whatever it last wrote to its tile
+        /// untouched rather than being cleared -- plus one per chain carrying data the format
+        /// can't hold (<see cref="Tiled.TsxLossyDataCheck"/>; that chain IS written, minus that
+        /// data). A caller should surface these to the user instead of assuming the save fully
+        /// captured every edit.
+        /// </summary>
+        /// <remarks>Same all-or-nothing invariant as <see cref="LoadTsxProject"/>: <see
+        /// cref="Tiled.NativeTsxAnimationSync.Apply"/> runs against a working copy (<see
+        /// cref="Tiled.NativeTsxAnimationSync.CloneForSave"/>), which is in the returned state only
+        /// after <see cref="Tiled.TsxWriter"/> has actually
+        /// succeeded -- so a write failure (a disk/permissions error)
+        /// can't leave the in-memory tileset reflecting computed-but-never-persisted state.</remarks>
+        private static TsxState SaveTsx(
+            AnimationChainListSave acls, TsxState state, FilePath target, out IReadOnlyList<string> warnings)
+        {
+            var mapped = MapForSave(acls, state, out var releasedHints);
 
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(state.Tileset);
             // The undo history keeps the state of each edit, so one that changed nothing shares the tileset.
@@ -766,7 +777,7 @@ namespace AnimationEditor.Core
         {
             var failed = new HashSet<AnimationChainSave>(
                 mapped.Where(r => r.Warnings.Count > 0).Select(r => r.SourceChain), ReferenceEqualityComparer.Instance);
-            var yielding = new Dictionary<AnimationChainSave, string>(ReferenceEqualityComparer.Instance);
+            var yielding = new Dictionary<AnimationChainSave, (string Reason, AnimationChainSave Holder)>(ReferenceEqualityComparer.Instance);
 
             var claims = new List<(uint TileId, AnimationChainSave Chain, int Rank)>();
             foreach (var r in mapped.Where(r => r.Warnings.Count == 0))
@@ -795,7 +806,7 @@ namespace AnimationEditor.Core
                     var winner = state.TileOwners.TryGetValue(tileId, out var owner) && (failed.Contains(owner) || yielding.ContainsKey(owner))
                         ? owner : claimants[0];
                     foreach (var loser in claimants.Where(c => !ReferenceEquals(c, winner)))
-                        yielding[loser] = $"chain \"{loser.Name}\": Tiled tile {tileId} already carries \"{winner.Name}\" - not saved; move its frames to cells no other chain uses.";
+                        yielding[loser] = ($"Tiled tile {tileId} already carries \"{winner.Name}\"", winner);
                 }
             } while (yielding.Count > yieldingBefore);
 
@@ -805,17 +816,21 @@ namespace AnimationEditor.Core
 
             return mapped.Select(r =>
             {
-                var warnings = yielding.TryGetValue(r.SourceChain, out var warning) ? [warning] : r.Warnings;
-                if (warnings.Count == 0)
+                bool yields = yielding.TryGetValue(r.SourceChain, out var yielded);
+                if (!yields && r.Warnings.Count == 0)
                     return r;
                 return r with
                 {
+                    SkipReason = yields ? yielded.Reason : r.SkipReason,
+                    TileHolder = yielded.Holder,
                     AnchorFrames = [],
                     EntryTileId = null,
                     EntryTileIdIsFreshlyComputed = false,
                     Satellites = state.TileOwners.Where(o => ReferenceEquals(o.Value, r.SourceChain))
                         .Select(o => new Tiled.TiledSatelliteMapping(o.Key, [], default)).ToList(),
-                    Warnings = warnings,
+                    Warnings = yields
+                        ? [$"chain \"{r.ChainName}\": {yielded.Reason} - not saved; move its frames to cells no other chain uses."]
+                        : r.Warnings,
                 };
             }).ToList();
         }

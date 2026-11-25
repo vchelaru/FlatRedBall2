@@ -483,6 +483,7 @@ public class TabSwitchCacheTests : IDisposable
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => _inner.GetChainNamesWithTsxIssues();
         public uint? GetTsxOwnerTileId(AnimationChainSave chain) => _inner.GetTsxOwnerTileId(chain);
         public string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId) => _inner.TrySetTsxOwnerTileId(chain, tileId);
+        public IReadOnlyList<AnimationEditor.Core.Tiled.MultiTileMappingResult> MapTsxForSave() => _inner.MapTsxForSave();
         public bool IsTsxOwnerTileIdAlreadySet(AnimationChainSave chain, uint tileId) => _inner.IsTsxOwnerTileIdAlreadySet(chain, tileId);
         public bool MarkChainNameExplicit(AnimationChainSave chain) => _inner.MarkChainNameExplicit(chain);
         public bool IsChainNameAuto(AnimationChainSave chain) => _inner.IsChainNameAuto(chain);

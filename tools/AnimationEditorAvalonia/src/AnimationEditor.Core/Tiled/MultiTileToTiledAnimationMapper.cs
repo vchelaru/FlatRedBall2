@@ -38,6 +38,10 @@ public sealed record MultiTileMappingResult
     /// <summary>Empty for a single-cell (1x1) chain.</summary>
     public required IReadOnlyList<TiledSatelliteMapping> Satellites { get; init; }
     public required IReadOnlyList<string> Warnings { get; init; }
+    /// <summary>Why a save does not write the chain; null when it does, or when the chain has no frames.</summary>
+    public string? SkipReason { get; init; }
+    /// <summary>The chain whose tile is the <see cref="SkipReason"/>, if it is one.</summary>
+    public AnimationChainSave? TileHolder { get; init; }
 }
 
 /// <summary>
@@ -103,11 +107,11 @@ public static class MultiTileToTiledAnimationMapper
         // a whole tile) deletes the chain's previously-working animation as a side effect. A chain
         // that's simply empty (no warning -- e.g. every frame deleted) is NOT protected this way:
         // that's the caller intentionally saying "this chain no longer owns a tile."
-        MultiTileMappingResult Empty(string? warning = null)
+        MultiTileMappingResult Empty(string? skipReason = null)
         {
             uint? entryTileId = null;
             IReadOnlyList<TiledSatelliteMapping> satellites = [];
-            if (warning != null)
+            if (skipReason != null)
             {
                 if (knownEntryTileIds != null && knownEntryTileIds.TryGetValue(chain, out var hintedEntry))
                     entryTileId = hintedEntry;
@@ -124,7 +128,8 @@ public static class MultiTileToTiledAnimationMapper
                 AnchorFrames = [],
                 EntryTileId = entryTileId,
                 Satellites = satellites,
-                Warnings = warning is null ? [] : [warning],
+                SkipReason = skipReason,
+                Warnings = skipReason is null ? [] : [$"chain \"{chain.Name}\": {skipReason} - skipped."],
             };
         }
 
@@ -141,7 +146,7 @@ public static class MultiTileToTiledAnimationMapper
         if (footprintColumns < 1 || footprintRows < 1
             || Math.Abs(firstRect.Width - grid.SpanWidth(footprintColumns)) > Epsilon
             || Math.Abs(firstRect.Height - grid.SpanHeight(footprintRows)) > Epsilon)
-            return Empty($"chain \"{chain.Name}\": frame size {firstRect.Width}x{firstRect.Height} isn't a whole number of tiles - skipped.");
+            return Empty($"frame size {firstRect.Width}x{firstRect.Height} isn't a whole number of tiles");
 
         var perOffset = new Dictionary<(int Dx, int Dy), List<MappedFrame>>();
         for (var dy = 0; dy < footprintRows; dy++)
@@ -151,17 +156,17 @@ public static class MultiTileToTiledAnimationMapper
         foreach (var frame in chain.Frames)
         {
             if (!tilesetInfo.IsImage(frame.TextureName))
-                return Empty($"chain \"{chain.Name}\": references a different texture (\"{frame.TextureName}\") than the open tileset (\"{tilesetInfo.ImageFileName}\") - skipped.");
+                return Empty($"references a different texture (\"{frame.TextureName}\") than the open tileset (\"{tilesetInfo.ImageFileName}\")");
 
             var rect = TiledFrameGeometry.FrameRectPixels(frame, coordinateType, tilesetInfo);
 
             if (Math.Abs(rect.Width - grid.SpanWidth(footprintColumns)) > Epsilon
                 || Math.Abs(rect.Height - grid.SpanHeight(footprintRows)) > Epsilon)
-                return Empty($"chain \"{chain.Name}\": frame size {rect.Width}x{rect.Height} doesn't match the chain's {footprintColumns}x{footprintRows}-tile footprint - skipped.");
+                return Empty($"frame size {rect.Width}x{rect.Height} doesn't match the chain's {footprintColumns}x{footprintRows}-tile footprint");
 
             // Size already matched the footprint, so a null here can only mean the origin is off-grid.
             if (grid.TryLocate(rect.Left, rect.Top, rect.Width, rect.Height, Epsilon) is not { } footprint)
-                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) is not aligned to the tile grid - skipped.");
+                return Empty($"frame rect origin ({rect.Left}, {rect.Top}) is not aligned to the tile grid");
 
             var duration = new FrameLengthUnit(timeUnit).ToMilliseconds(frame.FrameLength);
             var (originColumn, originRow, _, _) = footprint;
@@ -170,14 +175,14 @@ public static class MultiTileToTiledAnimationMapper
             // grid-alignment check above yet resolves to a negative column/row -- an unchecked
             // cast to uint below would wrap to a huge bogus tile id.
             if (originColumn < 0 || originRow < 0)
-                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) resolves to a negative column/row, which isn't a valid tile position - skipped.");
+                return Empty($"frame rect origin ({rect.Left}, {rect.Top}) resolves to a negative column/row, which isn't a valid tile position");
 
             // A footprint whose right-hand cell would need a column at or past the tileset's own
             // column count still computes a "valid"-looking tileId for that cell -- it just lands
             // on a real tile in the *next* row instead of failing, silently misplacing a satellite
             // onto an unrelated tile every save.
             if (originColumn + footprintColumns > tilesetInfo.ColumnCount)
-                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.ColumnCount, "column")} - skipped.");
+                return Empty($"frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.ColumnCount, "column")}");
 
             // The footprint's bottom-right cell (the largest tile id any cell in this footprint can
             // compute to, since the column bound above already guarantees every cell's column is
@@ -185,7 +190,7 @@ public static class MultiTileToTiledAnimationMapper
             // simply past the tileset's declared tile count, including a partial last row.
             var maxTileId = (uint)(((originRow + footprintRows - 1) * tilesetInfo.ColumnCount) + (originColumn + footprintColumns - 1));
             if (maxTileId >= tilesetInfo.TileCount)
-                return Empty($"chain \"{chain.Name}\": frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.TileCount, "tile")} - skipped.");
+                return Empty($"frame rect origin ({rect.Left}, {rect.Top}) with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.TileCount, "tile")}");
 
             for (var dy = 0; dy < footprintRows; dy++)
                 for (var dx = 0; dx < footprintColumns; dx++)
@@ -229,10 +234,10 @@ public static class MultiTileToTiledAnimationMapper
             else
             {
                 if (entryColumn + offset.Dx >= tilesetInfo.ColumnCount)
-                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.ColumnCount, "column")} - skipped.");
+                    return Empty($"owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.ColumnCount, "column")}");
                 tileId = (uint)(((entryRow + offset.Dy) * tilesetInfo.ColumnCount) + (entryColumn + offset.Dx));
                 if (tileId >= tilesetInfo.TileCount)
-                    return Empty($"chain \"{chain.Name}\": owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.TileCount, "tile")} - skipped.");
+                    return Empty($"owner tile {entryTileId} with a {footprintColumns}x{footprintRows}-tile footprint would extend past the tileset's {Plural.Format(tilesetInfo.TileCount, "tile")}");
             }
             satellites.Add(new TiledSatelliteMapping(tileId, frames, offset));
         }
