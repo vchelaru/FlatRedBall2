@@ -39,4 +39,28 @@ public class RedoDeleteSelectionScenarioTests
         editor.Wait(TimeSpan.FromMilliseconds(100));
         editor.ProblemText.ShouldBeNull();
     }
+
+    // Only a command, an undo or a redo deselects; a tab switch or a save must not add selection changes of its own.
+    [AvaloniaFact]
+    public async Task TabSwitch_RaisesNoExtraSelectionChange()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx",
+            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)), AnimationEditorHarness.Chain("Run", "sheet.png", (16, 0, 16, 16)));
+        await editor.OpenAsync(editor.WriteAchx("other.achx", AnimationEditorHarness.Chain("Bite", "sheet.png", (0, 0, 16, 16))));
+        await editor.OpenAsync(hero);
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        editor.ClickRow(editor.ChainNamed("Run"), RawInputModifiers.Control);
+        int events = 0;
+        editor.Services.SelectedState.SelectionChanged += () => events++;
+
+        editor.ClickTab("other.achx");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        events.ShouldBe(2, "to the other tab");
+        events = 0;
+        editor.ClickTab("hero.achx");
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        events.ShouldBe(2, "and back");
+    }
 }

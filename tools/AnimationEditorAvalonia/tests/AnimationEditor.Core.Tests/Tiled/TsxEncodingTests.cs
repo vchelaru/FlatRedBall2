@@ -90,21 +90,6 @@ public sealed class TsxEncodingTests : IDisposable
     }
 
     [Theory]
-    [MemberData(nameof(RefusedNames))]
-    public void SyncAll_NotUtf8Tileset_FailsNamingTheEncodingAndLeavesTheFile(string name)
-    {
-        var (bytes, named) = RefusedFile(name);
-        var path = Write(bytes);
-
-        var outcome = TiledTilesetSyncRunner.SyncAll(WalkOnTile1(), Path.Combine(_dir.Path, "Hero.achx"), [path]).Single();
-
-        outcome.Success.ShouldBeFalse();
-        outcome.Error!.Message.ShouldContain(named);
-        outcome.Error!.Message.ShouldContain(OnlyUtf8);
-        File.ReadAllBytes(path).ShouldBe(bytes);
-    }
-
-    [Theory]
     [InlineData("<?xml version=\"1.0\"?>\n")]
     [InlineData("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")]
     [InlineData("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")]
@@ -139,18 +124,5 @@ public sealed class TsxEncodingTests : IDisposable
         pm.SaveTsxProject(target);
 
         TsxLoader.LoadTileset(target).Tiles.Single().Type.ShouldBe("Größe");
-    }
-
-    private static AnimationChainListSave WalkOnTile1()
-    {
-        var save = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        var chain = new AnimationChainSave { Name = "Walk" };
-        chain.Frames.Add(new AnimationFrameSave
-        {
-            TextureName = "Heroes.png", FrameLength = 0.1f,
-            LeftCoordinate = 16, TopCoordinate = 0, RightCoordinate = 32, BottomCoordinate = 16,
-        });
-        save.AnimationChains.Add(chain);
-        return save;
     }
 }

@@ -11,122 +11,13 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// Every control no scenario had driven yet: the Edit and View menus item by item, the PixiJS
-/// export, Associate Tiled Tileset, Follow System theme, Expand All / Collapse All, the preview
+/// export, Follow System theme, Expand All / Collapse All, the preview
 /// checkboxes, the PNG usage overlay, the Move / Magic Wand pair, the
 /// remaining inspector fields, File > New and File > Save through the menu, crash recovery on
 /// the next start, and the open note about an empty chain's first frame.
 /// </summary>
 public class SweepScenarioTests
 {
-    private const string TsxXml = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="16" columns="4">
-         <image source="sheet.png" width="64" height="64"/>
-        </tileset>
-        """;
-
-    [AvaloniaFact]
-    public async Task AssociateTiledTileset_ThroughTheMenu_RecordsTheAssociation_AndTheNextEditStillSaves()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        editor.WritePng("sheet.png", 64, 64);
-        string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
-        File.WriteAllText(tsx, TsxXml);
-        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
-        await editor.OpenAsync(path);
-        editor.Dialogs.AnswerNextOpenFile(tsx);
-
-        editor.ClickMenu("MenuAssociateTiledTileset");
-        editor.Wait(TimeSpan.FromMilliseconds(200));
-
-        editor.ThrowIfErrorShown();
-        editor.Services.IoManager.GetAssociatedTiledTilesetPaths(path).ShouldContain(tsxPath => tsxPath.EndsWith("Heroes.tsx"));
-        editor.Click(editor.RowButton(editor.ChainNamed("Walk"), "Add Frame"));
-        editor.Wait(TimeSpan.FromMilliseconds(200));
-        editor.ThrowIfErrorShown();
-        editor.Control<TextBlock>("StatusSaveLabel").Text.ShouldBe("Auto Save On");
-        AnimationEditorHarness.ReadSaved(path).AnimationChains.Single().Frames.Count.ShouldBe(2);
-    }
-
-    [AvaloniaFact]
-    public async Task AssociateTiledTileset_UnreadableSyncFile_ShowsTheProblemBanner_AndLeavesTheFile()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        editor.WritePng("sheet.png", 64, 64);
-        string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
-        File.WriteAllText(tsx, TsxXml);
-        string sync = Path.Combine(editor.ProjectFolder, "hero.tiledsync");
-        File.WriteAllText(sync, "{ not json");
-        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
-        await editor.OpenAsync(path);
-        editor.Dialogs.AnswerNextOpenFile(tsx);
-
-        editor.ClickMenu("MenuAssociateTiledTileset");
-        editor.Wait(TimeSpan.FromMilliseconds(200));
-
-        editor.ProblemText.ShouldNotBeNull().ShouldContain("hero.tiledsync");
-        File.ReadAllText(sync).ShouldBe("{ not json");
-    }
-
-    [AvaloniaFact]
-    public async Task AssociateTiledTileset_UnwritableSyncFile_ShowsTheProblemBanner_AndLeavesTheFile()
-    {
-        const string contents = "{ \"TiledTilesetPaths\": [ \"old.tsx\" ] }";
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        editor.WritePng("sheet.png", 64, 64);
-        string tsx = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
-        File.WriteAllText(tsx, TsxXml);
-        string sync = Path.Combine(editor.ProjectFolder, "hero.tiledsync");
-        File.WriteAllText(sync, contents);
-        string path = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
-        await editor.OpenAsync(path);
-        editor.Dialogs.AnswerNextOpenFile(tsx);
-        UnusualProjectScenarioTests.MakeUnwritable(sync);
-        try
-        {
-            editor.ClickMenu("MenuAssociateTiledTileset");
-            editor.Wait(TimeSpan.FromMilliseconds(200));
-
-            editor.ProblemText.ShouldNotBeNull().ShouldContain("Could not write the Tiled sync file hero.tiledsync");
-            File.ReadAllText(sync).ShouldBe(contents);
-        }
-        finally
-        {
-            UnusualProjectScenarioTests.MakeWritable(sync);
-        }
-    }
-
-    [AvaloniaFact]
-    public void AssociateTiledTileset_NeverSavedProject_ShowsTheProblemBanner()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-
-        editor.ClickMenu("MenuAssociateTiledTileset");
-        editor.Wait(TimeSpan.FromMilliseconds(200));
-
-        editor.ProblemText.ShouldNotBeNull().ShouldContain("Save the project as an .achx or .achj first");
-    }
-
-    [AvaloniaFact]
-    public async Task AssociateTiledTileset_NativeTsxOpen_ShowsTheProblemBanner_AndWritesNothing()
-    {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
-        editor.WritePng("sheet.png", 64, 64);
-        string open = Path.Combine(editor.ProjectFolder, "Open.tsx");
-        File.WriteAllText(open, TsxXml);
-        string other = Path.Combine(editor.ProjectFolder, "Heroes.tsx");
-        File.WriteAllText(other, TsxXml);
-        await editor.OpenAsync(open);
-        editor.Services.ProjectManager.IsNativeTsxProject.ShouldBeTrue();
-        editor.Dialogs.AnswerNextOpenFile(other);
-
-        editor.ClickMenu("MenuAssociateTiledTileset");
-        editor.Wait(TimeSpan.FromMilliseconds(200));
-
-        editor.ProblemText.ShouldNotBeNull().ShouldContain("a .tsx cannot be a native project and an association target at once");
-        Directory.GetFiles(editor.ProjectFolder, "*.tiledsync").ShouldBeEmpty();
-    }
-
     [AvaloniaFact]
     public async Task CrashRecovery_UnsavedUntitledEdits_ComeBackOnTheNextStart_WithTheBanner()
     {

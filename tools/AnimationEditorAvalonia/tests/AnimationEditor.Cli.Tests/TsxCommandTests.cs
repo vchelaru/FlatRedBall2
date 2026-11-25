@@ -137,9 +137,8 @@ public class TsxCommandTests : IDisposable
 
         var describe = await _w.RunAsync("describe", _w.PathOf("tiles.tsx"));
         var edit = await Edit("tiles.tsx", """{"ops":[{"op":"rename-chain","chain":"Walk","to":"Run"}]}""");
-        var associate = await Edit("hero.achx", """{"ops":[{"op":"associate-tileset","path":"tiles.tsx"}]}""");
 
-        foreach (var r in new[] { describe, edit, associate })
+        foreach (var r in new[] { describe, edit })
         {
             r.Code.ShouldBe(1, r.Out + r.Err);
             (r.Out + r.Err).ShouldContain("encoding is UTF-16");
@@ -380,66 +379,6 @@ public class TsxCommandTests : IDisposable
         ErrorCode(r).ShouldBe("WrongFileKind");
     }
 
-    // ---- associate-tileset ----
-
-    [Fact]
-    public async Task AssociateTileset_WritesTheCompanionFile_AndTheSaveReportsTheSync()
-    {
-        var r = await Edit("hero.achx", """{"ops":[{"op":"associate-tileset","path":"tiles.tsx"}]}""", "--json");
-
-        r.Code.ShouldBe(0, r.Out + r.Err);
-        Directory.GetFiles(_w.Dir, "*.tiledsync").Length.ShouldBe(1);
-        JsonDocument.Parse(r.Out).RootElement.GetProperty("changed").EnumerateArray()
-            .Select(e => e.GetString()).ShouldContain(s => s!.EndsWith("tiles.tsx"));
-    }
-
-    [Fact]
-    public async Task AssociateTileset_MissingTsx_FailsAndWritesNothing()
-    {
-        var before = _w.Bytes("hero.achx");
-
-        var r = await Edit("hero.achx", """{"ops":[{"op":"associate-tileset","path":"nope.tsx"}]}""", "--json");
-
-        r.Code.ShouldBe(1);
-        ErrorCode(r).ShouldBe("NotFound");
-        Directory.GetFiles(_w.Dir, "*.tiledsync").ShouldBeEmpty();
-        _w.Bytes("hero.achx").ShouldBe(before);
-    }
-
-    [Fact]
-    public async Task AssociateTileset_LaterOpFails_WritesNothing()
-    {
-        var r = await Edit("hero.achx", """
-            {"ops":[
-              {"op":"associate-tileset","path":"tiles.tsx"},
-              {"op":"rename-chain","chain":"Nope","to":"X"}
-            ]}
-            """);
-
-        r.Code.ShouldBe(1);
-        Directory.GetFiles(_w.Dir, "*.tiledsync").ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task AssociateTileset_ThenDescribingThatTsx_IsRefusedUpFront()
-    {
-        await Edit("hero.achx", """{"ops":[{"op":"associate-tileset","path":"tiles.tsx"}]}""");
-
-        var r = await _w.RunAsync("describe", _w.PathOf("tiles.tsx"));
-
-        r.Code.ShouldBe(1);
-        r.Err.ShouldContain("associated");
-    }
-
-    [Fact]
-    public async Task AssociateTileset_InATsx_IsRefused()
-    {
-        var r = await Edit("tiles.tsx", """{"ops":[{"op":"associate-tileset","path":"tiles.tsx"}]}""", "--json");
-
-        r.Code.ShouldBe(1);
-        ErrorCode(r).ShouldBe("WrongFileKind");
-    }
-
     // ---- other commands ----
 
     [Fact]
@@ -466,7 +405,6 @@ public class TsxCommandTests : IDisposable
 
         using var doc = JsonDocument.Parse(r.Out);
         var ops = doc.RootElement.GetProperty("ops").EnumerateArray().Select(o => o.GetProperty("op").GetString()).ToList();
-        ops.ShouldContain("associate-tileset");
         ops.ShouldContain("set-chain-owner-tile");
         doc.RootElement.GetProperty("tsx").GetString()!.ShouldContain("rename-chain");
     }

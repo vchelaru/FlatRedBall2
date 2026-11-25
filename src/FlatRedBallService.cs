@@ -82,6 +82,7 @@ public class FlatRedBallService
     public FlatRedBallService()
     {
         Audio.Time = Time;
+        Content.LiveRenderables = () => CurrentScreen.RenderList;
         SourceContentRoots = new List<string>(DetectSourceContentRoots(AppContext.BaseDirectory));
         OutputContentRoot = IO.TitleLocation.Default;
     }

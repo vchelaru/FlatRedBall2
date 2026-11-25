@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.IO
@@ -32,19 +31,11 @@ namespace AnimationEditor.Core.IO
         /// <summary>Raised when saving the companion file fails. The app layer should display the error.</summary>
         public event Action<string, Exception>? SaveFailed;
 
-        /// <inheritdoc/>
-        public event Action<string, Exception>? TiledSyncParseFailed;
-
         public string RecoveryFilePath { get; set; }
 
         private FilePath GetCompanionFileFor(FilePath fileName)
         {
             return new FilePath(fileName.RemoveExtension().FullPath + ".aeproperties");
-        }
-
-        private FilePath GetTiledSyncCompanionFileFor(FilePath fileName)
-        {
-            return new FilePath(fileName.RemoveExtension().FullPath + ".tiledsync");
         }
 
         public void SaveCompanionFileFor(FilePath fileName, AESettingsSave settings)
@@ -82,80 +73,6 @@ namespace AnimationEditor.Core.IO
             catch
             {
                 return null;
-            }
-        }
-
-        /// <summary>The associations of <paramref name="achxFile"/> (none when it has no <c>.tiledsync</c>).</summary>
-        /// <exception cref="InvalidDataException">The file cannot be read. It must never be written over: it may still
-        /// hold associations.</exception>
-        private AETiledSyncSave LoadTiledSyncSettings(string achxFile)
-        {
-            var fileToLoad = GetTiledSyncCompanionFileFor(new FilePath(achxFile));
-
-            // No file at all legitimately means "no associations configured" -- stay silent.
-            if (!fileToLoad.Exists()) return new AETiledSyncSave();
-
-            try
-            {
-                var json = File.ReadAllText(fileToLoad.FullPath);
-                var settings = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
-                return settings?.TiledTilesetPaths is null
-                    ? throw new InvalidDataException($"{nameof(AETiledSyncSave.TiledTilesetPaths)} is not a list.")
-                    : settings;
-            }
-            catch (Exception e)
-            {
-                throw new InvalidDataException(
-                    $"Could not read the Tiled sync file {fileToLoad.NoPath}, so it was left as it is. Fix or delete it. {e.Message}", e);
-            }
-        }
-
-        public IReadOnlyList<string> GetAssociatedTiledTilesetPaths(string achxFile)
-        {
-            AETiledSyncSave settings;
-            try
-            {
-                settings = LoadTiledSyncSettings(achxFile);
-            }
-            catch (InvalidDataException e)
-            {
-                // The file exists but is corrupt -- this must not look identical to "no
-                // associations," or Tiled sync silently disables itself with zero indication.
-                TiledSyncParseFailed?.Invoke(achxFile, e);
-                return Array.Empty<string>();
-            }
-            if (settings.TiledTilesetPaths.Count == 0)
-                return Array.Empty<string>();
-
-            var achxFolder = new FilePath(achxFile).GetDirectoryContainingThis();
-            return settings.ResolveTilesets(achxFolder).Select(tileset => tileset.FullPath).ToList();
-        }
-
-        public void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile)
-        {
-            var achxFilePath = new FilePath(achxFile);
-            var achxFolder = achxFilePath.GetDirectoryContainingThis();
-            var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
-
-            var settings = LoadTiledSyncSettings(achxFile);
-            var alreadyAssociated = settings.ResolveTilesets(achxFolder).Contains(new FilePath(tsxFile));
-            if (!alreadyAssociated)
-            {
-                settings.TiledTilesetPaths.Add(relativeTsxPath);
-                var location = GetTiledSyncCompanionFileFor(achxFilePath);
-                try
-                {
-                    var json = JsonSerializer.Serialize(settings, AETiledSyncJsonContext.Default.AETiledSyncSave);
-                    AtomicFile.Write(location.FullPath, stream =>
-                    {
-                        using var writer = new StreamWriter(stream);
-                        writer.Write(json);
-                    });
-                }
-                catch (Exception e)
-                {
-                    throw new IOException($"Could not write the Tiled sync file {location.NoPath}. {e.Message}", e);
-                }
             }
         }
 

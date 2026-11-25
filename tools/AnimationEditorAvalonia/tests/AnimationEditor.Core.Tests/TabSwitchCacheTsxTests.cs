@@ -242,10 +242,10 @@ public class TabSwitchCacheTsxTests : IDisposable
     [Fact]
     public async Task SaveDocument_BackgroundTsxTabThatCannotBeWritten_KeepsTheFileAndTheCurrentDocument()
     {
-        // Tile 5 belongs to an associated .achx, so a chain moved onto it makes the save throw.
+        // Tile 5 has a name of the user's, so a chain moved onto it makes the save throw.
         string path = Path.Combine(_dir.Path, "Heroes.tsx");
         File.WriteAllText(path, TsxFixtureXml.Replace("</tileset>",
-            $" <tile id=\"5\"><properties><property name=\"{AnimationEditor.Core.Tiled.TilesetAnimationSync.SourceFilePropertyName}\" value=\"a.achx\"/></properties></tile></tileset>"));
+            $" <tile id=\"5\"><properties><property name=\"Name\" value=\"Mine\"/></properties></tile></tileset>"));
         byte[] before = File.ReadAllBytes(path);
         var tab = new TabEntry(new FilePath(path));
         await _ctx.AppCommands.OpenTsxWorkflowAsync(path);

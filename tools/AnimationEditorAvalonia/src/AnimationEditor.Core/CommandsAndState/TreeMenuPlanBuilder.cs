@@ -82,6 +82,8 @@ public static class TreeMenuPlanBuilder
                             index => appCommands.MoveFrames(frames, chain, chain, index),
                             delta => appCommands.MoveFramesRelative(frames, chain, delta));
                     }
+                    else
+                        AddSelectionReorderItems(items, appCommands);
                     if (items.Count > 0) items.Add(TreeMenuItem.Separator());
                 }
                 if (!isNativeTsx)
@@ -117,6 +119,8 @@ public static class TreeMenuPlanBuilder
                             index => appCommands.MoveChainsToIndex(selected, index),
                             delta => appCommands.MoveChainsRelative(selected, delta));
                     }
+                    else
+                        AddSelectionReorderItems(items, appCommands);
                     if (items.Count > 0) items.Add(TreeMenuItem.Separator());
                 }
                 items.Add(TreeMenuItem.HostSlotItem(TreeMenuHostSlot.AdjustFrameTime));
@@ -245,8 +249,8 @@ public static class TreeMenuPlanBuilder
 
     // Mirrors the shape/frame/chain reorder convention: four items (Move to Top/Up/Down/Bottom)
     // guarded by the node's position within its containing list. No-op (and no separator) when
-    // that list has one entry or less. A multi-selection moves as a group (AddGroupReorderItems); shapes, and
-    // a selection from several lists, have no group move, so they get no items.
+    // that list has one entry or less. A multi-selection moves as a group (AddGroupReorderItems); one from several
+    // lists has only the Alt+Up and Alt+Down step (AddSelectionReorderItems), and shapes have no group move at all.
     private static void AddShapeReorderItems(
         List<TreeMenuItem> items, object shape, AnimationFrameSave? frame, IAppCommands appCommands, Selection? selection)
     {
@@ -275,6 +279,12 @@ public static class TreeMenuPlanBuilder
                 ReorderMove.Down => TreeMenuItem.Item("Move Down", () => step(+1), TreeMenuIcon.MoveDown),
                 _ => TreeMenuItem.Item("Move To Bottom", () => moveTo(count), TreeMenuIcon.MoveToBottom),
             });
+    }
+
+    private static void AddSelectionReorderItems(List<TreeMenuItem> items, IAppCommands appCommands)
+    {
+        items.Add(TreeMenuItem.Item("Move Up", () => appCommands.HandleReorder(-1), TreeMenuIcon.MoveUp));
+        items.Add(TreeMenuItem.Item("Move Down", () => appCommands.HandleReorder(+1), TreeMenuIcon.MoveDown));
     }
 
     private static void AddFrameReorderItems(

@@ -468,32 +468,48 @@ public class TreeMenuPlanBuilderTests
         Assert.Equal(expected, string.Concat(ctx.Acls.AnimationChains.Select(c => c.Name)));
     }
 
-    // They have no group move, and moving only the right-clicked one would leave the rest behind.
+    [Fact]
+    public void Build_SeveralShapes_ShowsNoMoveItems()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = TestHelpers.MakeChain(ctx.Acls, "Walk", 1).Frames[0];
+        var rects = new[] { "A", "B", "C" }.Select(name => new AARectSave { Name = name }).ToList();
+        rects.ForEach(frame.ShapesSave!.Add);
+        ctx.SelectedState.SelectedNodes = [rects[0], rects[1]];
+
+        var items = TreeMenuPlanBuilder.Build(
+            rects[0], ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+
+        Assert.DoesNotContain(items, i => i.Header?.StartsWith("Move") == true);
+        Assert.False(items[0].IsSeparator, "the menu starts with a separator");
+    }
+
+    // As Alt+Up and Alt+Down; there is no move to the top or bottom of several lists.
     [Theory]
-    [InlineData("shapes")]
-    [InlineData("frames of two animations")]
-    [InlineData("an animation and a frame")]
-    public void Build_SelectionWithoutAGroupMove_ShowsNoMoveItems(string selection)
+    [InlineData("Walk/1,Run/1", "Move Up", "Walk[BA] Run[DC]")]
+    [InlineData("Walk/0,Run/0", "Move Down", "Walk[BA] Run[DC]")]
+    [InlineData("Walk,Run/0", "Move Down", "Run[DC] Walk[AB]")]
+    public void Build_SelectionFromSeveralLists_MovesAllOfItUpOrDown(string selection, string item, string expected)
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var walk = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var run = TestHelpers.MakeChain(ctx.Acls, "Run", 2);
-        var rects = new[] { "A", "B", "C" }.Select(name => new AARectSave { Name = name }).ToList();
-        rects.ForEach(walk.Frames[0].ShapesSave!.Add);
-        object[] nodes = selection switch
-        {
-            "shapes" => [rects[0], rects[1]],
-            "frames of two animations" => [walk.Frames[0], run.Frames[0]],
-            _ => [walk, run.Frames[0]],
-        };
-        ctx.SelectedState.SelectedNodes = [.. nodes];
+        foreach (var (frame, name) in walk.Frames.Concat(run.Frames).Zip("ABCD")) frame.TextureName = name.ToString();
+        var nodes = selection.Split(',').Select(name => name.Split('/') is [var chain, var index]
+            ? (object)ctx.Acls.AnimationChains.Single(c => c.Name == chain).Frames[int.Parse(index)]
+            : ctx.Acls.AnimationChains.Single(c => c.Name == name)).ToList();
+        ctx.SelectedState.SelectedNodes = nodes;
+        ctx.SelectedState.SelectedFrame = nodes.OfType<AnimationFrameSave>().Last();
 
         foreach (var node in nodes)
         {
             var items = TreeMenuPlanBuilder.Build(
                 node, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
-            Assert.DoesNotContain(items, i => i.Header?.StartsWith("Move") == true);
-            Assert.False(items[0].IsSeparator, "the menu starts with a separator");
+            Assert.Equal(new[] { "Move Up", "Move Down" }, items.Where(i => i.Header?.StartsWith("Move") == true).Select(i => i.Header!));
+            if (node == nodes[0]) items.Single(i => i.Header == item).OnClick!();
         }
+
+        Assert.Equal(expected, string.Join(" ", ctx.Acls.AnimationChains.Select(c => $"{c.Name}[{string.Concat(c.Frames.Select(f => f.TextureName))}]")));
+        Assert.Single(ctx.UndoManager.UndoHistory);
     }
 }

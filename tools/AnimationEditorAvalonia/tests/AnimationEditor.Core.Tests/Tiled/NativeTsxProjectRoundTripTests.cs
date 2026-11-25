@@ -77,7 +77,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         var reloadedTile0 = reloaded.Tiles.Single(t => t.ID == 0);
@@ -133,7 +133,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         Assert.DoesNotContain(reloaded.Tiles, t => t.ID == 64);
@@ -193,7 +193,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         var riseUp = reloaded.Tiles.SingleOrDefault(t => t.ID == 5);
@@ -267,7 +267,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         var anchor = reloaded.Tiles.Single(t => t.ID == 8);
@@ -343,7 +343,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         var reloadedSatellite = reloaded.Tiles.Single(t => t.ID == 9);
@@ -403,7 +403,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         var anchor = reloaded.Tiles.Single(t => t.ID == 0);
@@ -469,7 +469,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         var satellite = reloaded.Tiles.SingleOrDefault(t => t.ID == 6);
@@ -547,7 +547,7 @@ public class NativeTsxProjectRoundTripTests
 
         var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
         File.Copy(fixturePath, outputPath);
-        TsxWriter.Write(tileset, outputPath);
+        TsxTestFile.Write(tileset, outputPath);
         var reloaded = Loader.Default().LoadTileset(outputPath);
 
         // Anchor stayed on tile 8, with its Name property updated to the new name (not left
@@ -592,7 +592,7 @@ public class NativeTsxProjectRoundTripTests
         var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo, entryTileIdsByChain);
         NativeTsxAnimationSync.Apply(tileset, mapped);
 
-        TsxWriter.Write(tileset, fixturePath);
+        TsxTestFile.Write(tileset, fixturePath);
         var reloaded = Loader.Default().LoadTileset(fixturePath);
 
         var tile0 = reloaded.Tiles.Single(t => t.ID == 0);

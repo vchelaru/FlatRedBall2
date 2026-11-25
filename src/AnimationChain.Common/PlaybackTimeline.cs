@@ -8,6 +8,12 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <param name="IsBackward">Whether that timeline is being played mirrored at this instant.</param>
 public readonly record struct TimelinePoint(double ForwardTime, bool IsBackward);
 
+/// <summary>Where a playing time falls in the cycle.</summary>
+/// <param name="CycleTime">Seconds into the cycle.</param>
+/// <param name="Wraps">How many times a looping player passed the cycle's end.</param>
+/// <param name="AtEnd">Whether a non-looping player is at the cycle's end.</param>
+public readonly record struct CyclePoint(double CycleTime, int Wraps, bool AtEnd);
+
 /// <summary>Where playback is: the frame shown and the forward-timeline position to evaluate it at.</summary>
 /// <param name="FrameIndex">The frame shown.</param>
 /// <param name="ElapsedInFrame">Forward seconds into that frame (0 = its start, its length = its end), whichever direction plays.
@@ -31,8 +37,29 @@ public readonly record struct PlaybackPosition(int FrameIndex, double ElapsedInF
 /// </summary>
 public static class PlaybackTimeline
 {
+    /// <summary>
+    /// How far before a frame boundary or a cycle's end, in seconds, a time already counts as on it. Times add up
+    /// inexactly (0.1 + 0.1 + 0.1 is past 0.3, eight steps of 0.1 fall short of 0.8). Far below one update; a frame
+    /// shorter than this may not be shown, and a cycle shorter than twice this ends at most half of it early.
+    /// </summary>
+    public const double BoundaryTolerance = 1e-6;
+
     /// <summary>Length of one cycle: T, or 2T for a ping-pong. A looping player wraps here; a non-looping one stops here.</summary>
     public static double CycleLength(double forwardLength, bool pingPong) => pingPong ? 2 * forwardLength : forwardLength;
+
+    /// <summary>
+    /// Brings <paramref name="time"/> into a cycle of <paramref name="cycleLength"/> seconds: a looping player wraps, a
+    /// non-looping one holds the end. Within <see cref="BoundaryTolerance"/> before the end is the end. Takes the same
+    /// time however many cycles that is.
+    /// </summary>
+    public static CyclePoint Wrap(double time, double cycleLength, bool loop)
+    {
+        double tolerance = Math.Min(BoundaryTolerance, cycleLength / 2);
+        if (time < cycleLength - tolerance) return new(time, 0, false);
+        if (!loop || cycleLength <= 0) return new(cycleLength, 0, !loop);
+        double wraps = Math.Floor((time + tolerance) / cycleLength);
+        return new(Math.Max(0, time - wraps * cycleLength), (int)Math.Min(wraps, int.MaxValue), false);
+    }
 
     /// <summary>
     /// The forward time shown <paramref name="cycleTime"/> seconds into a cycle (clamped to the cycle), and whether the
@@ -60,7 +87,8 @@ public static class PlaybackTimeline
 
     /// <summary>
     /// <see cref="Map"/> plus the frame shown. A time exactly on a frame boundary shows the frame playback enters, in
-    /// playback order (forward: the later frame; backward: the earlier one), matching FRB1.
+    /// playback order (forward: the later frame; backward: the earlier one), matching FRB1. Within
+    /// <see cref="BoundaryTolerance"/> before a boundary is on it.
     /// </summary>
     public static PlaybackPosition Locate<TFrame>(IReadOnlyList<TFrame> frames, Func<TFrame, double> length,
         double cycleTime, bool pingPong, bool reverse)
@@ -79,7 +107,7 @@ public static class PlaybackTimeline
         for (int i = 0; i < n; i++)
         {
             double end = start + length(frames[i]);
-            if (backward ? f <= end : f < end)
+            if (backward ? f <= end + BoundaryTolerance : f < end - BoundaryTolerance)
             {
                 frame = i;
                 break;

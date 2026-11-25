@@ -54,7 +54,6 @@ public class EditRollbackTests : IDisposable
         {
             data.Add("NotFound", [CopyingOp + copy, "delete-chain Nope"]);
             data.Add("NoMatch", [CopyingOp + copy, "delete-chain Nope*"]);
-            data.Add("InvalidValue", [CopyingOp + copy, "associate-tileset nope.txt"]);
             data.Add("WrongFileKind", [CopyingOp + copy, "set-chain-owner-tile Idle tile=1"]);
             data.Add("Locked", ["set-chain-locked Idle value=true", $"set-frame-texture */* texture=FAR copy={copy}"]);
             data.Add("Locked", ["set-chain-locked Idle value=true", $"add-frame Idle texture=FAR copy={copy}"]);
@@ -112,7 +111,6 @@ public class EditRollbackTests : IDisposable
     [Theory]
     [InlineData("set-frame-texture Idle/0 texture=FAR copy=copy")]
     [InlineData("set-frame-texture Idle/0 texture=FAR copy=overwrite")]
-    [InlineData("associate-tileset tiles.tsx")]
     public async Task Edit_FailedSave_LeavesTheFolderAsItWas(string op)
     {
         if (op.Contains("overwrite")) ExistingFar();
@@ -158,34 +156,6 @@ public class EditRollbackTests : IDisposable
         Snapshot().ShouldBe(before);
     }
 
-    // The sync file cannot be read (#1992) or written (#1996), so the tileset is not associated.
-    [Theory]
-    [InlineData("in use", "{ \"TiledTilesetPaths\": [ \"old.tsx\" ] }", "read")]
-    [InlineData("corrupt", "{ \"TiledTilesetPaths\": [ \"old.tsx\" ", "read")]
-    [InlineData("unwritable", "{ \"TiledTilesetPaths\": [ \"old.tsx\" ] }", "write")]
-    public async Task Edit_AssociateTilesetFails_FailsTheOp_AndLeavesTheFolderAsItWas(string state, string contents, string verb)
-    {
-        ExistingFar();
-        var sync = _w.Write("hero.tiledsync", contents);
-        if (state == "unwritable") SetWritable(false, "hero.tiledsync");
-        try
-        {
-            var before = Snapshot();
-
-            CliOutput r;
-            using (state == "in use" ? new FileStream(sync, FileMode.Open, FileAccess.ReadWrite, FileShare.None) : null)
-                r = await Edit(CopyingOp + "overwrite", "associate-tileset tiles.tsx");
-
-            r.Code.ShouldBe(1, r.Out + r.Err);
-            r.Out.ShouldContain($"op 1 (associate-tileset): Could not {verb} the Tiled sync file hero.tiledsync");
-            r.Out.ShouldContain("\"IoFailed\"");
-            r.Out.ShouldNotContain("was not updated");
-            JsonDocument.Parse(r.Out).RootElement.GetProperty("changed").GetArrayLength().ShouldBe(0);
-            Snapshot().ShouldBe(before);
-        }
-        finally { SetWritable(true, "hero.tiledsync"); }
-    }
-
     // A null character makes a path unusable (#1992).
     [Fact]
     public async Task Edit_ANullCharacterAfterACopy_FailsTheOp_AndLeavesTheFolderAsItWas()
@@ -194,12 +164,12 @@ public class EditRollbackTests : IDisposable
         var before = Snapshot();
         var ops = JsonSerializer.Serialize(new { ops = new object[] {
             new { op = "set-frame-texture", frame = "Idle/0", texture = _far, copy = "overwrite" },
-            new { op = "associate-tileset", path = "a\0.tsx" } } });
+            new { op = "import-chain", chain = "Walk", from = "a\0.achx" } } });
 
         var r = await _w.RunWithStdinAsync(ops, "edit", _w.PathOf("hero.achx"), "--ops", "-", "--json");
 
         r.Code.ShouldBe(1, r.Out + r.Err);
-        r.Out.ShouldContain("op 1 (associate-tileset): path");
+        r.Out.ShouldContain("op 1 (import-chain): from");
         r.Out.ShouldContain("\"InvalidValue\"");
         Snapshot().ShouldBe(before);
     }
@@ -213,7 +183,7 @@ public class EditRollbackTests : IDisposable
         var session = (await EditSession.OpenAsync(_w.PathOf("hero.achx"))).Session!;
         var copy = EditOps.Parse(JsonSerializer.Serialize(new { ops = new object[] {
             new { op = "set-frame-texture", frame = "Idle/0", texture = _far, copy = "overwrite" } } })).Ops![0];
-        var throwing = new EditOp(1, EditOps.Specs.First(s => s.Name == "associate-tileset"), new Dictionary<string, string>());
+        var throwing = new EditOp(1, EditOps.Specs.First(s => s.Name == "import-chain"), new Dictionary<string, string>());
 
         await Should.ThrowAsync<KeyNotFoundException>(() => EditOps.ApplyAsync(session, [copy, throwing]));
 
@@ -231,12 +201,12 @@ public class EditRollbackTests : IDisposable
         File.ReadAllBytes(existing).ShouldBe(File.ReadAllBytes(_far));
     }
 
-    private void SetWritable(bool writable, string file = "hero.achx")
+    private void SetWritable(bool writable)
     {
         // A save moves a temp file over the old one, which a read-only file stops on Windows and a read-only folder stops elsewhere.
         if (OperatingSystem.IsWindows())
         {
-            File.SetAttributes(_w.PathOf(file), writable ? FileAttributes.Normal : FileAttributes.ReadOnly);
+            File.SetAttributes(_w.PathOf("hero.achx"), writable ? FileAttributes.Normal : FileAttributes.ReadOnly);
             return;
         }
         var mode = UnixFileMode.UserRead | UnixFileMode.UserExecute;

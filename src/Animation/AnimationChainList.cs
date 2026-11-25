@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FlatRedBall2.AnimationEditorCommon;
+using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2.Animation;
 
@@ -56,11 +58,18 @@ public class AnimationChainList : List<AnimationChain>
     /// <summary>
     /// Re-parses the .achx/.achj at <paramref name="path"/> and applies the result in place so any
     /// live <see cref="FlatRedBall2.Rendering.Sprite.CurrentAnimation"/> reference keeps working.
-    /// For each chain in the reloaded file, matches by <see cref="AnimationChain.Name"/>: if the
-    /// name exists in this list the existing chain's frames are replaced (instance identity
-    /// preserved); otherwise the fresh chain is appended. Chains only in this list (removed from
+    /// For each chain in the reloaded file, matches by <see cref="AnimationChain.Name"/> (the nth chain
+    /// of a name matches the nth): if the name exists in this list the existing chain takes the file's
+    /// frames and Loop, PingPong and Reverse (instance identity preserved); otherwise the fresh chain is
+    /// appended. Chains only in this list (removed from
     /// the file) are left alone — sprites still playing them keep rendering their old art until
     /// the caller switches them.
+    /// <para>
+    /// Every chain in the file ends up as the file has it, also where game code set its Loop, PingPong
+    /// or Reversed. Where that changes one of them on the chain, the current screen's sprites playing
+    /// the chain take it too, replacing a value game code set; a one-shot effect
+    /// (<see cref="Screen.CreateFireAndForget(AnimationChainList, string, float, float)"/>) still plays once.
+    /// </para>
     /// <para>
     /// Returns <c>false</c> on I/O or parse failure (e.g. file mid-write) — XML or JSON, depending
     /// on <paramref name="path"/>'s extension. Callers should fall back to
@@ -78,21 +87,19 @@ public class AnimationChainList : List<AnimationChain>
         catch (IOException) { return false; }
         catch (InvalidDataException) { return false; }
 
-        foreach (var freshChain in fresh)
-        {
-            var existing = this[freshChain.Name];
-            if (existing != null)
+        var before = ConvertAll(chain => (chain, chain.Loop, chain.PingPong, chain.Reversed));
+        ChainReload.Apply<AnimationChain, AnimationFrame>(this, fresh);
+        if (content.LiveRenderables is not { } renderables) return true;
+
+        // A sprite took these from the chain when it started playing. Only what the reload changed is set again.
+        foreach (var (chain, loop, pingPong, reversed) in before)
+            foreach (var sprite in renderables().OfType<Sprite>())
             {
-                // Replace frames in place — preserves the AnimationChain instance and therefore
-                // any Sprite.CurrentAnimation reference that points at it.
-                existing.Clear();
-                existing.AddRange(freshChain);
+                if (sprite.CurrentAnimation != chain || sprite.IsOneShot) continue;
+                if (chain.Loop != loop) sprite.IsLooping = chain.Loop;
+                if (chain.PingPong != pingPong) sprite.IsPingPong = chain.PingPong;
+                if (chain.Reversed != reversed) sprite.IsReversed = chain.Reversed;
             }
-            else
-            {
-                Add(freshChain);
-            }
-        }
         return true;
     }
 }

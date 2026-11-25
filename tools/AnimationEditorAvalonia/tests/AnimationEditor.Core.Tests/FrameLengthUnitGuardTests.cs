@@ -22,8 +22,6 @@ public class FrameLengthUnitGuardTests
         "Core/IO/AnimationCloneHelper.cs",
         "Core/IO/ClipboardPayload.cs",
         "Core/Export/GodotSpriteFramesExporter.cs",
-        "Core/Tiled/AchjSyncSnapshot.cs",
-        "Core/Tiled/AchjToTiledAnimationMapper.cs",
         "Core/Tiled/MultiTileToTiledAnimationMapper.cs",
         "Core/Tiled/TiledAnimationToAchjMapper.cs",
         "Core/Tiled/TsxLossyDataCheck.cs", // names the kind of data, reads no length

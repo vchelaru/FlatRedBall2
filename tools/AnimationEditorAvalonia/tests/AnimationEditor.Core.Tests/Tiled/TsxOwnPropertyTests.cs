@@ -1,5 +1,4 @@
 using AnimationEditor.Core;
-using AnimationEditor.Core.Tiled;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using System;
@@ -392,34 +391,5 @@ public class TsxOwnPropertyTests : IDisposable
         Open(Tile(0, Name, 0, 1), Tile(5, Name));
 
         _pm.GetChainNamesWithTsxIssues().ShouldBeEmpty();
-    }
-
-    /// <summary>The push has its own two property names and never reads or writes these.</summary>
-    [Theory]
-    [InlineData(Name)]
-    [InlineData(IntName)]
-    [InlineData(EmptyName)]
-    [InlineData(StringParentId)]
-    [InlineData(IntParentId)]
-    public void TiledTilesetSync_PushThenChainRemoved_KeepsThePropertyOfTheUser(string property)
-    {
-        Open(Tile(0, property), Tile(5, property));
-        var achj = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        achj.AnimationChains.Add(NewChain("Walk", tile: 0));
-
-        TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(_dir.Path, "Hero.achx"), [_path]);
-        SavedProperties(0)!.ShouldStartWith(property);
-        SavedProperties(0)!.ShouldContain("achjSourceFile");
-        SavedProperties(5).ShouldBe(property);
-
-        _pm.LoadTsxProject(new FilePath(_path));
-        _pm.SaveTsxProject();
-        SavedProperties(0)!.ShouldStartWith(property);
-        SavedProperties(5).ShouldBe(property);
-
-        achj.AnimationChains.Clear();
-        TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(_dir.Path, "Hero.achx"), [_path]);
-        SavedProperties(0).ShouldBe(property);
-        SavedProperties(5).ShouldBe(property);
     }
 }

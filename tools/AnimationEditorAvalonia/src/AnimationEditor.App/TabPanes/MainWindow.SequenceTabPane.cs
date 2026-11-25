@@ -660,6 +660,7 @@ public partial class MainWindow
         {
             if (TopLevel.GetTopLevel(_window)?.Clipboard is not { } clipboard || SelectionText(document, surface) is not { } text) return;
             await clipboard.SetTextAsync(text);
+            _window.Notifications.HideProblem("⚠ Cut failed");
             if (document != _document || SelectionText(document, surface) != text) return; // only what was copied is removed
             if (surface == EditSurface.List)
             {

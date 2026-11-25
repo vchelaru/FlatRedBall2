@@ -48,7 +48,6 @@ public static class AnimationChainListSaveExtensions
     // Shared chain-building logic; loadTexture maps a save frame to its Texture2D (or null).
     private static AnimationChainList BuildList(AnimationChainListSave save, Func<AnimationFrameSave, Texture2D?> loadTexture)
     {
-        float frameLengthDivisor = save.TimeMeasurementUnit == TimeMeasurementUnit.Millisecond ? 1000f : 1f;
         var list = new AnimationChainList { Name = save.FileName };
 
         foreach (var chainSave in save.AnimationChains)
@@ -63,7 +62,7 @@ public static class AnimationChainListSaveExtensions
                 var frame = new AnimationFrame
                 {
                     TextureName = frameSave.TextureName,
-                    FrameLength = TimeSpan.FromSeconds(frameSave.FrameLength / frameLengthDivisor),
+                    FrameLength = frameSave.GetDuration(save.TimeMeasurementUnit),
                     FlipHorizontal = frameSave.FlipHorizontal,
                     FlipVertical = frameSave.FlipVertical,
                     FlipDiagonal = frameSave.FlipDiagonal,
@@ -84,24 +83,9 @@ public static class AnimationChainListSaveExtensions
 
                 if (frame.Texture != null)
                 {
-                    int left, top, width, height;
-                    if (save.CoordinateType == TextureCoordinateType.Pixel)
-                    {
-                        left   = (int)frameSave.LeftCoordinate;
-                        top    = (int)frameSave.TopCoordinate;
-                        width  = (int)(frameSave.RightCoordinate  - frameSave.LeftCoordinate);
-                        height = (int)(frameSave.BottomCoordinate - frameSave.TopCoordinate);
-                    }
-                    else // UV
-                    {
-                        left   = (int)(frameSave.LeftCoordinate   * frame.Texture.Width);
-                        top    = (int)(frameSave.TopCoordinate    * frame.Texture.Height);
-                        width  = (int)((frameSave.RightCoordinate  - frameSave.LeftCoordinate) * frame.Texture.Width);
-                        height = (int)((frameSave.BottomCoordinate - frameSave.TopCoordinate)  * frame.Texture.Height);
-                    }
-
-                    if (width > 0 && height > 0)
-                        frame.SourceRectangle = new Rectangle(left, top, width, height);
+                    var region = PixelRectangle.FromFrame(frameSave, save.CoordinateType, frame.Texture.Width, frame.Texture.Height);
+                    if (region.Width > 0 && region.Height > 0)
+                        frame.SourceRectangle = new Rectangle(region.X, region.Y, region.Width, region.Height);
                 }
 
                 AppendShapes(frame, frameSave.ShapesSave);

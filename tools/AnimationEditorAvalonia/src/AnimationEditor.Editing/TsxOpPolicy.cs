@@ -30,9 +30,6 @@ internal static class TsxOpPolicy
                 ? Fail(EditErrorCode.WrongFileKind, "set-chain-owner-tile applies to a Tiled .tsx; an .achx/.achj has no owner tiles.")
                 : null;
 
-        if (name == "associate-tileset")
-            return Fail(EditErrorCode.WrongFileKind, ProjectManager.NativeTsxAssociationRefusal);
-
         if (!Supported.Contains(name))
             return Fail(EditErrorCode.NotSupportedInTsx, name switch
             {

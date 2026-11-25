@@ -52,7 +52,7 @@ public class TsxWriterTests
     {
         var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, LegacyStyleFixtureXmlCrlf);
 
-        TsxWriter.Write(tileset, path);
+        TsxTestFile.Write(tileset, path);
 
         Assert.Equal(LegacyStyleFixtureXmlCrlf, File.ReadAllText(path));
     }
@@ -62,7 +62,7 @@ public class TsxWriterTests
     {
         var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
 
-        TsxWriter.Write(tileset, path);
+        TsxTestFile.Write(tileset, path);
 
         Assert.Equal(LegacyStyleFixtureXml, File.ReadAllText(path));
     }
@@ -81,7 +81,7 @@ public class TsxWriterTests
         var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, sharedLineXml);
         tileset.Tiles.Single(t => t.ID == 5).Properties.Add(new StringProperty { Name = "note", Value = "edited" });
 
-        TsxWriter.Write(tileset, path);
+        TsxTestFile.Write(tileset, path);
         var reloaded = Loader.Default().LoadTileset(path);
 
         Assert.True(reloaded.TileOffset.HasValue);
@@ -109,7 +109,7 @@ public class TsxWriterTests
         var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, objectLayerXml);
         tileset.Tiles.Single(t => t.ID == 5).Properties.Add(new StringProperty { Name = "note", Value = "edited" });
 
-        TsxWriter.Write(tileset, path);
+        TsxTestFile.Write(tileset, path);
         var written = File.ReadAllText(path);
 
         Assert.Contains("<objectgroup id=\"1\" draworder=\"index\">", written);
@@ -130,7 +130,7 @@ public class TsxWriterTests
         var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, sharedLineXml);
         tileset.Tiles.Single(t => t.ID == 1).Properties.Add(new StringProperty { Name = "note", Value = "edited" });
 
-        TsxWriter.Write(tileset, path);
+        TsxTestFile.Write(tileset, path);
         var reloaded = Loader.Default().LoadTileset(path);
 
         Assert.Equal(2, reloaded.Tiles.Count);
@@ -148,7 +148,7 @@ public class TsxWriterTests
         var tileset = TsxLoader.LoadTileset(path);
         edit(tileset);
 
-        TsxWriter.Write(tileset, path);
+        TsxTestFile.Write(tileset, path);
 
         var written = File.ReadAllText(path);
         Assert.StartsWith(Open, written);

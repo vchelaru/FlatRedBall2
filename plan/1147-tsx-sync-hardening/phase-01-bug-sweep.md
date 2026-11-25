@@ -1,5 +1,7 @@
 # Phase 1 — Bug sweep: native .tsx / achx-push tile-animation sync
 
+The achx push (Associate Tiled Tileset, `.tiledsync`) was removed in #2136; what follows about it is history.
+
 Tracking issue: [vchelaru/FlatRedBall2#1147](https://github.com/vchelaru/FlatRedBall2/issues/1147)
 Branch: `fix/tsx-native-sync-identity` (single branch, no worktree — every subagent below commits
 directly to it).

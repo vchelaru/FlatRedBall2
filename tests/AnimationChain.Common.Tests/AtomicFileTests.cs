@@ -7,7 +7,7 @@ using Xunit;
 
 namespace AnimationEditorCommon.Tests;
 
-// #1183: project-format saves (.achx/.achj/.tsx/.aeproperties/.tiledsync) wrote directly to
+// #1183: project-format saves (.achx/.achj/.tsx/.aeproperties) wrote directly to
 // their final path via File.Create/File.WriteAllText, which truncates the file to zero bytes
 // before streaming new content -- a crash or a concurrent reader mid-write can observe an
 // empty file. AtomicFile is the shared fix: write to a same-directory temp file, then
