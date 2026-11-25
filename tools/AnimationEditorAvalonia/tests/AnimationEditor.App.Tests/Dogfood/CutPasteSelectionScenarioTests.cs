@@ -115,4 +115,33 @@ public class CutPasteSelectionScenarioTests
         Press(editor, Key.Y);
         Shapes().ShouldBe("Circle| | Hit,Hurt|");
     }
+
+    // Putting the row selection back after a refresh must not open what the user closed.
+    [AvaloniaTheory]
+    [InlineData("Walk/0", "Walk", "lengths")]
+    [InlineData("Walk/0,Walk/1", "Walk", "lengths")]
+    [InlineData("Hit", "Walk", "lengths")]
+    [InlineData("Hit", "Walk/0", "rename")]
+    [InlineData("Hit,Circle", "Walk/0", "rename")]
+    public async Task RefreshOfAFrame_LeavesACollapsedRowCollapsed(string selected, string collapsed, string edit)
+    {
+        var (editor, rows) = await OpenAsync();
+        using var _ = editor;
+        Select(editor, selected.Split(',').Select(name => rows[name]).ToArray());
+        var row = editor.NodeFor(rows[collapsed]);
+        row.IsExpanded = false;
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+
+        if (edit == "lengths")
+            editor.Services.AppCommands.SetAllFrameLengths((AnimationChainSave)rows["Walk"], 0.3f);
+        else
+            editor.Services.AppCommands.SetShapePropsBulk([(ShapeSave)rows["Hit"]], "Hot", null, null);
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+        row.IsExpanded.ShouldBeFalse("after the edit");
+        foreach (var key in new[] { Key.Z, Key.Y })
+        {
+            Press(editor, key);
+            row.IsExpanded.ShouldBeFalse("after " + key);
+        }
+    }
 }

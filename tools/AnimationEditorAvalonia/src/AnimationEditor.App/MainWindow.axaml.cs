@@ -2116,7 +2116,7 @@ public partial class MainWindow : Window
         // Sync the texture combo to the texture of the currently selected frame/chain
         Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTextureCombo", SyncTextureCombo));
         // Sync tree selection
-        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTreeSelection", SyncTreeSelection));
+        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTreeSelection", () => SyncTreeSelection()));
         // Refresh property inspector
         Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("RefreshPropertyPanel", RefreshPropertyPanel));
         // Refresh timeline strip
@@ -5157,7 +5157,8 @@ public partial class MainWindow : Window
                 frameNode.Meta       = rebuiltFrameNode.Meta;
                 TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
             }
-            SyncTreeSelection();
+            // A row the user collapsed over the selection stays collapsed.
+            SyncTreeSelection(expandAncestors: false);
         }
         finally { _suppressTreeSelectionHandling = prior; }
         // The chain node's Meta carries the total play time (#623), which a frame-length edit
@@ -5255,11 +5256,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SyncTreeSelection()
+    private void SyncTreeSelection(bool expandAncestors = true)
     {
         if (_selectedState.SelectedNodes.Count > 1)
         {
-            SyncTreeMultiSelection(_selectedState.SelectedNodes);
+            SyncTreeMultiSelection(_selectedState.SelectedNodes, expandAncestors);
             return;
         }
 
@@ -5274,7 +5275,7 @@ public partial class MainWindow : Window
         // Expand the selected node's ancestors so its row is visible even if its chain (or, for a
         // shape, its frame) was collapsed — e.g. a frame selected by scrubbing the timeline.
         // Avalonia does not auto-expand parents.
-        if (sel is not null)
+        if (sel is not null && expandAncestors)
             TreeBuilder.ExpandAncestorsOf(_treeRoots, sel);
 
         // Exact-match check (not just Contains): a stale multi-selection can already contain
@@ -8357,7 +8358,7 @@ public partial class MainWindow : Window
     /// <see cref="ISelectedState.SelectedNodes"/> or call <see cref="TreeBuilder.RouteNodeSelection"/> —
     /// that is <see cref="OnTreeSelectionChanged"/>'s job and causes a SelectionChanged loop.
     /// </summary>
-    private void SyncTreeMultiSelection(IReadOnlyList<object> dataObjects)
+    private void SyncTreeMultiSelection(IReadOnlyList<object> dataObjects, bool expandAncestors)
     {
         if (TreeMultiSelectionAlreadySynced(dataObjects))
             return;
@@ -8366,7 +8367,7 @@ public partial class MainWindow : Window
         bool chainsOnly = dataObjects.All(d => d is AnimationChainSave);
         foreach (var data in dataObjects)
         {
-            if (!chainsOnly)
+            if (expandAncestors && !chainsOnly)
                 TreeBuilder.ExpandAncestorsOf(_treeRoots, data);
             var node = TreeBuilder.FindNodeForData(_treeRoots, data);
             if (node is not null)
