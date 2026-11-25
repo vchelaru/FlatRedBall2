@@ -478,6 +478,15 @@ public partial class MainWindow : Window
         // SaveTabsToSettings only reads tab state and writes a file, touching no UI controls.
         _tabManager.TabsChanged += SaveTabsToSettings;
         _tabManager.TabsChanged += PruneTabTrees;
+        // The first edit with no tab open (Add Animation, a paste) is a new document. Without its tab it would be in no
+        // list, and every way out would drop it without asking (#898, #2184). Not StackChanged: opening a document raises
+        // that too, before its own tab exists.
+        _undoManager.CommandRan += () =>
+        {
+            if (_tabManager.ActiveTab is not null) return;
+            _tabController.EnsureCurrentDocumentHasTab(_projectManager);
+            WireframeCtrl.RememberLiveCamera(); // the document stays on screen, so its tab starts with this camera
+        };
         // Any recorded edit to the active preview tab promotes it to permanent (#841) -- leaving
         // it previewable would silently discard the edit the next time a different file is
         // single-clicked in the Project tree. Guarded against the load sequence's own
@@ -485,13 +494,6 @@ public partial class MainWindow : Window
         _undoManager.StackChanged += () =>
         {
             if (_suppressPreviewPromotion) return;
-            // The first edit with no tab open (Add Animation, a paste) is a new document. Without its tab it would be
-            // in no list, and every way out would drop it without asking (#898, #2184).
-            if (_tabManager.ActiveTab is null)
-            {
-                _tabController.EnsureCurrentDocumentHasTab(_projectManager);
-                WireframeCtrl.RememberLiveCamera(); // the document stays on screen, so its tab starts with this camera
-            }
             if (_tabManager.ActiveTab is { IsPreview: true } active)
             {
                 _tabManager.Promote(active.Path);

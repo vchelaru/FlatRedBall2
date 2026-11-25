@@ -127,6 +127,60 @@ public class ContentWithoutATabScenarioTests
     }
 
     [AvaloniaFact]
+    public void RestartingAfterACrash_WithOneRecoveryFile_OpensOneTab()
+    {
+        string folder = Directory.CreateTempSubdirectory("AeRecovery").FullName;
+        try
+        {
+            string recovery = Path.Combine(folder, "recovery.achx");
+            var recovered = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+            recovered.AnimationChains.Add(new AnimationChainSave { Name = "Recovered" });
+            recovered.Save(recovery);
+
+            using var editor = new AnimationEditorHarness(Path.Combine(folder, "settings"), recovery);
+            editor.Wait(TimeSpan.FromMilliseconds(200));
+
+            editor.TabLabels.ShouldBe(["Untitled"]);
+            editor.Project.AnimationChains.Single().Name.ShouldBe("Recovered");
+            editor.Window.CloseWithoutPrompt();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    // Opening a document does these before its tab exists. None is an edit, so none opens a tab of its own.
+    [AvaloniaTheory]
+    [InlineData("Clear")]
+    [InlineData("RestoreSnapshot")]
+    [InlineData("MarkSaved")]
+    [InlineData("MarkSaveFailed")]
+    public async Task AHistoryChangeThatIsNoEdit_OpensNoTab(string change)
+    {
+        using var editor = await OpenWithCopyAsync();
+        await PasteAsync(editor);
+        var snapshot = editor.UndoManager.TakeSnapshot();
+        snapshot.UndoStack.ShouldNotBeEmpty();
+        editor.Dialogs.AnswerNextSaveDiscardCancel(SaveDiscardCancelChoice.Discard);
+        editor.CloseTab("Untitled");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+        editor.Services.ProjectManager.AnimationChainListSave!.AnimationChains.Add(new AnimationChainSave { Name = "Loading" });
+
+        switch (change)
+        {
+            case "Clear": editor.UndoManager.Clear(); break;
+            case "RestoreSnapshot": editor.UndoManager.RestoreSnapshot(snapshot); break;
+            case "MarkSaved": editor.UndoManager.MarkSaved(); break;
+            case "MarkSaveFailed": editor.UndoManager.MarkSaveFailed(); break;
+        }
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+
+        editor.TabLabels.ShouldBeEmpty();
+        editor.Window.CloseWithoutPrompt();
+    }
+
+    [AvaloniaFact]
     public async Task UndoAndRedoOfThePaste_KeepTheOneTab()
     {
         using var editor = await OpenWithCopyAsync();
