@@ -1,5 +1,6 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Sequences;
+using AnimationEditor.Core.Conversions;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
@@ -300,8 +301,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.ExportCompleted"/>
         public event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
-        /// <inheritdoc cref="IAppCommands.TsxSaveCompletedWithWarnings"/>
-        public event Action<string, IReadOnlyList<string>>? TsxSaveCompletedWithWarnings;
+        /// <inheritdoc cref="IAppCommands.SaveCompletedWithWarnings"/>
+        public event Action<string, IReadOnlyList<string>>? SaveCompletedWithWarnings;
 
         /// <inheritdoc cref="IAppCommands.SaveFailed"/>
         public event Action<string>? SaveFailed;
@@ -731,7 +732,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
                 // A listener that throws fails the save too: escaping, it would keep the edit out of the undo history.
                 if (tsxWarnings.Count > 0)
-                    TsxSaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
+                    SaveCompletedWithWarnings?.Invoke(target, tsxWarnings);
                 if (isOpen)
                     EditorProjectModelChanged?.Invoke(target);
             }
@@ -817,7 +818,15 @@ namespace AnimationEditor.Core.CommandsAndState
             _ioManager.DeleteRecoveryFile(_pm.AnimationChainListSave);
             SaveAsCompleted?.Invoke(path);
             _events.RaiseCurrentFileChanged(path);
+            WarnOfWhatIsNotKept(path);
             return true;
+        }
+
+        private void WarnOfWhatIsNotKept(string path)
+        {
+            if (_pm.IsNativeTsxProject || new FilePath(path).Extension != "achj" || _pm.AnimationChainListSave is not { } document) return;
+            var notKept = ConversionDrop.Describe(ConversionLoss.OfSavingAsAchj(document));
+            if (notKept.Count > 0) SaveCompletedWithWarnings?.Invoke(path, notKept.Select(text => text + ".").ToList());
         }
 
         /// <summary>

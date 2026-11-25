@@ -90,6 +90,21 @@ public class ConversionPlanDialogTests
         owner.Close();
     }
 
+    [AvaloniaTheory]
+    [InlineData(1)]
+    [InlineData(200)]
+    public void WhatAFileLoses_IsThereAsOpened_InTheOneScrollArea(int files)
+    {
+        var plan = Plan(files);
+        var drops = Enumerable.Range(1, 30).Select(i => new ConversionDrop($"<Custom{i}>", new ConversionPlace(1, "Walk", 0))).ToList();
+        var (owner, dialog, _) = Show(plan with { Files = [.. plan.Files.SkipLast(1), plan.Files[^1] with { Drops = drops }] });
+
+        Shows(dialog, string.Join('\n', Enumerable.Range(1, 30).Select(i => $"<Custom{i}> in animation 'Walk' is not kept"))).ShouldBeTrue();
+        Scroller(dialog).Extent.Height.ShouldBeGreaterThan(Scroller(dialog).Viewport.Height);
+        Text(dialog, "Cancel").TranslatePoint(default, dialog)!.Value.Y.ShouldBeInRange(0, dialog.ClientSize.Height - 10);
+        owner.Close();
+    }
+
     [AvaloniaFact]
     public async Task NothingToConvert_EnterOnlyCloses()
     {

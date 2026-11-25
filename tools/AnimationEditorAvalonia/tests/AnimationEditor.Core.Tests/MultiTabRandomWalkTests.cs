@@ -87,7 +87,7 @@ public class MultiTabRandomWalkTests
         var messages = new List<string>();
         ctx.AppCommands.SaveFailed += messages.Add;
         ctx.AppCommands.SaveAsRefused += messages.Add;
-        ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, w) => messages.AddRange(w);
+        ctx.AppCommands.SaveCompletedWithWarnings += (_, w) => messages.AddRange(w);
         ctx.AppCommands.LoadFailed += (p, ex) => messages.Add(p + ex.Message);
         var random = new Random(seed);
         var docs = new List<Doc>();

@@ -8,6 +8,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Xml;
+using System.Xml.Linq;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Conversions;
@@ -168,6 +170,11 @@ public static class AchxConversion
             differences.Add($"{Name(file.Source)}: not converted, it is not the file the plan is for any more");
             return false;
         }
+        if (file.SavesEdits && LosesMore(file))
+        {
+            differences.Add($"{Name(file.Source)}: not converted, with its edits saved it loses more than the plan says. Convert it again");
+            return false;
+        }
         var result = AchxToAchjConverter.Convert(file.Source);
         if (result.Status != AchxConversionStatus.Converted)
         {
@@ -185,6 +192,18 @@ public static class AchxConversion
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; } // converting it says why
     }
 
+    // The plan is for the file without the edits.
+    private static bool LosesMore(PlannedFile file)
+    {
+        try
+        {
+            string text = File.ReadAllText(file.Source);
+            return new AchxElementCheck().Drops(XDocument.Parse(text), AnimationFileLoader.Parse(text, new FilePath(file.Source))).Except(file.Drops).Any();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or XmlException) { return false; } // converting it says why
+    }
+
+    // What is not kept is what the plan says: it is for this text, or the text was compared with it above.
     private static bool SameContent(PlannedFile file)
     {
         try

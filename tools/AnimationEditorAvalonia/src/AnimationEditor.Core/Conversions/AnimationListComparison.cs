@@ -5,7 +5,10 @@ using System.Xml.Linq;
 
 namespace AnimationEditor.Core.Conversions;
 
-/// <summary>Compares two animation lists field by field, as the <c>.achx</c> format writes them.</summary>
+/// <summary>
+/// Compares two animation lists field by field, as the <c>.achx</c> format writes them. What an <c>.achx</c> only carries
+/// (<see cref="AchxElementCheck.IsOnlyCarried"/>) is not compared.
+/// </summary>
 public static class AnimationListComparison
 {
     /// <summary>Where <paramref name="other"/> first differs from <paramref name="original"/> ("animation 'Walk', frame 2"), or null when it does not.</summary>
@@ -68,10 +71,18 @@ public static class AnimationListComparison
         return inside.FirstOrDefault(node => node is not null) ?? from;
     }
 
-    // An .achx writes an empty text as an empty element or as none, whichever it was read as, and both mean the same.
+    // An .achx writes an empty text as an empty element or as none, whichever it was read as, and both mean the same. So does
+    // a polygon's name before its points or after.
     private static XElement Fields(AnimationChainListSave list)
     {
         var root = XElement.Parse(list.ToXmlString());
+        root.Descendants().Where(AchxElementCheck.IsOnlyCarried).Remove();
+        foreach (var name in root.Descendants("PolygonSave").Elements("Name").ToList())
+        {
+            var polygon = name.Parent!;
+            name.Remove();
+            polygon.AddFirst(name);
+        }
         root.Descendants().Where(element => element is { HasElements: false, Value.Length: 0 }).Remove();
         return root;
     }

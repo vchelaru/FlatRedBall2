@@ -15,8 +15,9 @@ public sealed record AchxToAchjBatchResult(IReadOnlyList<AchxConversionResult> F
 
 /// <summary>
 /// Batch <c>.achx</c> to <c>.achj</c> conversion (#1376). Writes only the new <c>.achj</c> files:
-/// never overwrites one, never touches the source, and writes nothing for a file that fails. One that an <c>.achj</c> cannot
-/// hold exactly (<see cref="ConversionLoss"/>) fails with <see cref="EditErrorCode.WouldLoseData"/>.
+/// never overwrites one, never touches the source, and writes nothing for a file that fails. What an <c>.achj</c> does not keep
+/// (<see cref="ConversionLoss"/>) is a warning. A file whose animations would come out different fails with
+/// <see cref="EditErrorCode.WouldLoseData"/>.
 /// What happens to the originals (recycling, closing tabs) is the caller's decision.
 /// </summary>
 public static class AchxToAchjBatch
@@ -47,7 +48,7 @@ public static class AchxToAchjBatch
             var target = Path.ChangeExtension(source, ".achj");
             if (!File.Exists(target))
             {
-                var (problem, code, hasComments) = Check(source, name, check);
+                var (problem, code, notKept) = Check(source, name, check);
                 if (problem is not null)
                 {
                     files.Add(new AchxConversionResult(source, target, AchxConversionStatus.Failed, problem));
@@ -55,7 +56,7 @@ public static class AchxToAchjBatch
                     codes.Add(code);
                     continue;
                 }
-                if (hasComments) warnings.Add($"{name}: comments are not kept.");
+                warnings.AddRange(notKept);
             }
             var result = AchxToAchjConverter.Convert(source);
             files.Add(result);
@@ -77,21 +78,22 @@ public static class AchxToAchjBatch
         return new AchxToAchjBatchResult(files, new EditResult(changed, errors, warnings, codes));
     }
 
-    /// <summary>Why the file is not converted, if it is not, and whether it has comments.</summary>
-    private static (string? Problem, EditErrorCode Code, bool HasComments) Check(string source, string name, AchxElementCheck check)
+    /// <summary>Why the file is not converted, if it is not, and a warning for each thing that is not kept.</summary>
+    private static (string? Problem, EditErrorCode Code, IEnumerable<string> NotKept) Check(string source, string name, AchxElementCheck check)
     {
         try
         {
             var text = File.ReadAllText(source);
             var list = AnimationFileLoader.Parse(text, new FilePath(source));
             var document = XDocument.Parse(text);
-            return ConversionLoss.ToAchj(document, list, check) is { } loss
-                ? (FileConvertEdit.Refusal(name, loss), EditErrorCode.WouldLoseData, false)
-                : (null, EditErrorCode.Unspecified, AchxElementCheck.HasComments(document));
+            var loss = ConversionLoss.ToAchj(document, list, check);
+            if (loss.Difference is { } difference) return (FileConvertEdit.Refusal(name, difference), EditErrorCode.WouldLoseData, []);
+            var notKept = FileConvertEdit.Warnings(name, loss);
+            return (null, EditErrorCode.Unspecified, AchxElementCheck.HasComments(document) ? notKept.Append($"{name}: comments are not kept.") : notKept);
         }
         catch (Exception ex)
         {
-            return ($"{name}: {ex.Message}", EditErrorCode.IoFailed, false);
+            return ($"{name}: {ex.Message}", EditErrorCode.IoFailed, []);
         }
     }
 }

@@ -104,7 +104,7 @@ public class TabSwitchCacheTsxTests : IDisposable
         tab.CachedEditorModel!.AnimationChains.RemoveAt(0);
         tab.CachedEditorModel.AnimationChains[0].Loop = false;
         IReadOnlyList<string> warnings = [];
-        _ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, raised) => warnings = raised;
+        _ctx.AppCommands.SaveCompletedWithWarnings += (_, raised) => warnings = raised;
 
         _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
 
@@ -211,7 +211,7 @@ public class TabSwitchCacheTsxTests : IDisposable
         tab.CachedEditorModel!.AnimationChains[0].Loop = false;
         var messages = new List<string>();
         _ctx.AppCommands.SaveFailed += messages.Add;
-        _ctx.AppCommands.TsxSaveCompletedWithWarnings += (_, _) => throw new InvalidOperationException("boom");
+        _ctx.AppCommands.SaveCompletedWithWarnings += (_, _) => throw new InvalidOperationException("boom");
 
         _ctx.AppCommands.SaveDocument(tab).ShouldBeFalse();
 
