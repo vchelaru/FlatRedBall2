@@ -5854,7 +5854,10 @@ public partial class MainWindow : Window
         };
         PropFrameEvents.EditCommitted += (index, name, data) =>
         {
-            if (_selectedState.SelectedFrame is { } frame) _appCommands.SetFrameEvent(frame, index, name, data);
+            if (_selectedState.SelectedFrame is not { } frame) return;
+            var current = frame.Events[index];
+            if (RefuseUnstorable(name, current.Name) || RefuseUnstorable(data, current.Data)) return;
+            _appCommands.SetFrameEvent(frame, index, name, data);
         };
         PropFrameEvents.RemoveRequested += index =>
         {
@@ -6210,6 +6213,15 @@ public partial class MainWindow : Window
         return InspectorShapes(all);
     }
 
+    /// <summary>Reports a change from <paramref name="current"/> to text XML cannot store and puts the Inspector back; false for any other.</summary>
+    private bool RefuseUnstorable(string? text, string? current)
+    {
+        if (text == current || StorableText.Problem(text) is not { } problem) return false;
+        ShowProblem(problem);
+        RefreshPropertyPanel();
+        return true;
+    }
+
     private void ApplyMixedShapeProps()
     {
         if (_suppressPropRefresh) return;
@@ -6219,6 +6231,7 @@ public partial class MainWindow : Window
         NumericEdit? x = EditOf(PropShapesX);
         NumericEdit? y = EditOf(PropShapesY);
         string? name = PropShapesName.Text;
+        if (RefuseUnstorable(name, shapes[0].Name)) return;
         if (name != null) _appCommands.SetShapePropsBulk(shapes, name, null, null);
         if (x != null || y != null)
             _appCommands.SetShapePropsBulk(ShapeKeyframes(shapes, ShapeKeyframeGroup.Offset), null, x, y);
@@ -6640,6 +6653,7 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh || _selectedState.SelectedPolygon is not { } polygon) return;
         var polygons = InspectorShapes(_selectedState.SelectedPolygons);
+        if (RefuseUnstorable(PropPolygonName.Text, polygon.Name)) return;
 
         if (_selectedState.SelectedPolygons.Count > 1)
         {
@@ -6688,7 +6702,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Commits <see cref="PropChainName"/>. Empty reverts a tsx chain to its auto name
-    /// (see <see cref="IAppCommands.RenameChain"/>); a rejected rename (duplicate, or empty in an
+    /// (see <see cref="RenameEdit.RenameChain"/>); a rejected rename (duplicate, or empty in an
     /// achx project) snaps the box back to the current name.</summary>
     private void ApplyChainName()
     {
@@ -6696,9 +6710,8 @@ public partial class MainWindow : Window
         var chain = _selectedState.SelectedChain;
         if (chain is null) return;
 
-        var text = PropChainName.Text ?? string.Empty;
-        if (!_appCommands.RenameChain(chain, text))
-            ShowProblem(text.Trim().Length == 0 ? "Chain name cannot be empty." : $"Another chain is already named \"{text.Trim()}\".");
+        var result = RenameEdit.RenameChain(_projectManager, _appCommands, chain, PropChainName.Text ?? string.Empty);
+        if (!result.Success) ShowProblem(result.Errors[0]);
         RefreshChainNameBox(chain);
     }
 
@@ -6992,6 +7005,7 @@ public partial class MainWindow : Window
         NumericEdit? scaleX = EditOf(PropRectScaleX);
         NumericEdit? scaleY = EditOf(PropRectScaleY);
         string? name = PropRectName.Text;
+        if (RefuseUnstorable(name, rects[0].Name)) return;
 
         // Offset and size edits reach only the rectangles whose keyframe for that group is on (#1478): a
         // skipped rectangle shows a computed value that must not be written back as its own.
@@ -7013,6 +7027,7 @@ public partial class MainWindow : Window
         NumericEdit? y = EditOf(PropCircleY);
         NumericEdit? radius = EditOf(PropCircleRadius);
         string? name = PropCircleName.Text;
+        if (RefuseUnstorable(name, circles[0].Name)) return;
 
         // See ApplyRectProps: offset and size edits reach only shapes whose keyframe for that group is on.
         if (name != null) _appCommands.SetCirclePropsBulk(circles, name, null, null, null);

@@ -75,6 +75,16 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>AnimationChain.Common.Tests</_Parameter1>
     </AssemblyAttribute>
+    <!-- StorableText: the AnimationEditor refuses the text its XML writers would. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AnimationEditor.Core</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AnimationEditor.Editing</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AnimationEditor</_Parameter1>
+    </AssemblyAttribute>
     <!-- FrameEventRange: the engine's Sprite shares AnimationPlayer's frame-event semantics. -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>FlatRedBall2.Kni</_Parameter1>
