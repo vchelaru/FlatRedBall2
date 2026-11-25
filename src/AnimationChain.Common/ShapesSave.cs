@@ -242,8 +242,11 @@ public class PolygonSave : ShapeSave
     /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="PointsInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
     public string? PointsEasing;
 
-    // FRB1's rotation, not applied here. Only carried, so saving a file keeps it; null for a polygon FRB1 did not write.
-    internal float? RotationZ;
+    // FRB1's rotation, not applied here. Only carried, so saving a file keeps it.
+    internal string? RotationZ;
+
+    // FRB1 writes the name after the points, this writer before X.
+    internal bool NameAfterPoints;
 
     /// <inheritdoc/>
     public override ShapeSave Clone()

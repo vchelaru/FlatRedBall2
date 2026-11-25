@@ -33,6 +33,7 @@ public class NotAnAnimationFileTests
     [InlineData("<AnimationChainArraySave><AnimationChain><Name>Walk</Name><Frame /></AnimationChain></AnimationChainArraySave>")]
     [InlineData("<AnimationChainArraySave xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" other=\"1\"><Unknown /><AnimationChain><Name>Walk</Name><Frame><HasCustomName>true</HasCustomName></Frame></AnimationChain></AnimationChainArraySave>")]
     [InlineData("{\"other\":1,\"animationChains\":[{\"name\":\"Walk\",\"locked\":null,\"frames\":[{\"textureName\":null,\"red\":null,\"shapes\":null,\"events\":null}]}]}")]
+    [InlineData("{\"animationChains\":[{\"frames\":[{\"events\":[null,{\"name\":\"Hit\"}]}]}]}")]
     public void FromString_PartsMissingNullOrUnknown_IsRead(string text) =>
         AnimationChainListSave.FromString(text).AnimationChains.ShouldHaveSingleItem().Frames.Count.ShouldBe(1);
 }

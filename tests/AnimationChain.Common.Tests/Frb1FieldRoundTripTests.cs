@@ -163,6 +163,36 @@ public class Frb1FieldRoundTripTests : IDisposable
         save.ToXmlString().ShouldContain("<Name>Walk</Name>");
     }
 
+    // RotationZ is only carried, so it is never parsed, and the name stays on the side of the points it was on.
+    [Theory]
+    [InlineData("<RotationZ />", "", "<Name>Hull</Name>")]
+    [InlineData("<RotationZ>INF</RotationZ>", "", "<Name>Hull</Name>")]
+    [InlineData("<RotationZ>0,5</RotationZ>", "<Name>Hull</Name>", "")]
+    [InlineData("", "", "<Name>Hull</Name>")]
+    public void ToXmlString_PolygonRotationAndName_StayAsRead(string rotation, string nameBefore, string nameAfter)
+    {
+        string polygon = $"<PolygonSave>{nameBefore}<X>0</X><Y>0</Y><Z>0</Z>{rotation}<Points />{nameAfter}";
+
+        string saved = AnimationChainListSave.FromString(
+            $"<AnimationChainArraySave><AnimationChain><Frame><ShapeCollectionSave><PolygonSaves>{polygon}</PolygonSave></PolygonSaves></ShapeCollectionSave></Frame></AnimationChain></AnimationChainArraySave>")
+            .ToXmlString();
+
+        System.Text.RegularExpressions.Regex.Replace(saved, @">\s+<", "><").ShouldContain(polygon + "<Alpha>");
+    }
+
+    // The nested dialect is rewritten into FRB1's on save, so its empty text has no form to keep.
+    [Theory]
+    [InlineData("")]
+    [InlineData("<Name /><Name>b</Name>")]
+    public void ToXmlString_NestedShapeWithEmptyName_WritesAPairOfTags(string name)
+    {
+        string saved = AnimationChainListSave.FromString(
+            $"<AnimationChainArraySave><AnimationChain><Name>Walk</Name><Frame><ShapeCollectionSave><Shapes><AxisAlignedRectangleSave>{name}<X>1</X></AxisAlignedRectangleSave></Shapes></ShapeCollectionSave></Frame></AnimationChain></AnimationChainArraySave>")
+            .ToXmlString();
+
+        saved.ShouldContain("<Name></Name>");
+    }
+
     [Theory]
     [InlineData("0,5")]
     [InlineData("1,25")]

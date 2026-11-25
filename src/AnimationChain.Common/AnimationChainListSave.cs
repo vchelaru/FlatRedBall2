@@ -638,15 +638,14 @@ public class AnimationChainListSave
                     new XElement("X", FloatStr(v.X)),
                     new XElement("Y", FloatStr(v.Y))));
             var nameEl = p.EmptyText.Write("Name", p.Name);
-            // FRB1 always writes RotationZ, so a polygon that has it keeps FRB1's element order: the name after the points.
             polysEl.Add(new XElement("PolygonSave",
-                p.RotationZ == null ? nameEl : null,
+                p.NameAfterPoints ? null : nameEl,
                 new XElement("X", FloatStr(p.X)),
                 new XElement("Y", FloatStr(p.Y)),
                 new XElement("Z", FloatStr(p.Z)),
-                p.RotationZ is { } rotation ? new XElement("RotationZ", FloatStr(rotation)) : null,
+                p.EmptyText.Write("RotationZ", p.RotationZ),
                 pointsEl,
-                p.RotationZ == null ? null : nameEl,
+                p.NameAfterPoints ? nameEl : null,
                 WriteColor(p), WriteShapeKeyframes(p)));
         }
 
@@ -698,7 +697,8 @@ public class AnimationChainListSave
         target.OffsetEasing = target.EmptyText.ReadOptional(el, "OffsetEasing");
         if (target is PolygonSave poly)
         {
-            poly.RotationZ = el.Element("RotationZ") == null ? null : FloatEl(el, "RotationZ");
+            poly.RotationZ = poly.EmptyText.ReadOptional(el, "RotationZ");
+            poly.NameAfterPoints = el.Element("Name")?.ElementsBeforeSelf("Points").Any() == true;
             poly.SkipPointsKeyframe = BoolEl(el, "SkipPointsKeyframe");
             poly.PointsInterpolation = poly.EmptyText.ReadOptional(el, "PointsInterpolation");
             poly.PointsEasing = poly.EmptyText.ReadOptional(el, "PointsEasing");
@@ -941,6 +941,10 @@ public class AnimationChainListSave
             }
         }
 
+        // Saving rewrites this dialect into FRB1's, so there is no form or order of it to keep.
+        foreach (var shape in shapes.Shapes.OfType<ShapeSave>()) shape.EmptyText = default;
+        foreach (var poly in shapes.PolygonSaves) poly.NameAfterPoints = false;
+
         return shapes;
     }
 
@@ -1109,7 +1113,7 @@ public class AnimationChainListSave
         if (el["shapes"] is { } shapes)
             frame.ShapesSave = ParseShapesJson(shapes as JsonObject ?? throw Wrong(shapes, "an object"));
 
-        foreach (var eventObj in ObjectsProp(el, "events"))
+        foreach (var eventObj in ObjectsProp(el, "events", skipNulls: true))
             frame.Events.Add(new AnimationFrameEvent
             {
                 Name = StringProp(eventObj, "name") ?? string.Empty,
@@ -1210,12 +1214,13 @@ public class AnimationChainListSave
     }
 
     // The objects of an array property; none for an absent property or JSON null.
-    private static IEnumerable<JsonObject> ObjectsProp(JsonObject parent, string name)
+    private static IEnumerable<JsonObject> ObjectsProp(JsonObject parent, string name, bool skipNulls = false)
     {
         if (parent[name] is not { } node) yield break;
         var array = node as JsonArray ?? throw Wrong(node, "an array");
         for (int i = 0; i < array.Count; i++)
-            yield return array[i] as JsonObject ?? throw new InvalidDataException($"{PathOf(array)}[{i}] must be an object.");
+            if (array[i] is not null || !skipNulls)
+                yield return array[i] as JsonObject ?? throw new InvalidDataException($"{PathOf(array)}[{i}] must be an object.");
     }
 
     private static InvalidDataException Wrong(JsonNode node, string expected) => new($"{PathOf(node)} must be {expected}.");
