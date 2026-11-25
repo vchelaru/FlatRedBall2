@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.IO;
-using System.Xml;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace FlatRedBall2.Animation;
@@ -77,8 +76,7 @@ public class AnimationChainList : List<AnimationChain>
             fresh = content.LoadAnimationChainList(path);
         }
         catch (IOException) { return false; }
-        catch (XmlException) { return false; }
-        catch (System.Text.Json.JsonException) { return false; }
+        catch (InvalidDataException) { return false; }
 
         foreach (var freshChain in fresh)
         {
