@@ -54,6 +54,25 @@ public class FrameEventsEditorTests
     }
 
     [AvaloniaFact]
+    public void EditName_LeavesData_AndAnUntouchedRowCommitsNothing()
+    {
+        var editor = Show(new AnimationFrameEvent { Name = " Step ", Data = "  " });
+        (int, string, string?)? committed = null;
+        editor.EditCommitted += (i, n, d) => committed = (i, n, d);
+        var row = editor.Rows[0];
+
+        row.Name.Focus();
+        row.Data.Focus();
+        Assert.Null(committed);
+
+        row.Name.Focus();
+        row.Name.Text = "Footstep";
+        row.Data.Focus();
+
+        Assert.Equal((0, "Footstep", "  "), committed);
+    }
+
+    [AvaloniaFact]
     public void RemoveButton_RaisesRemoveRequestedWithRowIndex()
     {
         var editor = Show(new AnimationFrameEvent { Name = "A" }, new AnimationFrameEvent { Name = "B" });

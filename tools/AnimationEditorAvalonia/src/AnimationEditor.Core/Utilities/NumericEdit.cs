@@ -14,11 +14,13 @@ public readonly struct NumericEdit
 {
     private readonly char _op;
     private readonly decimal _operand;
+    private readonly (decimal Minimum, decimal Maximum, bool Clamps)? _limits;
 
-    private NumericEdit(char op, decimal operand)
+    private NumericEdit(char op, decimal operand, (decimal, decimal, bool)? limits = null)
     {
         _op = op;
         _operand = operand;
+        _limits = limits;
     }
 
     /// <summary>True when the edit applies an operator to each item's current value.</summary>
@@ -30,6 +32,10 @@ public readonly struct NumericEdit
     public static implicit operator NumericEdit(float value) => Set(ToDecimal(value));
     public static implicit operator NumericEdit(int value) => Set(value);
 
+    /// <summary>This edit kept in the range of the field it was typed in, for each item it applies to: a result outside is
+    /// clamped, or leaves the item's value unchanged when <paramref name="clamps"/> is false.</summary>
+    public NumericEdit Within(decimal minimum, decimal maximum, bool clamps) => new(_op, _operand, (minimum, maximum, clamps));
+
     /// <summary>The number as the file writes it. A cast keeps only 7 digits, so it can be another float.</summary>
     /// <exception cref="OverflowException">The value does not fit a decimal.</exception>
     public static decimal ToDecimal(float value) =>
@@ -38,10 +44,10 @@ public readonly struct NumericEdit
             : throw new OverflowException($"{value} does not fit a decimal.");
 
     /// <summary>The edited value of an item whose value is currently <paramref name="current"/>.
-    /// An edit that overflows leaves the value unchanged.</summary>
+    /// An edit that overflows, or is refused by its limits (<see cref="Within"/>), leaves the value unchanged.</summary>
     public decimal Apply(decimal current) => TryApply(current, out decimal value) ? value : current;
 
-    /// <summary><see cref="Apply(decimal)"/> for callers that must report an edit that overflows: returns false for one.</summary>
+    /// <summary><see cref="Apply(decimal)"/> for callers that must report an edit that overflows or is out of range: returns false for one.</summary>
     public bool TryApply(decimal current, out decimal value)
     {
         try
@@ -54,7 +60,11 @@ public readonly struct NumericEdit
                 '/' => current / _operand,
                 _ => _operand,
             };
-            return true;
+            if (_limits is not { } limits) return true;
+            decimal inRange = Math.Clamp(value, limits.Minimum, limits.Maximum);
+            bool accepted = limits.Clamps || inRange == value;
+            value = inRange;
+            return accepted;
         }
         catch (OverflowException)
         {
@@ -78,6 +88,15 @@ public readonly struct NumericEdit
 
     /// <summary>Rounds to the nearest integer, for whole-pixel and color-channel fields.</summary>
     public int Apply(int current) => (int)Math.Round(Apply((decimal)current), MidpointRounding.AwayFromZero);
+
+    /// <summary><see cref="Apply(int)"/> for a <paramref name="current"/> that is rounded from what is stored: writing it
+    /// back would change the item, so a refused edit (false) must write nothing.</summary>
+    public bool TryApply(int current, out int value)
+    {
+        bool accepted = TryApply((decimal)current, out decimal result);
+        value = accepted ? (int)Math.Round(result, MidpointRounding.AwayFromZero) : current;
+        return accepted;
+    }
 
     /// <summary>Returns false (leaving the target untouched) for empty, malformed, or
     /// divide-by-zero text.</summary>

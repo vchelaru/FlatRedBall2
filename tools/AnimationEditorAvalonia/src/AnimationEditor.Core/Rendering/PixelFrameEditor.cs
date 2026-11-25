@@ -9,22 +9,22 @@ namespace AnimationEditor.Core.Rendering;
 /// </summary>
 public static class PixelFrameEditor
 {
-    /// <summary>Moves the frame to <paramref name="newXPixels"/>, keeping its width (at least 1 pixel).</summary>
+    /// <summary>Moves the frame to <paramref name="newXPixels"/>, keeping its width exactly, also a fractional one.</summary>
     public static void SetX(AnimationFrameSave frame, int newXPixels)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
-        int frameWidth = Math.Max(1, RoundToPixel(frame.RightCoordinate) - RoundToPixel(frame.LeftCoordinate));
+        float frameWidth = frame.RightCoordinate - frame.LeftCoordinate;
         frame.LeftCoordinate  = newXPixels;
         frame.RightCoordinate = newXPixels + frameWidth;
     }
 
-    /// <summary>Moves the frame to <paramref name="newYPixels"/>, keeping its height (at least 1 pixel).</summary>
+    /// <summary>Moves the frame to <paramref name="newYPixels"/>, keeping its height exactly, also a fractional one.</summary>
     public static void SetY(AnimationFrameSave frame, int newYPixels)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
-        int frameHeight = Math.Max(1, RoundToPixel(frame.BottomCoordinate) - RoundToPixel(frame.TopCoordinate));
+        float frameHeight = frame.BottomCoordinate - frame.TopCoordinate;
         frame.TopCoordinate    = newYPixels;
         frame.BottomCoordinate = newYPixels + frameHeight;
     }
@@ -42,6 +42,4 @@ public static class PixelFrameEditor
         ArgumentNullException.ThrowIfNull(frame);
         frame.BottomCoordinate = frame.TopCoordinate + Math.Max(1, newHeightPixels);
     }
-
-    private static int RoundToPixel(float coord) => (int)Math.Round(coord);
 }

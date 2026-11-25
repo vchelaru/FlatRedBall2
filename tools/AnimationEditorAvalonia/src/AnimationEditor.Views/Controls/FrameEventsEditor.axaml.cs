@@ -114,8 +114,10 @@ public partial class FrameEventsEditor : UserControl
         if (index >= _shown.Count) return;
         var row = _rows[index];
         var shown = _shown[index];
-        var name = row.Name.Text?.Trim() ?? string.Empty;
-        var data = string.IsNullOrWhiteSpace(row.Data.Text) ? null : row.Data.Text;
+        // A box still holding the text it was given keeps its value as stored.
+        var name = row.Name.Text == shown.Name ? shown.Name : row.Name.Text?.Trim() ?? string.Empty;
+        var data = (row.Data.Text ?? string.Empty) == (shown.Data ?? string.Empty) ? shown.Data
+            : string.IsNullOrWhiteSpace(row.Data.Text) ? null : row.Data.Text;
         if (name.Length == 0)
         {
             // An unnamed event can't be matched by game code; restore instead of committing.
