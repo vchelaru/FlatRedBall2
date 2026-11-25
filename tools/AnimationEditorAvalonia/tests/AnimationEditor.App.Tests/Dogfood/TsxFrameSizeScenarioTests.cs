@@ -174,6 +174,50 @@ public class TsxFrameSizeScenarioTests
         blink.Frames.Count.ShouldBe(2);
     }
 
+    /// <summary>Blink keeps tile 5, so an animation that starts with its first frame cannot be saved (#2152).</summary>
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FirstFrameMovedIntoAnEmptyAnimation_IsRefused_UntilItsTileIsFree(bool drag)
+    {
+        const string reason = "'New' could not be saved with the frame, so the frame would be in no animation of the file: "
+            + "Tiled tile 5 already carries \"Blink\". Give \"Blink\" another Placed Tile first.";
+        using var editor = new AnimationEditorHarness();
+        string path = await OpenTsxAsync(editor);
+        var blink = editor.ChainNamed("Blink");
+        var empty = editor.Services.AppCommands.AddAnimationChainWithName("New")!;
+        editor.Layout();
+        if (drag)
+        {
+            typeof(MainWindow).GetField("_pendingFrameDrag", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(editor.Window, new FrameDragSource(new[] { blink.Frames[0] }, blink, FrameDragValidity.Valid));
+        }
+        else
+        {
+            ClickFrame(editor, "Blink");
+            Press(editor, Key.X);
+            editor.ClickRow(empty);
+        }
+
+        Put();
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain(reason);
+        empty.Frames.ShouldBeEmpty();
+        Documents.TileAnimations(path).ShouldContain("5: 5@100 6@100");
+
+        editor.Services.AppCommands.SetChainTsxOwnerTileId(blink, 1).ShouldBeNull();
+        if (!drag) editor.ClickRow(empty);
+        Put();
+
+        Documents.TileAnimations(path).Where(t => t.StartsWith("1:") || t.StartsWith("5:")).ShouldBe(["1: 6@100", "5: 5@100"]);
+
+        void Put()
+        {
+            if (drag) Raise(editor, DragDrop.DropEvent, empty);
+            else Press(editor, Key.V);
+        }
+    }
+
     // The OS drag cannot run headless.
     private static void Raise(AnimationEditorHarness editor, RoutedEvent<DragEventArgs> dragEvent, AnimationChainSave target)
     {
