@@ -12,10 +12,6 @@ namespace AnimationEditor.Core.Rendering;
 /// </summary>
 public static class ChainClock
 {
-    // Frame lengths are floats, so a boundary like 0.3s sums to a hair past 0.3 in double.
-    // Nudging the sample forward keeps a time that sits on a boundary in the later frame.
-    private const double BoundaryTolerance = 1e-6;
-
     /// <summary>
     /// Length of one cycle in seconds (unset lengths count as 0.1s): the sum of the chain's frames, or twice that under
     /// <see cref="AnimationChainSave.PingPong"/>.
@@ -36,7 +32,10 @@ public static class ChainClock
     public static (int FrameIndex, double Elapsed) Locate(AnimationChainSave chain, double time, FrameLengthUnit unit)
     {
         double total = TotalLength(chain, unit);
-        double local = time + BoundaryTolerance;
+        // Frame lengths are floats, so a boundary like 0.3s sums to a hair past 0.3 in double, and more so every cycle.
+        // Nudging the sample forward keeps a time that sits on a boundary in the later frame.
+        double nudge = SequenceTimeline.CycleSlack(time);
+        double local = time + nudge;
         bool atEnd = local >= total && !chain.Loop;
         if (local >= total)
             local = chain.Loop ? local % total : total;
@@ -44,7 +43,7 @@ public static class ChainClock
         var at = PlaybackTimeline.Locate(chain.Frames, f => PlaybackController.FrameSeconds(f, unit), local, chain.PingPong, chain.Reverse);
         // Undo the nudge on the sampled position, in the direction the timeline plays.
         double elapsed = atEnd ? at.ElapsedInFrame
-            : at.IsBackward ? at.ElapsedInFrame + BoundaryTolerance : at.ElapsedInFrame - BoundaryTolerance;
+            : at.IsBackward ? at.ElapsedInFrame + nudge : at.ElapsedInFrame - nudge;
         return (at.FrameIndex, Math.Clamp(elapsed, 0, PlaybackController.FrameSeconds(chain.Frames[at.FrameIndex], unit)));
     }
 }

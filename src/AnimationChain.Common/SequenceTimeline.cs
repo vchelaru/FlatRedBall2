@@ -36,6 +36,9 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// count included, so a time on a multiple of a length that summed to a hair more never lands on the hidden end
 /// (<see cref="WrapTime(double, double, out int)"/>). A player wraps its time that way before it samples: a looping sequence
 /// sampled at its own end is hidden. With Loop off such a time is the end, and holds.</item>
+/// <item>Inside a chain, a time within <see cref="CycleSlack"/> before a frame or cycle boundary shows the frame that starts
+/// there, however many cycles have played: five 0.1 s frames sum to a hair over 0.5 s, so the start of the 201st cycle,
+/// 100 s, is a little before 200 summed cycles.</item>
 /// </list>
 /// Cycle lengths come from the caller (a chain's frame lengths summed, doubled for ping-pong), so this class needs no
 /// chain data.
@@ -57,6 +60,16 @@ public static class SequenceTimeline
 
     // Float error in a summed block end grows with the number of cycles, so the slack scales with the time.
     private static double Slack(double time) => BoundaryTolerance * Math.Max(1, Math.Abs(time));
+
+    // A float is within 2^-24 of the decimal it was written as, relative to its size; twice that leaves room for the sums.
+    private const double FloatError = 1.0 / (1 << 23);
+
+    /// <summary>
+    /// Slack in seconds when comparing <paramref name="time"/> to a boundary that many whole cycles of float frame lengths add
+    /// up to: <see cref="BoundaryTolerance"/>, or the most those lengths can be off by then (about a ten-millionth of the
+    /// time). It stays under a frame at 60 fps for over a day of playback.
+    /// </summary>
+    public static double CycleSlack(double time) => Math.Max(BoundaryTolerance, Math.Abs(time) * FloatError);
 
     /// <summary>
     /// Authored length in seconds: <paramref name="length"/> when set, else one <paramref name="cycleLength"/>. Never
@@ -218,8 +231,9 @@ public static class SequenceTimeline
     /// <summary>
     /// The time inside the current loop of a looping sequence of <paramref name="length"/> seconds after
     /// <paramref name="time"/> seconds of playback, and in <paramref name="passes"/> the number of loops completed by then.
-    /// Within the slack (<see cref="BoundaryTolerance"/>, for <paramref name="length"/>) before a loop's end the next loop
-    /// has begun: the result is 0 and the pass is counted. Negative time, and an empty sequence, is 0 in pass 0.
+    /// Within the slack (<see cref="BoundaryTolerance"/>, for <paramref name="length"/>; <see cref="CycleSlack"/> of
+    /// <paramref name="time"/> when that is more) before a loop's end the next loop has begun: the result is 0 and the pass is
+    /// counted. Negative time, and an empty sequence, is 0 in pass 0.
     /// </summary>
     public static double WrapTime(double time, double length, out int passes)
     {
@@ -228,7 +242,7 @@ public static class SequenceTimeline
         double inLoop = time % length;
         // From the remainder, not time / length, which can round up to a whole number the remainder has not reached.
         passes = (int)Math.Round((time - inLoop) / length);
-        if (inLoop + Slack(length) < length) return inLoop;
+        if (inLoop + Math.Max(Slack(length), CycleSlack(time)) < length) return inLoop;
         passes++;
         return 0;
     }
