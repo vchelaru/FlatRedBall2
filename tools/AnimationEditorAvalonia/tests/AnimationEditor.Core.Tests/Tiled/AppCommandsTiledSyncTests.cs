@@ -473,61 +473,41 @@ public class AppCommandsTiledSyncTests
         }
     }
 
-    [Theory]
-    [InlineData("Hero.achj", true)]
-    [InlineData("Other.achj", false)]
-    public async Task SaveAs_TilesFollowTheDocumentOnlyToTheSameName_AndTheFileLeftBehindWarns(string target, bool follows)
+    // The .achx it was saved from still has Bee, whose tile only the .achx may clear.
+    [Fact]
+    public async Task SaveAs_AchxToAchjOfTheSameName_WarnsAndLeavesTheTilesUntilTheAchxIsDeleted()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var tsxPath = WriteFixtureTileset(dir.Path);
         var achxPath = Path.Combine(dir.Path, "Hero.achx");
-        var targetPath = Path.Combine(dir.Path, target);
-        foreach (var path in new[] { targetPath, achxPath })
-        {
-            ctx.ProjectManager.FileName = path;
-            ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
-        }
+        var achjPath = Path.Combine(dir.Path, "Hero.achj");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
         TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("Heroes.png"));
+        var bee = TestHelpers.MakeChain(ctx.Acls, "Bee");
+        var beeFrame = Tile0Frame("Heroes.png");
+        beeFrame.LeftCoordinate = 16f;
+        beeFrame.RightCoordinate = 32f;
+        bee.Frames.Add(beeFrame);
         ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-        ctx.AppCommands.FileDialogService = new StubFileDialogService(targetPath);
+        Loader.Default().LoadTileset(tsxPath).Tiles.Count.ShouldBe(2);
+        var pushed = File.ReadAllText(tsxPath);
+        ctx.Acls.AnimationChains.Remove(bee);
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(achjPath);
         IReadOnlyList<string> raised = [];
         ctx.AppCommands.TiledSyncWarned += w => raised = w;
 
         (await ctx.AppCommands.SaveCurrentAnimationChainListAsync()).ShouldBeTrue();
 
-        raised.Count.ShouldBe(follows ? 0 : 1);
-        string owner = follows ? target : "Hero.achx";
-        Owner().ShouldBe(owner);
-
-        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-
-        raised.Count.ShouldBe(follows ? 1 : 0);
-        Owner().ShouldBe(owner);
-
-        string Owner() => Loader.Default().LoadTileset(tsxPath).Tiles.Single().GetProperty<StringProperty>("achjSourceFile").Value;
-    }
-
-    [Fact]
-    public async Task SaveAs_FromAnotherNameNextToAFileThatOwnsTheTile_WarnsAndLeavesTheTile()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        using var dir = new TestHelpers.TempDir();
-        var tsxPath = WriteFixtureTileset(dir.Path);
-        var achxPath = Path.Combine(dir.Path, "Hero.achx");
-        ctx.ProjectManager.FileName = achxPath;
-        ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
-        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("Heroes.png"));
-        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
-        ctx.ProjectManager.FileName = Path.Combine(dir.Path, "Other.achx");
-        ctx.AppCommands.FileDialogService = new StubFileDialogService(Path.Combine(dir.Path, "Hero.achj"));
-        IReadOnlyList<string> raised = [];
-        ctx.AppCommands.TiledSyncWarned += w => raised = w;
-
-        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
-
         raised.Single().ShouldContain("already owned by \"Hero.achx\"");
-        Loader.Default().LoadTileset(tsxPath).Tiles.Single().GetProperty<StringProperty>("achjSourceFile").Value.ShouldBe("Hero.achx");
+        File.ReadAllText(tsxPath).ShouldBe(pushed);
+
+        File.Delete(achxPath);
+        ctx.AppCommands.SaveCurrentAnimationChainList(achjPath);
+
+        raised.ShouldBeEmpty();
+        Loader.Default().LoadTileset(tsxPath).Tiles.Single().GetProperty<StringProperty>("achjSourceFile").Value.ShouldBe("Hero.achj");
     }
 
     [Fact]

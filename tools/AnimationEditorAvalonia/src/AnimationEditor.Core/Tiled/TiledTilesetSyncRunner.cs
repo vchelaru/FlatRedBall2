@@ -38,11 +38,10 @@ public sealed record TiledTilesetSyncOutcome
 /// </remarks>
 public static class TiledTilesetSyncRunner
 {
-    /// <param name="movedFrom">The file the document was saved as until now (Save As).</param>
     public static IReadOnlyList<TiledTilesetSyncOutcome> SyncAll(
-        AnimationChainListSave achj, string achxFilePath, IReadOnlyList<string> tsxAbsolutePaths, string? movedFrom = null)
+        AnimationChainListSave achj, string achxFilePath, IReadOnlyList<string> tsxAbsolutePaths)
     {
-        var formerFile = FindFormerFile(new FilePath(achxFilePath), movedFrom);
+        var formerFile = FindFormerFile(new FilePath(achxFilePath));
         var outcomes = new List<TiledTilesetSyncOutcome>();
         // Lazy, because it is only read when a texture has an image's file name but another path.
         var images = new Lazy<HashSet<FilePath>>(() => LoadImages(tsxAbsolutePaths));
@@ -76,11 +75,10 @@ public static class TiledTilesetSyncRunner
 
     /// <summary>The .achx that a .achj was converted from, or the reverse: the file of the same name, unless it still
     /// exists. Then it may be another document that pushes to the same tilesets, because the .tiledsync is shared.</summary>
-    private static FilePath? FindFormerFile(FilePath file, string? movedFrom)
+    private static FilePath? FindFormerFile(FilePath file)
     {
         var sibling = new FilePath(file.RemoveExtension().FullPath + (file.Extension == "achx" ? ".achj" : ".achx"));
-        bool isMovedFrom = !string.IsNullOrEmpty(movedFrom) && new FilePath(movedFrom) == sibling;
-        return isMovedFrom || !System.IO.File.Exists(sibling.FullPath) ? sibling : null;
+        return System.IO.File.Exists(sibling.FullPath) ? null : sibling;
     }
 
     private static HashSet<FilePath> LoadImages(IReadOnlyList<string> tsxPaths)
