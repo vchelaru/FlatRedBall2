@@ -26,7 +26,6 @@ public class DocumentWriteGuardTests
         ["AppCommands.SyncAssociatedTiledTilesets"] = [DocAction.PushToTileset, DocAction.PushFromBackground],
         ["TiledTilesetSyncRunner.SyncAll"] = [DocAction.PushToTileset, DocAction.PushFromBackground],
         ["AppCommands.ExportAsync"] = [DocAction.Export],
-        ["AppCommands.CopyReferencedTextures"] = [DocAction.Export],
         ["ProjectManager.SaveTsx"] = [DocAction.Save, DocAction.SaveBackgroundDocument, DocAction.CutChain, DocAction.CutFrame],
         ["ProjectManager.SaveAnimationChainList"] = [DocAction.Save, DocAction.SaveBackgroundDocument],
         ["IoManager.WriteRecoveryFile"] = [DocAction.WriteRecovery, DocAction.RecoverAtStartup],
