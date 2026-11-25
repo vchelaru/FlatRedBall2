@@ -1452,23 +1452,16 @@ public partial class MainWindow : Window
         if (_suppressTextureComboChanged) return;
         if (TextureCombo.SelectedItem is not string absolutePath) return;
 
-        WireframeCtrl.LoadTexture(absolutePath);
-
         var frames = InspectorFrames();
-        if (frames.Count == 0) return;
-
-        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? string.Empty
-            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
-        string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
-        if (FrameTextureEdit.CheckTexture(_projectManager, _appCommands, absolutePath, frames) is { } refused)
+        if (frames.Count == 0)
         {
-            ReportTextureResult(refused);
-            SyncTextureCombo();   // the list goes back to the image the frame kept
+            WireframeCtrl.LoadTexture(absolutePath);
             return;
         }
-        _appCommands.SetFrameTextureName(frames, storePath);
-        RefreshPropertyPanel();
+
+        var result = FrameTextureEdit.SetResolved(_projectManager, _appCommands, frames, absolutePath, _textureProbe);
+        ReportTextureResult(result);
+        if (!result.Success) SyncTextureCombo();   // the list goes back to the image the frame kept
     }
 
     private void OnMoveModeToggled(object? sender, RoutedEventArgs e)
@@ -4235,9 +4228,9 @@ public partial class MainWindow : Window
 
         var refused = result switch
         {
-            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath),
-            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, [targetFrame!]),
-            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, targetChain!.Frames),
+            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, _fileProbe),
+            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, _fileProbe, [targetFrame!]),
+            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, _fileProbe, targetChain!.Frames),
             _ => null,
         };
         if (refused is not null)
@@ -6124,6 +6117,18 @@ public partial class MainWindow : Window
 
     private ITextureProbe _textureProbe => new WireframeTextureProbe(path => WireframeCtrl.LoadTexture(path));
 
+    /// <summary>Probes by decoding the file, leaving the wireframe alone: a drop's target need not be what it shows.</summary>
+    private sealed class FileTextureProbe : ITextureProbe
+    {
+        public bool CanDecode(string absolutePath)
+        {
+            using SKBitmap? bitmap = SkiaFileDecoder.DecodeFile(absolutePath);
+            return bitmap is not null;
+        }
+    }
+
+    private static readonly ITextureProbe _fileProbe = new FileTextureProbe();
+
     /// <summary>
     /// A rejected image (corrupt/undecodable/missing, issue #479) leaves every frame's name untouched, so no
     /// broken reference reaches the undo stack or the saved .achx; the wireframe is restored to the current
@@ -6181,6 +6186,12 @@ public partial class MainWindow : Window
         var resolved = await FrameTextureEdit.ResolveForProjectAsync(_projectManager, texturePath,
             async plan =>
             {
+                // Before asking, so a file that would be refused afterwards is not copied into the project first.
+                if (FrameTextureEdit.CheckImage(plan.SourcePath, _fileProbe) is { } notAnImage)
+                {
+                    ReportTextureResult(notAnImage);
+                    return TextureCopyChoice.Cancel;
+                }
                 var answer = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan);
                 choice = answer;
                 return answer;

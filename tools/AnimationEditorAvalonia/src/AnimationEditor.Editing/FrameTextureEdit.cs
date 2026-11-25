@@ -146,13 +146,7 @@ public static class FrameTextureEdit
         IProjectManager projectManager, IAppCommands commands, IReadOnlyList<AnimationFrameSave> frames,
         string absolutePath, string storePath, ITextureProbe probe)
     {
-        if (TsxEdit.CheckImage(projectManager, absolutePath) is { } otherImage) return otherImage;
-        if (!File.Exists(absolutePath))
-            return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absolutePath}");
-        if (!probe.CanDecode(absolutePath))
-            return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absolutePath}");
-
-        if (CheckTexture(projectManager, commands, absolutePath, frames) is { } refused) return refused;
+        if (CheckTexture(projectManager, commands, absolutePath, probe, frames) is { } refused) return refused;
 
         commands.SetFrameTextureName(frames, storePath);
         return new EditResult([storePath], [], []);
@@ -160,19 +154,32 @@ public static class FrameTextureEdit
 
     /// <summary>
     /// The refusal when frames of the open file cannot take <paramref name="absolutePath"/>: it is not the open .tsx's
-    /// image, or a frame would have to show the whole of it and its size cannot be read, so no region can be stored.
+    /// image, it is not a usable image (<see cref="CheckImage"/>), or a frame would have to show the whole of it and its size cannot be read, so no region can be stored.
     /// Null when there is nothing to refuse. <paramref name="frames"/> are the frames taking the texture (only those with
     /// no region yet need its size); null for a new frame, which always does outside a .tsx.
     /// </summary>
     public static EditResult? CheckTexture(
-        IProjectManager projectManager, IAppCommands commands, string absolutePath, IEnumerable<AnimationFrameSave>? frames = null)
+        IProjectManager projectManager, IAppCommands commands, string absolutePath, ITextureProbe probe,
+        IEnumerable<AnimationFrameSave>? frames = null)
     {
-        if (projectManager.IsNativeTsxProject) return TsxEdit.CheckImage(projectManager, absolutePath);
+        if (TsxEdit.CheckImage(projectManager, absolutePath) is { } otherImage) return otherImage;
+        if (CheckImage(absolutePath, probe) is { } notAnImage) return notAnImage;
+        if (projectManager.IsNativeTsxProject) return null;
         if (frames is not null && !frames.Any(f => FrameRegion.IsUnset(f, commands.GetTextureSize))) return null;
         return commands.GetTextureSize(absolutePath) is null
             ? Fail(EditErrorCode.UnsupportedFile,
                 $"A frame showing the whole texture needs the texture's size, which could not be read: {absolutePath}. Use a PNG.")
             : null;
+    }
+
+    /// <summary>The refusal when <paramref name="absolutePath"/> is missing or not an image <paramref name="probe"/> can read; null when it is usable.</summary>
+    public static EditResult? CheckImage(string absolutePath, ITextureProbe probe)
+    {
+        if (!File.Exists(absolutePath))
+            return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absolutePath}");
+        return probe.CanDecode(absolutePath)
+            ? null
+            : Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absolutePath}");
     }
 
     private static string AchxFolder(IProjectManager projectManager) =>
