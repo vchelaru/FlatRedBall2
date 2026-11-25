@@ -128,7 +128,7 @@ public static class EditOps
             new("length", "number", false, "Frame length in the file's own time unit (see describe). Default: that unit's default length."),
             new("copy", "string", false, CopyDescription, CopyValues),
         ]),
-        new("add-frames-grid", "Appends one frame per cell of a sprite sheet grid, row by row from the top-left. The texture must be an existing PNG and the whole grid must lie inside it.",
+        new("add-frames-grid", "Appends one frame per cell of a sprite sheet grid, row by row from the top-left. The texture must be an existing PNG and the whole grid must lie inside it. On a .tsx the cells follow the tileset's margin and spacing.",
         [
             new("chain", "string", true, "Chain name."),
             new("texture", "string", true, "Texture path, relative to the animation file or absolute."),

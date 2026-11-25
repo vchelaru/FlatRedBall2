@@ -41,12 +41,17 @@ public static class BatchFrameBuilder
     ///     The size of <paramref name="lastFrame"/>'s texture. Without it there is no row to wrap, so the
     ///     frames copy the region whatever <paramref name="incrementUV"/> says.
     /// </param>
+    /// <param name="tilesetGrid">
+    ///     The open .tsx's grid, whose margin and spacing the frames step over; <c>null</c> for an
+    ///     .achx/.achj, whose cells are the size of <paramref name="lastFrame"/> and start at 0.
+    /// </param>
     public static BatchResult BuildBatch(
         AnimationFrameSave? lastFrame,
         int count,
         bool incrementUV,
         AnimationEditor.Core.Utilities.FrameLengthUnit frameLengthUnit,
-        (int Width, int Height)? textureSize)
+        (int Width, int Height)? textureSize,
+        TileGrid? tilesetGrid = null)
     {
         if (count <= 0)
             return new BatchResult { Frames = [] };
@@ -74,23 +79,33 @@ public static class BatchFrameBuilder
             if (incrementUV && lastFrame != null && textureSize is { } size)
             {
                 // Advance to the next cell
-                int currentCellInRow = RoundToInt(currentLeft / frameWidth);
-                int totalCellsPerRow = RoundToInt(framesPerRow);
-
-                if (currentCellInRow + 1 < totalCellsPerRow)
+                float nextLeft;
+                bool rowHasRoom;
+                if (tilesetGrid is { } grid)
                 {
-                    // Move right within the same row
-                    currentLeft  = (currentCellInRow + 1) * frameWidth;
-                    currentRight = currentLeft + frameWidth;
+                    nextLeft   = grid.SnapStartX(currentLeft + frameWidth + grid.Spacing);
+                    rowHasRoom = nextLeft + frameWidth <= size.Width;
+                }
+                else
+                {
+                    int nextCellInRow = RoundToInt(currentLeft / frameWidth) + 1;
+                    nextLeft   = nextCellInRow * frameWidth;
+                    rowHasRoom = nextCellInRow < RoundToInt(framesPerRow);
+                }
+
+                if (rowHasRoom)
+                {
+                    currentLeft = nextLeft;
                 }
                 else
                 {
                     // Wrap to start of next row
-                    currentLeft   = 0f;
-                    currentRight  = frameWidth;
-                    currentTop    += frameHeight;
-                    currentBottom += frameHeight;
+                    float rowStep = frameHeight + (tilesetGrid?.Spacing ?? 0);
+                    currentLeft   = tilesetGrid?.Margin ?? 0;
+                    currentTop    += rowStep;
+                    currentBottom += rowStep;
                 }
+                currentRight = currentLeft + frameWidth;
 
                 if (currentBottom > size.Height + 0.01f)
                     exceeded = true;

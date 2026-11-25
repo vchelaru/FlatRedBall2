@@ -1425,9 +1425,10 @@ public partial class MainWindow : Window
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
         string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
-        if (FrameTextureEdit.CheckWholeTexture(_appCommands, absolutePath, frames) is { } refused)
+        if (FrameTextureEdit.CheckTexture(_projectManager, _appCommands, absolutePath, frames) is { } refused)
         {
             ReportTextureResult(refused);
+            SyncTextureCombo();   // the list goes back to the image the frame kept
             return;
         }
         _appCommands.SetFrameTextureName(frames, storePath);
@@ -2000,6 +2001,12 @@ public partial class MainWindow : Window
 
         var (bitmapW, bitmapH) = WireframeCtrl.BitmapSize;
         if (bitmapW == 0 || bitmapH == 0) return;
+
+        if (TsxEdit.CheckImage(_projectManager, texPath) is { } refused)
+        {
+            ReportTextureResult(refused);
+            return;
+        }
 
         string relPath = RelativizeTexturePath(texPath);
 
@@ -4155,9 +4162,9 @@ public partial class MainWindow : Window
 
         var refused = result switch
         {
-            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath),
-            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath, [targetFrame!]),
-            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckWholeTexture(_appCommands, resolvedFilePath, targetChain!.Frames),
+            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath),
+            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, [targetFrame!]),
+            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, targetChain!.Frames),
             _ => null,
         };
         if (refused is not null)
@@ -6436,6 +6443,8 @@ public partial class MainWindow : Window
                 SetNameOrMixed(PropTextureName,
                     frames.Select(f => TexturePathHelper.ComputeDisplayPath(f.TextureName, _projectManager.FileName)).ToList(),
                     disableForCollision: false);
+                // A tileset has one image, so its frames have no other texture to take.
+                PropTextureName.IsEnabled = PropTextureBrowseBtn.IsEnabled = !_projectManager.IsNativeTsxProject;
 
                 var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
                 if (bmpW > 0 && bmpH > 0)
@@ -8246,6 +8255,11 @@ public partial class MainWindow : Window
         else if (shapes is { Count: > 0 })
         {
             if (completingCut && _pendingCutState.Kind != CopySelectionKind.Shape) return;
+            if (_projectManager.IsNativeTsxProject)
+            {
+                ShowProblem($"⚠ {TsxEdit.ShapesRefusal}");
+                return;
+            }
             var frame = _selectedState.SelectedFrame;
             if (frame is null) return;
             // Cut/paste (same-document or cross-document) keeps a single-target destination

@@ -49,11 +49,12 @@ public static class TextureCopyDecider
     /// "copy file?" dialog, given the editor's current project state. No prompt when the .achx has
     /// never been saved (nowhere to copy to yet), when the texture already sits under the .achx's
     /// own folder, or when the .achx and the texture are both under the open project folder — a
-    /// project is shared as a whole, so a path relative to it is already portable.
+    /// project is shared as a whole, so a path relative to it is already portable. Never for a .tsx,
+    /// whose frames use the tileset's image where it is.
     /// </summary>
     public static bool ShouldPromptToCopyForProject(IProjectManager projectManager, string? texturePath)
     {
-        if (string.IsNullOrEmpty(projectManager.FileName)) return false;
+        if (string.IsNullOrEmpty(projectManager.FileName) || projectManager.IsNativeTsxProject) return false;
 
         var achxFolder = new FilePath(projectManager.FileName).GetDirectoryContainingThis().FullPath;
         return ShouldPromptToCopy(texturePath, achxFolder, projectManager.ProjectFolderPath);

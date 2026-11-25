@@ -179,12 +179,28 @@ namespace AnimationEditor.Core.CommandsAndState
         // -- Native tsx: achx-only data ------------------------------------------------------
         // A Tiled tile animation holds rects and durations, nothing else (see
         // Tiled.TsxLossyDataCheck, which warns on save about whatever slipped through). Every
-        // command that would create shapes, flips, sprite offsets, color, or a non-looping chain
-        // no-ops in a native tsx project, so no entry point (tree menu, inspector, keyboard)
+        // command that would create shapes, flips, sprite offsets, color, a non-looping chain or
+        // another texture no-ops in a native tsx project, so no entry point (tree menu, inspector, keyboard)
         // can produce data the file can't keep. Same pattern as the locked-chain guards.
 
         /// <summary>True when the current project is a native tsx, i.e. the edit must not happen.</summary>
         private bool IsAchxOnlyEditBlocked() => _pm.IsNativeTsxProject;
+
+        /// <summary>True when <paramref name="textureName"/> is not the open tsx's image: a tileset has one, and its frames keep it.</summary>
+        private bool IsTextureBlocked(string? textureName) => _pm.TsxTileset is { } tileset && !tileset.IsImage(textureName ?? "");
+
+        /// <summary>A frame showing the open tsx's tile 0, or null in an achx/achj project.</summary>
+        private AnimationFrameSave? FirstTsxTileFrame()
+        {
+            if (_pm.TsxTileset is not { } tileset) return null;
+            var frame = new AnimationFrameSave
+            {
+                TextureName = tileset.ImageFileName,
+                FrameLength = CurrentFrameLengthUnit.DefaultFrameLength,
+            };
+            new FrameRegion(tileset.Margin, tileset.Margin, tileset.Margin + tileset.TileWidth, tileset.Margin + tileset.TileHeight).ApplyTo(frame);
+            return frame;
+        }
         // Delegates wired up by the Avalonia app layer ----------------------------
 
         /// <summary>
@@ -1349,6 +1365,13 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
+            if (textureName is not null)
+            {
+                if (IsTextureBlocked(textureName)) return;
+                // A tsx has one image and its frames are cells of it, so naming it asks for no other region.
+                if (_pm.IsNativeTsxProject) textureName = null;
+            }
+
             // When no texture is passed, inherit both the texture and the sub-region from a
             // source frame so the new frame lands on the same sheet cell the user is working in,
             // rather than snapping back to the whole texture. An explicit texture (e.g. drag-drop
@@ -1356,6 +1379,8 @@ namespace AnimationEditor.Core.CommandsAndState
             var source = textureName is null
                 ? ResolveInheritedFrame(chain, _pm.AnimationChainListSave)
                 : null;
+            if (source is null || IsTextureBlocked(source.TextureName))
+                source = FirstTsxTileFrame() ?? source;
 
             // Nothing in the document to inherit from (a brand-new document, or a chain-less
             // selection) -- fall back to whatever the wireframe canvas is already showing rather
@@ -1380,7 +1405,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         private void CreateAndAddFrame(AnimationChainSave chain, string textureName, FrameRegion region)
         {
-            if (IsChainLocked(chain)) return;
+            if (IsChainLocked(chain) || IsTextureBlocked(textureName)) return;
 
             var frame = new AnimationFrameSave
             {
@@ -2075,7 +2100,7 @@ namespace AnimationEditor.Core.CommandsAndState
             AnimationChainSave chain,
             float offsetMultiplier = 1f)
         {
-            if (IsChainLocked(chain)) return;
+            if (IsChainLocked(chain) || IsAchxOnlyEditBlocked()) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () =>
@@ -2100,7 +2125,7 @@ namespace AnimationEditor.Core.CommandsAndState
             float? deltaY,
             bool relative)
         {
-            if (IsChainLocked(chain)) return;
+            if (IsChainLocked(chain) || IsAchxOnlyEditBlocked()) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => AdjustOffsetCalculator.ApplyAdjustAll(chain.Frames, deltaX, deltaY, relative),
@@ -2157,12 +2182,15 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (IsChainLocked(chain)) return false;
 
+            // With no frame of a tsx's image to continue from, the batch starts at tile 0.
             var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
+            var firstTile = count > 0 && (lastFrame is null || IsTextureBlocked(lastFrame.TextureName)) ? FirstTsxTileFrame() : null;
+            lastFrame = firstTile ?? lastFrame;
             var result    = BatchFrameBuilder.BuildBatch(
-                lastFrame, count, incrementUV, CurrentFrameLengthUnit,
-                lastFrame is null ? null : GetTextureSize(lastFrame.TextureName));
+                lastFrame, firstTile is null ? count : count - 1, incrementUV, CurrentFrameLengthUnit,
+                lastFrame is null ? null : GetTextureSize(lastFrame.TextureName), _pm.TsxTileGrid);
 
-            var added = result.Frames.ToArray();
+            var added = (firstTile is null ? result.Frames : result.Frames.Prepend(firstTile)).ToArray();
             if (added.Length > 0)
             {
                 _undoManager.Execute(new AddFramesCommand(added, chain, this, _events, _selectedState));
@@ -2242,7 +2270,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <param name="textureName">Relative texture path to assign (may be null to clear).</param>
         public void SetFrameTextureName(AnimationFrameSave frame, string? textureName)
         {
-            if (frame == null || IsFrameLocked(frame)) return;
+            if (frame == null || IsFrameLocked(frame) || IsTextureBlocked(textureName)) return;
             _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, GetTextureSize, this, _events));
         }
 
@@ -2278,6 +2306,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameTextureName(IReadOnlyList<AnimationFrameSave> frames, string? textureName)
         {
+            if (IsTextureBlocked(textureName)) return;
             var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToArray();
             if (unlockedFrames.Length == 0) return;
             var cmds = unlockedFrames
@@ -2288,7 +2317,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetAllFramesTextureName(AnimationChainSave chain, string? textureName)
         {
-            if (chain.Frames.Count == 0 || IsChainLocked(chain)) return;
+            if (chain.Frames.Count == 0 || IsChainLocked(chain) || IsTextureBlocked(textureName)) return;
             var cmds = chain.Frames
                 .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, GetTextureSize, this, _events))
                 .ToArray();

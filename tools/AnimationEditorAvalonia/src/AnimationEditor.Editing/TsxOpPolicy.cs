@@ -1,6 +1,4 @@
 using AnimationEditor.Core;
-using AnimationEditor.Core.IO;
-using AnimationEditor.Core.Paths;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -19,8 +17,6 @@ internal static class TsxOpPolicy
         "add-frame", "add-frames-grid", "delete-frame", "duplicate-frame", "reorder-frame",
         "set-frame-length", "set-chain-length", "invert-frame-order", "set-frame-region", "set-chain-owner-tile",
     ];
-
-    private const string Stores = "A Tiled tile animation holds only frame rectangles and durations";
 
     /// <summary>Why <paramref name="op"/> cannot run on this file, or null when it can.</summary>
     public static EditResult? Check(EditSession session, EditOp op)
@@ -44,7 +40,7 @@ internal static class TsxOpPolicy
                 "set-unit" => "A Tiled .tsx stores durations in milliseconds and has no time unit setting.",
                 "import-chain" => "import-chain works between .achx/.achj files; chains cannot be imported into a Tiled .tsx.",
                 "set-frame-texture" => "A Tiled tileset has one image, so a frame's texture cannot change.",
-                _ => $"{Stores}, so {name} cannot be kept in a .tsx (the editor disables it for tilesets too).",
+                _ => $"{TsxEdit.Stores}, so {name} cannot be kept in a .tsx (the editor disables it for tilesets too).",
             });
 
         if (name is "add-frame" or "add-frames-grid")
@@ -52,18 +48,10 @@ internal static class TsxOpPolicy
             if (name == "add-frame" && !op.Values.ContainsKey("region"))
                 return Fail(EditErrorCode.NotSupportedInTsx,
                     "A Tiled tile animation frame is a tile cell, not the whole image: add-frame on a .tsx needs a region.");
-            if (!IsTilesetImage(session, op.Values["texture"]))
-                return Fail(EditErrorCode.NotSupportedInTsx, "A Tiled tileset has one image, so frames can only use the tileset's own image.");
+            if (TsxEdit.CheckImage(session.ProjectManager, op.Values["texture"]) is { } refused)
+                return refused;
         }
         return null;
-    }
-
-    private static bool IsTilesetImage(EditSession session, string texture)
-    {
-        var folder = Path.GetDirectoryName(session.Path) ?? string.Empty;
-        var absolute = TexturePathHelper.ResolveDisplayPath(texture, folder);
-        var image = session.ProjectManager.ReferencedPngs.FirstOrDefault();
-        return image is not null && new FilePath(absolute) == image;
     }
 
     /// <summary>The state of a .tsx before the ops, so only problems the ops cause are reported.</summary>
