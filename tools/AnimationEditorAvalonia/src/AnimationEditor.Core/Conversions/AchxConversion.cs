@@ -107,7 +107,7 @@ public static class AchxConversion
             return AnimationListComparison.FirstDifference(
                 AnimationFileLoader.Read(new FilePath(file.Source)), AnimationFileLoader.Read(new FilePath(file.Target))) is null;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
+        catch (Exception) // whatever it is, it does not read back
         {
             return false;
         }
