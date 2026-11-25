@@ -4901,8 +4901,10 @@ public partial class MainWindow : Window
         // The tree can still hold rows for items a command just deleted (the TreeView drops them
         // from its selection lazily). Syncing those back would resurrect deleted shapes, frames
         // or animations in the selection (#1824), so only rows still in the model are synced.
+        // Nor the old row of an item that moved to another one.
         var liveData = AnimTree.SelectedItems
             .OfType<TreeNodeVm>()
+            .Where(IsInTree)
             .Select(n => n.Data)
             .OfType<object>()
             .Where(IsStillInModel)
@@ -5138,18 +5140,26 @@ public partial class MainWindow : Window
 
         var rebuiltFrameNode = TreeBuilder.BuildFrameNode(frame, CurrentFrameLengthUnit, frameIndex);
 
-        if (frameNode is null)
+        // As in RefreshChainNode: a selected shape row that goes away is not a click, and the model's selection stays.
+        bool prior = _suppressTreeSelectionHandling;
+        _suppressTreeSelectionHandling = true;
+        try
         {
-            chainNode.Children.Add(rebuiltFrameNode);
+            if (frameNode is null)
+            {
+                chainNode.Children.Add(rebuiltFrameNode);
+            }
+            else
+            {
+                frameNode.Header     = rebuiltFrameNode.Header;
+                frameNode.Kind       = rebuiltFrameNode.Kind;
+                frameNode.IsFrameNode = rebuiltFrameNode.IsFrameNode;
+                frameNode.Meta       = rebuiltFrameNode.Meta;
+                TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
+            }
+            SyncTreeSelection();
         }
-        else
-        {
-            frameNode.Header     = rebuiltFrameNode.Header;
-            frameNode.Kind       = rebuiltFrameNode.Kind;
-            frameNode.IsFrameNode = rebuiltFrameNode.IsFrameNode;
-            frameNode.Meta       = rebuiltFrameNode.Meta;
-            TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
-        }
+        finally { _suppressTreeSelectionHandling = prior; }
         // The chain node's Meta carries the total play time (#623), which a frame-length edit
         // changes — keep it in sync whenever a frame under it is refreshed.
         chainNode.Meta = TreeBuilder.BuildChainMeta(chain, CurrentFrameLengthUnit);
@@ -8271,11 +8281,7 @@ public partial class MainWindow : Window
             }
             else if (completingCut)
             {
-                var sourceFrame = _pendingCutState.Shapes[0] is ShapeSave source
-                    ? _objectFinder.GetAnimationFrameContaining(source)
-                    : null;
-                if (sourceFrame is null) return;
-                _appCommands.PasteShapesCut(frame, _pendingCutState.Shapes, sourceFrame);
+                _appCommands.PasteShapesCut(frame, _pendingCutState.Shapes);
             }
             else
             {
@@ -8334,13 +8340,16 @@ public partial class MainWindow : Window
         PreviewCtrl.InvalidateVisual();
     }
 
+    private bool IsInTree(TreeNodeVm row) =>
+        row.Data is { } data && ReferenceEquals(TreeBuilder.FindNodeForData(_treeRoots, data), row);
+
     private bool TreeMultiSelectionAlreadySynced(IReadOnlyList<object> dataObjects)
     {
         if (AnimTree.SelectedItems is null) return dataObjects.Count == 0;
         var selected = AnimTree.SelectedItems.OfType<TreeNodeVm>().ToList();
         if (selected.Count != dataObjects.Count) return false;
         var dataSet = new HashSet<object>(dataObjects);
-        return selected.All(n => n.Data is not null && dataSet.Contains(n.Data));
+        return selected.All(n => n.Data is not null && dataSet.Contains(n.Data) && IsInTree(n));
     }
 
     /// <summary>

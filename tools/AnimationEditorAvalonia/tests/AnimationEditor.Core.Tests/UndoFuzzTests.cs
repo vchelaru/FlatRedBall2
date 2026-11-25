@@ -386,7 +386,7 @@ public class UndoFuzzTests
                     ("MoveShape", () => c.MoveShape(shape, shapeFrame!, delta)),
                     ("MoveShapeToTop", () => c.MoveShapeToTop(shape, shapeFrame!)),
                     ("MoveShapeToIndex", () => c.MoveShapeToIndex(shape, shapeFrame!, _random.Next(3))),
-                    ("PasteShapesCut", () => c.PasteShapesCut(frame!, [shape], shapeFrame!)),
+                    ("PasteShapesCut", () => c.PasteShapesCut(frame!, [shape])),
                     ("SetShapePropsBulk", () => c.SetShapePropsBulk(shapes, Flag ? name : null, Flag ? Num : null, Flag ? Num : null)),
                     ("SetShapeKeyframe", () => c.SetShapeKeyframe(shapes, Pick(Enum.GetValues<ShapeKeyframeGroup>()), Flag)),
                     ("SetShapeKeyframeCurve", () => c.SetShapeKeyframeCurve(shapes, Pick(Enum.GetValues<ShapeKeyframeGroup>()), Pick(Enum.GetValues<KeyframeCurveChoice>()))),

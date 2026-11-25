@@ -145,7 +145,7 @@ public class CopyMoveUndoFuzzTests
                 {
                     var source = Frames().First(f => f.ShapesSave?.Shapes.Count > 0);
                     var cut = Some(source.ShapesSave!.Shapes);
-                    commands.PasteShapesCut(Pick(Frames()), cut, source);
+                    commands.PasteShapesCut(Pick(Frames()), cut);
                     return $"CutShapes {cut.Count}";
                 }
                 case 6:

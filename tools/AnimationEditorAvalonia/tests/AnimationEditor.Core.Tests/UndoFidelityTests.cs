@@ -119,12 +119,12 @@ public class UndoFidelityTests : IDisposable
     }
 
     [Fact]
-    public void PasteShapesCut_GivenUp_LeavesTheTargetWithoutAShapeList()
+    public void PasteShapesCut_OfAShapeNoLongerInTheDocument_LeavesTheTargetWithoutAShapeList()
     {
         var frame = TestHelpers.MakeChain(_ctx.Acls, "Walk", 1).Frames[0];
         frame.ShapesSave = null;
 
-        _ctx.AppCommands.PasteShapesCut(frame, [], frame);
+        _ctx.AppCommands.PasteShapesCut(frame, [new CircleSave { Name = "C" }]);
 
         frame.ShapesSave.ShouldBeNull();
     }

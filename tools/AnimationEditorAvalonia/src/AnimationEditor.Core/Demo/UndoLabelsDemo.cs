@@ -104,7 +104,7 @@ internal static class UndoLabelsDemo
         cmds.PasteShapes(shapeFrame, new object[] { pasteCircle });
 
         var cutSource = shapeFrame.ShapesSave!.AARectSaves.First(r => r.Name == "Other");
-        cmds.PasteShapesCut(walk.Frames[1], new object[] { cutSource }, shapeFrame);
+        cmds.PasteShapesCut(walk.Frames[1], new object[] { cutSource });
 
         cmds.PasteFramesCut(walk, new[] { scrap.Frames[0] }, insertIndex: null);
 

@@ -747,11 +747,11 @@ namespace AnimationEditor.Core.CommandsAndState
         void PasteFramesCut(AnimationChainSave targetChain, IReadOnlyList<AnimationFrameSave> frames, int? insertIndex);
 
         /// <summary>
-        /// Moves cut shapes from <paramref name="sourceFrame"/> to the end of their type in <paramref name="targetFrame"/>
-        /// in one undo step. A shape whose name is taken there gets a free one. Shapes of a locked chain stay there and
+        /// Moves cut shapes, each out of the frame it is in, to the end of their type in <paramref name="targetFrame"/> in one
+        /// undo step. A shape whose name is taken there gets a free one. Shapes of a locked chain stay there and
         /// are copied.
         /// </summary>
-        void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes, AnimationFrameSave sourceFrame);
+        void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes);
 
         /// <summary>Duplicates the homogeneous multi-selection as one undo step.</summary>
         void DuplicateSelection(CopySelectionPayload payload);

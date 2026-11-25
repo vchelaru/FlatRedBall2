@@ -159,7 +159,7 @@ public class CommandDescriptionTests
         var rect = new AARectSave { Name = "Hitbox" };
         frame.ShapesSave!.Add(rect);
 
-        ctx.AppCommands.PasteShapesCut(chain.Frames[1], new object[] { rect }, frame);
+        ctx.AppCommands.PasteShapesCut(chain.Frames[1], new object[] { rect });
 
         Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }

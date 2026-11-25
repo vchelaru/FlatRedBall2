@@ -1348,12 +1348,15 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <inheritdoc cref="IAppCommands.MoveChainsToIndex"/>
         public void MoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex)
-            => MoveChainsToIndex(chains, insertIndex, "Move");
+        {
+            if (BuildMoveChainsToIndex(chains, insertIndex, "Move") is { } command)
+                _undoManager.Execute(command);
+        }
 
-        private void MoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex, string verb)
+        private IUndoableCommand? BuildMoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex, string verb)
         {
             var list = _pm.AnimationChainListSave?.AnimationChains;
-            if (list is null || chains.Count == 0) return;
+            if (list is null || chains.Count == 0) return null;
 
             var indices = chains
                 .Select(c => list.IndexOf(c))
@@ -1361,7 +1364,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 .Distinct()
                 .OrderBy(i => i)
                 .ToList();
-            if (indices.Count == 0) return;
+            if (indices.Count == 0) return null;
 
             var moved = indices.Select(i => list[i]).ToArray();
 
@@ -1370,7 +1373,7 @@ namespace AnimationEditor.Core.CommandsAndState
             // (mirrors MoveFramesCommand).
             int insertAt = insertIndex - indices.Count(i => i < insertIndex);
 
-            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+            return new ReorderCommand<AnimationChainSave>(
                 list,
                 () =>
                 {
@@ -1383,7 +1386,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, RefreshTreeView,
                 moved.Length == 1
                     ? $"{verb} Animation '{moved[0].Name}'"
-                    : $"{verb} {moved.Length} Animations"));
+                    : $"{verb} {moved.Length} Animations");
         }
 
         public void MoveChainToTop(AnimationChainSave chain)
@@ -2809,9 +2812,9 @@ namespace AnimationEditor.Core.CommandsAndState
             if (acls is null || chains.Count == 0) return;
 
             var anchors = _selectedState.SelectedChains is { Count: > 0 } selected ? selected : chains;
-            MoveChainsToIndex(chains, insertIndex ?? ChainPasteLogic.ResolveBlockInsertIndexAfterAnchors(acls, anchors), "Cut");
-            _selectedState.SelectedNodes = chains.Cast<object>().ToList();
-            _selectedState.SelectedChain = chains[^1];
+            int index = insertIndex ?? ChainPasteLogic.ResolveBlockInsertIndexAfterAnchors(acls, anchors);
+            if (BuildMoveChainsToIndex(chains, index, "Cut") is { } move)
+                _undoManager.Execute(new SelectMovedChainsCommand(move, chains, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteFramesCut"/>
@@ -2837,17 +2840,20 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.PasteShapesCut"/>
-        public void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes, AnimationFrameSave sourceFrame)
+        public void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes)
         {
+            var sources = shapes.OfType<ShapeSave>()
+                .Select(s => (Shape: s, Frame: _objectFinder.GetAnimationFrameContaining(s)))
+                .Where(x => x.Frame is not null)
+                .ToList();
+            if (sources.Count == 0 || IsFrameLocked(targetFrame) || IsAchxOnlyEditBlocked()) return;
+
             // A locked chain keeps its shapes, so the paste gets copies of them.
-            if (IsFrameLocked(sourceFrame))
-            {
-                PasteShapes(targetFrame, shapes);
-                return;
-            }
-            var moved = shapes.OfType<ShapeSave>().ToArray();
-            if (moved.Length == 0 || IsFrameLocked(targetFrame) || IsAchxOnlyEditBlocked()) return;
-            _undoManager.Execute(new MoveShapesToFrameCommand(moved, sourceFrame, targetFrame, this, _events, _selectedState));
+            var block = sources
+                .Select(x => IsFrameLocked(x.Frame!) ? x.Shape.Clone() : x.Shape)
+                .ToArray();
+            _undoManager.Execute(new MoveShapesToFrameCommand(
+                block, sources.Select(x => x.Frame!).Where(f => !IsFrameLocked(f)), targetFrame, this, _events, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.CutFromBackgroundTab"/>

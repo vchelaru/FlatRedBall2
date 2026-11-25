@@ -137,11 +137,11 @@ public class CutPasteTests
         frame.ShapesSave.Add(hurt);
         other.ShapesSave!.Add(new CircleSave { Name = "Hit" });
 
-        ctx.AppCommands.PasteShapesCut(frame, [hit], frame);
+        ctx.AppCommands.PasteShapesCut(frame, [hit]);
         frame.ShapesSave.Shapes.ShouldBe([hurt, hit]);
         hit.Name.ShouldBe("Hit");
 
-        ctx.AppCommands.PasteShapesCut(other, [hit], frame);
+        ctx.AppCommands.PasteShapesCut(other, [hit]);
         frame.ShapesSave.Shapes.ShouldBe([hurt]);
         other.ShapesSave.Shapes[0].ShouldBeSameAs(hit);
         hit.Name.ShouldBe("Hit2");

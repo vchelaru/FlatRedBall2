@@ -481,8 +481,7 @@ public class UndoCoverageRosterTests
                 var frame = chain.Frames.Single(f => f.ShapesSave?.Shapes.Contains(source) == true);
                 ctx.AppCommands.PasteShapesCut(
                     chain.Frames.First(f => f != frame),
-                    new List<object> { source },
-                    frame);
+                    new List<object> { source });
             }));
         yield return Row(nameof(IAppCommands.DuplicateSelection),
             ctx => Sync(() => ctx.AppCommands.DuplicateSelection(new CopySelectionPayload

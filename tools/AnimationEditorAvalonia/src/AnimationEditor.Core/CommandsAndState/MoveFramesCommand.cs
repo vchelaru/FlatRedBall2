@@ -21,7 +21,7 @@ internal sealed class MoveFramesCommand : IUndoableCommand
     private readonly IAppCommands _commands;
     private readonly IApplicationEvents _events;
     private readonly ISelectedState _selectedState;
-    private readonly List<object> _preSelection;
+    private readonly SelectionBefore _selectionBefore;
 
     private AnimationFrameSave[][] _before = [];
 
@@ -70,7 +70,7 @@ internal sealed class MoveFramesCommand : IUndoableCommand
         _commands = commands;
         _events = events;
         _selectedState = selectedState;
-        _preSelection = new List<object>(selectedState.SelectedNodes);
+        _selectionBefore = new SelectionBefore(selectedState);
         Description = description;
     }
 
@@ -100,8 +100,7 @@ internal sealed class MoveFramesCommand : IUndoableCommand
         foreach (var (chain, before) in _chains.Zip(_before))
             RestoreOrder(chain, before);
         RaiseSideEffects();
-        _selectedState.SelectedNodes = _preSelection;
-        _selectedState.SelectedFrame = _preSelection.OfType<AnimationFrameSave>().LastOrDefault();
+        _selectionBefore.Restore();
     }
 
     public void Redo() => Do();
