@@ -746,27 +746,74 @@ public partial class MainWindow : Window
         RefreshShortcutsPanel();
     }
 
-    /// <summary>Snapshots the active tab before another one replaces it.</summary>
-    private void CaptureLeavingActiveTab()
+    /// <summary>
+    /// Snapshots the active tab before another one replaces it, and returns it for <see cref="ShowActiveTabAsync"/>.
+    /// Content made with no tab open (a paste, a dropped image) gets its tab first, so it is snapshotted too.
+    /// </summary>
+    private TabEntry? CaptureLeavingActiveTab()
     {
+        if (_tabManager.ActiveTab is null)
+            _tabController.EnsureCurrentDocumentHasTab(_projectManager);
         if (_tabManager.ActiveTab is { } leaving)
             PaneFor(leaving).CaptureLeaving(leaving);
+        return _tabManager.ActiveTab;
+    }
+
+    /// <summary>
+    /// Every change of active tab that has to load ends here, so the tab in front is always the document the editor
+    /// holds: loads <see cref="TabManager.ActiveTab"/>, drops it when it does not load, and goes on with the tab the
+    /// manager falls back to. With no tab left the editor is empty. Returns whether the tab that was active on entry
+    /// is the one showing.
+    /// </summary>
+    /// <param name="live">
+    /// The tab whose content the editor still holds (the one being left), or null when that tab closed. A failed load
+    /// leaves it live, so it is never dropped, and falling back to it needs no load.
+    /// </param>
+    private async Task<bool> ShowActiveTabAsync(TabEntry? live = null, TabLoad load = TabLoad.Switch)
+    {
+        bool fellBack = false;
+        while (_tabManager.ActiveTab is { } tab)
+        {
+            if (fellBack && tab == live && PaneFor(tab) == _visiblePane)
+            {
+                FollowActiveTab(tab);
+                return false;
+            }
+            if (await ShowTabAsync(tab, load) || tab == live)
+            {
+                if (tab == _tabManager.ActiveTab) return !fellBack;
+                // A file opened while the load asked something (handed over by a second instance) is now the one in front.
+                live = tab;
+            }
+            else
+                _tabManager.Close(tab.Path);
+            fellBack = true;
+        }
+        ResetToNoTabsOpen();
+        return false;
     }
 
     /// <summary>
     /// Shows <paramref name="tab"/>, already active in <see cref="_tabManager"/>, in its kind's pane
     /// and loads its content. Returns false when the content could not be loaded.
+    /// Only <see cref="ShowActiveTabAsync"/> calls it.
     /// </summary>
-    private async Task<bool> ShowTabAsync(TabEntry tab, TabLoad load = TabLoad.Switch)
+    private async Task<bool> ShowTabAsync(TabEntry tab, TabLoad load)
     {
         var pane = PaneFor(tab);
         ShowPane(pane);
         bool loaded = await pane.LoadAsync(tab, load);
+        FollowActiveTab(tab);
+        return loaded;
+    }
+
+    /// <summary>Brings the Project panel selection, tab strip, title and status bar in line with the active <paramref name="tab"/>.</summary>
+    private void FollowActiveTab(TabEntry tab)
+    {
         SyncProjectPanelSelectionTo(tab);
         RebuildTabStrip();
         UpdateTitle();
         UpdateStatusBar();
-        return loaded;
     }
 
     /// <summary>
@@ -777,16 +824,14 @@ public partial class MainWindow : Window
     /// <param name="asPreview">Opens it in the reusable preview tab, as a single click in the Project panel does.</param>
     private async Task OpenNonDocumentTabAsync(string path, bool asPreview = false)
     {
-        CaptureLeavingActiveTab();
-        EnsureCurrentEditorContentHasTab();
+        var leaving = CaptureLeavingActiveTab();
         var filePath = new FilePath(path);
-        var result = asPreview ? _tabManager.OpenPreview(filePath) : _tabManager.OpenOrFocus(filePath);
-        bool shown = await ShowTabAsync(_tabManager.ActiveTab!);
-        if (!shown && result != TabOpenResult.Focused)
-            DropUnloadedTab(filePath);
+        if (asPreview) _tabManager.OpenPreview(filePath);
+        else _tabManager.OpenOrFocus(filePath);
+        bool shown = await ShowActiveTabAsync(leaving);
         // An achx records itself through CurrentFileChanged; a sequence file raises no such event. A .png is a viewer,
         // not a document to come back to, so it stays out of the list.
-        else if (shown && TabEntry.ResolveKind(filePath) == TabKind.Sequence)
+        if (shown && TabEntry.ResolveKind(filePath) == TabKind.Sequence)
             RecordRecentFile(path);
     }
 
@@ -844,12 +889,10 @@ public partial class MainWindow : Window
         // completes it as a cross-tab move; ResolveCompletion decides staleness lazily at paste
         // time, so this is no longer a "just tidy up the highlight" clear.
 
-        CaptureLeavingActiveTab();
+        var leaving = CaptureLeavingActiveTab();
         _tabManager.Activate(tab.Path);
-        // A tab that was restored but never opened, or whose file changed on disk, loads now; one that no longer loads
-        // is dropped like a refused File > Open, which brings back the tab the user came from.
-        if (!await ShowTabAsync(tab))
-            DropUnloadedTab(tab.Path);
+        // A tab that was restored but never opened, or whose file changed on disk, loads now.
+        await ShowActiveTabAsync(leaving);
     }
 
     private void ActivateUntitledTabContent(TabEntry tab)
@@ -908,7 +951,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Closes <paramref name="tab"/> once its kind agrees (<see cref="ITabPane.PrepareCloseAsync"/>:
     /// an untitled tab with content prompts to save, #928). Discarding falls through to
-    /// <see cref="CloseTabCore"/>, which is what clears the crash-recovery file (#927).
+    /// <see cref="CloseTabCoreAsync"/>, which is what clears the crash-recovery file (#927).
     /// </summary>
     private bool _closeConfirmed;
     private bool _confirmingClose;
@@ -920,7 +963,7 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
-        CommitPendingRename();
+        SettlePendingInput();
         if (_closeConfirmed || e.CloseReason == WindowCloseReason.OSShutdown
             || !(_sequencePane.HasUnsavedEdits || _achxPane.HasUnsavedEdits)) return;
 
@@ -960,39 +1003,25 @@ public partial class MainWindow : Window
         using var navigation = _navigation.BeginUserAction();
         var toClose = await PaneFor(tab).PrepareCloseAsync(tab);
         if (toClose is not null)
-            CloseTabCore(toClose);
+            await CloseTabCoreAsync(toClose);
     }
 
-    private void CloseTabCore(TabEntry tab)
+    private async Task CloseTabCoreAsync(TabEntry tab)
     {
         PaneFor(tab).Closing(tab);
         bool wasActive = tab == _tabManager.ActiveTab;
         _tabManager.Close(tab.Path);
         // A front tab that stays is the live document; showing it again would load it over its own unsaved edits.
         if (wasActive)
-            ShowActiveTabAfterClose();
+            await ShowActiveTabAsync();
         else
             RebuildTabStrip();
     }
 
     /// <summary>
-    /// Brings the editor in line with <see cref="TabManager.ActiveTab"/> after tabs were closed:
-    /// loads whichever tab the manager fell back to, or resets to the no-tabs state when none are left.
-    /// Loads the fallback tab directly rather than through <see cref="LoadAnimationFileAsync"/>,
-    /// which would re-register the just-closed file as a background tab.
-    /// </summary>
-    private void ShowActiveTabAfterClose()
-    {
-        if (_tabManager.ActiveTab is { } next)
-            _ = ShowTabAsync(next);
-        else
-            ResetToNoTabsOpen();
-    }
-
-    /// <summary>
     /// Returns the editor to its startup-empty state: no document, no selection, no undo history.
-    /// Called whenever the last open tab goes away, whether by closing it (<see cref="CloseTabCore"/>)
-    /// or because it failed to load and was dropped (<see cref="RestoreTabsAsync"/>).
+    /// Called whenever the last open tab goes away, whether by closing it (<see cref="CloseTabCoreAsync"/>)
+    /// or because it failed to load and was dropped (<see cref="ShowActiveTabAsync"/>).
     /// </summary>
     private void ResetToNoTabsOpen()
     {
@@ -1046,21 +1075,8 @@ public partial class MainWindow : Window
         // Load the active tab directly — bypassing LoadAnimationFileAsync avoids the early-return
         // in that method (OpenOrFocus would return Focused for a tab that RestoreFrom already
         // registered, skipping the actual file load).
-        if (_tabManager.ActiveTab == null) return;
-        while (_tabManager.ActiveTab is { } active)
-        {
-            if (await ShowTabAsync(active, TabLoad.Restore)) return;
-
-            // The file that was open when the editor last closed no longer opens (missing
-            // texture, declined UV conversion, unreadable file) -- restoring it as a ghost
-            // active tab would show nothing behind it, so drop it the same way a refused
-            // File > Open does. Nothing is on screen yet, so the tab that falls back in is
-            // loaded by the next pass (and dropped too if it fails), however its kind compares.
-            DropUnloadedTab(active.Path, showFallback: false);
-            if (_tabManager.ActiveTab == active) break;
-        }
-        if (_tabManager.ActiveTab == null)
-            ResetToNoTabsOpen();
+        // A file that no longer opens (missing texture, declined UV conversion, unreadable file) is dropped there.
+        await ShowActiveTabAsync(load: TabLoad.Restore);
     }
 
     // ── Startup ───────────────────────────────────────────────────────────────
@@ -1137,7 +1153,7 @@ public partial class MainWindow : Window
     /// </summary>
     /// <remarks>
     /// Deleting on read is safe because the content lives in the restored tab from here on, and
-    /// closing that tab is what the user does to discard it (<see cref="CloseTabCore"/>). There is
+    /// closing that tab is what the user does to discard it (<see cref="CloseTabCoreAsync"/>). There is
     /// deliberately no "delete permanently?" prompt: the old modal made that call from memory,
     /// before the user could see what was in the file (#1020).
     /// </remarks>
@@ -1943,6 +1959,9 @@ public partial class MainWindow : Window
         // queue so it has run before we look the chain up in _treeRoots.
         await Dispatcher.UIThread.InvokeAsync(() => { });
 
+        // The file did not load: another document is showing, and its chain of that name is not the one asked for.
+        if (_tabManager.ActiveTab?.Path != filePath) return;
+
         var reloadedChain = _projectManager.AnimationChainListSave?.AnimationChains
             .FirstOrDefault(c => c.Name == chainName);
         if (reloadedChain is null) return;
@@ -2517,7 +2536,7 @@ public partial class MainWindow : Window
         // the recycle bin, defeating the confirm dialog above. No "unsaved changes?" prompt here:
         // the user already confirmed a destructive, non-undoable action.
         if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(absolutePath)) is { } openTab)
-            CloseTabCore(openTab);
+            await CloseTabCoreAsync(openTab);
     }
 
     /// <summary>
@@ -2631,7 +2650,7 @@ public partial class MainWindow : Window
 
             converted++;
             if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } openTab)
-                CloseTabCore(openTab);
+                await CloseTabCoreAsync(openTab);
         }
 
         if (problems.Count > 0)
@@ -2919,8 +2938,6 @@ public partial class MainWindow : Window
         // The open tab is being left for the new one: snapshot it, or switching back finds it blank (and
         // closing the window cannot tell it holds an unsaved Untitled document).
         CaptureLeavingActiveTab();
-        // Register the currently-open file (if any) as a tab before we clear it.
-        EnsureCurrentEditorContentHasTab();
 
         OpenAsNewUnsavedDocument(new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel });
 
@@ -3014,7 +3031,7 @@ public partial class MainWindow : Window
             // The active tab was in the folder: load the one the manager fell back to. An
             // untouched active tab is the live document and must not be reset or reloaded.
             if (_tabManager.ActiveTab != activeBefore)
-                ShowActiveTabAfterClose();
+                _ = ShowActiveTabAsync();
         }
 
         RebuildTabStrip();
@@ -3965,7 +3982,7 @@ public partial class MainWindow : Window
 
         // #898: a project with zero open tabs (empty Open Project Folder, or the last tab was
         // just closed) would otherwise add this chain with no tab visible for it.
-        _tabController.EnsureCurrentDocumentHasTab(_projectManager, TabActivation.Activate);
+        _tabController.EnsureCurrentDocumentHasTab(_projectManager);
         RebuildTabStrip();
 
         Dispatcher.UIThread.Post(() =>
@@ -7155,14 +7172,8 @@ public partial class MainWindow : Window
         }
 
         // Save the leaving tab's state before a different file takes over.
-        CaptureLeavingActiveTab();
+        var leaving = CaptureLeavingActiveTab();
         bool documentInFront = _visiblePane == _achxPane;
-        ShowPane(_achxPane);
-
-        // If there is already a file open that hasn't been registered as a tab yet,
-        // add it as a background tab so it appears as the first tab when the second
-        // file is opened.  This covers the common case of File > Open > Open.
-        EnsureCurrentEditorContentHasTab();
 
         var filePath = new FilePath(fileName);
 
@@ -7175,80 +7186,22 @@ public partial class MainWindow : Window
             var result = asPreview ? _tabManager.OpenPreview(filePath) : _tabManager.OpenOrFocus(filePath);
             var arrivedTab = _tabManager.ActiveTab;
 
-            if (result == TabOpenResult.Focused)
-            {
-                // The tab is already registered and now active in TabManager, but the editor
-                // may still be displaying a different tab's content (e.g. user was on tab 1
-                // and re-opened tab 2's file via File > Open).  Load the file to ensure the
-                // panels and previews reflect the focused tab.
-                // Behind a .seqj tab the document is still loaded, but the undo stack is the .seqj's. A file changed
-                // outside is loaded again: with hot reload off, the next autosave would overwrite the change.
-                bool alreadyShown = documentInFront && (FilePath?)_projectManager.FileName == filePath
-                    && arrivedTab?.CachedDiskState?.HasChanged(filePath) != true;
-                if (!alreadyShown)
-                {
-                    bool activated = await _appCommands.ActivateTabContentAsync(arrivedTab!);
-                    if (activated && arrivedTab?.UndoSnapshot != null)
-                        _undoManager.RestoreSnapshot(arrivedTab.UndoSnapshot);
-                }
-                RebuildTabStrip();
-                UpdateTitle();
-                UpdateStatusBar();
-                return;
-            }
-
-            bool opened = await _appCommands.OpenProjectWorkflowAsync(fileName);
-            if (!opened)
-            {
-                // The workflow refused (conversion declined, texture missing, unreadable file) and
-                // left the editor's document as it was, so the tab registered above would sit in
-                // the strip labelled with a file that never opened; closing it silently would then
-                // drop whatever the user typed under that label.
-                DropUnloadedTab(filePath);
-                return;
-            }
-            // Restore this tab's prior history if it was previously open (snapshot normally
-            // null on first open; non-null if the tab was closed and re-opened mid-session).
-            if (arrivedTab?.UndoSnapshot != null)
-                _undoManager.RestoreSnapshot(arrivedTab.UndoSnapshot);
+            // Re-opening the file in front leaves its document alone. Behind a .seqj tab the document is still loaded,
+            // but the undo stack is the .seqj's. A file changed outside is loaded again: with hot reload off, the next
+            // autosave would overwrite the change.
+            bool alreadyShown = result == TabOpenResult.Focused && documentInFront
+                && (FilePath?)_projectManager.FileName == filePath
+                && arrivedTab?.CachedDiskState?.HasChanged(filePath) != true;
+            if (alreadyShown)
+                FollowActiveTab(arrivedTab!);
+            else
+                await ShowActiveTabAsync(leaving);
         }
         finally
         {
             _suppressPreviewPromotion = false;
         }
     }
-
-    /// <summary>
-    /// Takes back a tab that <see cref="LoadAnimationFileAsync"/> registered for a file the open
-    /// workflow then refused. Nothing was loaded, so the previous tab's content is still what the
-    /// editor shows; only the strip and the Project panel selection need to follow.
-    /// </summary>
-    /// <param name="showFallback">False when the caller loads whichever tab falls back in itself, as session restore does.</param>
-    private void DropUnloadedTab(FilePath path, bool showFallback = true)
-    {
-        _tabManager.Close(path);
-        var next = _tabManager.ActiveTab;
-        // The open swapped to the document pane before it failed; a different kind falling back
-        // in has to be shown and loaded again.
-        if (showFallback && next != null && PaneFor(next) != _visiblePane)
-        {
-            _ = ShowTabAsync(next);
-            return;
-        }
-        if (next != null)
-            SyncProjectPanelSelectionTo(next);
-        RebuildTabStrip();
-        UpdateTitle();
-        UpdateStatusBar();
-    }
-
-    /// <summary>
-    /// Registers the currently-loaded file (or an "Untitled" placeholder when the editor has
-    /// content but no saved path) as a background tab so it appears before the next file that
-    /// is about to be opened.
-    /// </summary>
-    private void EnsureCurrentEditorContentHasTab() =>
-        _tabController.EnsureCurrentDocumentHasTab(_projectManager, TabActivation.Background);
 
     /// <summary>
     /// Shows (or moves) a thin vertical line in <see cref="DragOverlayCanvas"/> marking where
@@ -7333,7 +7286,7 @@ public partial class MainWindow : Window
         var filePath = tab.Path.FullPath;
         // Detaching closes the tab here, so a .seqj whose last save failed asks first, as closing it does.
         if (await PaneFor(tab).PrepareCloseAsync(tab) is not { } toClose) return;
-        CloseTabCore(toClose);
+        await CloseTabCoreAsync(toClose);
         var window = DetachedWindowFactory();
         window.Show();
         await window.OpenFileAsTab(filePath);
@@ -8063,8 +8016,9 @@ public partial class MainWindow : Window
             if (match.ShouldSkip?.Invoke() == true) return;
 
             e.Handled = true;
-            // A command that runs while an in-place rename is open (Ctrl+S, Undo, Back) applies the typed name first.
-            CommitPendingRename();
+            // A command that runs while an in-place rename is open (Ctrl+S, Undo, Back) applies the typed name first, and one
+            // that runs during a sequence timeline drag cancels the drag first, so it acts on the document as saved.
+            SettlePendingInput();
             match.Action();
         }), RoutingStrategies.Tunnel);
 
@@ -8864,7 +8818,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Applies the name typed into an open ANIMATIONS-tree rename, as Enter would. The tree's own commit is the box
     /// losing focus, which a tab switch, a hotkey, undo, back/forward or a press on blank space does not cause; those
-    /// reach it through <see cref="CommitPendingRename"/>. A refused name shows the message and keeps the old one.
+    /// reach it through <see cref="SettlePendingInput"/>. A refused name shows the message and keeps the old one.
     /// </summary>
     private void CommitPendingTreeRename()
     {

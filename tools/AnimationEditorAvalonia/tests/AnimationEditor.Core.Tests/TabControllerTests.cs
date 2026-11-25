@@ -40,9 +40,7 @@ public class TabControllerTests
 
     // ── EnsureCurrentDocumentHasTab (#898) ──────────────────────────────────────
     // Add Animation (and any other "start editing with zero tabs open" site) needs the new
-    // tab to become the active one; the pre-existing "leaving tab" background-registration
-    // need (EnsureCurrentEditorContentHasTab) must keep not activating. One method,
-    // parameterized by TabActivation, so a third site can't duplicate this logic again.
+    // tab to become the active one.
 
     private static TabController MakeController(TestServices ctx, TabManager tabManager) =>
         new(ctx.UndoManager, ctx.AppCommands, () => new Dictionary<object, bool>(), tabManager);
@@ -55,25 +53,11 @@ public class TabControllerTests
         var tabManager = new TabManager();
         var controller = MakeController(ctx, tabManager);
 
-        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager, TabActivation.Activate);
+        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager);
 
         Assert.Single(tabManager.Tabs);
         Assert.NotNull(tabManager.ActiveTab);
         Assert.Equal("Untitled", tabManager.ActiveTab!.DisplayName);
-    }
-
-    [Fact]
-    public void EnsureCurrentDocumentHasTab_ZeroTabsUnsavedContentBackground_RegistersWithoutActivating()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        TestHelpers.MakeChain(ctx.Acls, "Idle");
-        var tabManager = new TabManager();
-        var controller = MakeController(ctx, tabManager);
-
-        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager, TabActivation.Background);
-
-        Assert.Single(tabManager.Tabs);
-        Assert.Null(tabManager.ActiveTab);
     }
 
     [Fact]
@@ -83,7 +67,7 @@ public class TabControllerTests
         var tabManager = new TabManager();
         var controller = MakeController(ctx, tabManager);
 
-        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager, TabActivation.Activate);
+        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager);
 
         Assert.Empty(tabManager.Tabs);
     }
@@ -97,7 +81,7 @@ public class TabControllerTests
         tabManager.OpenOrFocus(new FilePath(tabManager.NewUntitledSentinelPath()), "Untitled");
         var controller = MakeController(ctx, tabManager);
 
-        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager, TabActivation.Activate);
+        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager);
 
         Assert.Single(tabManager.Tabs); // no second tab opened
     }
@@ -110,7 +94,7 @@ public class TabControllerTests
         var tabManager = new TabManager();
         var controller = MakeController(ctx, tabManager);
 
-        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager, TabActivation.Activate);
+        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager);
 
         Assert.Single(tabManager.Tabs);
         Assert.Equal(new FilePath(@"C:\Games\hero.achx"), tabManager.ActiveTab!.Path);
@@ -125,7 +109,7 @@ public class TabControllerTests
         tabManager.OpenOrFocus(new FilePath(@"C:\Games\hero.achx"));
         var controller = MakeController(ctx, tabManager);
 
-        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager, TabActivation.Activate);
+        controller.EnsureCurrentDocumentHasTab(ctx.ProjectManager);
 
         Assert.Single(tabManager.Tabs);
     }
