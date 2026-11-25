@@ -43,6 +43,21 @@ public class TiledSyncOtherDriveTests : IDisposable
         _ctx.IoManager.GetAssociatedTiledTilesetPaths(achx).ShouldBe(new[] { "//server/maps/Heroes.tsx" });
     }
 
+    // Neither is a path: the first leaves its drive-relative root, the second holds a null character.
+    [Theory]
+    [InlineData("C:a/../../b.tsx")]
+    [InlineData("a\0b.tsx")]
+    public void FindAssociationsTargeting_AnotherTiledSyncHoldsAnUnusablePath_IsStillFound(string unusable)
+    {
+        string achx = Documents.Write(_dir.Path, DocType.Achx, "source");
+        string tsx = Documents.Write(_dir.Path, DocType.Tsx, "Heroes");
+        File.WriteAllText(Path.Combine(_dir.Path, "a.tiledsync"),
+            JsonSerializer.Serialize(new AETiledSyncSave { TiledTilesetPaths = { unusable } }));
+        _ctx.IoManager.AddAssociatedTiledTilesetPath(achx, tsx);
+
+        TiledSyncAssociationScanner.FindAssociationsTargeting(tsx).ShouldHaveSingleItem().ShouldBe(new FilePath(achx).FullPath);
+    }
+
     [Fact]
     public void FindAssociationsTargeting_StoredWithItsFullPath_IsFound()
     {

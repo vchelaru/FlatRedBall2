@@ -31,7 +31,7 @@ public static class TiledSyncAssociationScanner
     /// Returns the absolute achx/achj path for every <c>.tiledsync</c> association pointing at
     /// <paramref name="tsxPath"/> -- or, if no sibling <c>.achx</c>/<c>.achj</c> file is found next
     /// to a matching <c>.tiledsync</c>, the <c>.tiledsync</c> path itself. Empty when none are
-    /// found. A corrupt <c>.tiledsync</c> encountered during the scan is skipped rather than
+    /// found. A corrupt <c>.tiledsync</c>, or one with a path that is not one, encountered during the scan is skipped rather than
     /// surfaced: it can't prove an association either way, and this is an exploratory scan, not the
     /// normal load-and-sync flow where a parse failure has real meaning.
     /// </summary>
@@ -47,22 +47,21 @@ public static class TiledSyncAssociationScanner
         var everyReadableFolder = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0 };
         foreach (var syncFile in Directory.EnumerateFiles(tsxDir.FullPath, "*.tiledsync", everyReadableFolder))
         {
-            AETiledSyncSave? settings;
             try
             {
                 var json = File.ReadAllText(syncFile);
-                settings = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
+                var settings = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
+                if (settings?.TiledTilesetPaths == null)
+                    continue;
+
+                var syncFolder = new FilePath(syncFile).GetDirectoryContainingThis();
+                if (settings.ResolveTilesets(syncFolder).Contains(targetTsx))
+                    owners.Add(FindOwningAchxPath(syncFile));
             }
             catch
             {
                 continue;
             }
-            if (settings?.TiledTilesetPaths == null)
-                continue;
-
-            var syncFolder = new FilePath(syncFile).GetDirectoryContainingThis();
-            if (settings.ResolveTilesets(syncFolder).Contains(targetTsx))
-                owners.Add(FindOwningAchxPath(syncFile));
         }
         return owners;
     }
