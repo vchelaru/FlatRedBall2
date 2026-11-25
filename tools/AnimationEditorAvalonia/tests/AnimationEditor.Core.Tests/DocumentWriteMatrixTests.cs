@@ -19,7 +19,7 @@ namespace AnimationEditor.Core.Tests;
 /// </summary>
 public class DocumentWriteMatrixTests
 {
-    private static readonly DocAction[] Actions = Enum.GetValues<DocAction>().Where(action => action <= DocAction.PushToTileset).ToArray();
+    private static readonly DocAction[] Actions = Enum.GetValues<DocAction>().Where(action => action <= DocAction.ConvertToAchj).ToArray();
 
     /// <summary>False only where the editor has no such command for the pair.</summary>
     private static bool Applies(DocAction action, DocType front, DocType background) => action switch
@@ -34,9 +34,6 @@ public class DocumentWriteMatrixTests
         // A sequence tab has no export to these formats, and no Untitled form to recover.
         DocAction.Export or DocAction.WriteRecovery => front != DocType.Seqj,
         DocAction.ConvertToAchj => front == DocType.Achx,
-        // Only an .achx or .achj has associated tilesets.
-        DocAction.PushFromBackground => background is DocType.Achx or DocType.Achj,
-        DocAction.PushToTileset => front is DocType.Achx or DocType.Achj && background == DocType.Tsx,
         _ => true,
     };
 
@@ -72,10 +69,9 @@ public class DocumentWriteMatrixTests
     public async Task Action_KeepsEveryDocument(DocAction action, DocType front, DocType background)
     {
         using var editor = new Editor();
-        // A folder each, as on Linux an unwritable file is an unwritable folder. A tileset and its source share the texture.
-        bool apart = action != DocAction.PushToTileset;
-        Document back = await editor.OpenAsync(background, Documents.BackgroundName, apart);
-        Document current = await editor.OpenAsync(front, Documents.FrontName, apart);
+        // A folder each, as on Linux an unwritable file is an unwritable folder.
+        Document back = await editor.OpenAsync(background, Documents.BackgroundName);
+        Document current = await editor.OpenAsync(front, Documents.FrontName);
         var before = Documents.FileBytes(editor.Folder);
         // The files whose bytes may change, and the new ones.
         var written = new List<string?>();
@@ -156,13 +152,6 @@ public class DocumentWriteMatrixTests
                 foreach (string extension in new[] { ".achx", ".achj", ".tsx", ".seqj" }) written.Add("blocked" + extension);
                 break;
             case DocAction.SaveBackgroundDocument:
-            case DocAction.PushFromBackground:
-                string? tileset = null;
-                if (action == DocAction.PushFromBackground)
-                {
-                    tileset = Documents.Write(back.Folder, DocType.Tsx, Documents.FrontName);
-                    editor.Ctx.IoManager.AddAssociatedTiledTilesetPath(back.Path!, tileset);
-                }
                 var cell = Documents.NewCell(back.Name);
                 var frames = back.Tab!.CachedEditorModel!.AnimationChains[0].Frames;
                 frames.Add(new AnimationFrameSave
@@ -176,10 +165,6 @@ public class DocumentWriteMatrixTests
                 });
                 editor.Ctx.AppCommands.SaveDocument(back.Tab).ShouldBeTrue();
                 back.Expected.AddFrame(back.Name);
-                // Its own tiles, not those of what is in front, beside the tileset's animation.
-                if (tileset != null)
-                    Documents.TileAnimations(tileset).ShouldBe(["3: 0@100 1@250", "4: 4@200", "8: 8@100 9@250 10@100", "12: 12@200"]);
-                written.Add(tileset);
                 editor.ShouldBeAsExpected();
                 // What is in front is still itself: it saves as its own type, to its own tiles.
                 editor.Edit(current);
@@ -254,15 +239,6 @@ public class DocumentWriteMatrixTests
                 result.Status.ShouldBe(AchxConversionStatus.Converted);
                 Documents.ShouldHold(result.TargetPath!, current.Expected);
                 written.Add(result.TargetPath);
-                break;
-            case DocAction.PushToTileset:
-                editor.Ctx.AppCommands.AddAssociatedTiledTileset(back.Path!);
-                editor.Edit(current);
-                // Its tiles and lengths reach the tileset, beside the tileset's own animation. A tileset something is pushed
-                // to does not open as a document.
-                Documents.TileAnimations(back.Path!).ShouldBe(["0: 0@100 1@250 2@100", "4: 4@200", "11: 8@100 9@250", "12: 12@200"]);
-                written.AddRange([current.Path, back.Path]);
-                editor.Forget(back);
                 break;
             default:
                 throw new InvalidOperationException($"{action} has no case here.");
@@ -365,9 +341,9 @@ public class DocumentWriteMatrixTests
 
         public string InFolderOf(Document document, string file) => Path.Combine(document.Folder, file);
 
-        public async Task<Document> OpenAsync(DocType type, string name, bool ownFolder)
+        public async Task<Document> OpenAsync(DocType type, string name)
         {
-            string folder = ownFolder ? Path.Combine(Folder, name) : Folder;
+            string folder = Path.Combine(Folder, name);
             Documents.WriteTextures(folder);
             string? path = type == DocType.Untitled ? null : Documents.Write(folder, type, name);
             AnimationChainSave chain = Documents.ChainFor(type, name);

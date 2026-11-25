@@ -28,10 +28,6 @@ public static class SaveTarget
     public static string OpenInAnotherTabMessage(string path) =>
         $"{new FilePath(path).NoPath} is open in another tab. Close that tab first.";
 
-    /// <summary>The refusal shown for a .tsx <paramref name="path"/> that <paramref name="owner"/> pushes its animations to.</summary>
-    public static string AssociatedTilesetMessage(string path, string owner) =>
-        $"{new FilePath(path).NoPath} is an associated Tiled tileset of {new FilePath(owner).NoPath}, which writes its animations there. Pick another name.";
-
     /// <summary>The refusal shown when <paramref name="path"/> changed on disk after a save to it failed.</summary>
     public static string ChangedOnDiskMessage(string path) =>
         $"\"{new FilePath(path).NoPath}\" changed on disk, and this tab has edits that could not be saved. " +
