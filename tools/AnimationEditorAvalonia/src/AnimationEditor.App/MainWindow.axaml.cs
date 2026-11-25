@@ -102,6 +102,10 @@ public partial class MainWindow : Window
     // self-promote before the user did anything.
     private bool _suppressPreviewPromotion;
 
+    private Border? _activeTabBorder;
+    // Set while a strip click makes its tab active, which is the synchronous part of ActivateTabAsync.
+    private TabEntry? _stripClickedTab;
+
     // ── Tab drag state ────────────────────────────────────────────────────────
     private TabEntry? _dragTab;
     private double _dragStartX;
@@ -453,6 +457,14 @@ public partial class MainWindow : Window
     {
         _tabManager.ActiveChanged += BindWireframeCamera;
         _tabManager.ActiveChanged += _ => Dispatcher.UIThread.InvokeAsync(RebuildTabStrip);
+        // Only on a change of active tab: a rebuild for any other reason (a background close, a reorder)
+        // must leave the strip where the user scrolled it. A clicked tab stays put too, or its close button
+        // would slide under the pointer. Background runs after the rebuild and its layout.
+        _tabManager.ActiveChanged += tab =>
+        {
+            if (tab != _stripClickedTab)
+                Dispatcher.UIThread.Post(() => _activeTabBorder?.BringIntoView(), DispatcherPriority.Background);
+        };
         // Persist the open-tab session on every change (open / switch / close / reorder), not just
         // on graceful window close — a debugger Stop or crash never fires Closed and would otherwise
         // lose the session (issue #439). Called synchronously so the write lands before any kill;
@@ -477,6 +489,7 @@ public partial class MainWindow : Window
     private void RebuildTabStrip()
     {
         TabStrip.Children.Clear();
+        _activeTabBorder = null;
 
         var tabs = _tabManager.Tabs;
         TabBarBorder.IsVisible = tabs.Count > 0;
@@ -682,7 +695,9 @@ public partial class MainWindow : Window
                 }
                 else
                 {
+                    _stripClickedTab = captured;
                     _tabSwitchInFlight = ActivateTabAsync(captured);
+                    _stripClickedTab = null;
                 }
 
                 _dragTab = null;
@@ -690,6 +705,7 @@ public partial class MainWindow : Window
             };
 
             TabStrip.Children.Add(tabBorder);
+            if (isActive) _activeTabBorder = tabBorder;
         }
     }
 

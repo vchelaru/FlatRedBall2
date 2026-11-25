@@ -459,6 +459,7 @@ internal sealed class AnimationEditorHarness : IDisposable
 
     public void ClickTab(string displayName)
     {
+        ScrollIntoView(TabFor(displayName));
         Click(TabFor(displayName).GetVisualDescendants().OfType<TextBlock>().First(label => label.Text == displayName));
         // The switch keeps loading after the click returns; a slow runner otherwise reads it half done.
         if (!WaitUntil(() => Window.WhenTabSwitchSettled().IsCompleted, TimeSpan.FromSeconds(10)))
@@ -468,8 +469,11 @@ internal sealed class AnimationEditorHarness : IDisposable
     }
 
     /// <summary>Clicks the ✕ on the tab labelled <paramref name="displayName"/>.</summary>
-    public void CloseTab(string displayName) =>
+    public void CloseTab(string displayName)
+    {
+        ScrollIntoView(TabFor(displayName));
         Click(TabFor(displayName).GetVisualDescendants().OfType<Button>().First(button => button.Content as string == "✕"));
+    }
 
     #endregion
 

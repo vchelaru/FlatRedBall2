@@ -141,6 +141,44 @@ public class ProjectFileConvertTests
     }
 
     [AvaloniaFact]
+    public async Task ConvertProjectFileToAchjAsync_AssociatedTileset_IsPushedToByTheAchj()
+    {
+        var dir = NewTempDir();
+        var achx = WriteAchx(dir, "hero.achx");
+        var tsx = Path.Combine(dir, "walk.tsx");
+        File.WriteAllText(tsx, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><tileset name=\"walk\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"4\"><image source=\"walk.png\" width=\"64\" height=\"16\"/></tileset>");
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            await ctx.OpenProjectFolderAsync(window, dir);
+            await window.OpenFileAsTab(achx);
+            var frame = ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[0];
+            frame.RightCoordinate = frame.BottomCoordinate = 16;
+            ctx.AppCommands.AddAssociatedTiledTileset(tsx);
+            ctx.AppCommands.SaveCurrentAnimationChainList();
+            Assert.Contains("value=\"hero.achx\"", File.ReadAllText(tsx));
+            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+            window.DeleteToRecycleBin = path => { File.Delete(path); return null; };
+            IReadOnlyList<string> warnings = [];
+            ctx.AppCommands.TiledSyncWarned += w => warnings = w;
+
+            await window.ConvertProjectFileToAchjAsync("hero.achx");
+            await window.OpenFileAsTab(Path.Combine(dir, "hero.achj"));
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[0].FrameLength = 0.25f;
+            ctx.AppCommands.SaveCurrentAnimationChainList();
+
+            Assert.Empty(warnings);
+            var text = File.ReadAllText(tsx);
+            Assert.Contains("value=\"hero.achj\"", text);
+            Assert.DoesNotContain("hero.achx", text);
+            Assert.Contains("duration=\"250\"", text);
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
+    [AvaloniaFact]
     public async Task ConvertProjectFolderToAchjAsync_UserConfirms_ConvertsAndRecyclesEveryAchxUnderIt()
     {
         var dir = NewTempDir();
