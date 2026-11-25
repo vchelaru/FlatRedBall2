@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Models;
 using DotTiled;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -214,6 +216,43 @@ public class TsxTileClaimTests : IDisposable
         a.Frames[0].LeftCoordinate = 3;
 
         Assert.Contains("has its own \"Name\" property", pm.TrySetTsxOwnerTileId(a, 9));
+    }
+
+    [Fact]
+    public void TrySetTsxOwnerTileId_OnlyASatelliteOfAnUnsavedChainWantsTheTile_IsAccepted()
+    {
+        var path = WriteTsx(Tile(0) + Tile(4));
+        var pm = Load(path);
+        Place(NewChain(pm, "Wide", 4), 4, columns: 2);
+        Assert.Contains("\"Wide\"", Assert.Single(pm.SaveTsxProject()));
+
+        Assert.Null(pm.TrySetTsxOwnerTileId(Chain(pm, "ID:0"), 5));
+
+        Assert.Contains("\"Wide\"", Assert.Single(pm.SaveTsxProject()));
+        Assert.Equal([4u, 5u], AnimatedTiles(path));
+    }
+
+    [Fact]
+    public async Task SaveDocument_BackgroundTab_SettlesTilesByThatTabsOwners()
+    {
+        var path = WriteTsx(Tile(5));
+        var ctx = new TestServices();
+        var tab = new TabEntry(new FilePath(path));
+        await ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        ctx.AppCommands.CaptureTabEditorState(tab);
+        var front = Path.Combine(_dir.Path, "Front.tsx");
+        File.WriteAllText(front, File.ReadAllText(path).Replace("id=\"5\"", "id=\"9\""));
+        await ctx.AppCommands.OpenTsxWorkflowAsync(front);
+        // Cannot be mapped, so only being known as the owner of tile 5 keeps it in the file.
+        tab.CachedEditorModel!.AnimationChains.Single().Frames[0].LeftCoordinate = 3;
+
+        Assert.True(ctx.AppCommands.SaveDocument(tab));
+        Assert.Equal([5u], AnimatedTiles(path));
+
+        // And the front document's own owners are untouched by it.
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single().Frames[0].LeftCoordinate = 3;
+        ctx.ProjectManager.SaveTsxProject();
+        Assert.Equal([9u], AnimatedTiles(front));
     }
 
     [Fact]
