@@ -1443,6 +1443,20 @@ public sealed class SequenceDocument : ISequenceChainLookup
         }
     }
 
+    // See KeepSelection.
+    private bool _keepSelection;
+
+    /// <summary>
+    /// Runs <paramref name="edit"/> without selecting the sequence it changes, for an edit committed by a click on another
+    /// sequence, which must stay selected. Undo and redo still select the changed one.
+    /// </summary>
+    public void KeepSelection(Action edit)
+    {
+        _keepSelection = true;
+        try { edit(); }
+        finally { _keepSelection = false; }
+    }
+
     /// <summary>
     /// Applies <paramref name="mutate"/> to a copy of the file and runs the result as one undo entry. False when the edit was
     /// dropped because the result may not be written (see the checks inside); an edit that changes nothing is not dropped.
@@ -1464,7 +1478,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
         // An edit that names no sequence selects the one it changed, so every edit, present and future, is followed.
         if (selectBefore is null && selectAfter is null && stateBefore is null && stateAfter is null && ChangedSequence(before, after) is { } changed)
             selectBefore = selectAfter = changed;
-        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo, renamed,
+        undo.Execute(new SnapshotCommand(this, description, before, after, selectBefore, selectAfter, trackBefore, trackAfter, selectOnDo && !_keepSelection, renamed,
             stateBefore, stateAfter, coalesceGroup));
         return true;
     }

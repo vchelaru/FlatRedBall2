@@ -10,7 +10,10 @@ using Shouldly;
 
 namespace AnimationEditor.App.Tests.Dogfood;
 
-/// <summary>Text typed in the Inspector while the file changes outside.</summary>
+/// <summary>
+/// Text typed in the Inspector and not committed yet only ever applies to what it was typed for, when the file changes outside,
+/// an edit is undone, or the user selects something else.
+/// </summary>
 public class SequenceInspectorOutsideChangeScenarioTests
 {
     [AvaloniaFact]
@@ -155,5 +158,128 @@ public class SequenceInspectorOutsideChangeScenarioTests
         editor.Press(Key.Enter);
 
         SequenceListSave.FromFile(path).Sequences.Select(s => s.Name).ShouldBe(new[] { "Idle", "Slam" });
+    }
+
+    [AvaloniaFact]
+    public async Task StartTyped_TheLengthOfTheBlockChangesOutside_IsKept()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body", ("Walk", 0, 2)));
+        var inspector = await OpenAsync(editor, path, new TimelineChainId(0, 0), null);
+        TypeInto(editor, BoxOf(inspector.ChainStartField), "7");
+
+        await ChangeOutsideAsync(editor, path, save => save.Sequences[0].Tracks[0].Chains[0].Length = 3);
+        editor.Press(Key.Enter);
+
+        SequenceListSave.FromFile(path).Sequences[0].Tracks[0].Chains.Select(c => (c.Start, c.Length)).ShouldBe(new[] { (7.0, (double?)3) });
+    }
+
+    [AvaloniaFact]
+    public async Task TrackNameTyped_ItsClipMovesOutside_IsKept()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Plays("Sub", "Idle"));
+        var inspector = await OpenAsync(editor, path, null, 0);
+        TypeInto(editor, inspector.TrackNameBox, "Legs");
+
+        await ChangeOutsideAsync(editor, path, save => save.Sequences[0].Tracks[0].References![0].Start = 3);
+
+        inspector.TrackNameBox.Text.ShouldBe("Legs");
+    }
+
+    [AvaloniaFact]
+    public async Task StartTyped_TheLengthOfTheBlockIsUndone_IsKept()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body", ("Walk", 0, 2)));
+        var inspector = await OpenAsync(editor, path, new TimelineChainId(0, 0), null);
+        editor.TypeAndEnter(BoxOf(inspector.ChainLengthField), "3");
+        TypeInto(editor, BoxOf(inspector.ChainStartField), "7");
+
+        editor.UndoManager.Undo();
+
+        BoxOf(inspector.ChainStartField).Text.ShouldBe("7");
+    }
+
+    [AvaloniaFact]
+    public async Task TrackNameTyped_OneOfTwoTracksOfThatNameIsRemovedOutside_IsDropped()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body", ("Walk", 0, 2)), Track("Body", ("Run", 1, 3)));
+        var inspector = await OpenAsync(editor, path, null, 0);
+        TypeInto(editor, inspector.TrackNameBox, "Legs");
+
+        await ChangeOutsideAsync(editor, path, save => save.Sequences[0].Tracks.RemoveAt(0));
+        editor.Press(Key.Enter);
+
+        SequenceListSave.FromFile(path).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Body" });
+    }
+
+    private static async Task ClickRowAsync(AnimationEditorHarness editor, int row)
+    {
+        editor.Click((Control)editor.Control<ListBox>("SequenceList").ContainerFromIndex(row)!);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+    }
+
+    [AvaloniaFact]
+    public async Task NameTyped_ClickOnAnotherRow_RenamesTheOneItWasTypedFor_AndTheClickedRowStaysSelected()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj");
+        var inspector = await OpenAsync(editor, path, null, null);
+        TypeInto(editor, inspector.SequenceNameBox, "Slam");
+
+        await ClickRowAsync(editor, 1);
+
+        SequenceListSave.FromFile(path).Sequences.Select(s => s.Name).ShouldBe(new[] { "Slam", "Idle" });
+        editor.UndoLabels.ShouldBe(new[] { "Rename Sequence 'Attack' to 'Slam'" });
+        editor.Control<ListBox>("SequenceList").SelectedIndex.ShouldBe(1);
+        inspector.SequenceNameBox.Text.ShouldBe("Idle");
+    }
+
+    [AvaloniaFact]
+    public async Task StartTyped_ClickOnAnotherRow_MovesTheBlockItWasTypedFor_AndTheClickedRowStaysSelected()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body", ("Walk", 0, 2)));
+        Rewrite(path, save => save.Sequences[1].Tracks.Add(Track("Body", ("Walk", 0, 2))));
+        var inspector = await OpenAsync(editor, path, new TimelineChainId(0, 0), null);
+        TypeInto(editor, BoxOf(inspector.ChainStartField), "7");
+
+        await ClickRowAsync(editor, 1);
+
+        SequenceListSave.FromFile(path).Sequences.Select(s => s.Tracks[0].Chains[0].Start).ShouldBe(new[] { 7.0, 0.0 });
+        editor.Control<ListBox>("SequenceList").SelectedIndex.ShouldBe(1);
+        inspector.SequenceNameBox.Text.ShouldBe("Idle");
+    }
+
+    [AvaloniaFact]
+    public async Task TrackNameTyped_ClickOnTheSameRow_RenamesTheTrack()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body"));
+        var inspector = await OpenAsync(editor, path, null, 0);
+        TypeInto(editor, inspector.TrackNameBox, "Legs");
+
+        await ClickRowAsync(editor, 0);
+
+        SequenceListSave.FromFile(path).Sequences[0].Tracks.Select(t => t.Name).ShouldBe(new[] { "Legs" });
+        inspector.SequencePanel.IsVisible.ShouldBeTrue();
+    }
+
+    [AvaloniaFact]
+    public async Task StartTyped_ClickOnAnotherTab_MovesTheBlockItWasTypedFor()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body", ("Walk", 0, 2)));
+        string other = Write(editor, "other.seqj", Track("Body", ("Walk", 0, 2)));
+        await editor.OpenAsync(other);
+        var inspector = await OpenAsync(editor, path, new TimelineChainId(0, 0), null);
+        TypeInto(editor, BoxOf(inspector.ChainStartField), "7");
+
+        editor.ClickTab("other.seqj");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(400));
+
+        new[] { path, other }.Select(file => SequenceListSave.FromFile(file).Sequences[0].Tracks[0].Chains[0].Start).ShouldBe(new[] { 7.0, 0.0 });
     }
 }
