@@ -8,19 +8,6 @@ using System.Linq;
 namespace AnimationEditor.Core.Models
 {
     /// <summary>
-    /// Whether <see cref="TabController.EnsureCurrentDocumentHasTab"/> should make the new/found
-    /// tab active or merely register it. Use <see cref="Background"/> when switching away to a
-    /// different tab that is about to become active (the outgoing tab must not steal focus);
-    /// use <see cref="Activate"/> when nothing else is being switched to (e.g. Add Animation on
-    /// a document with zero open tabs, #898).
-    /// </summary>
-    public enum TabActivation
-    {
-        Background,
-        Activate,
-    }
-
-    /// <summary>
     /// UI-free orchestration of the AnimationEditor's open tabs, kept in Core so it can be
     /// unit-tested. Owns the "leaving tab" capture couplet and "ensure a tab exists for
     /// the current document" logic; broader tab-switch/close sequencing migrates here
@@ -63,27 +50,21 @@ namespace AnimationEditor.Core.Models
         }
 
         /// <summary>
-        /// Ensures the currently-loaded document — on disk or unsaved — has a tab. No-op when
-        /// the document is unsaved and empty (nothing worth a tab yet), or when it already has
-        /// a tracked tab. Built from the same primitives <c>OpenAsNewUnsavedDocument</c> and the
-        /// old per-site <c>EnsureCurrentEditorContentHasTab</c> duplicated (#898): a project with
+        /// Ensures the currently-loaded document — on disk or unsaved — has a tab, opened as the
+        /// active one. No-op when the document is unsaved and empty (nothing worth a tab yet), or
+        /// when it already has a tracked tab (#898): a project with
         /// zero open tabs — e.g. after Open Project Folder on a folder with no files, or after
         /// closing the last tab — otherwise leaves any content added next (like Add Animation)
         /// with no visible tab.
         /// </summary>
-        public void EnsureCurrentDocumentHasTab(IProjectManager projectManager, TabActivation activation)
+        public void EnsureCurrentDocumentHasTab(IProjectManager projectManager)
         {
             var currentPath = projectManager.FileName;
             if (!string.IsNullOrEmpty(currentPath))
             {
                 var fp = new FilePath(currentPath);
                 if (_tabManager.Tabs.All(t => t.Path != fp))
-                {
-                    if (activation == TabActivation.Activate)
-                        _tabManager.OpenOrFocus(fp);
-                    else
-                        _tabManager.RegisterBackground(fp);
-                }
+                    _tabManager.OpenOrFocus(fp);
                 return;
             }
 
@@ -94,10 +75,7 @@ namespace AnimationEditor.Core.Models
             var displayName = TabManager.ComputeUntitledDisplayName(
                 _tabManager.Tabs.Select(t => t.DisplayName).ToList());
             var sentinelPath = new FilePath(_tabManager.NewUntitledSentinelPath());
-            if (activation == TabActivation.Activate)
-                _tabManager.OpenOrFocus(sentinelPath, displayName);
-            else
-                _tabManager.RegisterBackground(sentinelPath, displayName);
+            _tabManager.OpenOrFocus(sentinelPath, displayName);
         }
     }
 }

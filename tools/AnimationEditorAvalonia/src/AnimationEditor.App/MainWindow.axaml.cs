@@ -753,7 +753,7 @@ public partial class MainWindow : Window
     private TabEntry? CaptureLeavingActiveTab()
     {
         if (_tabManager.ActiveTab is null)
-            _tabController.EnsureCurrentDocumentHasTab(_projectManager, TabActivation.Activate);
+            _tabController.EnsureCurrentDocumentHasTab(_projectManager);
         if (_tabManager.ActiveTab is { } leaving)
             PaneFor(leaving).CaptureLeaving(leaving);
         return _tabManager.ActiveTab;
@@ -771,18 +771,23 @@ public partial class MainWindow : Window
     /// </param>
     private async Task<bool> ShowActiveTabAsync(TabEntry? live = null, TabLoad load = TabLoad.Switch)
     {
-        bool dropped = false;
+        bool fellBack = false;
         while (_tabManager.ActiveTab is { } tab)
         {
-            if (dropped && tab == live && PaneFor(tab) == _visiblePane)
+            if (fellBack && tab == live && PaneFor(tab) == _visiblePane)
             {
                 FollowActiveTab(tab);
                 return false;
             }
-            if (await ShowTabAsync(tab, load) || tab == live) return !dropped;
-
-            _tabManager.Close(tab.Path);
-            dropped = true;
+            if (await ShowTabAsync(tab, load) || tab == live)
+            {
+                if (tab == _tabManager.ActiveTab) return !fellBack;
+                // A file opened while the load asked something (handed over by a second instance) is now the one in front.
+                live = tab;
+            }
+            else
+                _tabManager.Close(tab.Path);
+            fellBack = true;
         }
         ResetToNoTabsOpen();
         return false;
@@ -3977,7 +3982,7 @@ public partial class MainWindow : Window
 
         // #898: a project with zero open tabs (empty Open Project Folder, or the last tab was
         // just closed) would otherwise add this chain with no tab visible for it.
-        _tabController.EnsureCurrentDocumentHasTab(_projectManager, TabActivation.Activate);
+        _tabController.EnsureCurrentDocumentHasTab(_projectManager);
         RebuildTabStrip();
 
         Dispatcher.UIThread.Post(() =>

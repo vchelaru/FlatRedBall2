@@ -259,4 +259,29 @@ public class TabFallbackScenarioTests
 
         editor.TabLabels.ShouldBe(new[] { "sheet.png", "boss.achx" });
     }
+
+    [AvaloniaFact]
+    public async Task OpeningAFile_WhileAnotherOpenAsksToConvert_KeepsItsDocumentUnderItsTab()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        editor.WritePng("sheet.png", 64, 64);
+        string hero = editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)));
+        string npc = editor.WriteAchx("npc.achx", AnimationEditorHarness.Chain("Wave", "sheet.png", (0, 0, 16, 16)));
+        string legacy = Path.Combine(editor.ProjectFolder, "legacy.achx");
+        AnimationChainListSave uv = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        uv.AnimationChains.Add(new AnimationChainSave { Name = "Old" });
+        uv.Save(legacy);
+        await editor.OpenAsync(hero);
+        TaskCompletionSource<bool> answer = new TaskCompletionSource<bool>();
+        editor.Services.AppCommands.ConfirmAsync = (_, _) => answer.Task;
+        Task asking = editor.Window.OpenFileAsTab(legacy);
+        await editor.Window.OpenFileAsTab(npc);     // handed over by a second instance
+
+        answer.SetResult(true);
+        await asking;
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(150));
+
+        editor.Tabs.ActiveTab!.DisplayName.ShouldBe("npc.achx");
+        ShouldAgree(editor);
+    }
 }
