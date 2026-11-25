@@ -2499,15 +2499,16 @@ namespace AnimationEditor.Core.CommandsAndState
                         // Order matters: SetX/SetY preserve each frame's own current width/height, so
                         // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
                         // (possibly just-moved) Left/Top.
-                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value.Apply(FrameDisplayValues.GetPixelX(f)));
-                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value.Apply(FrameDisplayValues.GetPixelY(f)));
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f)));
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f)));
+                        if (pixelX is { } ex && ex.TryApply(FrameDisplayValues.GetPixelX(f), out int x)) PixelFrameEditor.SetX(f, x);
+                        if (pixelY is { } ey && ey.TryApply(FrameDisplayValues.GetPixelY(f), out int y)) PixelFrameEditor.SetY(f, y);
+                        SetSize(f);
                     }
-                    foreach (var f in siblings)
+                    foreach (var f in siblings) SetSize(f);
+
+                    void SetSize(AnimationFrameSave f)
                     {
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f)));
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f)));
+                        if (pixelW is { } ew && ew.TryApply(FrameDisplayValues.GetPixelWidth(f), out int w)) PixelFrameEditor.SetWidth(f, w);
+                        if (pixelH is { } eh && eh.TryApply(FrameDisplayValues.GetPixelHeight(f), out int h)) PixelFrameEditor.SetHeight(f, h);
                     }
                 },
                 this, _events, true, "Set Region", coalesceKind: "PixelRegion"));

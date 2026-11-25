@@ -177,6 +177,9 @@ public partial class FlankerNumericField : UserControl
 
     private void Commit()
     {
+        // The box may show fewer digits than Value has, so leaving it untouched must not parse the text back.
+        if (!HasTypedText) return;
+
         if (Value is null)
         {
             // Mixed multi-selection (#1325): a relative edit goes to the owner to apply per item;
@@ -210,7 +213,7 @@ public partial class FlankerNumericField : UserControl
         decimal parsed = NumericToolbarInput.ParseClamp(ValueBox.Text, Minimum, Maximum, fallback);
 
         // Value's setter only raises OnValueChanged (which reformats ValueBox.Text) when the
-        // parsed value actually differs -- reformat explicitly here too so stray/uncommitted text
+        // parsed value actually differs -- reformat explicitly here too so typed text
         // (e.g. "0.1500" parsing to the already-current 0.15) always snaps back to FormatString.
         if (Value == parsed)
             ValueBox.Text = Format(parsed);
