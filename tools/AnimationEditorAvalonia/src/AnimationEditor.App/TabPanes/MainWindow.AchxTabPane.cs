@@ -40,8 +40,9 @@ public partial class MainWindow
 
         public void CaptureLeaving(TabEntry tab)
         {
-            // Before the snapshot, so the rename is in this tab's history, and a held drag cannot add to the next tab's.
+            // Before the snapshot, so what is typed is in this tab's history, and a held drag cannot add to the next tab's.
             _window.SettlePendingAchxInput();
+            _window.CommitPendingInspectorField();
             _window._tabController.CaptureLeavingTab(tab);
             tab.CachedGuides = new PreviewGuides(_window.PreviewCtrl.HGuides.ToList(), _window.PreviewCtrl.VGuides.ToList());
             _window.SaveCompanionFile();
@@ -173,6 +174,7 @@ public partial class MainWindow
         {
             if (_window._projectManager.AnimationChainListSave is null) return;
 
+            _window.CommitPendingInspectorField();
             if (string.IsNullOrEmpty(_window._projectManager.FileName))
                 await _window._appCommands.SaveCurrentAnimationChainListAsync();
             else
@@ -182,7 +184,11 @@ public partial class MainWindow
             }
         }
 
-        public Task SaveAsAsync(TabEntry? tab) => _window._appCommands.SaveCurrentAnimationChainListAsync();
+        public Task SaveAsAsync(TabEntry? tab)
+        {
+            _window.CommitPendingInspectorField();
+            return _window._appCommands.SaveCurrentAnimationChainListAsync();
+        }
 
         /// <summary>
         /// True when <paramref name="tab"/>'s document has content worth prompting to save (issue
@@ -209,6 +215,7 @@ public partial class MainWindow
         public void Closing(TabEntry tab)
         {
             _window.CommitPendingTreeRename();
+            _window.CommitPendingInspectorField();
             if (IsUntitledTab(tab))
                 _window._ioManager.DeleteRecoveryFile(UntitledDocument(tab));
         }

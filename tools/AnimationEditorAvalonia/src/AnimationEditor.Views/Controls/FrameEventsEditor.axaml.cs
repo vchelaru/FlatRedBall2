@@ -109,6 +109,13 @@ public partial class FrameEventsEditor : UserControl
         _rows.Add(new Row(name, data, remove));
     }
 
+    /// <summary>Commits the row that has the focus, as Enter does.</summary>
+    public void CommitTypedText()
+    {
+        int index = _rows.FindIndex(row => row.Name.IsFocused || row.Data.IsFocused);
+        if (index >= 0) Commit(index);
+    }
+
     private void Commit(int index)
     {
         if (index >= _shown.Count) return;
