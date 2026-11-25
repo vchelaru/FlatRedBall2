@@ -2051,6 +2051,13 @@ public partial class MainWindow : Window
 
         var chainsToAddTo = selectedChains.Count > 1 ? selectedChains : new List<AnimationChainSave> { primaryChain };
 
+        var region = new FrameRegion(minX, minY, maxX, maxY);
+        if (chainsToAddTo.Select(chain => TsxEdit.CheckFrameSize(_projectManager, chain, region)).FirstOrDefault(r => r is not null) is { } otherSize)
+        {
+            ShowProblem($"⚠ {otherSize.Errors[0]}");
+            return;
+        }
+
         if (chainsToAddTo.Count == 1)
         {
             // AddFrameFromPixelBounds selects the new frame — desired behavior for single-chain.
@@ -4052,8 +4059,10 @@ public partial class MainWindow : Window
             var target = ResolveFrameDrop(e, drag);
             if (target.IsValid)
             {
+                // Another size stays droppable so the drop can explain why it is refused.
                 e.DragEffects = DragDropEffects.Move;
-                ShowFrameDropIndicator(e);
+                if (TsxEdit.CheckFrameSize(_projectManager, target.Chain!, drag.Frames) is null) ShowFrameDropIndicator(e);
+                else RemoveFrameDropIndicators();
             }
             else
             {
@@ -4126,7 +4135,12 @@ public partial class MainWindow : Window
             RemoveFrameDropIndicators();
             var target = ResolveFrameDrop(e, drag);
             if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
-                _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
+            {
+                if (TsxEdit.CheckFrameSize(_projectManager, target.Chain, drag.Frames) is { } otherSize)
+                    ShowProblem($"⚠ {otherSize.Errors[0]}");
+                else
+                    _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
+            }
             e.Handled = true;
             return;
         }
@@ -8245,6 +8259,13 @@ public partial class MainWindow : Window
             var (targetChain, insertIndex) = PastePlacementLogic.ResolveFramePasteTarget(
                 acls, selectedData, _objectFinder, _selectedState);
             if (targetChain is null) return;
+
+            IReadOnlyList<AnimationFrameSave> incoming = cutCompletion == CutCompletion.SameDocument ? _pendingCutState.Frames : frames;
+            if (TsxEdit.CheckFrameSize(_projectManager, targetChain, incoming) is { } otherSize)
+            {
+                ShowProblem($"⚠ {otherSize.Errors[0]}");
+                return;
+            }
 
             if (completingCutAcrossDocuments)
             {

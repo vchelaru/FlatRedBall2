@@ -880,7 +880,7 @@ public static class EditOps
             if (!chain.Ok) return Fail(chain.Error!, chain.Code);
             to = chain.Value;
         }
-        return StructureEdit.DuplicateFramesTo(session.Commands, sources.Frames, to, Integer(op, "index"));
+        return StructureEdit.DuplicateFramesTo(session.ProjectManager, session.Commands, sources.Frames, to, Integer(op, "index"));
     }
 
     /// <summary>Runs <paramref name="apply"/> with the frames the op's <c>to</c> names, or null when it has none.</summary>

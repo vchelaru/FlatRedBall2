@@ -180,6 +180,49 @@ public class DuplicateToTests : InlineBatchTests
             "<frame tileid=\"5\" duration=\"150\"/>\n   <frame tileid=\"1\" duration=\"100\"/>\n   <frame tileid=\"2\" duration=\"200\"/>");
     }
 
+    /// <summary>Wide is 32x16 and Walk is 16x16: the save would write neither animation with both sizes in it (#2147).</summary>
+    [Theory]
+    [InlineData("duplicate-frame Walk/0 to=Wide")]
+    [InlineData("duplicate-frame Wide/0 to=Walk")]
+    [InlineData("add-frame Wide texture=sheet.png region=0,0,16,16")]
+    [InlineData("add-frame Walk texture=sheet.png region=0,0,32,16 length=0.5")]
+    [InlineData("add-frames-grid Walk texture=sheet.png cellWidth=32 cellHeight=16 columns=1 rows=1")]
+    public async Task FrameOfAnotherSize_OnATsx_IsRefused(string op)
+    {
+        Write("wide.tsx", """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Hero" tilewidth="16" tileheight="16" tilecount="6" columns="3">
+             <image source="sheet.png" width="48" height="32"/>
+             <tile id="0">
+              <properties>
+               <property name="Name" value="Walk"/>
+              </properties>
+              <animation>
+               <frame tileid="0" duration="100"/>
+              </animation>
+             </tile>
+             <tile id="3">
+              <properties>
+               <property name="Name" value="Wide"/>
+              </properties>
+              <animation>
+               <frame tileid="3" duration="100"/>
+              </animation>
+             </tile>
+             <tile id="4">
+              <properties>
+               <property name="ParentId" type="int" value="3"/>
+              </properties>
+              <animation>
+               <frame tileid="4" duration="100"/>
+              </animation>
+             </tile>
+            </tileset>
+            """);
+
+        (await Fails("wide.tsx", "NotSupportedInTsx", op)).ShouldContain("All frames of an animation in a .tsx have one size");
+    }
+
     // ---- duplicate-shape ----
 
     [Theory]

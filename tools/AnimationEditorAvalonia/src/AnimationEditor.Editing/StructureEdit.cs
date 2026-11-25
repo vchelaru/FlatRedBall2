@@ -179,6 +179,10 @@ public static class StructureEdit
             return refused;
         }
 
+        if (region is { } added
+            && TsxEdit.CheckFrameSize(projectManager, chain, new FrameRegion(added.X, added.Y, added.X + added.Width, added.Y + added.Height)) is { } otherSize)
+            return otherSize;
+
         var folder = string.IsNullOrEmpty(projectManager.FileName) ? string.Empty : Path.GetDirectoryName(projectManager.FileName) ?? string.Empty;
         var stored = folder.Length == 0 ? absoluteTexture : TexturePathHelper.ComputeStorePath(absoluteTexture, folder);
 
@@ -267,7 +271,7 @@ public static class StructureEdit
     /// destination must be unlocked.
     /// </summary>
     public static EditResult DuplicateFramesTo(
-        IAppCommands commands, IReadOnlyList<FrameRef> sources, AnimationChainSave? to, int? index)
+        IProjectManager projectManager, IAppCommands commands, IReadOnlyList<FrameRef> sources, AnimationChainSave? to, int? index)
     {
         var changed = new List<string>();
         foreach (var block in sources.GroupBy(s => to ?? s.Chain))
@@ -276,6 +280,8 @@ public static class StructureEdit
             if (chain.IsLocked) return LockedFail(chain);
             var slot = index ?? chain.Frames.Count;
             if (slot < 0 || slot > chain.Frames.Count) return OutOfRange(slot, chain.Frames.Count + 1, "frame");
+
+            if (TsxEdit.CheckFrameSize(projectManager, chain, block.Select(s => s.Frame)) is { } otherSize) return otherSize;
 
             commands.PasteFrames(chain, block.Select(s => s.Frame).ToList(), slot);
             changed.AddRange(Enumerable.Range(slot, block.Count()).Select(i => $"{chain.Name}/{i}"));
