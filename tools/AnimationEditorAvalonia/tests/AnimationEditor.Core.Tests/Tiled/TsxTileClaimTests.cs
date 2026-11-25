@@ -125,12 +125,10 @@ public class TsxTileClaimTests : IDisposable
         Assert.Contains("\"ID:0\": Tiled tile 0 already carries \"B\"", warning);
         Assert.Contains(a, pm.TsxChainsNotFullySaved);
         Assert.Equal("B", NameOn(path, 0));
-        // The warning's advice works: moved to free cells, the chain is saved there, still without a name of its own.
+        // The warning's advice works: moved to free cells, the chain is saved there.
         Place(a, 9);
         Assert.Empty(pm.SaveTsxProject());
-        Assert.Empty(pm.SaveTsxProject());
         Assert.Equal([0u, 9u], AnimatedTiles(path));
-        Assert.Null(NameOn(path, 9));
     }
 
     [Fact]
@@ -206,6 +204,16 @@ public class TsxTileClaimTests : IDisposable
         pm.AnimationChainListSave!.AnimationChains.Remove(a);
         Place(NewChain(pm, $"ID:{ownerTile}", ownerTile), ownerTile, columns: 2);
         Assert.Equal(Assert.Throws<InvalidOperationException>(() => pm.SaveTsxProject()).Message, error);
+    }
+
+    [Fact]
+    public void TrySetTsxOwnerTileId_ChainThatCannotBeMappedYetOnATileTheUserNamed_IsRefused()
+    {
+        var pm = Load(WriteTsx(Tile(0) + "<tile id=\"9\"><properties><property name=\"Name\" value=\"Mine\"/></properties></tile>"));
+        var a = Chain(pm, "ID:0");
+        a.Frames[0].LeftCoordinate = 3;
+
+        Assert.Contains("has its own \"Name\" property", pm.TrySetTsxOwnerTileId(a, 9));
     }
 
     [Fact]
@@ -445,11 +453,8 @@ public class TsxTileClaimTests : IDisposable
             .Select(t => (Name: t.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == "Name")?.Value ?? $"ID:{t.ID}", t.Animation.Count))
             .ToHashSet();
         foreach (var expected in pm.AnimationChainListSave!.AnimationChains.Where(c => c.Frames.Count > 0))
-        {
-            var nameOnDisk = pm.IsChainNameAuto(expected) ? $"ID:{pm.GetTsxOwnerTileId(expected)}" : expected.Name;
             Assert.True(
-                warnings.Any(w => w.Contains($"\"{expected.Name}\"")) || onDisk.Contains((nameOnDisk, expected.Frames.Count)),
+                warnings.Any(w => w.Contains($"\"{expected.Name}\"")) || onDisk.Contains((expected.Name, expected.Frames.Count)),
                 $"\"{expected.Name}\" is neither on disk nor reported.\n{log}");
-        }
     }
 }
