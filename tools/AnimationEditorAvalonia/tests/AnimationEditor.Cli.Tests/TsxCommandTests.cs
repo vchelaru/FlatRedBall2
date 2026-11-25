@@ -298,6 +298,109 @@ public class TsxCommandTests : IDisposable
         _w.Bytes("tiles.tsx").ShouldBe(before);
     }
 
+    /// <summary>The save would keep the old animation and skip the change (#2153).</summary>
+    [Theory]
+    [InlineData("""{"op":"set-frame-region","frame":"Walk/0","region":"0,0,20,16"}""", "frame size 20x16 isn't a whole number of tiles")]
+    [InlineData("""{"op":"set-frame-region","frame":"Walk/0","region":"3,0,16,16"}""", "frame rect origin (3, 0) is not aligned to the tile grid")]
+    [InlineData("""{"op":"set-frame-region","frame":"ID:5/0","region":"0,0,32,16"}""", "would extend past the tileset's")]
+    public async Task Edit_ChangeTheSaveWouldSkip_IsRefusedWithTheReason(string op, string reason)
+    {
+        var before = _w.Bytes("tiles.tsx");
+
+        var r = await Edit("tiles.tsx", $$"""{"ops":[{{op}}]}""", "--json");
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        ErrorCode(r).ShouldBe("UnmappableChain");
+        JsonDocument.Parse(r.Out).RootElement.GetProperty("errors")[0].GetProperty("message").GetString()!.ShouldContain(reason);
+        _w.Bytes("tiles.tsx").ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task Edit_ChangeThatLaterOpsMakeWritable_Saves()
+    {
+        var r = await Edit("tiles.tsx", """
+            {"ops":[
+              {"op":"set-frame-region","frame":"Walk/0","region":"0,0,20,16"},
+              {"op":"set-frame-region","frame":"Walk/0","region":"16,0,16,16"}
+            ]}
+            """);
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        r.Err.ShouldNotContain("skipped");
+    }
+
+    /// <summary>The right half of Wide's frame would be past the tileset's last column, so the editor can never write it.</summary>
+    private const string UnwritableXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Hero" tilewidth="16" tileheight="16" tilecount="6" columns="3">
+         <image source="sheet.png" width="48" height="32"/>
+         <tile id="0">
+          <properties>
+           <property name="Name" value="Wide"/>
+          </properties>
+          <animation>
+           <frame tileid="2" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="1">
+          <properties>
+           <property name="ParentId" type="int" value="0"/>
+          </properties>
+          <animation>
+           <frame tileid="2" duration="100"/>
+          </animation>
+         </tile>
+         <tile id="4">
+          <properties>
+           <property name="Name" value="Walk"/>
+          </properties>
+          <animation>
+           <frame tileid="4" duration="100"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
+    [Theory]
+    [InlineData("""{"op":"set-frame-length","frame":"Wide/0","length":0.5}""")]
+    [InlineData("""{"op":"rename-chain","chain":"Wide","to":"Wider"}""")]
+    public async Task Edit_OfAChainTheFileHadUnwritable_IsRefused(string op)
+    {
+        _w.Write("bad.tsx", UnwritableXml);
+
+        var r = await Edit("bad.tsx", $$"""{"ops":[{{op}}]}""", "--json");
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        ErrorCode(r).ShouldBe("UnmappableChain");
+        Raw("bad.tsx").ShouldBe(UnwritableXml);
+    }
+
+    /// <summary>Wide (32x16 on tiles 0 and 1) keeps its right half.</summary>
+    [Fact]
+    public async Task Edit_NewChainOnTheRightHalfOfAWideOne_IsRefused()
+    {
+        _w.Write("wide.tsx", UnwritableXml.Replace("<frame tileid=\"2\"", "<frame tileid=\"0\""));
+        var before = Raw("wide.tsx");
+
+        var r = await Edit("wide.tsx",
+            """{"ops":[{"op":"add-chain","name":"New"},{"op":"add-frame","chain":"New","texture":"sheet.png","region":"16,0,16,16"}]}""", "--json");
+
+        r.Code.ShouldBe(1, r.Out + r.Err);
+        ErrorCode(r).ShouldBe("DuplicateOwnerTile");
+        Raw("wide.tsx").ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task Edit_OfAnotherChain_InAFileWithAnUnwritableOne_Saves()
+    {
+        _w.Write("bad.tsx", UnwritableXml);
+
+        var r = await Edit("bad.tsx", """{"ops":[{"op":"set-frame-length","frame":"Walk/0","length":0.5}]}""");
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        Raw("bad.tsx").ShouldContain("<frame tileid=\"4\" duration=\"500\"");
+    }
+
     [Fact]
     public async Task Edit_DuplicatedChain_SharesTheOwnerTile_AndIsRefusedUntilItGetsItsOwn()
     {
