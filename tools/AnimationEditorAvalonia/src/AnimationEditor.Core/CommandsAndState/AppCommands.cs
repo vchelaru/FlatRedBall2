@@ -2053,7 +2053,7 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         private static List<string> GetShapeNames(AnimationFrameSave frame) =>
-            frame.ShapesSave!.Shapes.OfType<ShapeSave>().Select(s => s.Name).ToList();
+            frame.ShapesSave?.Shapes.OfType<ShapeSave>().Select(s => s.Name).ToList() ?? [];
 
         public void SortAnimationsAlphabetically()
         {
@@ -2995,7 +2995,6 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (IsFrameLocked(frame)) return new List<object>();
 
-            frame.ShapesSave ??= new ShapesSave();
             var existingNames = GetShapeNames(frame);
             var clones = new List<object>();
             foreach (var shape in shapes)

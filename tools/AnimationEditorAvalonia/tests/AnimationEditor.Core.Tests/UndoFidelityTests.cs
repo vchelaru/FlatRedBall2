@@ -69,4 +69,31 @@ public class UndoFidelityTests : IDisposable
 
         chain.Frames.Select(f => f.TextureName).ShouldBe(before.Select(f => f.TextureName));
     }
+
+    [Theory]
+    [InlineData(DocType.Achx)]
+    [InlineData(DocType.Achj)]
+    public void PasteShapes_OntoAFrameWithoutShapes_UndoLeavesTheFileAsItWas(DocType type)
+    {
+        Open(type);
+        var frame = Chains[1].Frames[0];
+        frame.ShapesSave.ShouldBeNull();
+        string before = OnDisk;
+
+        _ctx.AppCommands.PasteShapes(frame, [new CircleSave { Name = "C", Radius = 2 }]);
+        _ctx.UndoManager.Undo();
+
+        OnDisk.ShouldBe(before);
+    }
+
+    [Fact]
+    public void PasteShapesCut_GivenUp_LeavesTheTargetWithoutAShapeList()
+    {
+        var frame = TestHelpers.MakeChain(_ctx.Acls, "Walk", 1).Frames[0];
+        frame.ShapesSave = null;
+
+        _ctx.AppCommands.PasteShapesCut(frame, [new CircleSave { Name = "C" }], sourcesToRemove: [], frame);
+
+        frame.ShapesSave.ShouldBeNull();
+    }
 }
