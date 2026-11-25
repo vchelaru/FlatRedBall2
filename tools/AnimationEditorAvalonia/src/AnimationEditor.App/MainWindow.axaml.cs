@@ -6259,7 +6259,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// What a texture was dropped on or picked for: the tab and document in front at the time, and the animation or the
-    /// frames in it. Frames and animations are only in the model they came from, so another tab or a reload is a change.
+    /// frames in it.
     /// </summary>
     private sealed record TextureTarget(
         TabEntry? Tab, AnimationChainListSave? Document, string DocumentName, AnimationChainSave? Chain, IReadOnlyList<AnimationFrameSave> Frames);
