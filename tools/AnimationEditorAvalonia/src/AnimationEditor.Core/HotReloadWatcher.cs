@@ -216,8 +216,10 @@ namespace AnimationEditor.Core.HotReload
         }
 
         /// <summary>False when <paramref name="path"/> still holds the content last seen, so the
-        /// event is noise; otherwise records the new content and returns true.</summary>
-        private bool ContentChangedSinceSeen(string path, WatcherChangeType type)
+        /// event is noise; otherwise records the new content and returns true. Null when the file
+        /// exists but can't be read right now (its writer still holds it): the release raises no
+        /// event of its own, so the caller keeps this one until the file can be read.</summary>
+        private bool? ContentChangedSinceSeen(string path, WatcherChangeType type)
         {
             lock (_lock)
             {
@@ -227,6 +229,7 @@ namespace AnimationEditor.Core.HotReload
                     return true;
                 }
                 var current = TryHash(path);
+                if (current is null && File.Exists(path)) return null;
                 if (current != null && _seenHashes.TryGetValue(path, out var seen) &&
                     current.AsSpan().SequenceEqual(seen))
                     return false;
@@ -330,7 +333,9 @@ namespace AnimationEditor.Core.HotReload
                 bool isPng = !isAchx && !isSource && pngPaths.Contains(normalizedPath);
 
                 if (!isAchx && !isSource && !isPng) continue;
-                if (!ContentChangedSinceSeen(normalizedPath, type)) continue;
+                var changed = ContentChangedSinceSeen(normalizedPath, type);
+                if (changed is null) _coalescer.Record(normalizedPath, type, nowMs);
+                if (changed != true) continue;
 
                 if (isAchx)
                 {

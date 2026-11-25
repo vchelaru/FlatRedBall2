@@ -5127,9 +5127,9 @@ public partial class MainWindow : Window
         // the old ones, so they are rebuilt when their tab is next shown.
         MarkHiddenTreesStale();
 
-        // Force-reload the wireframe texture if it matches the changed PNG
-        if (string.Equals(WireframeCtrl.LoadedTexturePath,
-            new FilePath(absolutePath).Standardized,
+        // Force-reload the wireframe texture if it matches the changed PNG, also when the last load of it failed
+        if (string.Equals(WireframeCtrl.RequestedTexturePath,
+            new FilePath(absolutePath).StandardizedCaseSensitive,
             StringComparison.OrdinalIgnoreCase))
         {
             WireframeCtrl.ForceReloadTexture();
