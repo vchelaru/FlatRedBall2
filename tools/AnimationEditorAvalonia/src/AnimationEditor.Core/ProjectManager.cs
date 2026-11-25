@@ -592,6 +592,11 @@ namespace AnimationEditor.Core
             // with frame 0's current tile) changes which tile a chain owns.
             mapped = YieldCollidingClaims(mapped, satelliteHintsForMap, out var releasedHints);
 
+            // An automatic name follows the tile, so a chain that had to leave its tile never stores the old one.
+            mapped = mapped.Select(r => r.EntryTileId is { } tileId && _tsxSyntheticNamedChains.Contains(r.SourceChain)
+                && r.ChainName.StartsWith("ID:", StringComparison.Ordinal)
+                    ? r with { ChainName = Tiled.TiledAnimationToAchjMapper.SyntheticChainName(tileId) } : r).ToList();
+
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(_tsxTileset);
             Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped, _tsxUserProperties);
             _tsxFile.Save(workingTileset, new FilePath(targetPath ?? FileName!));
