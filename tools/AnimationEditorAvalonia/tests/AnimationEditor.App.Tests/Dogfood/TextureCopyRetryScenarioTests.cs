@@ -167,6 +167,30 @@ public class TextureCopyRetryScenarioTests : IDisposable
     }
 
     [AvaloniaTheory]
+    [InlineData("hero2.achx")]
+    [InlineData("moved/hero.achx")]
+    public async Task Retry_AfterSaveAs_AppliesToTheSameDocument_NextToItsNewFile(string savedAs)
+    {
+        using var editor = new AnimationEditorHarness();
+        string png = WritePngOutside(editor);
+        await OpenTabsAsync(editor);
+        var walk = editor.ChainNamed("Walk");
+        string path = Path.Combine(editor.ProjectFolder, savedAs);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        AnswerCopy(editor);
+        using (new FileStream(png, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            await Drop(editor, walk, walk.Frames[0], png);
+
+        editor.Dialogs.AnswerNextSaveFile(path);
+        editor.ClickMenu("MenuSaveAs");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+        await PressRetryAsync(editor);
+
+        walk.Frames[0].TextureName.ShouldBe("held.png");
+        File.Exists(Path.Combine(Path.GetDirectoryName(path)!, "held.png")).ShouldBeTrue();
+    }
+
+    [AvaloniaTheory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task TheDocumentReloadsUnderTheCopyQuestion_TheAnswerCopiesNothing_AndSaysWhy(bool dropped)

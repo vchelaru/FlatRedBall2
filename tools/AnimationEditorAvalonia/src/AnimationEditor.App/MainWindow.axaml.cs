@@ -1382,7 +1382,7 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowProblem($"Saved {new FilePath(path).NoPath}, but not every change applied — {string.Join(" ", warnings)}"));
         _appCommands.IsPathOpenInAnotherTab = path => IsOpenInTabOtherThan(_tabManager.ActiveTab, path);
-        _appCommands.IsDocumentTabInFront = () => _tabManager.ActiveTab?.Kind is null or TabKind.Achx;
+        _appCommands.IsDocumentTabInFront = IsDocumentTabInFront;
         _appCommands.SaveAsRefused += message => Dispatcher.UIThread.InvokeAsync(() => ShowProblem(message));
         _appCommands.SaveFailed += message =>
             Dispatcher.UIThread.InvokeAsync(() => ShowProblem($"{AutoSaveFailedPrefix}{message}"));
@@ -6257,15 +6257,18 @@ public partial class MainWindow : Window
     private void CommitPickedTexture(IReadOnlyList<AnimationFrameSave> frames, string absolutePath) =>
         ReportTextureResult(FrameTextureEdit.SetResolved(_projectManager, _appCommands, frames, absolutePath, _textureProbe));
 
+    /// <summary>False when a .png or .seqj tab is in front.</summary>
+    private bool IsDocumentTabInFront() => _tabManager.ActiveTab?.Kind is null or TabKind.Achx;
+
     /// <summary>
-    /// What a texture was dropped on or picked for: the tab and document in front at the time, and the animation or the
-    /// frames in it.
+    /// What a texture was dropped on or picked for: the document open at the time, and the animation or the frames in it.
+    /// Not its tab, which Save As replaces for the same document.
     /// </summary>
     private sealed record TextureTarget(
-        TabEntry? Tab, AnimationChainListSave? Document, string DocumentName, AnimationChainSave? Chain, IReadOnlyList<AnimationFrameSave> Frames);
+        AnimationChainListSave? Document, string DocumentName, AnimationChainSave? Chain, IReadOnlyList<AnimationFrameSave> Frames);
 
     private TextureTarget TextureTargetOf(AnimationChainSave? chain, IReadOnlyList<AnimationFrameSave> frames) =>
-        new(_tabManager.ActiveTab, _projectManager.AnimationChainListSave, Path.GetFileName(_projectManager.FileName) ?? string.Empty, chain, frames);
+        new(_projectManager.AnimationChainListSave, Path.GetFileName(_projectManager.FileName) ?? string.Empty, chain, frames);
 
     private AnimationChainSave? LockedChainOf(TextureTarget target) =>
         target.Frames.Select(_objectFinder.GetAnimationChainContaining).Append(target.Chain).FirstOrDefault(c => c is { IsLocked: true });
@@ -6277,7 +6280,7 @@ public partial class MainWindow : Window
     private bool RefuseChangedTarget(TextureTarget target, string texturePath)
     {
         string? reason =
-            target.Tab != _tabManager.ActiveTab || target.Document != _projectManager.AnimationChainListSave
+            !IsDocumentTabInFront() || target.Document != _projectManager.AnimationChainListSave
                 ? $"{target.DocumentName} was left or reloaded."
             : target.Frames.Any(f => _objectFinder.GetAnimationChainContaining(f) is null)
                 ? "its frame is gone."
