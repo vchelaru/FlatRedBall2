@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace AnimationEditor.Editing;
@@ -12,6 +13,28 @@ public static class EditJson
         using (var w = new Utf8JsonWriter(stream))
             write(w);
         return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    /// <summary>Writes a number a file holds or that is made from one; a JSON number cannot be NaN or infinite, so those are strings ("NaN", "Infinity", "-Infinity").</summary>
+    internal static void WriteReal(this Utf8JsonWriter w, string name, float value)
+    {
+        w.WritePropertyName(name);
+        w.WriteRealValue(value);
+    }
+
+    /// <inheritdoc cref="WriteReal(Utf8JsonWriter, string, float)"/>
+    internal static void WriteReal(this Utf8JsonWriter w, string name, double value)
+    {
+        w.WritePropertyName(name);
+        if (double.IsFinite(value)) w.WriteNumberValue(value);
+        else w.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <inheritdoc cref="WriteReal(Utf8JsonWriter, string, float)"/>
+    internal static void WriteRealValue(this Utf8JsonWriter w, float value)
+    {
+        if (float.IsFinite(value)) w.WriteNumberValue(value);
+        else w.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
     }
 
     /// <summary>

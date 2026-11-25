@@ -10,6 +10,9 @@ public class AnimationChainSave
     /// <summary>The name of the animation chain.</summary>
     public string Name = string.Empty;
 
+    // FRB1's transparent color, which it wrote until 2017. Only carried, so saving a file keeps it.
+    internal string? ColorKey;
+
     // FRB1's GIF source, obsolete there. Only carried, so saving a file keeps it.
     internal string? ParentFile;
 
