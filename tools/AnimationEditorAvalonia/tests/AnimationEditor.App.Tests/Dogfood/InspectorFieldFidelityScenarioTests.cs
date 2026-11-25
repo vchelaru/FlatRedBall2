@@ -243,4 +243,54 @@ public class InspectorFieldFidelityScenarioTests
         editor.UndoLabels.ShouldBeEmpty();
         File.ReadAllText(path).ShouldBe(before);
     }
+
+    [AvaloniaFact]
+    public async Task PixelWidth_HugeRelativeEditOnMixedFrames_DoesNotThrow()
+    {
+        using var editor = await Open(chain => chain.Frames[1].RightCoordinate = 40);
+        var walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk.Frames[0]);
+        editor.ClickRow(walk.Frames[1], RawInputModifiers.Control);
+
+        Should.NotThrow(() => editor.TypeNumber("PropPixelW", "* 999999999999"));
+    }
+
+    [AvaloniaFact]
+    public async Task FrameLength_RelativeEditOnMixedFrames_NeverGoesNegative()
+    {
+        using var editor = await Open(chain => { chain.Frames[0].FrameLength = 0.1f; chain.Frames[1].FrameLength = 0.5f; });
+        var walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk.Frames[0]);
+        editor.ClickRow(walk.Frames[1], RawInputModifiers.Control);
+
+        editor.TypeFlanker("PropFrameLen", "- 0.2");
+
+        walk.Frames.ShouldAllBe(f => f.FrameLength > 0);
+    }
+
+    [AvaloniaFact]
+    public async Task RectSize_RelativeEditOnMixedShapes_NeverGoesNegative()
+    {
+        using var editor = await Open(chain => { AddRect(chain.Frames[0], "A", 0, 0, 4, 4); AddRect(chain.Frames[1], "A", 0, 0, 12, 4); });
+        var walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk.Frames[0].ShapesSave!.AARectSaves.First());
+        editor.ClickRow(walk.Frames[1].ShapesSave!.AARectSaves.First(), RawInputModifiers.Control);
+
+        editor.TypeNumber("PropRectScaleX", "- 8");
+
+        walk.Frames.ShouldAllBe(f => f.ShapesSave!.AARectSaves.First().ScaleX > 0);
+    }
+
+    [AvaloniaFact]
+    public async Task PixelWidth_HugeValueOnOneFrame_IsRefused()
+    {
+        using var editor = await Open(_ => { });
+        var frame = editor.ChainNamed("Walk").Frames[0];
+        editor.ClickRow(frame);
+
+        editor.TypeNumber("PropPixelW", "* 999999999999");
+
+        frame.RightCoordinate.ShouldBe(16f);
+        editor.Control<NumericUpDown>("PropPixelW").Value.ShouldBe(16m);
+    }
 }

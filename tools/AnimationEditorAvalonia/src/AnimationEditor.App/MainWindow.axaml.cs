@@ -6097,14 +6097,19 @@ public partial class MainWindow : Window
     private static void ShowName(TextBox box, string? text) => box.Tag = box.Text = text;
 
     /// <summary>The edit being committed to <paramref name="field"/>, or null when it is another field's, or the field
-    /// is blank: leave each item alone.</summary>
-    private NumericEdit? EditOf(Control field, decimal? value) =>
+    /// is blank: leave each item alone. A relative edit carries the field's limits, which each item then gets as a single
+    /// selected one does: a NumericUpDown refuses a value out of range, a FlankerNumericField clamps it.</summary>
+    private NumericEdit? EditOf(NumericUpDown field) =>
+        EditOf(field, field.Value, relative => relative.Within(field.Minimum, field.Maximum, clamps: false));
+
+    private NumericEdit? EditOf(FlankerNumericField field) =>
+        EditOf(field, field.Value, relative => relative.Within(field.Minimum, field.Maximum, clamps: true));
+
+    private NumericEdit? EditOf(Control field, decimal? value, Func<NumericEdit, NumericEdit> limit) =>
         _committing is not { } commit || !ReferenceEquals(commit.Field, field) ? null
-        : commit.Relative is { } relative ? relative
+        : commit.Relative is { } relative ? limit(relative)
         : value is { } v ? v
         : null;
-
-    private NumericEdit? EditOf(NumericUpDown field) => EditOf(field, field.Value);
 
     /// <summary>The name being committed in <paramref name="box"/>, or null when the edit is another field's.</summary>
     private string? NameOf(TextBox box) => _committing is { } commit && ReferenceEquals(commit.Field, box) ? box.Text : null;
@@ -7001,7 +7006,7 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh) return;
         var frames = InspectorFrames();
-        if (frames.Count == 0 || EditOf(PropFrameLen, PropFrameLen.Value) is not { } length) return;
+        if (frames.Count == 0 || EditOf(PropFrameLen) is not { } length) return;
         _appCommands.SetFrameLength(frames, length);
     }
 
