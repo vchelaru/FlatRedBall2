@@ -673,7 +673,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 // A native tsx project has no achx to push from -- the achj-push feature
                 // (issue #1133) doesn't apply to it.
                 if (!_pm.IsNativeTsxProject)
-                    SyncAssociatedTiledTilesets(target);
+                    SyncAssociatedTiledTilesets(target, toAnotherFile ? _pm.FileName : null);
             }
             else
             {
@@ -796,7 +796,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// task against a project model the user may keep editing while it runs. A failure for one
         /// .tsx never rolls back or retries the .achx save, which has already succeeded by this point.
         /// </summary>
-        private void SyncAssociatedTiledTilesets(string achxPath)
+        private void SyncAssociatedTiledTilesets(string achxPath, string? movedFrom)
         {
             if (_tiledSyncWarned)
             {
@@ -825,7 +825,7 @@ namespace AnimationEditor.Core.CommandsAndState
             IReadOnlyList<TiledTilesetSyncOutcome> outcomes;
             try
             {
-                outcomes = TiledTilesetSyncRunner.SyncAll(snapshot, achxPath, tsxPaths);
+                outcomes = TiledTilesetSyncRunner.SyncAll(snapshot, achxPath, tsxPaths, movedFrom);
             }
             catch (Exception ex)
             {

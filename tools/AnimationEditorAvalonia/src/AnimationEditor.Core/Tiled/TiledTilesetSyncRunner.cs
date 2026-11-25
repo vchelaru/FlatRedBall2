@@ -38,9 +38,11 @@ public sealed record TiledTilesetSyncOutcome
 /// </remarks>
 public static class TiledTilesetSyncRunner
 {
+    /// <param name="movedFrom">The file the document was saved as until now (Save As).</param>
     public static IReadOnlyList<TiledTilesetSyncOutcome> SyncAll(
-        AnimationChainListSave achj, string achxFilePath, IReadOnlyList<string> tsxAbsolutePaths)
+        AnimationChainListSave achj, string achxFilePath, IReadOnlyList<string> tsxAbsolutePaths, string? movedFrom = null)
     {
+        var formerFile = FindFormerFile(new FilePath(achxFilePath), movedFrom);
         var outcomes = new List<TiledTilesetSyncOutcome>();
         // Lazy, because it is only read when a texture has an image's file name but another path.
         var images = new Lazy<HashSet<FilePath>>(() => LoadImages(tsxAbsolutePaths));
@@ -57,7 +59,7 @@ public static class TiledTilesetSyncRunner
                 var sourceLabel = achxFile.RelativeTo(tsxFolder);
 
                 var results = AchjToTiledAnimationMapper.Map(achj, tilesetInfo, tallySkips: true);
-                var syncResult = TilesetAnimationSync.Apply(tileset, results, sourceLabel);
+                var syncResult = TilesetAnimationSync.Apply(tileset, results, sourceLabel, formerFile?.RelativeTo(tsxFolder));
                 if (syncResult.Changed)
                     TsxWriter.Write(tileset, tsxPath);
 
@@ -70,6 +72,15 @@ public static class TiledTilesetSyncRunner
         }
 
         return outcomes;
+    }
+
+    /// <summary>The .achx that a .achj was converted from, or the reverse: the file of the same name, unless it still
+    /// exists. Then it may be another document that pushes to the same tilesets, because the .tiledsync is shared.</summary>
+    private static FilePath? FindFormerFile(FilePath file, string? movedFrom)
+    {
+        var sibling = new FilePath(file.RemoveExtension().FullPath + (file.Extension == "achx" ? ".achj" : ".achx"));
+        bool isMovedFrom = !string.IsNullOrEmpty(movedFrom) && new FilePath(movedFrom) == sibling;
+        return isMovedFrom || !System.IO.File.Exists(sibling.FullPath) ? sibling : null;
     }
 
     private static HashSet<FilePath> LoadImages(IReadOnlyList<string> tsxPaths)
