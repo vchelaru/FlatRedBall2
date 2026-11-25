@@ -178,6 +178,8 @@ public class TsxRefusedEditsScenarioTests
         editor.Services.ApplicationEvents.RaiseAnimationChainsChanged();
         editor.ClickRow(chain.Frames[0]);
         var combo = editor.Control<ComboBox>("TextureCombo");
+        object? own = combo.SelectedItem;
+        own.ShouldNotBeNull();
         combo.Items.Add(other.Replace('\\', '/'));
 
         combo.SelectedItem = other.Replace('\\', '/');
@@ -185,6 +187,7 @@ public class TsxRefusedEditsScenarioTests
 
         editor.ProblemText.ShouldNotBeNull().ShouldContain(TsxEdit.OtherImageRefusal);
         chain.Frames[0].TextureName.ShouldBe("Heroes.png");
+        combo.SelectedItem.ShouldBe(own);
 
         editor.Notifications.ErrorBanner.IsVisible = false;
         editor.Wireframe.LoadTexture(other);

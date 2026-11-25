@@ -12,7 +12,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
+using System.Reflection;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -100,7 +100,27 @@ public class TsxEditCommandsStayStorableTests : IDisposable
 
         methods.Where(m => !known.Contains(m)).ShouldBeEmpty("run it in Commands, or list why it adds no data");
         known.Where(k => !methods.Contains(k)).ShouldBeEmpty("no longer on IAppCommands");
+
+        // A name is not enough for an overloaded command: each of these is run, or adds no data, on its own.
+        typeof(IAppCommands).GetMethods().Where(m => !m.IsSpecialName).GroupBy(m => m.Name).Where(g => g.Count() > 1)
+            .SelectMany(g => g).Select(Signature).OrderBy(s => s, StringComparer.Ordinal)
+            .ShouldBe(Overloads, "a new overload of a command needs its own row");
     }
+
+    private static string Signature(MethodInfo m) => $"{m.Name}({string.Join(", ", m.GetParameters().Select(p => TypeName(p.ParameterType)))})";
+
+    private static string TypeName(Type type) =>
+        type.IsGenericType ? $"{type.Name.Split('`')[0]}<{string.Join(", ", type.GetGenericArguments().Select(TypeName))}>" : type.Name;
+
+    private static readonly string[] Overloads =
+    [
+        "PasteShapes(AnimationFrameSave, IReadOnlyList<Object>)",
+        "PasteShapes(IReadOnlyList<AnimationFrameSave>, IReadOnlyList<Object>)",
+        "RefreshTreeNode(AnimationChainSave)",
+        "RefreshTreeNode(AnimationFrameSave)",
+        "SetFrameTextureName(AnimationFrameSave, String)",
+        "SetFrameTextureName(IReadOnlyList<AnimationFrameSave>, String)",
+    ];
 
     public static IEnumerable<object[]> CommandRows() =>
         Commands.GroupBy(c => c.Name).SelectMany(g => g.Select((_, i) => new object[] { g.Key, i }));
@@ -262,16 +282,43 @@ public class TsxEditCommandsStayStorableTests : IDisposable
         chain.Frames[0].TextureName.ShouldBe("Heroes.png");
     }
 
-    [Fact]
-    public void AddFrame_AfterAPastedFrameOfAnotherImage_IsTile0OfTheTileset()
+    /// <summary>A pasted frame keeps its image. The commands that continue from the last frame do not repeat it.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AddingFrames_AfterAPastedFrameOfAnotherImage_StartsAtTile0OfTheTileset(bool multiple)
     {
         OpenTsx(TwoAnimations);
-        Second(_ctx).Frames[0].TextureName = "other.png";
+        var chain = Second(_ctx);
+        chain.Frames[0].TextureName = "other.png";
 
-        _ctx.AppCommands.AddFrame(Second(_ctx));
+        if (multiple) _ctx.AppCommands.AddMultipleFrames(chain, 1, incrementUV: false);
+        else _ctx.AppCommands.AddFrame(chain);
 
-        Second(_ctx).Frames[1].TextureName.ShouldBe("Heroes.png");
-        FrameRegion.Of(Second(_ctx).Frames[1]).ShouldBe(new FrameRegion(0, 0, 16, 16));
+        chain.Frames.Count.ShouldBe(2);
+        chain.Frames[1].TextureName.ShouldBe("Heroes.png");
+        FrameRegion.Of(chain.Frames[1]).ShouldBe(new FrameRegion(0, 0, 16, 16));
+    }
+
+    [Fact]
+    public void AddFrame_OfAnotherImage_AddsNoFrameAtAll()
+    {
+        OpenTsx(TwoAnimations);
+
+        _ctx.AppCommands.AddFrame(First(_ctx), "other.png");
+
+        First(_ctx).Frames.Count.ShouldBe(2);
+        _ctx.UndoManager.CanUndo.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AddFrame_OfTheTilesetsImage_ContinuesFromTheLastFramesCell()
+    {
+        OpenTsx(TwoAnimations);
+
+        _ctx.AppCommands.AddFrame(First(_ctx), "Heroes.png");
+
+        FrameRegion.Of(First(_ctx).Frames[2]).ShouldBe(new FrameRegion(16, 0, 32, 16));
     }
 
     [Fact]

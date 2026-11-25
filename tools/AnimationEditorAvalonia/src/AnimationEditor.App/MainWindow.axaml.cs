@@ -1428,6 +1428,7 @@ public partial class MainWindow : Window
         if (FrameTextureEdit.CheckTexture(_projectManager, _appCommands, absolutePath, frames) is { } refused)
         {
             ReportTextureResult(refused);
+            SyncTextureCombo();   // the list goes back to the image the frame kept
             return;
         }
         _appCommands.SetFrameTextureName(frames, storePath);
@@ -6032,7 +6033,7 @@ public partial class MainWindow : Window
         bool hadTexture = frames.Any(f => !string.IsNullOrEmpty(f.TextureName));
 
         var result = FrameTextureEdit.SetFromText(_projectManager, _appCommands, frames, PropTextureName.Text, _textureProbe);
-        if (clearing && result.Success)
+        if (clearing)
         {
             if (hadTexture)
             {

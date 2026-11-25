@@ -2178,9 +2178,10 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (IsChainLocked(chain)) return false;
 
-            // The first frame of a tsx animation is tile 0, and the rest of the batch follows from it.
-            var firstTile = chain.Frames.Count == 0 && count > 0 ? FirstTsxTileFrame() : null;
-            var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : firstTile;
+            // With no frame of a tsx's image to continue from, the batch starts at tile 0.
+            var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
+            var firstTile = count > 0 && (lastFrame is null || IsTextureBlocked(lastFrame.TextureName)) ? FirstTsxTileFrame() : null;
+            lastFrame = firstTile ?? lastFrame;
             var result    = BatchFrameBuilder.BuildBatch(
                 lastFrame, firstTile is null ? count : count - 1, incrementUV, CurrentFrameLengthUnit,
                 lastFrame is null ? null : GetTextureSize(lastFrame.TextureName), _pm.TsxTileGrid);
