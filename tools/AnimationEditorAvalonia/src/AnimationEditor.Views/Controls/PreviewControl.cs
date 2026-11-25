@@ -1845,6 +1845,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// </summary>
     internal void SetGuides(IReadOnlyList<float> hGuides, IReadOnlyList<float> vGuides)
     {
+        _draggedGuideIdx = -1; // a guide held now is gone
         _hGuides.Clear();
         _hGuides.AddRange(hGuides);
         _vGuides.Clear();

@@ -48,6 +48,15 @@ internal interface ITabPane
     /// </summary>
     Task<TabEntry?> PrepareCloseAsync(TabEntry tab);
 
+    /// <summary>Whether <paramref name="tab"/> holds edits its file lacks because its last save failed.</summary>
+    bool HasFailedSave(TabEntry tab);
+
+    /// <summary>
+    /// Writes the edits a failed save left in <paramref name="tab"/> (<see cref="HasFailedSave"/>), without switching to it.
+    /// Returns why that failed again, or null when the file has them.
+    /// </summary>
+    string? SaveFailedEdits(TabEntry tab);
+
     /// <summary>
     /// File &gt; Save for <paramref name="tab"/>, the active tab (null when none is open). Only called while
     /// <see cref="Accepts"/> takes <see cref="HotkeyScope.Document"/>.

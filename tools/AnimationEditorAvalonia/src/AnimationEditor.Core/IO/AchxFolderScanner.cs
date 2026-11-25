@@ -76,7 +76,14 @@ public static class AchxFolderScanner
         {
             var subPrefix = CombineRelativePath(relativePrefix, subfolder.Name);
             folderPaths.Add(subPrefix);
-            await ScanAsync(subfolder, subPrefix, results, folderPaths);
+            try
+            {
+                await ScanAsync(subfolder, subPrefix, results, folderPaths);
+            }
+            catch (Exception ex) when (FolderWalk.IsUnlistable(ex))
+            {
+                // Not allowed to list it, or deleted during the scan: the rest of the tree still shows.
+            }
         }
     }
 

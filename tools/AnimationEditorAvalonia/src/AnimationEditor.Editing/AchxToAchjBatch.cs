@@ -23,7 +23,8 @@ public static class AchxToAchjBatch
     /// anything under a <c>bin</c> or <c>obj</c> folder.
     /// </summary>
     public static IReadOnlyList<string> FindSources(string folderPath) =>
-        Directory.EnumerateFiles(folderPath, "*.achx", SearchOption.AllDirectories)
+        FolderWalk.Files(folderPath)
+            .Where(f => Path.GetExtension(f).Equals(".achx", StringComparison.OrdinalIgnoreCase))
             .Where(f => !BinObjPathFilter.IsExcluded(Path.GetRelativePath(folderPath, f)))
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();

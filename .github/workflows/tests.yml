@@ -152,9 +152,10 @@ jobs:
             ${{ runner.os }}-nuget-
 
       # AnimationEditor.App.Tests references Avalonia.Headless.XUnit, which provides a
-      # headless platform — no display server needed.
+      # headless platform — no display server needed. A hung test is named and ends the run; without
+      # --blame-hang the job is cancelled at its time limit with no output.
       - name: Test AnimationEditor.App (shard ${{ matrix.shard }})
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal" --filter "$(python3 scripts/app_test_shards.py ${{ matrix.shard }})"
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal" --blame-hang-timeout 90s --blame-hang-dump-type none --filter "$(python3 scripts/app_test_shards.py ${{ matrix.shard }})"
 
       # Names the exception behind a headless-session death (every later test fails with "idle test
       # context"); written by UnhandledExceptionLog in AnimationEditor.App.Tests.
