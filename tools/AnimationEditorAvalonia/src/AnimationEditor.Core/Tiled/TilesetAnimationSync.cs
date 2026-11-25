@@ -25,14 +25,20 @@ public static class TilesetAnimationSync
     public const string AnimationNamePropertyName = "achjAnimationName";
 
     /// <summary>Tile property recording which achx/achj file (relative to the .tsx's own
-    /// directory) populated a tile's animation -- scopes stale-clearing to tiles this exact
+    /// directory) populated a tile's animation -- scopes stale-clearing to tiles this
     /// source previously wrote, so two different achx files targeting the same tileset don't
-    /// clobber each other's tiles.</summary>
+    /// clobber each other's tiles. Compared without case, as <see cref="Paths.FilePath"/> does.</summary>
     public const string SourceFilePropertyName = "achjSourceFile";
 
+    /// <param name="formerLabel">The source's label before it became <paramref name="sourceLabel"/>; its tiles are the
+    /// source's own and are tagged with the new label.</param>
     public static TilesetAnimationSyncResult Apply(
-        Tileset tileset, IReadOnlyList<ChainMappingResult> results, string sourceLabel)
+        Tileset tileset, IReadOnlyList<ChainMappingResult> results, string sourceLabel, string? formerLabel = null)
     {
+        bool IsOwn(string? label) => label != null &&
+            (label.Equals(sourceLabel, System.StringComparison.OrdinalIgnoreCase)
+             || label.Equals(formerLabel, System.StringComparison.OrdinalIgnoreCase));
+
         // Two chains in the *same* achx computing the same entry tile id is unambiguous authoring
         // error (a Tiled tile can only carry one <animation>) -- fail loudly rather than letting
         // whichever chain iterates last silently win.
@@ -48,7 +54,7 @@ public static class TilesetAnimationSync
         }
 
         var previouslyTrackedTileIds = tileset.Tiles
-            .Where(t => GetStringProperty(t, SourceFilePropertyName) == sourceLabel)
+            .Where(t => IsOwn(GetStringProperty(t, SourceFilePropertyName)))
             .Select(t => t.ID)
             .ToHashSet();
 
@@ -117,7 +123,7 @@ public static class TilesetAnimationSync
             if (!isNewTile)
             {
                 var owningSource = GetStringProperty(tile!, SourceFilePropertyName);
-                if (owningSource != null && owningSource != sourceLabel)
+                if (owningSource != null && !IsOwn(owningSource))
                 {
                     warnings.Add($"chain \"{result.ChainName}\": tile {tileId} is already owned by \"{owningSource}\" - skipped.");
                     continue;
