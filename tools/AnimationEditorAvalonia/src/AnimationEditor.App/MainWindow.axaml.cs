@@ -2577,6 +2577,7 @@ public partial class MainWindow : Window
         var sourcePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (sourcePath is null) return;
 
+        SettleBeforeLeaving(); // now, because the file is copied before opening the copy leaves this document
         var fileName = new FilePath(sourcePath).NoPath;
         var (savedEdits, reason) = SaveFailedEditsOf(sourcePath);
         if (reason is not null)
@@ -3273,10 +3274,16 @@ public partial class MainWindow : Window
     private void OnSaveAsClick(object? sender, RoutedEventArgs e) => _ = RunGuardedAsync(() => ActivePane.SaveAsAsync(_tabManager.ActiveTab), "Save As");
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
-        _ = RunGuardedAsync(() => _appCommands.ExportAsync(ExportFormat.PixiJs), "PixiJS export");
+        _ = RunGuardedAsync(() => ExportAsync(ExportFormat.PixiJs), "PixiJS export");
 
     private void OnExportGodotClick(object? sender, RoutedEventArgs e) =>
-        _ = RunGuardedAsync(() => _appCommands.ExportAsync(ExportFormat.Godot), "Godot export");
+        _ = RunGuardedAsync(() => ExportAsync(ExportFormat.Godot), "Godot export");
+
+    private Task ExportAsync(ExportFormat format)
+    {
+        SettleBeforeLeaving(); // the macOS menu bar takes no focus off a typed field
+        return _appCommands.ExportAsync(format);
+    }
 
     // Remembered for the session so a second export starts from the last choices.
     private readonly Dictionary<AnimatedImageFormat, AnimationExportOptions> _animatedExportOptions = new();
