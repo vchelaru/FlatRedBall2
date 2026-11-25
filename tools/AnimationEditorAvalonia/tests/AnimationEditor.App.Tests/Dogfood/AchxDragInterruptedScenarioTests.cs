@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using AnimationEditor.Core.DragDrop;
+using AnimationEditor.App.Controls;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using System.Globalization;
@@ -331,6 +332,22 @@ public class AchxDragInterruptedScenarioTests
             editor.Layout();
         }
         editor.Preview.HGuides.Single().ShouldBe(guide);
+    }
+
+    [AvaloniaFact]
+    public async Task SequencePreviewGuideDrag_UndoDuringIt_RemovesTheNewGuide()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await editor.OpenAsync(SequenceTimelineMultiSelectScenarioTests.WriteFixture(editor));
+        var preview = editor.Control<PreviewControl>("SequencePreview");
+        Point to = editor.PointIn(preview, 60, 100);
+        editor.DragHold(editor.PointIn(preview, 2, 80), to);
+        preview.HGuideCount.ShouldBe(1);
+
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        ContinueAndRelease(editor, to);
+
+        preview.HGuideCount.ShouldBe(0);
     }
 
     private const string TsxXml = """
