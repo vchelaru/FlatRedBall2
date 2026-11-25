@@ -62,8 +62,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            // Re-insert in original order so indices remain correct.
-            foreach (var (chain, idx) in _removed)
+            // Lowest index first: an index is right only once everything before it is back.
+            foreach (var (chain, idx) in _removed.OrderBy(r => r.OriginalIndex))
             {
                 int safeIdx = Math.Min(idx, _acls.AnimationChains.Count);
                 _acls.AnimationChains.Insert(safeIdx, chain);

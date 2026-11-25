@@ -33,7 +33,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public string Description => $"Move {ShapeUndoLabel.Format(_shape)}";
 
-        public bool Do() { Apply(_newX, _newY); return true; }
+        public bool Do()
+        {
+            if (_newX == _oldX && _newY == _oldY) return false;
+            Apply(_newX, _newY);
+            return true;
+        }
+
         public void Undo() => Apply(_oldX, _oldY);
 
         private void Apply(float x, float y)

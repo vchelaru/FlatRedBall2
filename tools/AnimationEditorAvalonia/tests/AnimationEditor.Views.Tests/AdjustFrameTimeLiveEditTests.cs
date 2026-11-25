@@ -74,7 +74,9 @@ public class AdjustFrameTimeLiveEditTests
         }
     }
 
-    private static (AnimationChainSave Chain, IAppCommands AppCommands, IUndoManager UndoManager) Setup()
+    private FakeProjectManager? _project;
+
+    private (AnimationChainSave Chain, IAppCommands AppCommands, IUndoManager UndoManager) Setup()
     {
         var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "Walk" };
@@ -82,7 +84,8 @@ public class AdjustFrameTimeLiveEditTests
         chain.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FrameLength = 0.3f });
         acls.AnimationChains.Add(chain);
 
-        var pm = new FakeProjectManager { AnimationChainListSave = acls };
+        _project = new FakeProjectManager { AnimationChainListSave = acls };
+        var pm = _project;
         var selectedState = new SelectedState(pm);
         var events = new ApplicationEvents();
         var ioManager = new IoManager(new AppState(events, selectedState), TestRecoveryPath.New());
@@ -167,6 +170,109 @@ public class AdjustFrameTimeLiveEditTests
         Assert.Equal(0.1f, chain.Frames[0].FrameLength, 3);
         Assert.Equal(0.3f, chain.Frames[1].FrameLength, 3);
         Assert.False(undoManager.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task Cancel_AfterAnEditThatChangedNothing_KeepsTheEarlierUndoEntry()
+    {
+        var (chain, appCommands, undoManager) = Setup();
+        appCommands.SetAllFrameLengths(chain, 0.5f);
+
+        var host = new ScriptedDialogHost(
+            interact: content => ((StackPanel)content).Children.OfType<RadioButton>()
+                .Single(r => (string?)r.Content == "Set All Frames Same").IsChecked = true, // they already are
+            confirm: false);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+        Assert.True(undoManager.CanUndo);
+        Assert.Equal(0.5f, chain.Frames[0].FrameLength, 3);
+    }
+
+    [AvaloniaFact]
+    public async Task Cancel_AfterTypingBackTheFirstDuration_KeepsTheEarlierUndoEntry()
+    {
+        var (chain, appCommands, undoManager) = Setup();
+        appCommands.SetAllFrameLengths(chain, 0.5f);
+
+        var host = new ScriptedDialogHost(
+            interact: content =>
+            {
+                var durationInput = ((StackPanel)content).Children.OfType<FlankerNumericField>().Single();
+                durationInput.Value = 2m;
+                durationInput.Value = 1m;
+            },
+            confirm: false);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+        Assert.True(undoManager.CanUndo);
+        Assert.Equal(0.5f, chain.Frames[0].FrameLength, 3);
+    }
+
+    // An inspector field still holding focus leaves its edit open for coalescing while the dialog is up.
+    [AvaloniaFact]
+    public async Task Cancel_WithAnInspectorEditStillOpen_KeepsThatEdit()
+    {
+        var (chain, appCommands, undoManager) = Setup();
+        foreach (var length in new[] { 0.6f, 0.5f })
+            appCommands.SetFrameLength(chain.Frames.ToList(), length);
+
+        var host = new ScriptedDialogHost(
+            interact: content => ((StackPanel)content).Children.OfType<RadioButton>()
+                .Single(r => (string?)r.Content == "Set All Frames Same").IsChecked = true,
+            confirm: false);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+        Assert.True(undoManager.CanUndo);
+        Assert.Equal(0.5f, chain.Frames[0].FrameLength, 3);
+    }
+
+    [AvaloniaFact]
+    public async Task Ok_AfterTypingBackTheFirstDuration_RedoKeepsWhatOkLeft()
+    {
+        var (chain, appCommands, undoManager) = Setup();
+
+        var host = new ScriptedDialogHost(
+            interact: content =>
+            {
+                var durationInput = ((StackPanel)content).Children.OfType<FlankerNumericField>().Single();
+                durationInput.Value = 0.8m;
+                durationInput.Value = 0.4m;
+            },
+            confirm: true);
+        await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+        undoManager.Undo();
+        undoManager.Redo();
+        Assert.Equal(0.1f, chain.Frames[0].FrameLength, 3); // not the 0.8 s tried on the way
+    }
+
+    [AvaloniaFact]
+    public async Task Ok_AfterTypingBackTheFirstDuration_SavesIt()
+    {
+        var (chain, appCommands, _) = Setup();
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"frametime_{Guid.NewGuid():N}.achx");
+        try
+        {
+            appCommands.SaveCurrentAnimationChainList(path);
+            _project!.FileName = path;
+
+            var host = new ScriptedDialogHost(
+                interact: content =>
+                {
+                    var durationInput = ((StackPanel)content).Children.OfType<FlankerNumericField>().Single();
+                    durationInput.Value = 0.8m;
+                    durationInput.Value = 0.4m;
+                },
+                confirm: true);
+            await EditorDialogs.ShowAdjustFrameTimeAsync(host, appCommands, chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+            var saved = AnimationChainListSave.FromFile(path).AnimationChains[0];
+            Assert.Equal(chain.Frames.Select(f => f.FrameLength), saved.Frames.Select(f => f.FrameLength));
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
     }
 
     // #1274: the field opened as "0.4" but the + button produced "0.500".

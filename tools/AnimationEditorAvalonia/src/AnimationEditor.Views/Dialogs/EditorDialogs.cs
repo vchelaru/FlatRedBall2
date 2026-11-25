@@ -161,7 +161,9 @@ public static class EditorDialogs
         // (not from whatever the previous live edit left behind) so switching between "Keep
         // Proportional" and "Set All Frames Same" mid-dialog can't flatten the original ratios.
         var originalLengths = chain.Frames.Select(f => f.FrameLength).ToArray();
-        bool didEdit = false;
+
+        // Only edits made from here on are the dialog's own, so only those are Cancel's to take back.
+        appCommands.SealPendingEdits();
 
         var durationInput = new FlankerNumericField
         {
@@ -195,12 +197,9 @@ public static class EditorDialogs
 
         void ApplyLive()
         {
-            for (int i = 0; i < chain.Frames.Count; i++)
-                chain.Frames[i].FrameLength = originalLengths[i];
-            didEdit = true;
             float value = (float)(durationInput.Value ?? 0m);
             if (radioProportional.IsChecked == true)
-                appCommands.ScaleFrameTimesProportional(chain, value);
+                appCommands.ScaleFrameTimesProportional(chain, value, originalLengths);
             else
                 appCommands.ScaleFrameTimesSetAllSame(chain, value);
         }
@@ -227,8 +226,7 @@ public static class EditorDialogs
         var choice = await host.ShowAsync(dialog);
         if (choice is null)
         {
-            if (didEdit)
-                appCommands.DiscardPendingEdits();
+            appCommands.DiscardPendingEdits();
             return;
         }
         appCommands.SealPendingEdits();

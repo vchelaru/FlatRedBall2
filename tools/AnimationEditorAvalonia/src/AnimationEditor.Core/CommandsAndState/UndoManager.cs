@@ -33,10 +33,15 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             if (!cmd.Do()) return;
 
-            if (cmd.CoalesceGroup is { } group && group == _openCoalesceGroup &&
-                _undoStack.Count > 0 && _undoStack.Peek().CoalesceGroup == group)
+            if (HasOpenCoalescedEdit && cmd.CoalesceGroup == _openCoalesceGroup)
             {
-                cmd = cmd.CoalesceWith(_undoStack.Pop());
+                if (cmd.CoalesceWith(_undoStack.Pop()) is not { } merged)
+                {
+                    _openCoalesceGroup = null;
+                    StackChanged?.Invoke();
+                    return;
+                }
+                cmd = merged;
             }
             _openCoalesceGroup = cmd.CoalesceGroup;
             Record(cmd);
@@ -49,6 +54,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _redoStack.Clear();
             StackChanged?.Invoke();
         }
+
+        /// <inheritdoc cref="IUndoManager.HasOpenCoalescedEdit"/>
+        public bool HasOpenCoalescedEdit =>
+            _openCoalesceGroup is not null && CanUndo && _undoStack.Peek().CoalesceGroup == _openCoalesceGroup;
 
         /// <inheritdoc cref="IUndoManager.SealCoalescing"/>
         public void SealCoalescing() => _openCoalesceGroup = null;
