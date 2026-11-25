@@ -246,6 +246,9 @@ public class TsxTileClaimTests : IDisposable
         var pm = Load(path);
         Place(NewChain(pm, "Wide", 4), 4, columns: 2);
         NewChain(pm, "B", 4);
+        // Last in the list, so tile 4 comes up before tile 5.
+        pm.AnimationChainListSave!.AnimationChains.Reverse();
+        pm.AnimationChainListSave.AnimationChains.Reverse(0, 2);
 
         var warning = Assert.Single(pm.SaveTsxProject());
 
