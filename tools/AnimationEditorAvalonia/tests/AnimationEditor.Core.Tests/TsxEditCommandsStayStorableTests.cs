@@ -114,6 +114,8 @@ public class TsxEditCommandsStayStorableTests : IDisposable
 
     private static readonly string[] Overloads =
     [
+        "AddFrameFromPixelBounds(AnimationChainSave, String, Int32, Int32, Int32, Int32)",
+        "AddFrameFromPixelBounds(IReadOnlyList<AnimationChainSave>, String, Int32, Int32, Int32, Int32)",
         "PasteShapes(AnimationFrameSave, IReadOnlyList<Object>)",
         "PasteShapes(IReadOnlyList<AnimationFrameSave>, IReadOnlyList<Object>)",
         "RefreshTreeNode(AnimationChainSave)",
@@ -190,6 +192,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
         Row(nameof(IAppCommands.AddFrame), c => c.AppCommands.AddFrame(First(c))),
         Row(nameof(IAppCommands.AddFrame), c => c.AppCommands.AddFrame(First(c), "other.png")),
         Row(nameof(IAppCommands.AddFrameFromPixelBounds), c => c.AppCommands.AddFrameFromPixelBounds(First(c), "other.png", 16, 0, 32, 16)),
+        Row(nameof(IAppCommands.AddFrameFromPixelBounds), c => c.AppCommands.AddFrameFromPixelBounds([First(c)], "other.png", 16, 0, 32, 16)),
         Row(nameof(IAppCommands.AddMultipleFrames), c => c.AppCommands.AddMultipleFrames(First(c), 2, incrementUV: true)),
         Row(nameof(IAppCommands.SetFrameTextureName), c => c.AppCommands.SetFrameTextureName(Frame(c), "other.png")),
         Row(nameof(IAppCommands.SetFrameTextureName), c => c.AppCommands.SetFrameTextureName(Frame(c), null)),

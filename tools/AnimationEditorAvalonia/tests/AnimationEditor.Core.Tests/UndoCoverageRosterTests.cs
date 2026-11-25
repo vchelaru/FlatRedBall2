@@ -403,6 +403,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.AddMultipleFrames(Zebra(ctx), 2, incrementUV: false)));
         yield return Row(nameof(IAppCommands.AddFrameFromPixelBounds),
             ctx => Sync(() => ctx.AppCommands.AddFrameFromPixelBounds(Zebra(ctx), "sheet.png", 0, 0, 8, 8)));
+        yield return Row(nameof(IAppCommands.AddFrameFromPixelBounds),
+            ctx => Sync(() => ctx.AppCommands.AddFrameFromPixelBounds(ctx.ProjectManager.AnimationChainListSave!.AnimationChains, "sheet.png", 0, 0, 8, 8)));
         yield return Row(nameof(IAppCommands.SetFrameTextureName),
             ctx => Sync(() => ctx.AppCommands.SetFrameTextureName(Zebra(ctx).Frames[0], "set.png")));
         yield return Row(nameof(IAppCommands.SetAllFramesTextureName),

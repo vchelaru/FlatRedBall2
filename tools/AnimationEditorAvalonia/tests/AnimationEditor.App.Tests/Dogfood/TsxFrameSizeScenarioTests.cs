@@ -247,4 +247,20 @@ public class TsxFrameSizeScenarioTests
         ShouldBeRefused(editor, path);
         editor.ChainNamed("Blink").Frames.Count.ShouldBe(2);
     }
+
+    [AvaloniaFact]
+    public async Task RegionOnTheTexture_OfTheSizeOfTheUnlockedAnimation_IsAddedToIt()
+    {
+        using var editor = new AnimationEditorHarness();
+        await OpenTsxAsync(editor);
+        editor.ChainNamed("Torch").IsLocked = true;
+        editor.ClickRow(editor.ChainNamed("Torch"));
+        editor.ClickRow(editor.ChainNamed("Blink"), RawInputModifiers.Control);
+
+        typeof(MainWindow).GetMethod("OnFrameCreatedFromRegion", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(editor.Window, [0, 0, 16, 16]);
+
+        editor.ChainNamed("Blink").Frames.Count.ShouldBe(3);
+        editor.ChainNamed("Torch").Frames.Count.ShouldBe(2);
+    }
 }
