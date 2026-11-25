@@ -10,6 +10,7 @@ using Avalonia.VisualTree;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
+using SkiaSharp;
 using Xunit;
 
 namespace AnimationEditor.App.Tests.Dogfood;
@@ -243,6 +244,96 @@ public class TypedFieldLeaveScenarioTests
 
         File.Exists(hero).ShouldBeFalse();
         Saved(Path.ChangeExtension(hero, ".achj"))[0].FrameLength.ShouldBe(0.5f);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("PropFrameLen")]
+    [InlineData("PropRed")]
+    [InlineData("EventName")]
+    [InlineData("tree rename")]
+    public async Task DuplicatingTheOpenFile_WhileAFieldIsTyped_CopiesTheTypedValue(string field)
+    {
+        using var editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(hero);
+
+        if (field == "tree rename")
+        {
+            editor.ClickRow(editor.ChainNamed("Walk"));
+            editor.Press(Key.F2);
+            editor.Wait(TimeSpan.FromMilliseconds(50));
+            editor.Type("7");
+        }
+        else Begin(editor, field, "7");
+        await editor.Window.DuplicateProjectFileAsync("hero.achx");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        foreach (string path in new[] { hero, Path.Combine(editor.ProjectFolder, "hero2.achx") })
+        {
+            var chain = AnimationEditorHarness.ReadSaved(path).AnimationChains[0];
+            string? saved = field switch
+            {
+                "PropFrameLen" => chain.Frames[0].FrameLength.ToString(),
+                "PropRed" => chain.Frames[0].Red.ToString(),
+                "EventName" => chain.Frames[0].Events[0].Name,
+                _ => chain.Name,
+            };
+            saved.ShouldBe("7", path);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task DuplicatingTheOpenSequenceFile_WhileASequenceIsRenamed_CopiesTheTypedName()
+    {
+        using var editor = new AnimationEditorHarness();
+        string boss = editor.WriteSeqj("boss.seqj", "One");
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(boss);
+        editor.Click((Control)editor.Control<ListBox>("SequenceList").ContainerFromIndex(0)!);
+        editor.Press(Key.F2);
+        editor.Wait(TimeSpan.FromMilliseconds(50));
+        editor.Type("Typed");
+
+        await editor.Window.DuplicateProjectFileAsync("boss.seqj");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        SequenceListSave.FromFile(Path.Combine(editor.ProjectFolder, "boss2.seqj")).Sequences[0].Name.ShouldBe("Typed");
+    }
+
+    // The macOS menu bar takes no focus off the field.
+    [AvaloniaTheory]
+    [InlineData("Godot SpriteFrames…", "walk.tres")]
+    [InlineData("PixiJS…", "walk.json")]
+    [InlineData("Animated GIF…", "walk.gif")]
+    public async Task Exporting_WhileAFieldIsTyped_ExportsTheTypedValue(string header, string name)
+    {
+        using var editor = new AnimationEditorHarness();
+        string hero = WriteFixture(editor);
+        await editor.OpenAsync(hero);
+        string target = Path.Combine(editor.ProjectFolder, name);
+        editor.Dialogs.AnswerNextEditorDialog(_ => true);
+        editor.Dialogs.AnswerNextSaveFile(target);
+
+        bool pixi = name.EndsWith("json"); // exports no frame length
+        if (pixi)
+        {
+            editor.ClickRow(editor.ChainNamed("Walk"));
+            editor.Control<TextBox>("PropChainName").Focus();
+            editor.Control<TextBox>("PropChainName").SelectAll();
+            editor.Type("Typed");
+        }
+        else Begin(editor, "PropFrameLen", "0.5");
+        NativeMenuTestSupport.Activate(NativeMenuTestSupport.Build(editor), "File", "Export", header);
+        (await editor.WaitUntilAsync(() => editor.InfoText is not null || editor.ProblemText is not null, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+
+        if (pixi) File.ReadAllText(target).ShouldContain("Typed");
+        else if (name.EndsWith("tres")) File.ReadAllText(target).ShouldContain("2.5"); // relative to the 0.2 s frame
+        else
+        {
+            using var codec = SKCodec.Create(new SKMemoryStream(File.ReadAllBytes(target)));
+            codec!.FrameInfo[0].Duration.ShouldBe(500);
+        }
     }
 
     [AvaloniaFact]
