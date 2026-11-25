@@ -2939,7 +2939,7 @@ public partial class MainWindow : Window
             var item = new MenuItem { Header = fileLabels[i].Replace("_", "__") };
             ToolTip.SetTip(item, file);
             var captured = file;
-            item.Click += async (_, _) => await LoadAnimationFileAsync(captured);
+            item.Click += (_, _) => _ = RunGuardedAsync(() => LoadAnimationFileAsync(captured), "Open");
             MenuLoadRecent.Items.Add(item);
         }
 
@@ -2954,7 +2954,7 @@ public partial class MainWindow : Window
             var item = new MenuItem { Header = (label.Length > 0 ? label : folder).Replace("_", "__") };
             ToolTip.SetTip(item, folder);
             var captured = folder;
-            item.Click += async (_, _) => await OpenRecentProjectFolderAsync(captured);
+            item.Click += (_, _) => _ = RunGuardedAsync(() => OpenRecentProjectFolderAsync(captured), "Open Project Folder");
             MenuLoadRecent.Items.Add(item);
         }
     }
@@ -4185,6 +4185,16 @@ public partial class MainWindow : Window
         AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
         string droppedFilePath, bool createFrameOnCtrl)
     {
+        bool applied = false;
+        await RunGuardedAsync(async () =>
+            applied = await HandlePngDropCoreAsync(targetChain, targetFrame, droppedFilePath, createFrameOnCtrl), "Image drop");
+        return applied;
+    }
+
+    private async Task<bool> HandlePngDropCoreAsync(
+        AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
+        string droppedFilePath, bool createFrameOnCtrl)
+    {
         if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
             return false;
 
@@ -4776,7 +4786,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnWindowDrop(object? sender, DragEventArgs e)
+    private void OnWindowDrop(object? sender, DragEventArgs e)
     {
         // Includes native-tsx (#1140) paths alongside achx/achj (#1147) -- LoadAnimationFileAsync
         // dispatches either kind to the correct workflow via OpenProjectWorkflowAsync.
@@ -4788,8 +4798,11 @@ public partial class MainWindow : Window
         e.Handled = true;
         // LoadAnimationFileAsync de-dupes against already-open tabs (focuses instead of
         // duplicating); awaiting in sequence opens each file and leaves the last active.
-        foreach (var path in projectFiles)
-            await LoadAnimationFileAsync(path);
+        _ = RunGuardedAsync(async () =>
+        {
+            foreach (var path in projectFiles)
+                await LoadAnimationFileAsync(path);
+        }, "Open");
     }
 
     // ---- TEMP diagnostic probe (multi-select freeze investigation) -- remove once done ----
@@ -6000,7 +6013,7 @@ public partial class MainWindow : Window
 
         PropTextureName.LostFocus  += (_, _) => ApplyTextureName();
         PropTextureName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyTextureName(); };
-        PropTextureBrowseBtn.Click += async (_, _) => await BrowseForFrameTexture();
+        PropTextureBrowseBtn.Click += (_, _) => _ = RunGuardedAsync(BrowseForFrameTexture, "Select Texture");
 
         // #897: every field above commits on ValueChanged so the wireframe/preview updates live as
         // the user types or scrolls the wheel; each commit coalesces with the previous one for the
