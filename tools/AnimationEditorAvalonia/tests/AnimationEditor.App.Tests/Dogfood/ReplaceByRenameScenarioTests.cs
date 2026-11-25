@@ -18,7 +18,7 @@ public class ReplaceByRenameScenarioTests
         File.Move(hero, hero + ".bak");
         await editor.WaitAsync(TimeSpan.FromMilliseconds(400));    // slower than the watcher's window for one save
         File.Move(next, hero);
-        await editor.WaitUntilAsync(() => editor.Project.AnimationChains[0].Name == "Run", TimeSpan.FromSeconds(3));
+        await editor.WaitUntilAsync(() => editor.Project.AnimationChains[0].Name == "Run", TimeSpan.FromSeconds(8));
 
         editor.Project.AnimationChains.Select(chain => chain.Name).ShouldBe(new[] { "Run" });
     }

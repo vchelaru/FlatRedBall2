@@ -126,101 +126,107 @@ public class MultiTabRandomWalkTests
         AnimationChainListSave Mem(Doc d) => (d == front ? pm.AnimationChainListSave : d.Tab.CachedEditorModel)!;
         var readOnly = new HashSet<string>();
         var owed = new Dictionary<Doc, string>();
-        for (int step = 0; step < 14; step++)
+        try
         {
-            var d = docs[random.Next(docs.Count)];
-            int action = random.Next(13);
-            log.Append($"\n{step}: {action} front {docs.IndexOf(front!)} other {docs.IndexOf(d)}");
-            var chains = pm.AnimationChainListSave!.AnimationChains;
-            switch (action)
+            for (int step = 0; step < 14; step++)
             {
-                case 0 or 1:
-                    if (ctx.AppCommands.AddAnimationChainWithName($"N{step}") is { } a)
-                    {
-                        int c = random.Next(4) * 16, r = random.Next(4) * 16;
-                        ctx.AppCommands.AddFrameFromPixelBounds(a, Path.GetRelativePath(Path.GetDirectoryName(P(front!))!, front!.Sheet).Replace('\\', '/'), c, r, c + 16, r + 16);
-                    }
-                    break;
-                case 2 when chains.Count > 0: ctx.AppCommands.DeleteAnimationChains([chains[0]]); break;
-                case 3 when chains.Count > 0: ctx.AppCommands.RenameChain(chains[^1], $"R{step}"); break;
-                case 4 or 5: ctx.UndoManager.Undo(); break;
-                case 6: ctx.UndoManager.Redo(); break;
-                case 7 or 8: await Switch(d); break;
-                case 9:
+                var d = docs[random.Next(docs.Count)];
+                int action = random.Next(13);
+                log.Append($"\n{step}: {action} front {docs.IndexOf(front!)} other {docs.IndexOf(d)}");
+                var chains = pm.AnimationChainListSave!.AnimationChains;
+                switch (action)
                 {
-                    string to = Path.Combine(dir.Path, random.Next(2) == 0 ? Path.GetFileName(Path.GetDirectoryName(P(front!))!) : $"moved{step}");
-                    Directory.CreateDirectory(to);
-                    string target = Path.Combine(to, $"as{step}" + front!.Type.Extension());
-                    ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
-                    if (await ctx.AppCommands.SaveCurrentAnimationChainListAsync())
+                    case 0 or 1:
+                        if (ctx.AppCommands.AddAnimationChainWithName($"N{step}") is { } a)
+                        {
+                            int c = random.Next(4) * 16, r = random.Next(4) * 16;
+                            ctx.AppCommands.AddFrameFromPixelBounds(a, Path.GetRelativePath(Path.GetDirectoryName(P(front!))!, front!.Sheet).Replace('\\', '/'), c, r, c + 16, r + 16);
+                        }
+                        break;
+                    case 2 when chains.Count > 0: ctx.AppCommands.DeleteAnimationChains([chains[0]]); break;
+                    case 3 when chains.Count > 0: ctx.AppCommands.RenameChain(chains[^1], $"R{step}"); break;
+                    case 4 or 5: ctx.UndoManager.Undo(); break;
+                    case 6: ctx.UndoManager.Redo(); break;
+                    case 7 or 8: await Switch(d); break;
+                    case 9:
                     {
-                        front.Tab = new TabEntry(new FilePath(target));
-                        owed.Remove(front);
+                        string to = Path.Combine(dir.Path, random.Next(2) == 0 ? Path.GetFileName(Path.GetDirectoryName(P(front!))!) : $"moved{step}");
+                        Directory.CreateDirectory(to);
+                        string target = Path.Combine(to, $"as{step}" + front!.Type.Extension());
+                        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
+                        if (await ctx.AppCommands.SaveCurrentAnimationChainListAsync())
+                        {
+                            front.Tab = new TabEntry(new FilePath(target));
+                            owed.Remove(front);
+                        }
+                        break;
                     }
-                    break;
+                    case 10:
+                        if (readOnly.Remove(P(d))) Documents.SetWritable(P(d), true);
+                        else
+                        {
+                            readOnly.Add(P(d));
+                            Documents.SetWritable(P(d), false);
+                        }
+                        break;
+                    case 11:
+                    {
+                        string path = P(d);
+                        if (readOnly.Contains(path)) break;
+                        string mark = $"Out{step}";
+                        bool tsx = d.Type == DocType.Tsx;
+                        if (tsx)
+                        {
+                            string text = File.ReadAllText(path);
+                            File.WriteAllText(path, text.Replace("</tileset>", $" <!--{mark}-->\n</tileset>"));
+                        }
+                        else
+                        {
+                            var list = AnimationChainListSave.FromFile(path);
+                            list.AnimationChains.Add(new AnimationChainSave { Name = mark });
+                            if (d.Type == DocType.Achj) list.SaveJson(path); else list.Save(path);
+                        }
+                        bool wasFailed = Failed(d);
+                        if (wasFailed) owed[d] = mark;
+                        watcher.Changed(path);
+                        if (!wasFailed && d == front && !tsx) Mem(d).AnimationChains.ShouldContain(x => x.Name == mark, "live reload");
+                        break;
+                    }
+                    case 12:
+                        if (d != front && d.Tab.CachedEditorModel is { } model && model.AnimationChains.Count > 1 && !(d.Tab.CachedDiskState?.HasChanged(d.Tab.Path) ?? false))
+                        {
+                            model.AnimationChains.RemoveAt(model.AnimationChains.Count - 1);
+                            d.Tab.UndoSnapshot = null;
+                            ctx.AppCommands.SaveDocument(d.Tab);
+                        }
+                        break;
                 }
-                case 10:
-                    if (readOnly.Remove(P(d))) Documents.SetWritable(P(d), true);
+                watcher.Flush();
+                foreach (var x in docs)
+                {
+                    if (owed.TryGetValue(x, out var mark)) File.ReadAllText(P(x)).ShouldContain(mark, Case.Sensitive, $"doc {docs.IndexOf(x)}: outside change overwritten");
+                    if (x != front && (x.Tab.CachedDiskState?.HasChanged(x.Tab.Path) ?? false)) continue;
+                    foreach (var f in Mem(x).AnimationChains.SelectMany(c => c.Frames))
+                        new FilePath(Path.Combine(Path.GetDirectoryName(P(x))!, f.TextureName)).FullPath.ShouldBe(x.Sheet, $"doc {docs.IndexOf(x)} texture");
+                    if (Failed(x)) continue;
+                    string folder = Path.GetDirectoryName(P(x))!;
+                    if (x.Type == DocType.Tsx)
+                    {
+                        var re = new ProjectManager();
+                        re.LoadTsxProject(new FilePath(P(x)));
+                        var notFull = x == front ? pm.TsxChainsNotFullySaved : ((ProjectManager.TsxState)x.Tab.CachedTsxState!).ChainsNotFullySaved;
+                        var full = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+                        full.AnimationChains.AddRange(Mem(x).AnimationChains.Where(c => !notFull.Contains(c)));
+                        Documents.Lines(full, folder).Except(Documents.Lines(re.AnimationChainListSave!, folder)).ShouldBeEmpty($"doc {docs.IndexOf(x)} disk");
+                    }
                     else
-                    {
-                        readOnly.Add(P(d));
-                        Documents.SetWritable(P(d), false);
-                    }
-                    break;
-                case 11:
-                {
-                    string path = P(d);
-                    if (readOnly.Contains(path)) break;
-                    string mark = $"Out{step}";
-                    bool tsx = d.Type == DocType.Tsx;
-                    if (tsx)
-                    {
-                        string text = File.ReadAllText(path);
-                        File.WriteAllText(path, text.Replace("</tileset>", $" <!--{mark}-->\n</tileset>"));
-                    }
-                    else
-                    {
-                        var list = AnimationChainListSave.FromFile(path);
-                        list.AnimationChains.Add(new AnimationChainSave { Name = mark });
-                        if (d.Type == DocType.Achj) list.SaveJson(path); else list.Save(path);
-                    }
-                    bool wasFailed = Failed(d);
-                    if (wasFailed) owed[d] = mark;
-                    watcher.Changed(path);
-                    if (!wasFailed && d == front && !tsx) Mem(d).AnimationChains.ShouldContain(x => x.Name == mark, "live reload");
-                    break;
+                        Norm(AnimationChainListSave.FromFile(P(x)), P(x)).ShouldBe(Norm(Mem(x), P(x)), $"doc {docs.IndexOf(x)} disk");
                 }
-                case 12:
-                    if (d != front && d.Tab.CachedEditorModel is { } model && model.AnimationChains.Count > 1 && !(d.Tab.CachedDiskState?.HasChanged(d.Tab.Path) ?? false))
-                    {
-                        model.AnimationChains.RemoveAt(model.AnimationChains.Count - 1);
-                        d.Tab.UndoSnapshot = null;
-                        ctx.AppCommands.SaveDocument(d.Tab);
-                    }
-                    break;
-            }
-            watcher.Flush();
-            foreach (var x in docs)
-            {
-                if (owed.TryGetValue(x, out var mark)) File.ReadAllText(P(x)).ShouldContain(mark, Case.Sensitive, $"doc {docs.IndexOf(x)}: outside change overwritten");
-                if (x != front && (x.Tab.CachedDiskState?.HasChanged(x.Tab.Path) ?? false)) continue;
-                foreach (var f in Mem(x).AnimationChains.SelectMany(c => c.Frames))
-                    new FilePath(Path.Combine(Path.GetDirectoryName(P(x))!, f.TextureName)).FullPath.ShouldBe(x.Sheet, $"doc {docs.IndexOf(x)} texture");
-                if (Failed(x)) continue;
-                string folder = Path.GetDirectoryName(P(x))!;
-                if (x.Type == DocType.Tsx)
-                {
-                    var re = new ProjectManager();
-                    re.LoadTsxProject(new FilePath(P(x)));
-                    var notFull = x == front ? pm.TsxChainsNotFullySaved : ((ProjectManager.TsxState)x.Tab.CachedTsxState!).ChainsNotFullySaved;
-                    var full = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-                    full.AnimationChains.AddRange(Mem(x).AnimationChains.Where(c => !notFull.Contains(c)));
-                    Documents.Lines(full, folder).Except(Documents.Lines(re.AnimationChainListSave!, folder)).ShouldBeEmpty($"doc {docs.IndexOf(x)} disk");
-                }
-                else
-                    Norm(AnimationChainListSave.FromFile(P(x)), P(x)).ShouldBe(Norm(Mem(x), P(x)), $"doc {docs.IndexOf(x)} disk");
             }
         }
-        foreach (var p in readOnly.Where(File.Exists)) Documents.SetWritable(p, true);
+        finally
+        {
+            foreach (var p in readOnly.Where(File.Exists)) Documents.SetWritable(p, true);
+        }
     }
 }
