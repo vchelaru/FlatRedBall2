@@ -1366,7 +1366,7 @@ public partial class MainWindow : Window
 
         _appCommands.ItemsDeleted += label =>
         {
-            _toastDeletion = (_tabManager.ActiveTab, _undoManager.UndoHistory.LastOrDefault());
+            _toastDeletion = _undoManager.UndoHistory.LastOrDefault();
             Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (IsToastDeletionLast()) ShowItemDeleted(label);
@@ -8637,11 +8637,11 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>The deletion the deleted toast is for: the undo step it added, and the tab in front then.</summary>
-    private (TabEntry? Tab, IUndoableCommand? Step)? _toastDeletion;
+    /// <summary>The undo step of the deletion the deleted toast is for.</summary>
+    private IUndoableCommand? _toastDeletion;
 
     private bool IsToastDeletionLast() =>
-        _toastDeletion is { } deletion && deletion.Tab == _tabManager.ActiveTab && deletion.Step == _undoManager.UndoHistory.LastOrDefault();
+        _appCommands.IsDocumentTabInFront?.Invoke() != false && _undoManager.UndoHistory.LastOrDefault() == _toastDeletion;
 
     // Its Undo would undo something else (#2183).
     private void HideStaleDeletedToast()

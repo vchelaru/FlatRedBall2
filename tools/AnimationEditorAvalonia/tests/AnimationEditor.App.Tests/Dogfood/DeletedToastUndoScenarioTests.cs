@@ -53,6 +53,25 @@ public class DeletedToastUndoScenarioTests
         editor.DeletedToastText.ShouldBeNull();
     }
 
+    [AvaloniaTheory]
+    [InlineData("hero2.achx")]
+    [InlineData("moved/hero.achx")]
+    public async Task AfterSaveAs_TheToastStays_AndUndoesTheDeletion(string savedAs)
+    {
+        using var editor = new AnimationEditorHarness();
+        await OpenAndDeleteRunAsync(editor);
+        string path = Path.Combine(editor.ProjectFolder, savedAs);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        editor.Dialogs.AnswerNextSaveFile(path);
+        editor.ClickMenu("MenuSaveAs");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+        editor.Click(editor.Notifications.ItemDeletedToastUndoBtn);
+        editor.Layout();
+
+        AnimationEditorHarness.ReadSaved(path).AnimationChains.Select(c => c.Name).ShouldBe(["Walk", "Run", "First"]);
+    }
+
     [AvaloniaFact]
     public async Task AfterASelectionAndASave_TheToastStays_AndUndoesTheDeletion()
     {
