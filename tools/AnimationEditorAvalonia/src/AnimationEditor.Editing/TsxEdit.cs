@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Tiled;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -24,6 +25,14 @@ public static class TsxEdit
         projectManager.TsxTileset is { } tileset && !tileset.IsImage(texture)
             ? Fail(EditErrorCode.NotSupportedInTsx, OtherImageRefusal)
             : null;
+
+    /// <summary>The refusal when <paramref name="frames"/> differ in size from the frames of <paramref name="chain"/> in an open .tsx.</summary>
+    public static EditResult? CheckFrameSize(IProjectManager projectManager, AnimationChainSave chain, IEnumerable<AnimationFrameSave> frames) =>
+        TsxFrameSize.Refusal(projectManager, chain, frames) is { } reason ? Fail(EditErrorCode.NotSupportedInTsx, reason) : null;
+
+    /// <summary>The same for a new frame showing <paramref name="added"/>.</summary>
+    public static EditResult? CheckFrameSize(IProjectManager projectManager, AnimationChainSave chain, FrameRegion added) =>
+        TsxFrameSize.Refusal(projectManager, chain, [added]) is { } reason ? Fail(EditErrorCode.NotSupportedInTsx, reason) : null;
 
     /// <summary>
     /// Moves a native-.tsx chain's animation to <paramref name="tileId"/>. Fails with

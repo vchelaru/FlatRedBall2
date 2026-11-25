@@ -730,7 +730,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Adds clipboard frames to <paramref name="chain"/>. Undoable.
         /// <paramref name="insertIndex"/> <c>null</c> appends; a value inserts the frames
         /// there in order (paste after the selected frame).</summary>
-        /// <returns>False when nothing was added: the chain is locked.</returns>
+        /// <returns>False when nothing was added: the chain is locked, or <see cref="Tiled.TsxFrameSize"/> refuses the frames.</returns>
         bool PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
             int? insertIndex = null);
 

@@ -202,6 +202,10 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>True when <paramref name="textureName"/> is not the open tsx's image: a tileset has one, and its frames keep it.</summary>
         private bool IsTextureBlocked(string? textureName) => _pm.TsxTileset is { } tileset && !tileset.IsImage(textureName ?? "");
 
+        /// <summary>True when the open tsx could not store <paramref name="chain"/> with <paramref name="frames"/> added.</summary>
+        private bool IsFrameSizeBlocked(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames) =>
+            Tiled.TsxFrameSize.Refusal(_pm, chain, frames) is not null;
+
         /// <summary>A frame showing the open tsx's tile 0, or null in an achx/achj project.</summary>
         private AnimationFrameSave? FirstTsxTileFrame()
         {
@@ -1481,7 +1485,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveFrames(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave sourceChain, AnimationChainSave targetChain, int insertIndex)
         {
-            if (frames.Count == 0 || IsChainLocked(sourceChain) || IsChainLocked(targetChain)) return;
+            if (frames.Count == 0 || IsChainLocked(sourceChain) || IsChainLocked(targetChain) || IsFrameSizeBlocked(targetChain, frames)) return;
             _undoManager.Execute(new MoveFramesCommand(
                 frames, sourceChain, targetChain, insertIndex, this, _events, _selectedState));
         }
@@ -2171,7 +2175,9 @@ namespace AnimationEditor.Core.CommandsAndState
             string textureName,
             int minX, int minY, int maxX, int maxY)
         {
-            CreateAndAddFrame(chain, textureName, new FrameRegion(minX, minY, maxX, maxY));
+            var region = new FrameRegion(minX, minY, maxX, maxY);
+            if (Tiled.TsxFrameSize.Refusal(_pm, chain, [region]) is not null) return;
+            CreateAndAddFrame(chain, textureName, region);
         }
 
         // ── Texture assignment (WF10b — write direction) ─────────────────────────
@@ -2792,7 +2798,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public bool PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
             int? insertIndex = null)
         {
-            if (IsChainLocked(chain)) return false;
+            if (IsChainLocked(chain) || IsFrameSizeBlocked(chain, frames)) return false;
             var clones = frames.Select(AnimationCloneHelper.CloneFrame).ToArray();
             _undoManager.Execute(new AddFramesCommand(clones, chain, this, _events, _selectedState, insertIndex));
             return true;
@@ -2856,7 +2862,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
                 .Where(x => x.Chain is not null)
                 .ToList();
-            if (sources.Count == 0 || IsChainLocked(targetChain)) return;
+            if (sources.Count == 0 || IsChainLocked(targetChain) || IsFrameSizeBlocked(targetChain, frames)) return;
 
             // A locked chain keeps its frames, so the paste gets copies of them.
             var block = sources
