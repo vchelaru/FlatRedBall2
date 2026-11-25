@@ -57,7 +57,8 @@ public class AnimationChainList<TFrame> : List<AnimationChain<TFrame>> where TFr
     /// in place so any live <see cref="AnimationPlayer{TFrame}"/> reference keeps working. For
     /// each chain in the reloaded file, matches by <see cref="AnimationChain{TFrame}.Name"/> (the nth
     /// chain of a name matches the nth): existing chains take the file's frames and Loop, PingPong
-    /// and Reverse in place (instance identity preserved); new chains are appended. A player already
+    /// and Reverse in place (instance identity preserved), also over a value game code set on the
+    /// chain; new chains are appended. A player already
     /// playing a chain takes the new Loop, PingPong and Reverse the next time it starts that chain.
     /// <para>
     /// Returns <c>false</c> on I/O or parse failure (e.g. file mid-write) — XML or JSON, depending

@@ -387,6 +387,9 @@ public class Sprite : IRenderable, IAttachable
     /// </summary>
     public bool IsReversed { get; set; }
 
+    // Plays its chain once whatever the chain says (CreateFireAndForget), so a hot reload leaves its flags alone.
+    internal bool IsOneShot { get; set; }
+
     /// <summary>Multiplier applied to animation playback speed. Default is <c>1f</c> (normal speed).</summary>
     public float AnimationSpeed { get; set; } = 1f;
 
@@ -596,15 +599,19 @@ public class Sprite : IRenderable, IAttachable
     private bool RaiseEnteredFrameEvents(AnimationChain chain, int previousVisitIndex, int wraps)
     {
         if (FrameEventRaised == null) return true;
-        int visits = PlaybackTimeline.VisitCount(chain.Count, IsPingPong);
+        // As they are now: a handler that reloads the content changes them.
+        int count = chain.Count;
+        bool pingPong = IsPingPong, reversed = IsReversed;
+        int visits = PlaybackTimeline.VisitCount(count, pingPong);
         var (start, length) = FrameEventRange.Get(previousVisitIndex, _currentVisitIndex, wraps, visits);
         int playbackVersion = _playbackVersion;
         for (int j = 0; j < length; j++)
         {
             int visit = (start + j) % visits;
-            if (!PlaybackTimeline.EntersNewFrame(visit, chain.Count, IsPingPong, IsReversed)) continue;
-            if (!RaiseEvents(chain[PlaybackTimeline.FrameOfVisit(visit, chain.Count, IsPingPong, IsReversed)], playbackVersion))
-                return false;
+            if (!PlaybackTimeline.EntersNewFrame(visit, count, pingPong, reversed)) continue;
+            int frame = PlaybackTimeline.FrameOfVisit(visit, count, pingPong, reversed);
+            if (frame >= chain.Count) continue;
+            if (!RaiseEvents(chain[frame], playbackVersion)) return false;
         }
         return true;
     }

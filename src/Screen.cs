@@ -1352,6 +1352,7 @@ public class Screen : ILifecycleEvents
         // Force one-shot AFTER PlayAnimation, which seeds IsLooping from the chain's own
         // authored Loop value — setting it before would just get overwritten.
         sprite.IsLooping = false;
+        sprite.IsOneShot = true;
         sprite.AnimationFinished += () => entity.Destroy();
         return entity;
     }

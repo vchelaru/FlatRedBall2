@@ -102,4 +102,27 @@ public class HotReloadMergeTests
 
         finished.ShouldBe(1);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TryReloadFrom_InsideAFrameEventHandler_DoesNotThrow(bool pingPong)
+    {
+        var list = Load(Achx(Chain("Walk", "", "1", "1", "1")));
+        foreach (var frame in list[0]) frame.Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "step" });
+        var player = new AnimationPlayer<Frame>(list);
+        player.Play("Walk");
+        player.IsPingPong = pingPong;
+        int raised = 0;
+        player.FrameEventRaised += _ =>
+        {
+            raised++;
+            player.IsPingPong = false;
+            Reload(list, Achx(Chain("Walk", "", "1"))).ShouldBeTrue();
+        };
+
+        Should.NotThrow(() => player.Update(TimeSpan.FromSeconds(4.5)));
+
+        raised.ShouldBe(1);
+    }
 }

@@ -248,14 +248,18 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         int playbackVersion = _playbackVersion;
         if (FrameEventRaised != null)
         {
-            int visits = PlaybackTimeline.VisitCount(chain.Count, IsPingPong);
+            // As they are now: a handler that reloads the content changes them.
+            int count = chain.Count;
+            bool pingPong = IsPingPong, reversed = IsReversed;
+            int visits = PlaybackTimeline.VisitCount(count, pingPong);
             var (start, length) = FrameEventRange.Get(previousVisitIndex, _currentVisitIndex, wraps, visits);
             for (int j = 0; j < length; j++)
             {
                 int visit = (start + j) % visits;
-                if (!PlaybackTimeline.EntersNewFrame(visit, chain.Count, IsPingPong, IsReversed)) continue;
-                if (!RaiseEvents(chain[PlaybackTimeline.FrameOfVisit(visit, chain.Count, IsPingPong, IsReversed)], playbackVersion))
-                    break;
+                if (!PlaybackTimeline.EntersNewFrame(visit, count, pingPong, reversed)) continue;
+                int frame = PlaybackTimeline.FrameOfVisit(visit, count, pingPong, reversed);
+                if (frame >= chain.Count) continue;
+                if (!RaiseEvents(chain[frame], playbackVersion)) break;
             }
         }
         if (finished && playbackVersion == _playbackVersion)

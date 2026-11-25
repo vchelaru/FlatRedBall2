@@ -294,6 +294,68 @@ public class AnimationChainListReloadTests
     }
 
     [Fact]
+    public void TryReloadFrom_GameSetTheChainsFlag_ChainAndPlayingSpriteTakeTheFiles()
+    {
+        var (list, sprite, reload) = PlayingOnScreen(screenLoader: false);
+        list[0].Loop = false;
+        sprite.IsLooping = false;
+
+        reload(WalkFile(""));
+
+        (list[0].Loop, sprite.IsLooping).ShouldBe((true, true));
+    }
+
+    [Fact]
+    public void TryReloadFrom_LoopTurnedOn_FireAndForgetEffectStillPlaysOnce()
+    {
+        var engine = new FlatRedBallService();
+        string file = WalkFile("<Loop>false</Loop>");
+        engine.Content.StreamProvider = _ => new MemoryStream(Encoding.UTF8.GetBytes(file));
+        var list = engine.Content.LoadAnimationChainList("a.achx");
+        var screen = engine.CurrentScreen;
+        screen.Engine = engine;
+        var effect = screen.CreateFireAndForget(list, "Walk", x: 0, y: 0);
+
+        file = WalkFile("<Loop>true</Loop>");
+        list.TryReloadFrom("a.achx", engine.Content).ShouldBeTrue();
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(0.5), TimeSpan.Zero, TimeSpan.Zero));
+
+        screen.Entities.ShouldNotContain(effect);
+    }
+
+    [Theory]
+    [InlineData("<PingPong>true</PingPong>", "", 3)]
+    [InlineData("", "", 1)]
+    [InlineData("<Reverse>true</Reverse>", "", 1)]
+    public void TryReloadFrom_InsideAFrameEventHandler_DoesNotThrow(string flagsBefore, string flagsAfter, int framesAfter)
+    {
+        static string File(string flags, int frames)
+        {
+            const string frame = "<Frame><FrameLength>0.1</FrameLength><Events><Event><Name>step</Name></Event></Events></Frame>";
+            return $"<AnimationChainArraySave><AnimationChain><Name>Walk</Name>{flags}{string.Concat(System.Linq.Enumerable.Repeat(frame, frames))}</AnimationChain></AnimationChainArraySave>";
+        }
+        var engine = new FlatRedBallService();
+        string file = File(flagsBefore, 3);
+        engine.Content.StreamProvider = _ => new MemoryStream(Encoding.UTF8.GetBytes(file));
+        var list = engine.Content.LoadAnimationChainList("a.achx");
+        var sprite = new Sprite { AnimationChains = list };
+        engine.CurrentScreen.Add(sprite);
+        sprite.PlayAnimation("Walk");
+        int raised = 0;
+        sprite.FrameEventRaised += _ =>
+        {
+            raised++;
+            file = File(flagsAfter, framesAfter);
+            list.TryReloadFrom("a.achx", engine.Content).ShouldBeTrue();
+        };
+
+        Should.NotThrow(() => sprite.AnimateSelf(0.45));
+        Should.NotThrow(() => sprite.AnimateSelf(0.45));
+
+        raised.ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
     public void Loop_ChangedWithoutAReload_PlayingSpriteKeepsItsValue()
     {
         var (list, sprite, _) = PlayingOnScreen(screenLoader: false);

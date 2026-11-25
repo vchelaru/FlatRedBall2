@@ -63,8 +63,13 @@ public class AnimationChainList : List<AnimationChain>
     /// frames and Loop, PingPong and Reverse (instance identity preserved); otherwise the fresh chain is
     /// appended. Chains only in this list (removed from
     /// the file) are left alone — sprites still playing them keep rendering their old art until
-    /// the caller switches them. A Loop, PingPong or Reverse the file changed is also set on the
-    /// current screen's sprites playing that chain, replacing a value game code set.
+    /// the caller switches them.
+    /// <para>
+    /// Every chain in the file ends up as the file has it, also where game code set its Loop, PingPong
+    /// or Reversed. Where that changes one of them on the chain, the current screen's sprites playing
+    /// the chain take it too, replacing a value game code set; a one-shot effect
+    /// (<see cref="Screen.CreateFireAndForget(AnimationChainList, string, float, float)"/>) still plays once.
+    /// </para>
     /// <para>
     /// Returns <c>false</c> on I/O or parse failure (e.g. file mid-write) — XML or JSON, depending
     /// on <paramref name="path"/>'s extension. Callers should fall back to
@@ -86,11 +91,11 @@ public class AnimationChainList : List<AnimationChain>
         ChainReload.Apply<AnimationChain, AnimationFrame>(this, fresh);
         if (content.LiveRenderables is not { } renderables) return true;
 
-        // A sprite took these from the chain when it started playing. Only what the file changed is set again.
+        // A sprite took these from the chain when it started playing. Only what the reload changed is set again.
         foreach (var (chain, loop, pingPong, reversed) in before)
             foreach (var sprite in renderables().OfType<Sprite>())
             {
-                if (sprite.CurrentAnimation != chain) continue;
+                if (sprite.CurrentAnimation != chain || sprite.IsOneShot) continue;
                 if (chain.Loop != loop) sprite.IsLooping = chain.Loop;
                 if (chain.PingPong != pingPong) sprite.IsPingPong = chain.PingPong;
                 if (chain.Reversed != reversed) sprite.IsReversed = chain.Reversed;
