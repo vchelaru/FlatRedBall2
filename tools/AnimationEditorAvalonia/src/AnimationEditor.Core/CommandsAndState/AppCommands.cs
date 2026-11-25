@@ -2156,7 +2156,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
             var result    = BatchFrameBuilder.BuildBatch(
                 lastFrame, count, incrementUV, CurrentFrameLengthUnit,
-                lastFrame is null ? null : GetTextureSize(lastFrame.TextureName));
+                lastFrame is null ? null : GetTextureSize(lastFrame.TextureName), _pm.TsxTileGrid);
 
             var added = result.Frames.ToArray();
             if (added.Length > 0)
