@@ -26,6 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../Shared/UnlistableFolder.cs" Link="Shared/UnlistableFolder.cs" />
     <Compile Include="../Shared/DocumentMatrix.cs" Link="Shared/DocumentMatrix.cs" />
     <ProjectReference Include="..\..\src\AnimationEditor.App\AnimationEditor.App.csproj" />
   </ItemGroup>

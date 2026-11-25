@@ -1,5 +1,6 @@
 using AnimationEditor.Core.IO;
 using AnimationEditor.Editing;
+using AnimationEditor.Tests.Shared;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -126,5 +127,14 @@ public class AchxToAchjBatchTests : IDisposable
         var found = AchxToAchjBatch.FindSources(_root);
 
         found.ShouldBe(new[] { Path.Combine(_root, "b.achx"), Path.Combine(_root, "sub", "a.achx") });
+    }
+
+    [Fact]
+    public void FindSources_SubfolderWithoutReadAccess_FindsTheRest()
+    {
+        WriteAchx(Path.Combine(_root, "hero.achx"));
+        using var denied = new UnlistableFolder(Path.Combine(_root, "denied"));
+
+        AchxToAchjBatch.FindSources(_root).ShouldBe(new[] { Path.Combine(_root, "hero.achx") });
     }
 }

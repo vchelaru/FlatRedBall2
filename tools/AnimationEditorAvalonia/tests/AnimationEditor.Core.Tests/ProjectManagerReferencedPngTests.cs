@@ -1,5 +1,7 @@
 using AnimationEditor.Core;
+using AnimationEditor.Tests.Shared;
 using FlatRedBall2.AnimationEditorCommon;
+using Shouldly;
 using System.Reflection;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 using Xunit;
@@ -123,6 +125,22 @@ public class ProjectManagerReferencedPngTests
         Assert.Contains(new FilePath(Path.Combine(contentDir, "A.png")).Standardized, fullPaths);
         Assert.Contains(new FilePath(Path.Combine(contentDir, "B.PNG")).Standardized, fullPaths);
         Assert.Contains(new FilePath(Path.Combine(contentDir, "Sprites", "C.png")).Standardized, fullPaths);
+    }
+
+    [Fact]
+    public void TryLoadProjectFile_WhenXmlIsInvalid_SubfolderWithoutReadAccess_FindsTheOtherPngs()
+    {
+        using var temp = new TempDir();
+        string projectFile = Path.Combine(temp.Path, "Game.gluj");
+        string contentDir = Path.Combine(temp.Path, "Content");
+        File.WriteAllText(projectFile, "<Project><Screens>");
+        using var denied = new UnlistableFolder(Path.Combine(contentDir, "denied"));
+        File.WriteAllText(Path.Combine(contentDir, "A.png"), "");
+
+        var sut = new ProjectManager();
+        InvokeTryLoadProjectFile(sut, new FilePath(projectFile));
+
+        sut.ReferencedPngs.ShouldBe(new[] { new FilePath(Path.Combine(contentDir, "A.png")) });
     }
 
     [Fact]
