@@ -130,9 +130,8 @@ public class CommandDescriptionTests
         var ctx = TestHelpers.SetupFreshAcls();
         var walk = TestHelpers.MakeChain(ctx.Acls, "Walk");
         TestHelpers.MakeChain(ctx.Acls, "Run");
-        var pasted = new AnimationChainSave { Name = "Walk" };
 
-        ctx.AppCommands.PasteChainsCut(new[] { pasted }, new[] { walk });
+        ctx.AppCommands.PasteChainsCut(new[] { walk }, insertIndex: 2);
 
         Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }
@@ -144,9 +143,8 @@ public class CommandDescriptionTests
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var f0 = chain.Frames[0];
-        var pasted = TestHelpers.MakeFrame();
 
-        ctx.AppCommands.PasteFramesCut(chain, new[] { pasted }, insertIndex: 2, sourcesToRemove: new[] { f0 });
+        ctx.AppCommands.PasteFramesCut(chain, new[] { f0 }, insertIndex: 2);
 
         Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }
@@ -156,13 +154,12 @@ public class CommandDescriptionTests
     {
         var expected = "Cut Rect 'Hitbox'";
         var ctx = TestHelpers.SetupFreshAcls();
-        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
         frame.ShapesSave!.Add(rect);
-        var pasted = new AARectSave { Name = "Hitbox" };
 
-        ctx.AppCommands.PasteShapesCut(frame, new object[] { pasted }, new[] { rect }, frame);
+        ctx.AppCommands.PasteShapesCut(chain.Frames[1], new object[] { rect });
 
         Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }

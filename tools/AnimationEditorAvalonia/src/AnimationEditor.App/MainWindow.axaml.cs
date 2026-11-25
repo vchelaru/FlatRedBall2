@@ -2116,7 +2116,7 @@ public partial class MainWindow : Window
         // Sync the texture combo to the texture of the currently selected frame/chain
         Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTextureCombo", SyncTextureCombo));
         // Sync tree selection
-        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTreeSelection", SyncTreeSelection));
+        Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("SyncTreeSelection", () => SyncTreeSelection()));
         // Refresh property inspector
         Dispatcher.UIThread.InvokeAsync(() => TimeSelectionPerf("RefreshPropertyPanel", RefreshPropertyPanel));
         // Refresh timeline strip
@@ -4901,8 +4901,10 @@ public partial class MainWindow : Window
         // The tree can still hold rows for items a command just deleted (the TreeView drops them
         // from its selection lazily). Syncing those back would resurrect deleted shapes, frames
         // or animations in the selection (#1824), so only rows still in the model are synced.
+        // Nor the old row of an item that moved to another one.
         var liveData = AnimTree.SelectedItems
             .OfType<TreeNodeVm>()
+            .Where(IsInTree)
             .Select(n => n.Data)
             .OfType<object>()
             .Where(IsStillInModel)
@@ -5138,18 +5140,27 @@ public partial class MainWindow : Window
 
         var rebuiltFrameNode = TreeBuilder.BuildFrameNode(frame, CurrentFrameLengthUnit, frameIndex);
 
-        if (frameNode is null)
+        // As in RefreshChainNode: a selected shape row that goes away is not a click, and the model's selection stays.
+        bool prior = _suppressTreeSelectionHandling;
+        _suppressTreeSelectionHandling = true;
+        try
         {
-            chainNode.Children.Add(rebuiltFrameNode);
+            if (frameNode is null)
+            {
+                chainNode.Children.Add(rebuiltFrameNode);
+            }
+            else
+            {
+                frameNode.Header     = rebuiltFrameNode.Header;
+                frameNode.Kind       = rebuiltFrameNode.Kind;
+                frameNode.IsFrameNode = rebuiltFrameNode.IsFrameNode;
+                frameNode.Meta       = rebuiltFrameNode.Meta;
+                TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
+            }
+            // A row the user collapsed over the selection stays collapsed.
+            SyncTreeSelection(expandAncestors: false);
         }
-        else
-        {
-            frameNode.Header     = rebuiltFrameNode.Header;
-            frameNode.Kind       = rebuiltFrameNode.Kind;
-            frameNode.IsFrameNode = rebuiltFrameNode.IsFrameNode;
-            frameNode.Meta       = rebuiltFrameNode.Meta;
-            TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
-        }
+        finally { _suppressTreeSelectionHandling = prior; }
         // The chain node's Meta carries the total play time (#623), which a frame-length edit
         // changes — keep it in sync whenever a frame under it is refreshed.
         chainNode.Meta = TreeBuilder.BuildChainMeta(chain, CurrentFrameLengthUnit);
@@ -5245,11 +5256,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SyncTreeSelection()
+    private void SyncTreeSelection(bool expandAncestors = true)
     {
         if (_selectedState.SelectedNodes.Count > 1)
         {
-            SyncTreeMultiSelection(_selectedState.SelectedNodes);
+            SyncTreeMultiSelection(_selectedState.SelectedNodes, expandAncestors);
             return;
         }
 
@@ -5264,7 +5275,7 @@ public partial class MainWindow : Window
         // Expand the selected node's ancestors so its row is visible even if its chain (or, for a
         // shape, its frame) was collapsed — e.g. a frame selected by scrubbing the timeline.
         // Avalonia does not auto-expand parents.
-        if (sel is not null)
+        if (sel is not null && expandAncestors)
             TreeBuilder.ExpandAncestorsOf(_treeRoots, sel);
 
         // Exact-match check (not just Contains): a stale multi-selection can already contain
@@ -8174,8 +8185,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentFrameLengthUnit, CurrentAchxFolder));
-        _pendingCutState.Set(payload, _projectManager.AnimationChainListSave!);
+        var text = ClipboardPayload.SerializeFromPayload(payload, CurrentFrameLengthUnit, CurrentAchxFolder);
+        await clipboard.SetTextAsync(text);
+        _pendingCutState.Set(payload, _projectManager.AnimationChainListSave!, text);
         SyncPendingCutHighlights();
     }
 
@@ -8188,9 +8200,12 @@ public partial class MainWindow : Window
         var text = await clipboard.TryGetTextAsync();
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit, _projectManager.GetTextureSizeInPixels,
-            out var chains, out var frames, out var shapes);
-        if (!ok) return;
+        // Something else was copied since the cut, in another window or program: this paste is a plain copy of that.
+        if (!_pendingCutState.IsOnClipboard(text))
+        {
+            _pendingCutState.Clear();
+            SyncPendingCutHighlights();
+        }
 
         var acls = _projectManager.AnimationChainListSave;
         if (acls is null) return;
@@ -8204,24 +8219,29 @@ public partial class MainWindow : Window
             _pendingCutState.Clear();
             SyncPendingCutHighlights();
         }
+        // The cut items may have been edited since: they move as they are now, not as the clipboard has them.
+        if (completingCutAcrossDocuments && CutSourceTab() is { } sourceTab)
+            text = ClipboardPayload.SerializeFromPayload(_pendingCutState.Payload!, FrameLengthUnit.Of(_pendingCutState.SourceDocument),
+                IsUntitledTab(sourceTab) ? null : sourceTab.Path.GetDirectoryContainingThis().FullPath);
+
+        bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit, _projectManager.GetTextureSizeInPixels,
+            out var chains, out var frames, out var shapes);
+        if (!ok) return;
 
         if (chains is { Count: > 0 })
         {
-            if (completingCut && _pendingCutState.Kind != CopySelectionKind.Chain) return;
-            QueuePastedChainExpandFromSources(chains, chains);
-            if (completingCutAcrossDocuments)
-            {
-                _appCommands.PasteChains(chains);
-                RemoveCutSourcesAndSaveTheirDocument(chains);
-            }
-            else if (completingCut)
-                _appCommands.PasteChainsCut(chains, _pendingCutState.Chains);
+            if (cutCompletion == CutCompletion.SameDocument)
+                _appCommands.PasteChainsCut(_pendingCutState.Chains);
             else
+            {
+                QueuePastedChainExpandFromSources(chains, chains);
                 _appCommands.PasteChains(chains);
+                if (completingCutAcrossDocuments)
+                    RemoveCutSourcesAndSaveTheirDocument(chains);
+            }
         }
         else if (frames is { Count: > 0 })
         {
-            if (completingCut && _pendingCutState.Kind != CopySelectionKind.Frame) return;
             var (targetChain, insertIndex) = PastePlacementLogic.ResolveFramePasteTarget(
                 acls, selectedData, _objectFinder, _selectedState);
             if (targetChain is null) return;
@@ -8232,7 +8252,7 @@ public partial class MainWindow : Window
                 RemoveCutSourcesAndSaveTheirDocument([targetChain]);
             }
             else if (completingCut)
-                _appCommands.PasteFramesCut(targetChain, frames, insertIndex, _pendingCutState.Frames);
+                _appCommands.PasteFramesCut(targetChain, _pendingCutState.Frames, insertIndex);
             else
                 _appCommands.PasteFrames(targetChain, frames, insertIndex);
             RefreshChainNode(targetChain);
@@ -8241,7 +8261,6 @@ public partial class MainWindow : Window
         }
         else if (shapes is { Count: > 0 })
         {
-            if (completingCut && _pendingCutState.Kind != CopySelectionKind.Shape) return;
             if (_projectManager.IsNativeTsxProject)
             {
                 ShowProblem($"⚠ {TsxEdit.ShapesRefusal}");
@@ -8263,11 +8282,7 @@ public partial class MainWindow : Window
             }
             else if (completingCut)
             {
-                var sourceFrame = _pendingCutState.Shapes[0] is ShapeSave source
-                    ? _objectFinder.GetAnimationFrameContaining(source)
-                    : null;
-                if (sourceFrame is null) return;
-                _appCommands.PasteShapesCut(frame, shapes, _pendingCutState.Shapes, sourceFrame);
+                _appCommands.PasteShapesCut(frame, _pendingCutState.Shapes);
             }
             else
             {
@@ -8296,7 +8311,7 @@ public partial class MainWindow : Window
     {
         if (!_appCommands.LastSaveStored(pastedInto)) return;
         var source = _pendingCutState.SourceDocument;
-        var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
+        var sourceTab = CutSourceTab();
         if (source is null || sourceTab is null) return;
         var namesBefore = source.AnimationChains.Select(chain => chain.Name).ToList();
         if (!_appCommands.CutFromBackgroundTab(sourceTab, _pendingCutState)) return; // all of them in locked chains
@@ -8306,6 +8321,11 @@ public partial class MainWindow : Window
         WarnAboutBrokenSequences(sourceTab.Path.FullPath, new RemovedChainNames(source, "Cutting",
             namesBefore.Except(source.AnimationChains.Select(chain => chain.Name)).ToList()));
     }
+
+    /// <summary>The background tab the pending cut was made in, or null when it was closed since.</summary>
+    private TabEntry? CutSourceTab() => _pendingCutState.SourceDocument is { } source
+        ? _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source))
+        : null;
 
     private void SyncPendingCutHighlights()
     {
@@ -8321,13 +8341,16 @@ public partial class MainWindow : Window
         PreviewCtrl.InvalidateVisual();
     }
 
+    private bool IsInTree(TreeNodeVm row) =>
+        row.Data is { } data && ReferenceEquals(TreeBuilder.FindNodeForData(_treeRoots, data), row);
+
     private bool TreeMultiSelectionAlreadySynced(IReadOnlyList<object> dataObjects)
     {
         if (AnimTree.SelectedItems is null) return dataObjects.Count == 0;
         var selected = AnimTree.SelectedItems.OfType<TreeNodeVm>().ToList();
         if (selected.Count != dataObjects.Count) return false;
         var dataSet = new HashSet<object>(dataObjects);
-        return selected.All(n => n.Data is not null && dataSet.Contains(n.Data));
+        return selected.All(n => n.Data is not null && dataSet.Contains(n.Data) && IsInTree(n));
     }
 
     /// <summary>
@@ -8335,7 +8358,7 @@ public partial class MainWindow : Window
     /// <see cref="ISelectedState.SelectedNodes"/> or call <see cref="TreeBuilder.RouteNodeSelection"/> —
     /// that is <see cref="OnTreeSelectionChanged"/>'s job and causes a SelectionChanged loop.
     /// </summary>
-    private void SyncTreeMultiSelection(IReadOnlyList<object> dataObjects)
+    private void SyncTreeMultiSelection(IReadOnlyList<object> dataObjects, bool expandAncestors)
     {
         if (TreeMultiSelectionAlreadySynced(dataObjects))
             return;
@@ -8344,7 +8367,7 @@ public partial class MainWindow : Window
         bool chainsOnly = dataObjects.All(d => d is AnimationChainSave);
         foreach (var data in dataObjects)
         {
-            if (!chainsOnly)
+            if (expandAncestors && !chainsOnly)
                 TreeBuilder.ExpandAncestorsOf(_treeRoots, data);
             var node = TreeBuilder.FindNodeForData(_treeRoots, data);
             if (node is not null)

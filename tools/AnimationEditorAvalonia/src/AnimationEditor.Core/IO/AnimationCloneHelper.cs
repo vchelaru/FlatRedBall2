@@ -51,6 +51,7 @@ public static class AnimationCloneHelper
 
     public static AnimationChainSave CloneChain(AnimationChainSave source)
     {
+        // The lock goes along to a duplicate or a paste on purpose for now; this may be revisited.
         var copy = new AnimationChainSave
         {
             Name = source.Name, Loop = source.Loop, PingPong = source.PingPong, Reverse = source.Reverse, IsLocked = source.IsLocked,

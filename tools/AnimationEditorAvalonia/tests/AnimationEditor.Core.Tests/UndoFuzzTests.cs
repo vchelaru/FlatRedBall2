@@ -341,7 +341,7 @@ public class UndoFuzzTests
                     ("SetChainsPingPong " + Names(chains), () => c.SetChainsPingPong(chains, Flag)),
                     ("SetChainsReverse " + Names(chains), () => c.SetChainsReverse(chains, Flag)),
                     ("PasteChains " + Names(chains), () => c.PasteChains(Clones(chains), Flag ? _random.Next(Acls.AnimationChains.Count + 1) : null)),
-                    ("PasteChainsCut " + Names(chains), () => c.PasteChainsCut(Clones(chains), chains)),
+                    ("PasteChainsCut " + Names(chains), () => c.PasteChainsCut(chains)),
                 });
                 if (tsx)
                     edits.Add(("SetChainTsxOwnerTileId " + chain.Name, () => c.SetChainTsxOwnerTileId(chain, (uint)_random.Next(16))));
@@ -374,7 +374,7 @@ public class UndoFuzzTests
                     ("AddCircle", () => c.AddCircle(frame)),
                     ("AddPolygon", () => c.AddPolygon(frame)),
                     ("PasteFrames", () => c.PasteFrames(chain, frames, Flag ? _random.Next(3) : null)),
-                    ("PasteFramesCut " + Where(frames) + " to " + chain.Name, () => c.PasteFramesCut(chain, frames, Flag ? _random.Next(3) : null, frames)),
+                    ("PasteFramesCut " + Where(frames) + " to " + chain.Name, () => c.PasteFramesCut(chain, frames, Flag ? _random.Next(3) : null)),
                     ("PasteShapes", () => c.PasteShapes(frames, shapes.Count > 0 ? shapes.Cast<object>().ToList() : [new AARectSave { Name = "R", ScaleX = 1, ScaleY = 1 }])),
                 });
             if (shape is not null)
@@ -386,7 +386,7 @@ public class UndoFuzzTests
                     ("MoveShape", () => c.MoveShape(shape, shapeFrame!, delta)),
                     ("MoveShapeToTop", () => c.MoveShapeToTop(shape, shapeFrame!)),
                     ("MoveShapeToIndex", () => c.MoveShapeToIndex(shape, shapeFrame!, _random.Next(3))),
-                    ("PasteShapesCut", () => c.PasteShapesCut(frame!, [shape], [shape], shapeFrame!)),
+                    ("PasteShapesCut", () => c.PasteShapesCut(frame!, [shape])),
                     ("SetShapePropsBulk", () => c.SetShapePropsBulk(shapes, Flag ? name : null, Flag ? Num : null, Flag ? Num : null)),
                     ("SetShapeKeyframe", () => c.SetShapeKeyframe(shapes, Pick(Enum.GetValues<ShapeKeyframeGroup>()), Flag)),
                     ("SetShapeKeyframeCurve", () => c.SetShapeKeyframeCurve(shapes, Pick(Enum.GetValues<ShapeKeyframeGroup>()), Pick(Enum.GetValues<KeyframeCurveChoice>()))),

@@ -1349,8 +1349,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.MoveChainsToIndex"/>
         public void MoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex)
         {
+            if (BuildMoveChainsToIndex(chains, insertIndex, "Move") is { } command)
+                _undoManager.Execute(command);
+        }
+
+        private IUndoableCommand? BuildMoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex, string verb)
+        {
             var list = _pm.AnimationChainListSave?.AnimationChains;
-            if (list is null || chains.Count == 0) return;
+            if (list is null || chains.Count == 0) return null;
 
             var indices = chains
                 .Select(c => list.IndexOf(c))
@@ -1358,7 +1364,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 .Distinct()
                 .OrderBy(i => i)
                 .ToList();
-            if (indices.Count == 0) return;
+            if (indices.Count == 0) return null;
 
             var moved = indices.Select(i => list[i]).ToArray();
 
@@ -1367,7 +1373,7 @@ namespace AnimationEditor.Core.CommandsAndState
             // (mirrors MoveFramesCommand).
             int insertAt = insertIndex - indices.Count(i => i < insertIndex);
 
-            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+            return new ReorderCommand<AnimationChainSave>(
                 list,
                 () =>
                 {
@@ -1379,8 +1385,8 @@ namespace AnimationEditor.Core.CommandsAndState
                 },
                 this, _events, RefreshTreeView,
                 moved.Length == 1
-                    ? $"Move Animation '{moved[0].Name}'"
-                    : $"Move {moved.Length} Animations"));
+                    ? $"{verb} Animation '{moved[0].Name}'"
+                    : $"{verb} {moved.Length} Animations");
         }
 
         public void MoveChainToTop(AnimationChainSave chain)
@@ -2800,88 +2806,54 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.PasteChainsCut"/>
-        public void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains,
-            IReadOnlyList<AnimationChainSave> sourcesToRemove)
+        public void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains, int? insertIndex = null)
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null || chains.Count == 0) return;
 
-            var cmds = new List<IUndoableCommand>
-            {
-                new PasteChainsCommand(acls, chains, this, _events, _selectedState),
-                new DeleteChainsCommand(sourcesToRemove, acls, this, _events, _selectedState),
-            };
-            string desc = chains.Count == 1
-                ? $"Cut Animation '{(sourcesToRemove.Count > 0 ? sourcesToRemove[0].Name : chains[0].Name)}'"
-                : $"Cut {chains.Count} Animations";
-            ExecuteRemovingChainNames("Cutting", acls, new CompositeCommand(cmds, desc));
+            var anchors = _selectedState.SelectedChains is { Count: > 0 } selected ? selected : chains;
+            int index = insertIndex ?? ChainPasteLogic.ResolveBlockInsertIndexAfterAnchors(acls, anchors);
+            if (BuildMoveChainsToIndex(chains, index, "Cut") is { } move)
+                _undoManager.Execute(new SelectMovedChainsCommand(move, chains, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteFramesCut"/>
         public void PasteFramesCut(AnimationChainSave targetChain,
-            IReadOnlyList<AnimationFrameSave> frames, int? insertIndex,
-            IReadOnlyList<AnimationFrameSave> sourcesToRemove)
+            IReadOnlyList<AnimationFrameSave> frames, int? insertIndex)
         {
-            if (frames.Count == 0 || IsChainLocked(targetChain)) return;
-            var clones = frames.Select(AnimationCloneHelper.CloneFrame).ToArray();
-            var cmds = new List<IUndoableCommand>
-            {
-                new AddFramesCommand(clones, targetChain, this, _events, _selectedState, insertIndex),
-            };
-            // A locked source chain keeps its originals: the paste still happens, but the "cut"
-            // half is skipped only for the locked source chain's frames (bulk skip-locked-entries).
-            foreach (var group in sourcesToRemove
-                         .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
-                         .Where(x => x.Chain is not null && !IsChainLocked(x.Chain))
-                         .GroupBy(x => x.Chain!))
-            {
-                cmds.Add(new DeleteFramesCommand(
-                    group.Select(x => x.Frame).ToList(), group.Key, this, _events, _selectedState));
-            }
-            string desc;
-            if (frames.Count == 1)
-            {
-                var sourceChain = sourcesToRemove.Count > 0
-                    ? _objectFinder.GetAnimationChainContaining(sourcesToRemove[0])
-                    : null;
-                desc = $"Cut Frame in '{(sourceChain ?? targetChain).Name}'";
-            }
-            else
-            {
-                desc = $"Cut {frames.Count} Frames";
-            }
-            _undoManager.Execute(new CompositeCommand(cmds, desc));
+            var sources = frames
+                .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
+                .Where(x => x.Chain is not null)
+                .ToList();
+            if (sources.Count == 0 || IsChainLocked(targetChain)) return;
+
+            // A locked chain keeps its frames, so the paste gets copies of them.
+            var block = sources
+                .Select(x => IsChainLocked(x.Chain!) ? AnimationCloneHelper.CloneFrame(x.Frame) : x.Frame)
+                .ToArray();
+            var sourceChains = sources.Select(x => x.Chain!).Where(c => !IsChainLocked(c)).ToList();
+            string description = sources.Count == 1
+                ? $"Cut Frame in '{sources[0].Chain!.Name}'"
+                : $"Cut {sources.Count} Frames";
+            _undoManager.Execute(new MoveFramesCommand(
+                block, sourceChains, targetChain, insertIndex ?? targetChain.Frames.Count, description, this, _events, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteShapesCut"/>
-        public void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes,
-            IReadOnlyList<object> sourcesToRemove, AnimationFrameSave sourceFrame)
+        public void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes)
         {
-            if (IsAchxOnlyEditBlocked()) return;
-            var clones = BuildShapeClones(targetFrame, shapes);
-            if (clones.Count == 0) return;
+            var sources = shapes.OfType<ShapeSave>()
+                .Select(s => (Shape: s, Frame: _objectFinder.GetAnimationFrameContaining(s)))
+                .Where(x => x.Frame is not null)
+                .ToList();
+            if (sources.Count == 0 || IsFrameLocked(targetFrame) || IsAchxOnlyEditBlocked()) return;
 
-            // A locked source keeps its originals: the paste still happens, but the "cut"
-            // half (removing the source) is skipped, same as any other bulk operation
-            // skipping only its locked entries.
-            bool sourceLocked = IsFrameLocked(sourceFrame);
-            var deleteCmds = new List<IUndoableCommand>();
-            if (!sourceLocked)
-            {
-                foreach (var shape in sourcesToRemove.OfType<ShapeSave>())
-                    deleteCmds.Add(new DeleteShapeCommand(shape, sourceFrame, this, _events, _selectedState));
-                if (deleteCmds.Count == 0) return;
-            }
-
-            var cmds = new List<IUndoableCommand>
-            {
-                new PasteShapesCommand(targetFrame, clones, this, _events, _selectedState),
-            };
-            cmds.AddRange(deleteCmds);
-            string desc = clones.Count == 1
-                ? $"Cut {ShapeUndoLabel.Format(sourcesToRemove.Count > 0 ? sourcesToRemove[0] : clones[0])}"
-                : $"Cut {clones.Count} Shapes";
-            _undoManager.Execute(new CompositeCommand(cmds, desc));
+            // A locked chain keeps its shapes, so the paste gets copies of them.
+            var block = sources
+                .Select(x => IsFrameLocked(x.Frame!) ? x.Shape.Clone() : x.Shape)
+                .ToArray();
+            _undoManager.Execute(new MoveShapesToFrameCommand(
+                block, sources.Select(x => x.Frame!).Where(f => !IsFrameLocked(f)), targetFrame, this, _events, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.CutFromBackgroundTab"/>
