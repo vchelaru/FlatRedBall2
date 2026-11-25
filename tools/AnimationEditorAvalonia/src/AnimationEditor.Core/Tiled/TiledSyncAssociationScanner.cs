@@ -43,7 +43,9 @@ public static class TiledSyncAssociationScanner
             return Array.Empty<string>();
 
         var owners = new List<string>();
-        foreach (var syncFile in Directory.EnumerateFiles(tsxDir.FullPath, "*.tiledsync", SearchOption.AllDirectories))
+        // A folder that cannot be read is skipped, as a file that cannot be is.
+        var everyReadableFolder = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0 };
+        foreach (var syncFile in Directory.EnumerateFiles(tsxDir.FullPath, "*.tiledsync", everyReadableFolder))
         {
             AETiledSyncSave? settings;
             try
