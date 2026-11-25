@@ -147,6 +147,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     private bool _draggingHGuide;                  // true = horizontal guide
     private bool  _guideDragIsNew;                 // the dragged guide was created by this press
     private float _guideDragStart;                 // its world coordinate when the drag began
+    private Point _guideDragAnchor;
 
     // -- Shape drag -----------------------------------------------------------
     private object?    _draggingShape;   // AARectSave or CircleSave
@@ -173,6 +174,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     private List<Vector2Save>? _vertexDragPointsBefore;
     private PolygonVertexEdit  _vertexDragEdit;
     private float              _vertexDragStartX, _vertexDragStartY;
+    private Point              _vertexDragAnchor;
     private const float        VertexHandleRadius = 5f;
     private int                _hoverVertexIndex = -1;
     private int                _inspectorVertexIndex = -1;
@@ -1347,20 +1349,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (shape is null || IsShapeLocked(shape)) return;
         _draggingShape = shape;
 
-        if (_draggingShape is AARectSave r)
-        {
-            _shapeDragStartX = r.X;
-            _shapeDragStartY = r.Y;
-            r.X = SnapToPixel(r.X + worldDx);
-            r.Y = SnapToPixel(r.Y + worldDy);
-        }
-        else if (_draggingShape is CircleSave c)
-        {
-            _shapeDragStartX = c.X;
-            _shapeDragStartY = c.Y;
-            c.X = SnapToPixel(c.X + worldDx);
-            c.Y = SnapToPixel(c.Y + worldDy);
-        }
+        (_shapeDragStartX, _shapeDragStartY) = (((ShapeSave)shape).X, ((ShapeSave)shape).Y);
+        ApplyShapeDrag(worldDx, worldDy);
         CommitShapeDrag();
     }
 
@@ -1443,8 +1433,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _draggingFrame   = frame;
         _frameDragStartX = frame.RelativeX;
         _frameDragStartY = frame.RelativeY;
-        frame.RelativeX  = SnapToPixel(frame.RelativeX + worldDx);
-        frame.RelativeY  = SnapToPixel(frame.RelativeY + worldDy);
+        ApplyFrameDrag(worldDx, worldDy);
         CommitFrameDrag();
     }
 
@@ -1479,18 +1468,37 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _chainShapeStartY    = scope.Shapes.Select(s => s.Shape.Y).ToArray();
     }
 
+    private void ApplyFrameDrag(float dx, float dy)
+    {
+        _draggingFrame!.RelativeX = DragTo(_frameDragStartX, dx);
+        _draggingFrame.RelativeY = DragTo(_frameDragStartY, dy);
+    }
+
+    /// <summary>Places the dragged shape, and the selected shapes that move with it, at its start offset plus the world-space delta.</summary>
+    private void ApplyShapeDrag(float dx, float dy)
+    {
+        var dragged = (ShapeSave)_draggingShape!;
+        dragged.X = DragTo(_shapeDragStartX, dx);
+        dragged.Y = DragTo(_shapeDragStartY, dy);
+        foreach (var (shape, startX, startY) in _shapeDragCompanions ?? [])
+        {
+            shape.X = DragTo(startX, dx);
+            shape.Y = DragTo(startY, dy);
+        }
+    }
+
     /// <summary>Places every dragged frame and shape at its start offset plus the world-space delta.</summary>
     private void ApplyChainDrag(float dx, float dy)
     {
         for (int i = 0; i < _draggingChainFrames!.Length; i++)
         {
-            _draggingChainFrames[i].RelativeX = SnapToPixel(_chainFrameStartX![i] + dx);
-            _draggingChainFrames[i].RelativeY = SnapToPixel(_chainFrameStartY![i] + dy);
+            _draggingChainFrames[i].RelativeX = DragTo(_chainFrameStartX![i], dx);
+            _draggingChainFrames[i].RelativeY = DragTo(_chainFrameStartY![i], dy);
         }
         for (int i = 0; i < _chainShapes!.Length; i++)
         {
-            _chainShapes[i].Shape.X = SnapToPixel(_chainShapeStartX![i] + dx);
-            _chainShapes[i].Shape.Y = SnapToPixel(_chainShapeStartY![i] + dy);
+            _chainShapes[i].Shape.X = DragTo(_chainShapeStartX![i], dx);
+            _chainShapes[i].Shape.Y = DragTo(_chainShapeStartY![i], dy);
         }
     }
 
@@ -1763,6 +1771,12 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
 
     // Guides snap to the nearest integer (pixel boundary) in world space.
     private static float SnapToPixel(float world) => MathF.Round(world, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// Where a drag puts a coordinate: on a whole pixel, or exactly where it was when the drag does not move it
+    /// along this axis (a Shift lock, a drag moved back to its start, or a cancelled one).
+    /// </summary>
+    private static float DragTo(float start, float delta) => delta == 0f ? start : SnapToPixel(start + delta);
 
     // -- Test helpers (internal) ----------------------------------------------
 
@@ -2330,8 +2344,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     private object? _pendingCycleShape;
 
     /// <summary>
-    /// Finalises an in-progress shape drag: records an undo command (unless the delta is
-    /// negligible), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
+    /// Finalises an in-progress shape drag: records an undo command (unless nothing
+    /// moved), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
     /// saves, and re-assigns the selection so the property panel refreshes.
     /// </summary>
     private void CommitShapeDrag()
@@ -2346,8 +2360,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         var dragged = (ShapeSave)_draggingShape;
         float newX = dragged.X, newY = dragged.Y;
 
-        const float eps = 1e-4f;
-        if (MathF.Abs(newX - _shapeDragStartX) > eps || MathF.Abs(newY - _shapeDragStartY) > eps)
+        if (!newX.Equals(_shapeDragStartX) || !newY.Equals(_shapeDragStartY))
         {
             var frame = FindOwningFrame(_draggingShape);
             // Defense-in-depth: OnPointerPressed/Simulate* already refuse to start a drag on a
@@ -2386,12 +2399,11 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// <summary>Records one undo step for every shape a multi-shape drag moved; the selection is left as is.</summary>
     private void CommitMultiShapeDrag()
     {
-        const float eps = 1e-4f;
         var pressed = (ShapeSave)_draggingShape!;
         var snapshots = new List<MoveShapesCommand.ShapeSnapshot>();
         foreach (var (shape, startX, startY) in _shapeDragCompanions!.Prepend((pressed, _shapeDragStartX, _shapeDragStartY)))
         {
-            if (MathF.Abs(shape.X - startX) <= eps && MathF.Abs(shape.Y - startY) <= eps) continue;
+            if (shape.X.Equals(startX) && shape.Y.Equals(startY)) continue;
             // Defense-in-depth: see the comment in CommitShapeDrag.
             if (FindOwningFrame(shape) is not { } frame || IsFrameLocked(frame)) continue;
             snapshots.Add(new MoveShapesCommand.ShapeSnapshot(frame, shape, startX, startY, shape.X, shape.Y));
@@ -2461,6 +2473,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _vertexDragPointsBefore = before;
         _vertexDragEdit         = edit;
         (_vertexDragStartX, _vertexDragStartY) = PolygonVertices.Get(polygon, vertex);
+        _vertexDragAnchor       = new Point(px, py);
         InvalidateVisual();
         return true;
     }
@@ -2496,8 +2509,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     }
 
     /// <summary>
-    /// Finalises an in-progress frame-offset drag: records an undo command (unless the delta is
-    /// negligible), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>, and saves.
+    /// Finalises an in-progress frame-offset drag: records an undo command (unless nothing
+    /// moved), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>, and saves.
     /// </summary>
     private void CommitFrameDrag()
     {
@@ -2506,9 +2519,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         float newX = _draggingFrame.RelativeX;
         float newY = _draggingFrame.RelativeY;
 
-        const float eps = 1e-4f;
         // Defense-in-depth: see the comment in CommitShapeDrag.
-        if ((MathF.Abs(newX - _frameDragStartX) > eps || MathF.Abs(newY - _frameDragStartY) > eps)
+        if ((!newX.Equals(_frameDragStartX) || !newY.Equals(_frameDragStartY))
             && !IsFrameLocked(_draggingFrame))
         {
             _undoManager!.Record(new MoveFrameOffsetCommand(
@@ -2524,14 +2536,13 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// <summary>
     /// Finalises an in-progress whole-animation drag: records a single
     /// <see cref="MoveFrameOffsetBulkCommand"/> covering every frame that actually moved (unless
-    /// the net delta is negligible), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
+    /// none did), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
     /// and saves. Mirrors <see cref="CommitFrameDrag"/> for the single-frame case.
     /// </summary>
     private void CommitChainDrag()
     {
         if (_draggingChainFrames is null) return;
 
-        const float eps = 1e-4f;
         var snapshots = new List<MoveFrameOffsetBulkCommand.FrameSnapshot>();
         for (int i = 0; i < _draggingChainFrames.Length; i++)
         {
@@ -2540,7 +2551,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             if (IsFrameLocked(frame)) continue;
             float newX = frame.RelativeX;
             float newY = frame.RelativeY;
-            if (MathF.Abs(newX - _chainFrameStartX![i]) > eps || MathF.Abs(newY - _chainFrameStartY![i]) > eps)
+            if (!newX.Equals(_chainFrameStartX![i]) || !newY.Equals(_chainFrameStartY![i]))
                 snapshots.Add(new MoveFrameOffsetBulkCommand.FrameSnapshot(
                     frame, _chainFrameStartX[i], _chainFrameStartY![i], newX, newY));
         }
@@ -2549,7 +2560,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         for (int i = 0; i < _chainShapes!.Length; i++)
         {
             var (shape, owner) = _chainShapes[i];
-            if (MathF.Abs(shape.X - _chainShapeStartX![i]) <= eps && MathF.Abs(shape.Y - _chainShapeStartY![i]) <= eps) continue;
+            if (shape.X.Equals(_chainShapeStartX![i]) && shape.Y.Equals(_chainShapeStartY![i])) continue;
             shapeSnapshots.Add(new MoveShapesCommand.ShapeSnapshot(
                 owner, shape, _chainShapeStartX![i], _chainShapeStartY![i], shape.X, shape.Y));
         }
@@ -2642,66 +2653,34 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                 HandleKind.BotLeft    => (-worldDX - worldDY) / 2f,
                 _ => 0f,
             };
-            circle.Radius = MathF.Max(1f, SnapToPixel(_shapeDragStartScaleX + delta));
+            circle.Radius = delta == 0f ? _shapeDragStartScaleX : MathF.Max(1f, SnapToPixel(_shapeDragStartScaleX + delta));
         }
         else if (_draggingShape is AARectSave r)
         {
-            float startLeft   = _shapeDragStartX - _shapeDragStartScaleX;
-            float startRight  = _shapeDragStartX + _shapeDragStartScaleX;
-            float startTop    = _shapeDragStartY + _shapeDragStartScaleY; // world Y up
-            float startBottom = _shapeDragStartY - _shapeDragStartScaleY;
-
-            float newLeft   = startLeft,  newRight  = startRight;
-            float newTop    = startTop,   newBottom = startBottom;
-
-            switch (_shapeResizeHandle)
-            {
-                case HandleKind.MidRight:   newRight  = startRight  + worldDX; break;
-                case HandleKind.MidLeft:    newLeft   = startLeft   + worldDX; break;
-                case HandleKind.TopCenter:  newTop    = startTop    + worldDY; break;
-                case HandleKind.BotCenter:  newBottom = startBottom + worldDY; break;
-                case HandleKind.TopRight:   newRight  = startRight  + worldDX; newTop    = startTop    + worldDY; break;
-                case HandleKind.TopLeft:    newLeft   = startLeft   + worldDX; newTop    = startTop    + worldDY; break;
-                case HandleKind.BotRight:   newRight  = startRight  + worldDX; newBottom = startBottom + worldDY; break;
-                case HandleKind.BotLeft:    newLeft   = startLeft   + worldDX; newBottom = startBottom + worldDY; break;
-            }
-
-            // Snap only the edges this handle moves; the opposite edge stays where it was.
             bool movesLeft   = _shapeResizeHandle is HandleKind.MidLeft  or HandleKind.TopLeft  or HandleKind.BotLeft;
             bool movesRight  = _shapeResizeHandle is HandleKind.MidRight or HandleKind.TopRight or HandleKind.BotRight;
             bool movesTop    = _shapeResizeHandle is HandleKind.TopCenter or HandleKind.TopRight or HandleKind.TopLeft;
             bool movesBottom = _shapeResizeHandle is HandleKind.BotCenter or HandleKind.BotRight or HandleKind.BotLeft;
-            if (movesLeft)   newLeft   = SnapToPixel(newLeft);
-            if (movesRight)  newRight  = SnapToPixel(newRight);
-            if (movesTop)    newTop    = SnapToPixel(newTop);
-            if (movesBottom) newBottom = SnapToPixel(newBottom);
-
-            const float minSize = 1f; // minimum 1 world unit on each axis
-            if (newRight - newLeft < minSize)
-            {
-                if (_shapeResizeHandle is HandleKind.MidLeft or HandleKind.TopLeft or HandleKind.BotLeft)
-                    newLeft = newRight - minSize;
-                else
-                    newRight = newLeft + minSize;
-            }
-            if (newTop - newBottom < minSize)
-            {
-                if (_shapeResizeHandle is HandleKind.TopCenter or HandleKind.TopRight or HandleKind.TopLeft)
-                    newTop = newBottom + minSize;
-                else
-                    newBottom = newTop - minSize;
-            }
-
-            r.X      = (newLeft   + newRight)  / 2f;
-            r.Y      = (newTop    + newBottom)  / 2f;
-            r.ScaleX = (newRight  - newLeft)    / 2f;
-            r.ScaleY = (newTop    - newBottom)  / 2f;
+            (r.X, r.ScaleX) = ResizeAxis(_shapeDragStartX, _shapeDragStartScaleX, movesLeft, movesRight, worldDX);
+            (r.Y, r.ScaleY) = ResizeAxis(_shapeDragStartY, _shapeDragStartScaleY, movesBottom, movesTop, worldDY); // world Y up
         }
     }
 
+    /// <summary>One axis of a rectangle resize: the moved edge snaps and stays 1 unit from the other, which stays put.</summary>
+    private static (float Center, float HalfSize) ResizeAxis(float center, float halfSize, bool movesLow, bool movesHigh, float delta)
+    {
+        if (delta == 0f || !(movesLow || movesHigh)) return (center, halfSize);
+
+        const float minSize = 1f;
+        float low = center - halfSize, high = center + halfSize;
+        if (movesLow) low  = MathF.Min(SnapToPixel(low + delta), high - minSize);
+        else          high = MathF.Max(SnapToPixel(high + delta), low + minSize);
+        return ((low + high) / 2f, (high - low) / 2f);
+    }
+
     /// <summary>
-    /// Finalises an in-progress shape resize: records an undo command (unless the delta is
-    /// negligible), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
+    /// Finalises an in-progress shape resize: records an undo command (unless nothing
+    /// moved), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
     /// saves, and re-assigns the selection so the property panel refreshes.
     /// </summary>
     private void CommitShapeResize()
@@ -2714,11 +2693,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         else
             { var c = (CircleSave)_draggingShape; newX = c.X; newY = c.Y; newP1 = c.Radius; newP2 = 0f; }
 
-        const float eps = 1e-4f;
-        bool changed = MathF.Abs(newX  - _shapeDragStartX)      > eps
-                    || MathF.Abs(newY  - _shapeDragStartY)       > eps
-                    || MathF.Abs(newP1 - _shapeDragStartScaleX)  > eps
-                    || MathF.Abs(newP2 - _shapeDragStartScaleY)  > eps;
+        bool changed = !newX.Equals(_shapeDragStartX) || !newY.Equals(_shapeDragStartY)
+                    || !newP1.Equals(_shapeDragStartScaleX) || !newP2.Equals(_shapeDragStartScaleY);
 
         if (changed)
         {
@@ -3081,6 +3057,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             _draggingHGuide  = true;
             _guideDragIsNew  = true;
             _guideDragStart  = wy;
+            _guideDragAnchor = pos;
             e.Pointer.Capture(this);
             OnGuideAdded();
             return;
@@ -3095,6 +3072,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             _draggingHGuide  = false;
             _guideDragIsNew  = true;
             _guideDragStart  = wx;
+            _guideDragAnchor = pos;
             e.Pointer.Capture(this);
             OnGuideAdded();
             return;
@@ -3113,6 +3091,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                     _draggingHGuide  = true;
                     _guideDragIsNew  = false;
                     _guideDragStart  = _hGuides[i];
+                    _guideDragAnchor = pos;
                     e.Pointer.Capture(this);
                     return;
                 }
@@ -3125,6 +3104,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                     _draggingHGuide  = false;
                     _guideDragIsNew  = false;
                     _guideDragStart  = _vGuides[i];
+                    _guideDragAnchor = pos;
                     e.Pointer.Capture(this);
                     return;
                 }
@@ -3267,12 +3247,11 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
 
         if (_draggingVertexPolygon is not null)
         {
-            // The vertex follows the pointer's absolute position, so an inserted vertex does not
-            // jump from the edge midpoint to wherever the press landed within the handle.
             float om = _appState!.OffsetMultiplier * _zoom;
-            float worldX = ((float)pos.X - GetCenterX()) / om - _draggingVertexPolygon.X;
-            float worldY = -((float)pos.Y - GetCenterY()) / om - _draggingVertexPolygon.Y;
-            PolygonVertices.Set(_draggingVertexPolygon, _draggingVertexIndex, SnapToPixel(worldX), SnapToPixel(worldY));
+            float dx = (float)(pos.X - _vertexDragAnchor.X) / om;
+            float dy = -(float)(pos.Y - _vertexDragAnchor.Y) / om;
+            PolygonVertices.Set(_draggingVertexPolygon, _draggingVertexIndex,
+                DragTo(_vertexDragStartX, dx), DragTo(_vertexDragStartY, dy));
             InvalidateVisual();
             return;
         }
@@ -3284,17 +3263,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
             (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             if (Point.Distance(pos, _shapeDragAnchor) > ShapeClickSlopPx) _shapeDragTraveled = true;
-            var dragged = (ShapeSave)_draggingShape;
-            dragged.X = SnapToPixel(_shapeDragStartX + dx);
-            dragged.Y = SnapToPixel(_shapeDragStartY + dy);
-            if (_shapeDragCompanions is { } companions)
-            {
-                foreach (var (shape, startX, startY) in companions)
-                {
-                    shape.X = SnapToPixel(startX + dx);
-                    shape.Y = SnapToPixel(startY + dy);
-                }
-            }
+            ApplyShapeDrag(dx, dy);
             InvalidateVisual();
             return;
         }
@@ -3305,8 +3274,7 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             float dx = (float)(pos.X - _frameDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _frameDragAnchor.Y) / om;
             (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
-            _draggingFrame.RelativeX = SnapToPixel(_frameDragStartX + dx);
-            _draggingFrame.RelativeY = SnapToPixel(_frameDragStartY + dy);
+            ApplyFrameDrag(dx, dy);
             InvalidateVisual();
             FrameLiveUpdated?.Invoke(_draggingFrame);
             return;
@@ -3329,9 +3297,9 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (_draggedGuideIdx >= 0)
         {
             if (_draggingHGuide)
-                _hGuides[_draggedGuideIdx] = SnapToPixel(ScreenToWorldY((float)pos.Y));
+                _hGuides[_draggedGuideIdx] = DragTo(_guideDragStart, (float)(pos.Y - _guideDragAnchor.Y) / _zoom);
             else
-                _vGuides[_draggedGuideIdx] = SnapToPixel(ScreenToWorldX((float)pos.X));
+                _vGuides[_draggedGuideIdx] = DragTo(_guideDragStart, (float)(pos.X - _guideDragAnchor.X) / _zoom);
             InvalidateVisual();
         }
 
