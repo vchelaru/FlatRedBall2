@@ -195,8 +195,8 @@ public static class StructureEdit
     /// <summary>
     /// Appends a frame for each cell of a sprite sheet grid (#1811), row by row from the top-left, starting at
     /// cell <paramref name="start"/> and taking <paramref name="count"/> cells (null: to the end of the grid). Cells are
-    /// <paramref name="cellWidth"/> by <paramref name="cellHeight"/> pixels; the whole grid must lie inside the PNG
-    /// texture. Everything is validated before the first frame is added. Each frame goes through
+    /// <paramref name="cellWidth"/> by <paramref name="cellHeight"/> pixels, on a .tsx spaced by the tileset's margin and
+    /// spacing; the whole grid must lie inside the PNG texture. Everything is validated before the first frame is added. Each frame goes through
     /// <see cref="AddFrame"/>, so the texture checks, stored path and length rules are the same.
     /// </summary>
     public static EditResult AddFramesGrid(
@@ -214,9 +214,12 @@ public static class StructureEdit
         var size = TextureCoordinateConverter.TryReadPngSize(absoluteTexture);
         if (size is null)
             return Fail(EditErrorCode.UnsupportedFile, "A grid needs the texture's size, which is only read from PNG files.");
-        if ((long)columns * cellWidth > size.Value.Width || (long)rows * cellHeight > size.Value.Height)
+        // A .tsx's cells follow the tileset's margin and spacing; any other sheet's touch, starting at 0.
+        var (margin, spacing) = projectManager.TsxTileGrid is { } grid ? (grid.Margin, grid.Spacing) : (0, 0);
+        long strideX = (long)cellWidth + spacing, strideY = (long)cellHeight + spacing;
+        if (margin + columns * strideX - spacing > size.Value.Width || margin + rows * strideY - spacing > size.Value.Height)
             return Fail(EditErrorCode.InvalidValue,
-                $"A {columns}x{rows} grid of {cellWidth}x{cellHeight} cells does not fit the {size.Value.Width}x{size.Value.Height} texture.");
+                $"A {columns}x{rows} grid of {cellWidth}x{cellHeight} cells{(margin > 0 || spacing > 0 ? $" (margin {margin}, spacing {spacing})" : "")} does not fit the {size.Value.Width}x{size.Value.Height} texture.");
 
         var cells = columns * rows;
         if (start < 0 || start >= cells)
@@ -228,7 +231,7 @@ public static class StructureEdit
         var firstNew = chain.Frames.Count;
         for (int cell = start; cell < start + take; cell++)
         {
-            var region = new FramePixelRegion(cell % columns * cellWidth, cell / columns * cellHeight, cellWidth, cellHeight);
+            var region = new FramePixelRegion((int)(margin + cell % columns * strideX), (int)(margin + cell / columns * strideY), cellWidth, cellHeight);
             var added = AddFrame(projectManager, commands, chain, absoluteTexture, region, frameLength, probe);
             if (!added.Success) return added;
         }
@@ -308,6 +311,7 @@ public static class StructureEdit
     {
         if (name.Length == 0) return Fail(EditErrorCode.EmptyName, "Chain name cannot be empty.");
         if (name.Contains('/')) return Fail(EditErrorCode.InvalidAddress, $"Chain name '{name}' cannot contain '/'.");
+        if (StorableText.Problem(name) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
         if (projectManager.AnimationChainListSave?.AnimationChains.Any(c => c.Name == name) == true)
             return Fail(EditErrorCode.DuplicateName, $"A chain named '{name}' already exists.");
         return null;

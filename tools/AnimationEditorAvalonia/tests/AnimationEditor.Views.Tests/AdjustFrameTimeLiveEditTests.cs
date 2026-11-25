@@ -33,6 +33,7 @@ public class AdjustFrameTimeLiveEditTests
         public string? ProjectFolderPath { get; set; }
         public TextureCoordinateType OnDiskCoordinateType { get; set; }
         public bool IsNativeTsxProject => false;
+        public AnimationEditor.Core.Tiled.TilesetAnimationInfo? TsxTileset => null;
         public TileGrid? TsxTileGrid => null;
         public void LoadTsxProject(FilePath fileName) { }
         public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => [];

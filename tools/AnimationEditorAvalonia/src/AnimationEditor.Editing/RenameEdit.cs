@@ -15,7 +15,7 @@ public static class RenameEdit
     /// <summary>
     /// Empty fails with <see cref="EditErrorCode.EmptyName"/>, except that in a native-tsx project it
     /// reverts the chain to its auto "ID:{tileId}" name. A name another chain holds fails with
-    /// <see cref="EditErrorCode.DuplicateName"/>.
+    /// <see cref="EditErrorCode.DuplicateName"/>; one XML cannot store with <see cref="EditErrorCode.InvalidValue"/>.
     /// </summary>
     public static EditResult RenameChain(
         IProjectManager projectManager, IAppCommands commands, AnimationChainSave chain, string newName)
@@ -29,6 +29,7 @@ public static class RenameEdit
         }
 
         if (newName == chain.Name) return Ok();
+        if (StorableText.Problem(newName) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
 
         var acls = projectManager.AnimationChainListSave;
         if (acls is not null && acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
@@ -42,7 +43,7 @@ public static class RenameEdit
     /// <summary>
     /// Renames a rect, circle or polygon, leaving its position and size as they are. Empty fails with
     /// <see cref="EditErrorCode.EmptyName"/>; a name another shape of the same frame holds, of any type,
-    /// fails with <see cref="EditErrorCode.DuplicateName"/>.
+    /// fails with <see cref="EditErrorCode.DuplicateName"/>; one XML cannot store with <see cref="EditErrorCode.InvalidValue"/>.
     /// </summary>
     public static EditResult RenameShape(
         IAppCommands commands, IObjectFinder objectFinder, ShapeSave shape, string newName)
@@ -50,6 +51,7 @@ public static class RenameEdit
         newName = newName.Trim();
         if (newName.Length == 0) return Fail(EditErrorCode.EmptyName, "Shape name cannot be empty.");
         if (newName == shape.Name) return Ok();
+        if (StorableText.Problem(newName) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
 
         var frame = objectFinder.GetAnimationFrameContaining(shape);
         if (frame?.ShapesSave?.Shapes.Any(s => !ReferenceEquals(s, shape) && NameOf(s) == newName) == true)
