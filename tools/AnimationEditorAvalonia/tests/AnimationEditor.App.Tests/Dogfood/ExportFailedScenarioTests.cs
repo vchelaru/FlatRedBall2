@@ -16,13 +16,14 @@ public class ExportFailedScenarioTests
         await editor.OpenAsync(editor.WriteAchx("hero.achx", AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16))));
         string target = Path.Combine(editor.ProjectFolder, name);
         File.WriteAllText(target, "old");
-        UnusualProjectScenarioTests.MakeUnwritable(target);
+        // The file itself, not its folder: an export writes in place, which a read-only folder allows on Linux.
+        File.SetAttributes(target, FileAttributes.ReadOnly);
         editor.Dialogs.AnswerNextSaveFile(target);
 
         editor.ClickMenu(menu);
 
         bool said = await editor.WaitUntilAsync(() => editor.ProblemText is not null, TimeSpan.FromSeconds(3));
-        UnusualProjectScenarioTests.MakeWritable(target);
+        File.SetAttributes(target, FileAttributes.Normal);
         said.ShouldBeTrue("the export failed and nothing says so");
     }
 }
