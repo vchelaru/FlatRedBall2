@@ -7156,6 +7156,7 @@ public partial class MainWindow : Window
 
         // Save the leaving tab's state before a different file takes over.
         CaptureLeavingActiveTab();
+        bool documentInFront = _visiblePane == _achxPane;
         ShowPane(_achxPane);
 
         // If there is already a file open that hasn't been registered as a tab yet,
@@ -7180,9 +7181,11 @@ public partial class MainWindow : Window
                 // may still be displaying a different tab's content (e.g. user was on tab 1
                 // and re-opened tab 2's file via File > Open).  Load the file to ensure the
                 // panels and previews reflect the focused tab.
-                bool alreadyShown = string.Equals(_projectManager.FileName, fileName,
-                    StringComparison.OrdinalIgnoreCase);
-                if (!alreadyShown && !string.IsNullOrEmpty(fileName))
+                // Behind a .seqj tab the document is still loaded, but the undo stack is the .seqj's. A file changed
+                // outside is loaded again: with hot reload off, the next autosave would overwrite the change.
+                bool alreadyShown = documentInFront && (FilePath?)_projectManager.FileName == filePath
+                    && arrivedTab?.CachedDiskState?.HasChanged(filePath) != true;
+                if (!alreadyShown)
                 {
                     bool activated = await _appCommands.ActivateTabContentAsync(arrivedTab!);
                     if (activated && arrivedTab?.UndoSnapshot != null)
