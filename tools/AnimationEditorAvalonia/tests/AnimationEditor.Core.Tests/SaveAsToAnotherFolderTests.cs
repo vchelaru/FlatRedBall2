@@ -131,7 +131,7 @@ public class SaveAsToAnotherFolderTests : IDisposable
     {
         string sheet = Path.Combine(Folder("front"), "sheet.png"), moved = Folder("moved");
         var document = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        document.AnimationChains.Add(Chain(sheet, sheet));
+        document.AnimationChains.Add(Chain(sheet, sheet, "other.png"));
         _ctx.ProjectManager.ResetToBlankDocument();
         _ctx.ProjectManager.AnimationChainListSave = document;
         _ctx.AppCommands.DeleteFrames([document.AnimationChains[0].Frames[1]]);
@@ -140,9 +140,10 @@ public class SaveAsToAnotherFolderTests : IDisposable
         await SaveAsAsync(target);
         _ctx.UndoManager.Undo();
 
-        string[] same = [new FilePath(sheet).FullPath, new FilePath(sheet).FullPath];
+        // A relative name had no folder to be relative to.
+        string[] same = [new FilePath(sheet).FullPath, new FilePath(sheet).FullPath, new FilePath(Path.Combine(moved, "other.png")).FullPath];
         Resolved(document, moved).ShouldBe(same);
-        Names(AnimationChainListSave.FromFile(target)).ShouldBe(["../front/sheet.png", "../front/sheet.png"]);
+        Names(AnimationChainListSave.FromFile(target)).ShouldBe(["../front/sheet.png", "../front/sheet.png", "other.png"]);
         _ctx.UndoManager.Redo();
         _ctx.UndoManager.Undo();
         Resolved(document, moved).ShouldBe(same);
@@ -157,7 +158,7 @@ public class SaveAsToAnotherFolderTests : IDisposable
         var document = _ctx.ProjectManager.AnimationChainListSave!;
         document.ProjectFile = "../Game.gluj";
         _ctx.AppCommands.DeleteFrames([document.AnimationChains[0].Frames[1]]);
-        string target = Path.Combine(Folder("moved"), "hero.achx");
+        string target = Path.Combine(Folder("front", "moved"), "hero.achx");
         Directory.CreateDirectory(target);
 
         await SaveAsAsync(target);
