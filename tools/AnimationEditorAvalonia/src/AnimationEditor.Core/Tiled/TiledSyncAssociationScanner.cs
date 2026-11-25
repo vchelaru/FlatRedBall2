@@ -20,7 +20,7 @@ namespace AnimationEditor.Core.Tiled;
 /// A <c>.tiledsync</c> file lives next to its OWNING achx/achj, never next to the tsx it targets --
 /// so there is no single companion path to check directly for a given tsx. This recursively scans
 /// the tsx's own directory and subdirectories for every <c>.tiledsync</c> file and resolves each
-/// one's relative paths against its own folder. An achx/achj living outside that directory tree (a
+/// one's paths against its own folder. An achx/achj living outside that directory tree (a
 /// sibling or parent folder) is not found -- narrower than a perfect search, but consistent with how
 /// every other relative path in this file format is already resolved from the achx's own folder,
 /// and matches the ordinary case of an achx/achj and its tsx living in one content folder.
@@ -45,23 +45,21 @@ public static class TiledSyncAssociationScanner
         var owners = new List<string>();
         foreach (var syncFile in Directory.EnumerateFiles(tsxDir.FullPath, "*.tiledsync", SearchOption.AllDirectories))
         {
-            List<string>? associated;
+            AETiledSyncSave? settings;
             try
             {
                 var json = File.ReadAllText(syncFile);
-                associated = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave)?.TiledTilesetPaths;
+                settings = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
             }
             catch
             {
                 continue;
             }
-            if (associated == null)
+            if (settings?.TiledTilesetPaths == null)
                 continue;
 
             var syncFolder = new FilePath(syncFile).GetDirectoryContainingThis();
-            bool matches = associated
-                .Any(relative => new FilePath(syncFolder.FullPath + relative) == targetTsx);
-            if (matches)
+            if (settings.ResolveTilesets(syncFolder).Contains(targetTsx))
                 owners.Add(FindOwningAchxPath(syncFile));
         }
         return owners;
