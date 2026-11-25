@@ -210,8 +210,7 @@ public static class AnimationChainListSaveExtensions
             fresh = save.ToAnimationChainList(textureLoader);
         }
         catch (IOException) { return false; }
-        catch (System.Xml.XmlException) { return false; }
-        catch (System.Text.Json.JsonException) { return false; }
+        catch (InvalidDataException) { return false; }
 
         ApplyReloadedChains(list, fresh);
         return true;
@@ -239,8 +238,7 @@ public static class AnimationChainListSaveExtensions
             fresh = save.ToAnimationChainList(textureLoader);
         }
         catch (IOException) { return false; }
-        catch (System.Xml.XmlException) { return false; }
-        catch (System.Text.Json.JsonException) { return false; }
+        catch (InvalidDataException) { return false; }
 
         ApplyReloadedChains(list, fresh);
         return true;

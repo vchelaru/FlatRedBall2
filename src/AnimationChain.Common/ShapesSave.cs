@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace FlatRedBall2.AnimationEditorCommon;
 
@@ -13,6 +14,10 @@ namespace FlatRedBall2.AnimationEditorCommon;
 public class ShapesSave
 {
     private readonly List<object> _shapes = new();
+
+    // FRB1's 3D shapes, which FRB2 does not model. Only carried, so saving a file keeps them.
+    internal XElement? CubeSaves;
+    internal XElement? SphereSaves;
 
     /// <summary>
     /// All shapes in display order. Always grouped by type (rectangles, then polygons, then circles),
@@ -165,6 +170,8 @@ public abstract class ShapeSave : Frb1ShapeData
     /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="OffsetInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
     public string? OffsetEasing;
 
+    internal EmptyTextForms EmptyText;
+
     /// <summary>Returns a deep copy of every stored field, including the <see cref="Frb1ShapeData"/> ones.</summary>
     public virtual ShapeSave Clone() => (ShapeSave)MemberwiseClone();
 }
@@ -187,6 +194,9 @@ public abstract class SizedShapeSave : ShapeSave
 
     /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="SizeInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
     public string? SizeEasing;
+
+    // FRB1's attachment parent. Only carried, so saving a file keeps it.
+    internal string? Parent;
 }
 
 /// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>
@@ -231,6 +241,12 @@ public class PolygonSave : ShapeSave
 
     /// <summary><c>In</c>, <c>Out</c> or <c>InOut</c> for <see cref="PointsInterpolation"/>; <c>null</c> means <c>Out</c>.</summary>
     public string? PointsEasing;
+
+    // FRB1's rotation, not applied here. Only carried, so saving a file keeps it.
+    internal string? RotationZ;
+
+    // FRB1 writes the name after the points, this writer before X.
+    internal bool NameAfterPoints;
 
     /// <inheritdoc/>
     public override ShapeSave Clone()

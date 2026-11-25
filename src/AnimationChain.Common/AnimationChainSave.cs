@@ -10,6 +10,11 @@ public class AnimationChainSave
     /// <summary>The name of the animation chain.</summary>
     public string Name = string.Empty;
 
+    // FRB1's GIF source, obsolete there. Only carried, so saving a file keeps it.
+    internal string? ParentFile;
+
+    internal EmptyTextForms EmptyText;
+
     /// <summary>The list of frames in this chain.</summary>
     public List<AnimationFrameSave> Frames = new();
 

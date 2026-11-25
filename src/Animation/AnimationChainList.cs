@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Xml;
 using FlatRedBall2.AnimationEditorCommon;
 using FlatRedBall2.Rendering;
 
@@ -81,8 +80,7 @@ public class AnimationChainList : List<AnimationChain>
             fresh = content.LoadAnimationChainList(path);
         }
         catch (IOException) { return false; }
-        catch (XmlException) { return false; }
-        catch (System.Text.Json.JsonException) { return false; }
+        catch (InvalidDataException) { return false; }
 
         var before = ConvertAll(chain => (chain, chain.Loop, chain.PingPong, chain.Reversed));
         ChainReload.Apply<AnimationChain, AnimationFrame>(this, fresh);

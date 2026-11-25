@@ -229,7 +229,8 @@ public static class PropertyEdit
 
     private static NumericEdit? Edit(float? value) => value is { } v ? (NumericEdit)v : null;
 
-    private static EditResult? CheckLength(FrameLengthUnit unit, float length, string address) =>
+    /// <summary>Why a frame length, in the file's unit, is outside the Inspector's range; null when it is inside.</summary>
+    internal static EditResult? CheckLength(FrameLengthUnit unit, float length, string address) =>
         // Scaling can land a hair outside a limit (9 x 0.1 scaled to 0.009), which is not an out-of-range length.
         !float.IsFinite(length) || length < (float)unit.Minimum * (1 - 1e-6f) || length > (float)unit.Maximum * (1 + 1e-6f)
             ? Fail(EditErrorCode.InvalidValue,

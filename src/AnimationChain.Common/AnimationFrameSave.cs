@@ -142,4 +142,6 @@ public class AnimationFrameSave
     /// them if they re-save the file.
     /// </summary>
     public List<AnimationFrameEvent> Events { get; } = new();
+
+    internal EmptyTextForms EmptyText;
 }

@@ -105,6 +105,18 @@ public class AnimationChainListReloadTests
         result.ShouldBeFalse();
     }
 
+    [Theory]
+    [InlineData("bad.achx", "<AnimationChainArraySave><AnimationChain><Loop>fals</Loop></AnimationChain></AnimationChainArraySave>")]
+    [InlineData("bad.achj", "{\"animationChains\":[null]}")]
+    public void TryReloadFrom_ValueThatDoesNotParse_ReturnsFalse(string path, string text)
+    {
+        var content = MakeContent();
+        var list = LoadFresh(WriteAchx("base.achx", ("Walk", 2)), content);
+        WriteRaw(path, text);
+
+        list.TryReloadFrom(path, content).ShouldBeFalse();
+    }
+
     [Fact]
     public void TryReloadFrom_AchjFile_SameChain_PreservesChainInstanceIdentity()
     {
