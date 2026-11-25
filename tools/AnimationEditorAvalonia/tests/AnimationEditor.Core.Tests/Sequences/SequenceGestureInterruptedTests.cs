@@ -74,4 +74,48 @@ public class SequenceGestureInterruptedTests
 
         SequenceListSave.FromFile(path).Sequences[2].Name.ShouldBe("Outside");
     }
+
+    private const string TwoSequencesJson = """
+        {
+          "version": 1,
+          "sources": ["hero.achx"],
+          "sequences": [
+            { "name": "Walk", "loop": true, "tracks": [ { "name": "A", "chains": [ { "source": "hero.achx", "chain": "Walk", "start": 0 } ] } ] },
+            { "name": "Host", "loop": true, "tracks": [ { "name": "R", "references": [ { "sequence": "Walk", "start": 0 } ] } ] }
+          ]
+        }
+        """;
+
+    [Fact]
+    public void Edit_DuringAGesture_LeavesTheGestureOutOfTheFileAndTheHistory()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WriteAchx(Path.Combine(dir.Path, "hero.achx"));
+        string path = Write(dir.Path, TwoSequencesJson);
+        var document = SequenceDocument.Load(path);
+        var undo = new UndoManager();
+        string before = document.BeginGesture();
+        document.Save.Sequences[0].Tracks[0].Chains[0].Start = 3;
+
+        document.RenameSequence(undo, 1, "Renamed", keepSelection: true).ShouldBeNull();
+        document.CommitGesture(undo, "Move", before);
+
+        SequenceListSave.FromFile(path).Sequences[0].Tracks[0].Chains[0].Start.ShouldBe(0);
+        undo.UndoHistory.Select(c => c.Description).ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void SaveToDisk_DuringAGesture_WritesTheStateBeforeIt()
+    {
+        using var dir = new TestHelpers.TempDir();
+        WriteAchx(Path.Combine(dir.Path, "hero.achx"));
+        string path = Write(dir.Path, TwoSequencesJson);
+        var document = SequenceDocument.Load(path);
+        document.BeginGesture();
+        document.Save.Sequences[0].Tracks[0].Chains[0].Start = 3;
+
+        document.SaveToDisk();
+
+        SequenceListSave.FromFile(path).Sequences[0].Tracks[0].Chains[0].Start.ShouldBe(0);
+    }
 }

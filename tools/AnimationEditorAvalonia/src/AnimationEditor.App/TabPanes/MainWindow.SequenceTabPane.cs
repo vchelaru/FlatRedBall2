@@ -335,8 +335,8 @@ public partial class MainWindow
 
         public void CaptureLeaving(TabEntry tab)
         {
-            // Before the snapshot, so the rename is in this tab's history.
-            CommitPendingRename();
+            // Before the snapshot, so the rename is in this tab's history, and a held drag cannot add to it once another tab's is shown.
+            SettlePendingInput();
             tab.UndoSnapshot = _window._undoManager.TakeSnapshot();
         }
 
@@ -524,7 +524,7 @@ public partial class MainWindow
 
         public void Closing(TabEntry tab)
         {
-            CommitPendingRename();
+            SettlePendingInput();
             if (_documents.TryGetValue(tab.Path, out var document) && document == _document)
                 Detach();
             if (document is not null) _guides.Remove(document);
@@ -813,7 +813,7 @@ public partial class MainWindow
             w.SequenceList.AddHandler(InputElement.PointerPressedEvent, OnSequenceListPressedTunnel, RoutingStrategies.Tunnel);
             w.SequenceList.DoubleTapped += OnSequenceListDoubleTapped;
             _listDrag = new Controls.SequenceListDragController(w.SequenceList, () => _document?.SelectedIndices ?? Array.Empty<int>(),
-                CommitPendingRename, MoveSequences, w.ShowDropLine, w.RemoveDropLine,
+                SettlePendingInput, MoveSequences, w.ShowDropLine, w.RemoveDropLine,
                 point => w.SequenceList.TranslatePoint(point, w.DragOverlayCanvas),
                 SequenceDragOverTimeline, DropSequencesOnTimeline, () => w.SequenceTimeline.UpdateSequenceDrag(null, null));
             w.SequenceList.AddHandler(InlineRenameBox.CommittedEvent, OnSequenceRenameCommitted);
@@ -1168,15 +1168,16 @@ public partial class MainWindow
         private bool HasPendingRename => _items.Any(item => item.IsEditing) || _window.SequenceTimeline.IsRenamingTrack;
 
         /// <summary>
-        /// Applies the name typed into any open in-place rename (a sequence row or a track header), as Enter would. This
-        /// is the one path for every way of leaving a rename that Enter and Escape are not: another tab or file, closing
-        /// the tab or the window, undo and redo, Back and Forward, a hotkey, and a press that moves no focus. A name
-        /// that fails validation shows the banner and keeps the old name, as on a click-away. Does nothing when no
-        /// rename is open.
+        /// Applies the name typed into any open in-place rename (a sequence row or a track header), as Enter would, and
+        /// cancels a timeline drag that is still held, as Escape would. This is the one path for every way of leaving a
+        /// rename that Enter and Escape are not: another tab or file, closing the tab or the window, undo and redo, Back
+        /// and Forward, a hotkey, and a press that moves no focus. A name that fails validation shows the banner and
+        /// keeps the old name, as on a click-away. Does nothing when no rename or drag is open.
         /// </summary>
-        public void CommitPendingRename()
+        public void SettlePendingInput()
         {
             if (_document is not { } document) return;
+            _window.SequenceTimeline.CancelDrag();
             for (int index = 0; index < _items.Count; index++)
             {
                 if (_items[index].IsEditing) CommitListRename(document, index);
