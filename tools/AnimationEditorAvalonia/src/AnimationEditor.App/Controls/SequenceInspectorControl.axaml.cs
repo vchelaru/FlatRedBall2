@@ -207,7 +207,8 @@ public partial class SequenceInspectorControl : UserControl
             track.Chains.Select(block => (block.Source, block.Chain, block.Start, block.Length)).ToList(),
             (track.References ?? []).Select(clip => (clip.Sequence, clip.Start, clip.Length)).ToList(),
             SequenceTimeline.OrderedClips(track).FirstOrDefault() is { } first ? track.References!.IndexOf(first) : -1)).ToList();
-        return new Shown(document, document.Save, _sequence, _chain, _track, _chains, _tracks, _canRenameSequence,
+        // Copies: the lists are the timeline's own, which the next selection changes.
+        return new Shown(document, document.Save, _sequence, _chain, _track, _chains.ToList(), _tracks.ToList(), _canRenameSequence,
             document.Save.Sequences.Select(s => s.Name).ToList(), tracks);
     }
 

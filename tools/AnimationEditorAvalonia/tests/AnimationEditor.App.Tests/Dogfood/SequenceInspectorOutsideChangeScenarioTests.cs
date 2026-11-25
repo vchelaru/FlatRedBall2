@@ -282,4 +282,47 @@ public class SequenceInspectorOutsideChangeScenarioTests
 
         new[] { path, other }.Select(file => SequenceListSave.FromFile(file).Sequences[0].Tracks[0].Chains[0].Start).ShouldBe(new[] { 7.0, 0.0 });
     }
+
+    private static async Task<SequenceInspectorControl> OpenWithAllBlocksSelectedAsync(AnimationEditorHarness editor, string path)
+    {
+        var inspector = await OpenAsync(editor, path, null, null);
+        var timeline = editor.Control<SequenceTimelineControl>("SequenceTimeline");
+        timeline.Focus();
+        timeline.SelectAllItems();
+        editor.Layout();
+        timeline.SelectedChains.Count.ShouldBe(3);
+        return inspector;
+    }
+
+    [AvaloniaFact]
+    public async Task RelativeStartTypedForSeveralBlocks_ClickOnAnotherRow_MovesThemAllInOneUndoStep()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body", ("Walk", 0, 2), ("Run", 4, 2)), Track("Arm", ("Walk", 1, 1)));
+        var inspector = await OpenWithAllBlocksSelectedAsync(editor, path);
+        double[] Starts() => SequenceListSave.FromFile(path).Sequences[0].Tracks.SelectMany(t => t.Chains).Select(c => c.Start).ToArray();
+        TypeInto(editor, BoxOf(inspector.ChainStartField), "+1");
+
+        await ClickRowAsync(editor, 1);
+
+        Starts().ShouldBe(new[] { 1.0, 5.0, 2.0 });
+        editor.UndoLabels.Count.ShouldBe(1);
+        editor.Control<ListBox>("SequenceList").SelectedIndex.ShouldBe(1);
+        editor.UndoManager.Undo();
+        Starts().ShouldBe(new[] { 0.0, 4.0, 1.0 });
+    }
+
+    [AvaloniaFact]
+    public async Task LengthTypedForSeveralBlocks_ClickOnAnotherRow_SetsThemAllInOneUndoStep()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string path = Write(editor, "boss.seqj", Track("Body", ("Walk", 0, 2), ("Run", 4, 2)), Track("Arm", ("Walk", 1, 1)));
+        var inspector = await OpenWithAllBlocksSelectedAsync(editor, path);
+        TypeInto(editor, BoxOf(inspector.ChainLengthField), "6");
+
+        await ClickRowAsync(editor, 1);
+
+        SequenceListSave.FromFile(path).Sequences[0].Tracks.SelectMany(t => t.Chains).Select(c => c.Length).ShouldBe(new double?[] { 6, 6, 6 });
+        editor.UndoLabels.Count.ShouldBe(1);
+    }
 }
