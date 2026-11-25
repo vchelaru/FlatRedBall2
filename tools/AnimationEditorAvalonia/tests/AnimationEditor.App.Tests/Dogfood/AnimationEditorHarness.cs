@@ -118,8 +118,8 @@ internal sealed class AnimationEditorHarness : IDisposable
     /// <summary>The "… deleted" toast's text while it shows, else null.</summary>
     public string? DeletedToastText => Notifications.ItemDeletedToastPanel.IsVisible ? Notifications.ItemDeletedToastLabel.Text : null;
 
-    /// <summary>The window title's file part, as the title bar shows it.</summary>
-    public string TitleFileName => Control<TextBlock>("TitleFileName").Text ?? "";
+    /// <summary>The window title's file part as the title bar shows it, "" while it shows none.</summary>
+    public string TitleFileName => Control<TextBlock>("TitleFileName") is { IsVisible: true, Text: { } name } ? name : "";
 
     public TabManager Tabs =>
         (TabManager)typeof(MainWindow).GetField("_tabManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(Window)!;
