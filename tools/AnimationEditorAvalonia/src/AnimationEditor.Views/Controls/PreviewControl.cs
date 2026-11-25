@@ -2810,11 +2810,14 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// same way. Every unlocked selected animation contributes all its frames and every unlocked
     /// selected frame contributes itself; locked ones contribute nothing, so they neither move nor
     /// block the rest. The grab hits when the cursor is over the sprite currently shown for any
-    /// contributing animation or frame. Returns null when nothing unlocked is grabbed.
+    /// contributing animation or frame. Returns null when nothing unlocked is grabbed, and in a
+    /// <c>.tsx</c>, which cannot store a sprite offset.
     /// <paramref name="requireHit"/> false skips the cursor test (test helpers).
     /// </summary>
     private SpriteDragScope? ResolveSpriteDragScope(float px, float py, bool requireHit = true)
     {
+        if (_projectManager?.IsNativeTsxProject == true) return null;
+
         var moves = new List<AnimationFrameSave>();
         var shapesToMove = new List<(ShapeSave Shape, AnimationFrameSave Frame)>();
         bool hit = !requireHit;
