@@ -127,7 +127,6 @@ public static class NativeTsxAnimationSync
                     changed = true;
         }
 
-        tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID));
         return new NativeTsxAnimationSyncResult(changed);
     }
 
@@ -184,46 +183,19 @@ public static class NativeTsxAnimationSync
     }
 
     /// <summary>
-    /// Deep-clones exactly the parts of <paramref name="tileset"/> that <see cref="Apply"/> ever
-    /// mutates: the <see cref="Tileset.Tiles"/> list itself (membership -- tiles get added), and
-    /// per tile, its <see cref="Tile.Properties"/> list and the <see cref="IProperty"/> instances
-    /// within it (mutated in place via add/remove/<c>.Value =</c>). <see cref="Tile.Animation"/> is
-    /// never mutated in place by <see cref="Apply"/> -- only wholesale-reassigned -- so copying the
-    /// list without cloning each <see cref="Frame"/> is enough. Every other field (tileset name/
-    /// size/image/wangsets/transformations/properties; per-tile type/probability/x/y/width/height/
-    /// image/object layer) is never touched by <see cref="Apply"/> and is shared by reference with
-    /// the original.
+    /// Clones what <see cref="TsxLoader"/> reads, deeply where <see cref="Apply"/> changes it, so a caller can run
+    /// <see cref="Apply"/> on a working copy and adopt it once it is written (see <see cref="ProjectManager.SaveTsxProject"/>).
     /// </summary>
-    /// <remarks>
-    /// Lets a caller run <see cref="Apply"/> against a working copy and only adopt it once writing
-    /// the result has actually succeeded, so a write failure can't leave the caller's own tileset
-    /// reflecting computed-but-never-persisted state -- see <see cref="ProjectManager.SaveTsxProject"/>.
-    /// If <see cref="Apply"/> is ever extended to mutate a field this method doesn't copy, that
-    /// field must be added here too.
-    /// </remarks>
     internal static Tileset CloneForSave(Tileset tileset) => new()
     {
-        Version = tileset.Version,
-        TiledVersion = tileset.TiledVersion,
-        FirstGID = tileset.FirstGID,
-        Source = tileset.Source,
         Name = tileset.Name,
-        Class = tileset.Class,
         TileWidth = tileset.TileWidth,
         TileHeight = tileset.TileHeight,
         Spacing = tileset.Spacing,
         Margin = tileset.Margin,
         TileCount = tileset.TileCount,
         Columns = tileset.Columns,
-        ObjectAlignment = tileset.ObjectAlignment,
-        RenderSize = tileset.RenderSize,
-        FillMode = tileset.FillMode,
         Image = tileset.Image,
-        TileOffset = tileset.TileOffset,
-        Grid = tileset.Grid,
-        Properties = tileset.Properties,
-        Wangsets = tileset.Wangsets,
-        Transformations = tileset.Transformations,
         Tiles = tileset.Tiles.Select(CloneTile).ToList(),
     };
 
@@ -231,14 +203,9 @@ public static class NativeTsxAnimationSync
     {
         ID = tile.ID,
         Type = tile.Type,
-        Probability = tile.Probability,
-        X = tile.X,
-        Y = tile.Y,
         Width = tile.Width,
         Height = tile.Height,
         Properties = tile.Properties.Select(p => p.Clone()).ToList(),
-        Image = tile.Image,
-        ObjectLayer = tile.ObjectLayer,
         Animation = tile.Animation.ToList(),
     };
 
@@ -282,23 +249,10 @@ public static class NativeTsxAnimationSync
         tile.Animation = [];
     }
 
-    /// <summary>Whether a tile has nothing left worth keeping a &lt;tile&gt; element for -- no
-    /// animation, no properties, and none of Tiled's other per-tile data (type/probability/x/y/
-    /// width/height/image/object layer). A tile that only ever existed to carry an animation this
-    /// sync owns becomes exactly this once <see cref="ClearTile"/> strips it, and leaving it in
-    /// <see cref="Tileset.Tiles"/> as a bare <c>&lt;tile id="N"/&gt;</c> stub would accumulate one
-    /// such stub per animation ever removed.</summary>
+    /// <summary>Whether the model has nothing left for a tile. <see cref="TsxWriter"/> keeps its element in the file
+    /// when that still holds something the model does not.</summary>
     private static bool IsTileEmpty(Tile tile) =>
-        string.IsNullOrEmpty(tile.Type) &&
-        tile.Probability == 0f &&
-        tile.X == 0 &&
-        tile.Y == 0 &&
-        tile.Width == 0 &&
-        tile.Height == 0 &&
-        !tile.Image.HasValue &&
-        !tile.ObjectLayer.HasValue &&
-        tile.Properties.Count == 0 &&
-        tile.Animation.Count == 0;
+        string.IsNullOrEmpty(tile.Type) && tile.Properties.Count == 0 && tile.Animation.Count == 0;
 
     private static bool AnimationEquals(List<Frame> a, List<Frame> b)
     {

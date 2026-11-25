@@ -413,6 +413,8 @@ public class TabSwitchCacheTests : IDisposable
         public TileGrid? TsxTileGrid => _inner.TsxTileGrid;
         public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
         public IReadOnlyList<string> SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
+        public bool MoveTsxProject(FilePath path) => _inner.MoveTsxProject(path);
+        public bool TsxLacksOutsideChange => _inner.TsxLacksOutsideChange;
         public IReadOnlySet<AnimationChainSave> TsxChainsNotFullySaved => _inner.TsxChainsNotFullySaved;
         public IReadOnlyList<string> GetChainNamesWithTsxIssues() => _inner.GetChainNamesWithTsxIssues();
         public uint? GetTsxOwnerTileId(AnimationChainSave chain) => _inner.GetTsxOwnerTileId(chain);

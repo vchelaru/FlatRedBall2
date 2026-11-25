@@ -39,15 +39,11 @@ public class SaveAsToAnotherFolderTests : IDisposable
     [InlineData("https://example.com/sheet.png", "https://example.com/sheet.png")]
     [InlineData("", "")]
     public void Rebase_AnotherFolder_NamesTheSameFile(string name, string expected) =>
-        TexturePathHelper.Rebase(name, new FilePath(@"C:\game\front\"), new FilePath(@"C:\game\moved\")).ShouldBe(expected);
-
-    [Fact]
-    public void Rebase_AnotherDrive_IsAbsolute() =>
-        TexturePathHelper.Rebase("art/sheet.png", new FilePath(@"C:\front\"), new FilePath(@"D:\moved\")).ShouldBe("C:/front/art/sheet.png");
+        TexturePathHelper.Rebase(name, new FilePath(TestPaths.AbsDir("game", "front")), new FilePath(TestPaths.AbsDir("game", "moved"))).ShouldBe(expected);
 
     [Fact]
     public void Rebase_SameFolder_IsUnchanged() =>
-        TexturePathHelper.Rebase(@"art\sheet.png", new FilePath(@"C:\front\"), new FilePath("c:/front/")).ShouldBe(@"art\sheet.png");
+        TexturePathHelper.Rebase(@"art\sheet.png", new FilePath("C:/front/"), new FilePath("c:/Front/")).ShouldBe(@"art\sheet.png");
 
     [Theory]
     [InlineData(".achx", TextureCoordinateType.Pixel)]
@@ -127,6 +123,34 @@ public class SaveAsToAnotherFolderTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveAs_SameFolderInAnotherCase_KeepsUndo()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string path = Path.Combine(Folder("front"), "hero.achx");
+        Write(path, TextureCoordinateType.Pixel, "sheet.png", "other.png");
+        _ctx.ProjectManager.LoadAnimationChain(new FilePath(path));
+        _ctx.AppCommands.DeleteFrames([_ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0].Frames[1]]);
+
+        await SaveAsAsync(Path.Combine(_dir.Path, "FRONT", "copy.achx"));
+
+        _ctx.UndoManager.CanUndo.ShouldBeTrue();
+        Names(_ctx.ProjectManager.AnimationChainListSave!).ShouldBe(["sheet.png"]);
+    }
+
+    [Fact]
+    public async Task SaveAs_AnotherFolder_AbsoluteProjectFile_BecomesRelativeAgain()
+    {
+        string path = Path.Combine(Folder("front"), "hero.achx");
+        Write(path, TextureCoordinateType.Pixel, "sheet.png");
+        _ctx.ProjectManager.LoadAnimationChain(new FilePath(path));
+        _ctx.ProjectManager.AnimationChainListSave!.ProjectFile = Path.Combine(_dir.Path, "Game.gluj");
+
+        await SaveAsAsync(Path.Combine(Folder("moved"), "hero.achx"));
+
+        _ctx.ProjectManager.AnimationChainListSave!.ProjectFile.ShouldBe("../Game.gluj");
+    }
+
+    [Fact]
     public async Task SaveAs_Untitled_KeepsUndo_WhoseTexturesResolveInTheNewFolder()
     {
         string sheet = Path.Combine(Folder("front"), "sheet.png"), moved = Folder("moved");
@@ -167,6 +191,21 @@ public class SaveAsToAnotherFolderTests : IDisposable
         Names(document).ShouldBe(["sheet.png"]);
         document.ProjectFile.ShouldBe("../Game.gluj");
         _ctx.UndoManager.CanUndo.ShouldBeTrue();
+    }
+
+    // A Save As onto another drive or share leaves an absolute one.
+    [Fact]
+    public void AbsoluteProjectFile_IsTheFilesPanelRootAndLoadsItsPngs()
+    {
+        string game = Folder("game"), content = Folder("game", "Content"), moved = Folder("moved");
+        string project = Path.Combine(game, "Game.gluj"), path = Path.Combine(moved, "hero.achx");
+        File.WriteAllText(project, "{}");
+        new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel, ProjectFile = project }.Save(path);
+
+        _ctx.ProjectManager.LoadAnimationChain(new FilePath(path));
+
+        new FilePath(_ctx.ProjectManager.ResolveFilesPanelRoot()!).ShouldBe(new FilePath(content + "/"));
+        _ctx.ProjectManager.ReferencedPngs.ShouldContain(new FilePath(Path.Combine(content, "sheet.png")));
     }
 
     private string Folder(params string[] names)

@@ -109,15 +109,20 @@ public static class TexturePathHelper
         return Path.GetFullPath(Path.Combine(achxFolder, displayPath));
     }
 
-    /// <summary>
-    /// A relative path as seen from another folder, absolute when that folder is on another drive. Unchanged when it is
-    /// already absolute or a URL.
-    /// </summary>
+    /// <summary>A relative path as seen from another folder: absolute from another drive or share, unchanged when it is absolute
+    /// already, a URL, or not a usable path.</summary>
     public static string Rebase(string path, FilePath fromFolder, FilePath toFolder)
     {
-        if (fromFolder == toFolder || string.IsNullOrEmpty(path) || IsAbsolute(path) || path[0] == '\\' || path.Contains("://"))
+        if (fromFolder == toFolder || string.IsNullOrEmpty(path) || path.Contains("://") || path[0] is '/' or '\\' || path.AsSpan(1).StartsWith(":"))
             return path;
-        return new FilePath(fromFolder.FullPath.TrimEnd('/') + "/" + path).RelativeTo(toFolder);
+        try
+        {
+            return ComputeStorePath(ResolveDisplayPath(path, fromFolder.FullPath), toFolder.FullPath);
+        }
+        catch (System.Exception ex) when (ex is System.ArgumentException or System.InvalidOperationException or IOException)
+        {
+            return path;
+        }
     }
 
     private static bool IsAbsolute(string path)

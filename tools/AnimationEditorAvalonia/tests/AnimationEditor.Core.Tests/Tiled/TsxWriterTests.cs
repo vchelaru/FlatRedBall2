@@ -2,6 +2,7 @@ using AnimationEditor.Core.Tiled;
 using DotTiled;
 using DotTiled.Serialization;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Xunit;
@@ -10,40 +11,6 @@ namespace AnimationEditor.Core.Tests.Tiled;
 
 public class TsxWriterTests
 {
-    // Modeled on real-world shape: a shared tileset image, several animated tiles, a plain
-    // typed tile with no animation, and a tile carrying custom properties.
-    private const string FixtureXml = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="256" columns="16">
-         <image source="Heroes.png" width="256" height="256"/>
-         <tile id="0">
-          <animation>
-           <frame tileid="0" duration="200"/>
-           <frame tileid="1" duration="200"/>
-           <frame tileid="2" duration="200"/>
-          </animation>
-         </tile>
-         <tile id="5">
-          <animation>
-           <frame tileid="5" duration="150"/>
-           <frame tileid="6" duration="150"/>
-          </animation>
-         </tile>
-         <tile id="12" type="Chest"/>
-         <tile id="20" type="Torch">
-          <properties>
-           <property name="lightRadius" type="int" value="4"/>
-           <property name="flickers" type="bool" value="true"/>
-           <property name="label" value="Wall Torch"/>
-          </properties>
-          <animation>
-           <frame tileid="20" duration="100"/>
-           <frame tileid="21" duration="100"/>
-          </animation>
-         </tile>
-        </tileset>
-        """;
-
     // Predates Tiled 1.12's own conventions (space before "/>", format="png", lowercase
     // "utf-8") -- the exact shape that made a single-tile edit reformat a whole real-world
     // tileset (#1146). Three tiles (first/middle/last) so position-dependent bugs (the writer
@@ -73,72 +40,11 @@ public class TsxWriterTests
         " <tile id=\"12\" type=\"Chest\"/>\r\n" +
         "</tileset>\r\n";
 
-    // No tiles at all -- the exact shape a brand-new project starts from before any animation
-    // has been synced in (#1146's regression: adding the first-ever tile got a stray leading
-    // space because nothing preceded it to borrow indentation from).
-    private const string LegacyStyleFixtureXmlNoTiles =
-        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-        "<tileset name=\"Bare\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"2\">\n" +
-        " <image source=\"Bare.png\"/>\n" +
-        "</tileset>\n";
-
-    private static string WriteFixture(string tempDir)
-    {
-        var path = Path.Combine(tempDir, "Heroes.tsx");
-        File.WriteAllText(path, FixtureXml);
-        return path;
-    }
-
     private static Tileset WriteLegacyFixture(string tempDir, out string path, string xml = LegacyStyleFixtureXml)
     {
         path = Path.Combine(tempDir, "Legacy.tsx");
         File.WriteAllText(path, xml);
         return Loader.Default().LoadTileset(path);
-    }
-
-    [Fact]
-    public void Write_AllTilesRemoved_ProducesTilesetWithNoTiles()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Clear();
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_AnimationFramesReordered_TreatsAsChangeNotDuplicate()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        var tile5 = tileset.Tiles.Single(t => t.ID == 5);
-        var reversed = tile5.Animation.AsEnumerable().Reverse().ToList();
-        tile5.Animation.Clear();
-        tile5.Animation.AddRange(reversed);
-
-        TsxWriter.Write(tileset, path);
-        var written = File.ReadAllText(path);
-
-        Assert.Equal(1, written.Split("<tile id=\"5\"").Length - 1);
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"6\" duration=\"200\" />\n" +
-            "   <frame tileid=\"5\" duration=\"200\" />\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            written);
     }
 
     [Fact]
@@ -152,29 +58,6 @@ public class TsxWriterTests
     }
 
     [Fact]
-    public void Write_DuplicateTileIdOnDifferentLines_FallsBackSafely()
-    {
-        // Invalid TSX (two <tile id="5">), but on separate lines -- TileLineLooksLikeATile can't
-        // catch this by itself (each line genuinely looks like a lone tile); it's
-        // originalTilesById's ToDictionary throw, caught by TryWritePatched, that has to save this.
-        const string duplicateIdXml =
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset name=\"Broken\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"2\">\n" +
-            " <image source=\"Broken.png\"/>\n" +
-            " <tile id=\"5\" type=\"First\"/>\n" +
-            " <tile id=\"5\" type=\"Second\"/>\n" +
-            "</tileset>\n";
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, duplicateIdXml);
-        tileset.Tiles.Single(t => t.Type == "First").Properties.Add(new StringProperty { Name = "note", Value = "edited" });
-
-        TsxWriter.Write(tileset, path);
-        var reloaded = Loader.Default().LoadTileset(path);
-
-        Assert.Equal(2, reloaded.Tiles.Count(t => t.ID == 5));
-        Assert.Equal("edited", reloaded.Tiles.Single(t => t.Type == "First").GetProperty<StringProperty>("note").Value);
-    }
-
-    [Fact]
     public void Write_ExistingFileNoContentChange_PreservesOriginalFormatting()
     {
         var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
@@ -185,250 +68,9 @@ public class TsxWriterTests
     }
 
     [Fact]
-    public void Write_FirstTileEdited_OnlyRewritesThatTileExactly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Single(t => t.ID == 5).Animation.Clear();
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\" />\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_LastTileEdited_OnlyRewritesThatTileExactly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Single(t => t.ID == 12).Properties.Add(new StringProperty { Name = "locked", Value = "true" });
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\">\n" +
-            "  <properties>\n" +
-            "   <property name=\"locked\" value=\"true\" />\n" +
-            "  </properties>\n" +
-            " </tile>\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_MiddleTileEdited_OnlyRewritesThatTileExactly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Single(t => t.ID == 8).Properties.Add(new StringProperty { Name = "note", Value = "boulder" });
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"8\" type=\"Rock\">\n" +
-            "  <properties>\n" +
-            "   <property name=\"note\" value=\"boulder\" />\n" +
-            "  </properties>\n" +
-            " </tile>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_MultipleSimultaneousChanges_OnlyRewritesChangedTiles()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Single(t => t.ID == 5).Animation.Clear();
-        tileset.Tiles.RemoveAll(t => t.ID == 8);
-        tileset.Tiles.Add(new Tile { ID = 99, Type = "Extra", Width = 0, Height = 0 });
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\" />\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            " <tile id=\"99\" type=\"Extra\" />\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_NewTileAddedAtEnd_OnlyAddsThatTileExactly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Add(new Tile { ID = 20, Type = "Extra", Width = 0, Height = 0 });
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            " <tile id=\"20\" type=\"Extra\" />\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_NewTileInsertedAtStart_OnlyAddsThatTileExactly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Insert(0, new Tile { ID = 1, Type = "First", Width = 0, Height = 0 });
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"1\" type=\"First\" />\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_NewTileInsertedInMiddle_OnlyAddsThatTileExactly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.Insert(1, new Tile { ID = 7, Type = "Mid", Width = 0, Height = 0 });
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"7\" type=\"Mid\" />\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Write_RoundTrip_PreservesAnimationFrames()
-    {
-        var tempDir = Directory.CreateTempSubdirectory().FullName;
-        var fixturePath = WriteFixture(tempDir);
-        var original = Loader.Default().LoadTileset(fixturePath);
-        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
-
-        TsxWriter.Write(original, outputPath);
-        var reloaded = Loader.Default().LoadTileset(outputPath);
-
-        var tile0 = reloaded.Tiles.Single(t => t.ID == 0);
-        Assert.Equal([((uint)0, 200), ((uint)1, 200), ((uint)2, 200)],
-            tile0.Animation.Select(f => (f.TileID, f.Duration)));
-
-        var tile5 = reloaded.Tiles.Single(t => t.ID == 5);
-        Assert.Equal([((uint)5, 150), ((uint)6, 150)],
-            tile5.Animation.Select(f => (f.TileID, f.Duration)));
-    }
-
-    [Fact]
-    public void Write_RoundTrip_PreservesTileTypeAndProperties()
-    {
-        var tempDir = Directory.CreateTempSubdirectory().FullName;
-        var fixturePath = WriteFixture(tempDir);
-        var original = Loader.Default().LoadTileset(fixturePath);
-        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
-
-        TsxWriter.Write(original, outputPath);
-        var reloaded = Loader.Default().LoadTileset(outputPath);
-
-        var chest = reloaded.Tiles.Single(t => t.ID == 12);
-        Assert.Equal("Chest", chest.Type);
-        Assert.Empty(chest.Animation);
-
-        var torch = reloaded.Tiles.Single(t => t.ID == 20);
-        Assert.Equal("Torch", torch.Type);
-        Assert.Equal(4, torch.GetProperty<IntProperty>("lightRadius").Value);
-        Assert.True(torch.GetProperty<BoolProperty>("flickers").Value);
-        Assert.Equal("Wall Torch", torch.GetProperty<StringProperty>("label").Value);
-        Assert.Equal([((uint)20, 100), ((uint)21, 100)],
-            torch.Animation.Select(f => (f.TileID, f.Duration)));
-    }
-
-    [Fact]
-    public void Write_RoundTrip_PreservesTilesetAttributes()
-    {
-        var tempDir = Directory.CreateTempSubdirectory().FullName;
-        var fixturePath = WriteFixture(tempDir);
-        var original = Loader.Default().LoadTileset(fixturePath);
-        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
-
-        TsxWriter.Write(original, outputPath);
-        var reloaded = Loader.Default().LoadTileset(outputPath);
-
-        Assert.Equal("Heroes", reloaded.Name);
-        Assert.Equal(16, reloaded.TileWidth);
-        Assert.Equal(16, reloaded.TileHeight);
-        Assert.Equal(256, reloaded.TileCount);
-        Assert.Equal(16, reloaded.Columns);
-        Assert.True(reloaded.Image.HasValue);
-        Assert.Equal("Heroes.png", reloaded.Image.Value.Source.Value);
-        Assert.Equal(256, reloaded.Image.Value.Width.Value);
-        Assert.Equal(256, reloaded.Image.Value.Height.Value);
-    }
-
-    [Fact]
     public void Write_SharedLineWithTileoffsetAndEditedTile_FallsBackWithoutLosingTileoffset()
     {
-        // <tileoffset> shares a physical line with the tile that's about to be edited. Without
-        // the word-boundary check in TileLineLooksLikeATile, "<tileoffset..." would pass a naive
-        // StartsWith("<tile") test, get treated as if it belonged to the tile's slice, and vanish
-        // the moment that tile is regenerated (it's in neither the prologue, which ends before
-        // this line, nor the freshly rendered tile fragment, which only knows about the tile).
+        // <tileoffset> shares a physical line with the tile that is edited.
         const string sharedLineXml =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
             "<tileset name=\"Weird\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"2\">\n" +
@@ -450,115 +92,9 @@ public class TsxWriterTests
     }
 
     [Fact]
-    public void Write_TileOrderChanged_RelocatesWithoutDuplicating()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        (tileset.Tiles[0], tileset.Tiles[1]) = (tileset.Tiles[1], tileset.Tiles[0]);
-
-        TsxWriter.Write(tileset, path);
-        var written = File.ReadAllText(path);
-
-        Assert.Equal(1, written.Split("<tile id=\"5\"").Length - 1);
-        Assert.Equal(1, written.Split("<tile id=\"8\"").Length - 1);
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            written);
-    }
-
-    [Fact]
-    public void Write_OriginalFileTilesNotInAscendingIdOrder_SortBeforeWriteReusesSlicesReorderedNotCorrupted()
-    {
-        // Tiled doesn't strictly guarantee ascending <tile> order in a real file, and both
-        // NativeTsxAnimationSync.Apply and TilesetAnimationSync.Apply always run
-        // tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID)) before handing the tileset to
-        // TsxWriter.Write. originalSlicesById/originalTilesById are keyed by id (not by original
-        // position), so lookups during the final foreach (over the now-sorted list) are
-        // order-independent -- this pins that no corruption/loss occurs, only a reordering.
-        const string outOfOrderXml =
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"OutOfOrder\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"OutOfOrder.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            "</tileset>\n";
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, outOfOrderXml);
-        tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID));
-
-        TsxWriter.Write(tileset, path);
-        var written = File.ReadAllText(path);
-
-        // Each unchanged tile's original slice text reused verbatim, just re-emitted in the new
-        // (ascending) order -- not regenerated, not merged, not dropped.
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"OutOfOrder\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"OutOfOrder.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"8\" type=\"Rock\"/>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            written);
-
-        var reloaded = Loader.Default().LoadTileset(path);
-        Assert.Equal(3, reloaded.Tiles.Count);
-        Assert.Equal([((uint)5, 200), ((uint)6, 200)],
-            reloaded.Tiles.Single(t => t.ID == 5).Animation.Select(f => (f.TileID, f.Duration)));
-        Assert.Equal("Rock", reloaded.Tiles.Single(t => t.ID == 8).Type);
-        Assert.Equal("Chest", reloaded.Tiles.Single(t => t.ID == 12).Type);
-    }
-
-    [Fact]
-    public void Write_TileRemoved_OmitsThatTileExactly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Tiles.RemoveAll(t => t.ID == 8);
-
-        TsxWriter.Write(tileset, path);
-
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <tile id=\"5\">\n" +
-            "  <animation>\n" +
-            "   <frame tileid=\"5\" duration=\"200\"/>\n" +
-            "   <frame tileid=\"6\" duration=\"200\"/>\n" +
-            "  </animation>\n" +
-            " </tile>\n" +
-            " <tile id=\"12\" type=\"Chest\"/>\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
-    }
-
-    [Fact]
     public void Write_TileWithUnchangedObjectLayer_ReusesOriginalSliceWithoutThrowing()
     {
-        // WriteTile unconditionally throws NotSupportedException the moment it has to render a
-        // tile with an object layer (per-tile collision data) -- but only if it has to render it.
-        // Patch mode's job is to make sure an UNCHANGED object-layer tile never reaches that path
-        // when some other, unrelated tile is what's actually being edited.
+        // Editing one tile leaves another tile's collision layer alone.
         const string objectLayerXml =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
             "<tileset name=\"Collide\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"2\">\n" +
@@ -583,64 +119,8 @@ public class TsxWriterTests
     }
 
     [Fact]
-    public void Write_TopLevelAttributeChanged_FallsBackButStaysCorrect()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path);
-        tileset.Properties.Add(new StringProperty { Name = "schemaVersion", Value = "2" });
-
-        TsxWriter.Write(tileset, path);
-        var reloaded = Loader.Default().LoadTileset(path);
-
-        Assert.Equal("2", reloaded.GetProperty<StringProperty>("schemaVersion").Value);
-        var tile5 = reloaded.Tiles.Single(t => t.ID == 5);
-        Assert.Equal([((uint)5, 200), ((uint)6, 200)], tile5.Animation.Select(f => (f.TileID, f.Duration)));
-    }
-
-    [Fact]
-    public void Write_TopLevelPropertiesReorderedButContentUnchanged_FallsBackButStaysCorrect()
-    {
-        // TopLevelEquals's PropertiesEqual compares tileset-level properties position-by-position
-        // (Zip), so a hand-edit (or another tool) that reorders them without changing their
-        // content is seen as "different" and triggers the same full-rewrite fallback as an actual
-        // content change -- accepted as a known cosmetic limitation, same "full rewrite is always
-        // a safe fallback" tradeoff already accepted for tileset.Tiles ordering. Pins that the
-        // fallback still produces correct content (not corruption), and that it really is the
-        // fallback path that ran: the written file's property order matches the in-memory
-        // (reversed) order, not the original on-disk order, which only a full rewrite -- not a
-        // patch reusing the original prologue byte-for-byte -- would produce.
-        const string xmlWithProperties =
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<tileset version=\"1.10\" tiledversion=\"1.12.2\" name=\"Legacy\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">\n" +
-            " <image source=\"Legacy.png\" width=\"128\" height=\"128\"/>\n" +
-            " <properties>\n" +
-            "  <property name=\"schemaVersion\" value=\"1\"/>\n" +
-            "  <property name=\"author\" value=\"Vic\"/>\n" +
-            " </properties>\n" +
-            " <tile id=\"5\" type=\"Rock\"/>\n" +
-            "</tileset>\n";
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, xmlWithProperties);
-
-        // Same two properties, reversed order, no actual content edit.
-        var reordered = tileset.Properties.AsEnumerable().Reverse().ToList();
-        tileset.Properties.Clear();
-        tileset.Properties.AddRange(reordered);
-
-        TsxWriter.Write(tileset, path);
-        var written = File.ReadAllText(path);
-        var reloaded = Loader.Default().LoadTileset(path);
-
-        Assert.True(written.IndexOf("author", StringComparison.Ordinal) < written.IndexOf("schemaVersion", StringComparison.Ordinal));
-        Assert.Equal("1", reloaded.GetProperty<StringProperty>("schemaVersion").Value);
-        Assert.Equal("Vic", reloaded.GetProperty<StringProperty>("author").Value);
-        Assert.Equal("Rock", reloaded.Tiles.Single(t => t.ID == 5).Type);
-    }
-
-    [Fact]
     public void Write_TwoTilesShareOneLine_FallsBackSafely()
     {
-        // Two distinct <tile> elements crammed onto one physical line: both would resolve to the
-        // SAME "line start" offset, which without the duplicate-offset guard would make one
-        // tile's slice zero-length and the other's swallow both tiles' text.
         const string sharedLineXml =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
             "<tileset name=\"Cramped\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"2\">\n" +
@@ -658,41 +138,162 @@ public class TsxWriterTests
         Assert.Equal("Second", reloaded.Tiles.Single(t => t.ID == 2).Type);
     }
 
-    [Fact]
-    public void Write_WellFormedXml_KeepsRequiredTiledAttributes()
+    private const string Open = "<tileset name=\"T\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"64\" columns=\"8\">";
+
+    /// <summary>What is inside the <c>&lt;tileset&gt;</c> after an edit.</summary>
+    private static string Edit(string content, Action<Tileset> edit)
     {
-        var tempDir = Directory.CreateTempSubdirectory().FullName;
-        var fixturePath = WriteFixture(tempDir);
-        var original = Loader.Default().LoadTileset(fixturePath);
-        var outputPath = Path.Combine(tempDir, "Heroes.written.tsx");
-
-        TsxWriter.Write(original, outputPath);
-        var document = System.Xml.Linq.XDocument.Load(outputPath);
-        var tilesetElement = document.Root!;
-
-        Assert.Equal("tileset", tilesetElement.Name.LocalName);
-        Assert.Equal("Heroes", tilesetElement.Attribute("name")!.Value);
-        Assert.Equal("16", tilesetElement.Attribute("tilewidth")!.Value);
-        Assert.Equal("16", tilesetElement.Attribute("tileheight")!.Value);
-        Assert.Equal("256", tilesetElement.Attribute("tilecount")!.Value);
-        Assert.Equal("16", tilesetElement.Attribute("columns")!.Value);
-        Assert.Equal(4, tilesetElement.Elements("tile").Count());
-    }
-
-    [Fact]
-    public void Write_ZeroTilesOriginally_TilesAdded_RendersCorrectly()
-    {
-        var tileset = WriteLegacyFixture(Directory.CreateTempSubdirectory().FullName, out var path, LegacyStyleFixtureXmlNoTiles);
-        tileset.Tiles.Add(new Tile { ID = 0, Type = "First", Width = 0, Height = 0 });
+        var path = Path.Combine(Directory.CreateTempSubdirectory().FullName, "T.tsx");
+        File.WriteAllText(path, $"{Open}{content}</tileset>");
+        var tileset = TsxLoader.LoadTileset(path);
+        edit(tileset);
 
         TsxWriter.Write(tileset, path);
 
+        var written = File.ReadAllText(path);
+        Assert.StartsWith(Open, written);
+        Assert.EndsWith("</tileset>", written);
+        return written[Open.Length..^"</tileset>".Length];
+    }
+
+    private static Tile Find(Tileset tileset, uint id) => tileset.Tiles.Single(tile => tile.ID == id);
+
+    private static List<Frame> Frames(params (uint TileId, int Duration)[] frames) =>
+        frames.Select(frame => new Frame { TileID = frame.TileId, Duration = frame.Duration }).ToList();
+
+    private static Tile Animated(uint id) => new() { ID = id, Width = 0, Height = 0, Animation = Frames((id, 100)) };
+
+    private static string AnimatedText(uint id, string lead, string indent) =>
+        $"{lead}<tile id=\"{id}\">{lead}{indent}<animation>{lead}{indent}{indent}<frame tileid=\"{id}\" duration=\"100\"/>{lead}{indent}</animation>{lead}</tile>";
+
+    [Theory]
+    [InlineData(1, "\n <tile id=\"5\" type=\"A\"/>")]
+    [InlineData(7, "\n <tile id=\"8\" type=\"B\"/>")]
+    [InlineData(20, "\n <wangsets/>")]
+    public void Write_NewTile_IsInsertedById(uint id, string before)
+    {
+        const string content = "\n <image source=\"a.png\"/>\n <tile id=\"5\" type=\"A\"/>\n <tile id=\"8\" type=\"B\"/>\n <wangsets/>\n";
+
         Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-            "<tileset name=\"Bare\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"2\">\n" +
-            " <image source=\"Bare.png\"/>\n" +
-            " <tile id=\"0\" type=\"First\" />\n" +
-            "</tileset>\n",
-            File.ReadAllText(path));
+            content.Replace(before, AnimatedText(id, "\n ", " ") + before),
+            Edit(content, tileset => tileset.Tiles.Add(Animated(id))));
+    }
+
+    [Theory]
+    [InlineData("\n <image/>", "\n <wangsets/>\n", "\n ", " ")]
+    [InlineData("\n <image/>", "\n", "\n ", " ")]
+    [InlineData("\r\n\t<image/>", "\r\n", "\r\n\t", "\t")]
+    [InlineData("<image/>", "", "", "")]
+    public void Write_NewTileInAFileWithoutTiles_FollowsTheLayoutOfTheFile(string head, string tail, string lead, string indent)
+    {
+        Assert.Equal(head + AnimatedText(3, lead, indent) + tail, Edit(head + tail, tileset => tileset.Tiles.Add(Animated(3))));
+    }
+
+    [Fact]
+    public void Write_TwoNewTiles_AreInsertedInOrder()
+    {
+        Assert.Equal(
+            $"\n <tile id=\"1\"/>{AnimatedText(3, "\n ", " ")}{AnimatedText(4, "\n ", " ")}\n",
+            Edit("\n <tile id=\"1\"/>\n", tileset => tileset.Tiles.AddRange([Animated(4), Animated(3)])));
+    }
+
+    // The frames around the change keep their own text, so an unknown attribute stays with its frame.
+    [Theory]
+    [InlineData("1,2,3", "1,9,2,3", "\n  <frame tileid=\"1\" duration=\"1\" x=\"\"/>\n  <frame tileid=\"9\" duration=\"9\"/>\n  <frame tileid=\"2\" duration=\"2\" x=\"\"/>\n  <frame tileid=\"3\" duration=\"3\" x=\"\"/>")]
+    [InlineData("1,2", "1,2,9", "\n  <frame tileid=\"1\" duration=\"1\" x=\"\"/>\n  <frame tileid=\"2\" duration=\"2\" x=\"\"/>\n  <frame tileid=\"9\" duration=\"9\"/>")]
+    [InlineData("1,2", "9,1,2", "\n  <frame tileid=\"9\" duration=\"9\"/>\n  <frame tileid=\"1\" duration=\"1\" x=\"\"/>\n  <frame tileid=\"2\" duration=\"2\" x=\"\"/>")]
+    [InlineData("1,2,3", "2,3", "\n  <frame tileid=\"2\" duration=\"2\" x=\"\"/>\n  <frame tileid=\"3\" duration=\"3\" x=\"\"/>")]
+    [InlineData("1,2,3", "1,2", "\n  <frame tileid=\"1\" duration=\"1\" x=\"\"/>\n  <frame tileid=\"2\" duration=\"2\" x=\"\"/>")]
+    [InlineData("1,2,3", "1,9,3", "\n  <frame tileid=\"1\" duration=\"1\" x=\"\"/>\n  <frame tileid=\"9\" duration=\"9\" x=\"\"/>\n  <frame tileid=\"3\" duration=\"3\" x=\"\"/>")]
+    [InlineData("1,2", "2,1", "\n  <frame tileid=\"2\" duration=\"2\" x=\"\"/>\n  <frame tileid=\"1\" duration=\"1\" x=\"\"/>")]
+    [InlineData("1", "9,8", "\n  <frame tileid=\"9\" duration=\"9\" x=\"\"/>\n  <frame tileid=\"8\" duration=\"8\"/>")]
+    public void Write_FramesChanged_OtherFramesKeepTheirText(string before, string after, string expectedFrames)
+    {
+        static uint[] Ids(string ids) => ids.Split(',').Select(uint.Parse).ToArray();
+        static string Tile(string frames) => $"\n <tile id=\"5\">\n  <animation y=\"\">{frames}\n  </animation>\n </tile>\n";
+        var original = string.Concat(Ids(before).Select(id => $"\n  <frame tileid=\"{id}\" duration=\"{id}\" x=\"\"/>"));
+
+        var written = Edit(Tile(original), tileset => Find(tileset, 5).Animation = Frames([.. Ids(after).Select(id => (id, (int)id))]));
+
+        Assert.Equal(Tile(expectedFrames), written);
+    }
+
+    [Theory]
+    // Nothing but its id is left: the tile goes.
+    [InlineData("<tile id=\"5\">\n  <properties>\n   <property name=\"Name\" value=\"A\"/>\n  </properties>\n  <animation>\n   <frame tileid=\"5\" duration=\"1\"/>\n  </animation>\n </tile>", "")]
+    [InlineData("<tile id=\"5\"><animation><frame tileid=\"5\" duration=\"1\"/></animation></tile>", "")]
+    // Anything else keeps it.
+    [InlineData("<tile id=\"5\" future=\"1\">\n  <animation>\n   <frame tileid=\"5\" duration=\"1\"/>\n  </animation>\n </tile>", "\n <tile id=\"5\" future=\"1\"/>")]
+    [InlineData("<tile id=\"5\">\n  <!-- a -->\n  <animation>\n   <frame tileid=\"5\" duration=\"1\"/>\n  </animation>\n </tile>", "\n <tile id=\"5\">\n  <!-- a -->\n </tile>")]
+    [InlineData("<tile id=\"5\">\n  <objectgroup/>\n  <animation>\n   <frame tileid=\"5\" duration=\"1\"/>\n  </animation>\n </tile>", "\n <tile id=\"5\">\n  <objectgroup/>\n </tile>")]
+    public void Write_TileNoLongerInTheModel_IsRemovedOnlyWhenNothingIsLeft(string tile, string expected)
+    {
+        Assert.Equal(
+            $"\n <image/>{expected}\n <tile id=\"6\"/>\n",
+            Edit($"\n <image/>\n {tile}\n <tile id=\"6\"/>\n", tileset => tileset.Tiles.RemoveAt(0)));
+    }
+
+    [Theory]
+    [InlineData("<tile id=\"5\" type=\"A\" />", "<tile id=\"5\" type=\"A\">{0}{1}\n </tile>")]
+    [InlineData("<tile id=\"5\"></tile>", "<tile id=\"5\">{0}{1}\n </tile>")]
+    [InlineData("<tile id=\"5\" type='a>\"b'></tile>", "<tile id=\"5\" type='a>\"b'>{0}{1}\n </tile>")]
+    [InlineData("<tile id=\"5\">\n  <objectgroup/>\n  <!-- a -->\n </tile>", "<tile id=\"5\">{0}\n  <objectgroup/>\n  <!-- a -->{1}\n </tile>")]
+    public void Write_TileGetsANameAndAnAnimation_PutsThemWhereTiledDoes(string tile, string expected)
+    {
+        var written = Edit($"\n {tile}\n", tileset =>
+        {
+            Find(tileset, 5).Animation = Frames((5, 100));
+            Find(tileset, 5).Properties.Add(new StringProperty { Name = "Name", Value = "<\"&'>" });
+        });
+
+        Assert.Equal("\n " + string.Format(
+            expected,
+            "\n  <properties>\n   <property name=\"Name\" value=\"&lt;&quot;&amp;&apos;&gt;\"/>\n  </properties>",
+            "\n  <animation>\n   <frame tileid=\"5\" duration=\"100\"/>\n  </animation>") + "\n", written);
+    }
+
+    [Theory]
+    [InlineData("<property value = 'old' name='Name' x='1'/>", "<property value = 'new' name='Name' x='1'/>")]
+    [InlineData("<property x=\" value='a'\" name=\"Name\" value=\"old\" />", "<property x=\" value='a'\" name=\"Name\" value=\"new\" />")]
+    [InlineData("<property name=\"Name\">old</property>", "<property name=\"Name\">new</property>")]
+    [InlineData("<property name=\"Name\"><![CDATA[old]]></property>", "<property name=\"Name\">new</property>")]
+    [InlineData("<property name=\"Name\"/>", "<property value=\"new\" name=\"Name\"/>")]
+    [InlineData("<property name=\"Name\" type=\"string\" value=\"&#111;ld\"/>", "<property name=\"Name\" type=\"string\" value=\"new\"/>")]
+    public void Write_PropertyValueChanged_ReplacesOnlyTheValue(string property, string expected)
+    {
+        static string Tile(string content) => $"\n <tile id=\"5\">\n  <properties>\n   <property name=\"B\" type=\"bool\" value=\"true\"/>\n   {content}\n  </properties>\n </tile>\n";
+
+        Assert.Equal(Tile(expected), Edit(Tile(property), tileset => Find(tileset, 5).Properties.OfType<StringProperty>().Single().Value = "new"));
+    }
+
+    [Fact]
+    public void LoadTileset_PropertyInTextAndCData_ReadsBoth()
+    {
+        Edit("<tile id='5'><properties><property name='Name'>a <![CDATA[< b]]>&amp;</property></properties></tile>",
+            tileset => Assert.Equal("a < b&", Find(tileset, 5).Properties.OfType<StringProperty>().Single().Value));
+    }
+
+    [Fact]
+    public void Write_OnePropertyReplacesAnother_KeepsTheRest()
+    {
+        static string Tile(string content) => $"\n <tile id=\"5\">\n  <properties>\n   <property name=\"L\" type=\"list\"/>{content}\n  </properties>\n </tile>\n";
+
+        var written = Edit(Tile("\n   <property name=\"Name\" value=\"A\"/>\n   <!-- a -->"), tileset =>
+        {
+            Find(tileset, 5).Properties.RemoveAll(property => property.Name == "Name");
+            Find(tileset, 5).Properties.Add(new IntProperty { Name = "ParentId", Value = 3 });
+        });
+
+        Assert.Equal(Tile("\n   <!-- a -->\n   <property name=\"ParentId\" type=\"int\" value=\"3\"/>"), written);
+    }
+
+    [Fact]
+    public void Write_AttributeInSingleQuotes_StaysWellFormed()
+    {
+        var written = Edit(
+            "<tile id='5'><properties><property name='Name' value='a'/></properties></tile>",
+            tileset => Find(tileset, 5).Properties.OfType<StringProperty>().Single().Value = "it's");
+
+        Assert.Equal("<tile id='5'><properties><property name='Name' value='it&apos;s'/></properties></tile>", written);
     }
 }

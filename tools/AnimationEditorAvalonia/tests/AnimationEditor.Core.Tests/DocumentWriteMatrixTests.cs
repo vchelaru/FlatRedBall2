@@ -41,7 +41,6 @@ public class DocumentWriteMatrixTests
     /// <summary>The issue of a row that is a real bug and how the row fails, or null. The fix deletes the line.</summary>
     private static (string Issue, string Failure)? KnownBug(DocAction action, DocType front) => (action, front) switch
     {
-        (DocAction.SaveAsToAnotherFolder, DocType.Tsx) => ("#2016", "the new file names files that are not there"),
         _ => null,
     };
 
@@ -52,14 +51,18 @@ public class DocumentWriteMatrixTests
         Documents.Rows(Actions, (action, front, background) => Applies(action, front, background) && KnownBug(action, front) is not null);
 
     // Passes while the row fails the way its issue says, so the fix has to delete its line.
-    [Theory]
-    [MemberData(nameof(KnownBugRows))]
-    public async Task KnownBug_StillFails(DocAction action, DocType front, DocType background)
+    // A fact, as a theory with no rows fails.
+    [Fact]
+    public async Task KnownBug_StillFails()
     {
-        var (issue, failure) = KnownBug(action, front)!.Value;
-        Exception? thrown = await Record.ExceptionAsync(() => Action_KeepsEveryDocument(action, front, background));
-        Assert.True(thrown != null, $"{issue} is fixed: delete its line from KnownBug.");
-        Assert.Contains(failure, thrown.Message);
+        foreach (object[] row in KnownBugRows())
+        {
+            var (action, front, background) = ((DocAction)row[0], (DocType)row[1], (DocType)row[2]);
+            var (issue, failure) = KnownBug(action, front)!.Value;
+            Exception? thrown = await Record.ExceptionAsync(() => Action_KeepsEveryDocument(action, front, background));
+            Assert.True(thrown != null, $"{issue} is fixed for {action}, {front}, {background}: delete its line from KnownBug.");
+            Assert.Contains(failure, thrown.Message);
+        }
     }
 
     [Theory]

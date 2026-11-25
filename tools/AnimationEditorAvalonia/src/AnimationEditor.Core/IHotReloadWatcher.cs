@@ -43,5 +43,9 @@ namespace AnimationEditor.Core.HotReload
         /// content and suppressed, while an external write still fires. The watcher never samples
         /// the file mid-write: its content check waits for the save to finish.</summary>
         void RunOwnSave(string filePath, Action write);
+
+        /// <summary>Reports the file as changed on disk although the last write to it was an own save, because that
+        /// write kept a change of another program. The default does nothing, for doubles that watch nothing.</summary>
+        void ReportChange(string filePath) { }
     }
 }
