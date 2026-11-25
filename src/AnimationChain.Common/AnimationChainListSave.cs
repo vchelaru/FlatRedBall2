@@ -71,6 +71,8 @@ public class AnimationChainListSave
     /// </summary>
     public string? ProjectFile { get; set; }
 
+    internal EmptyTextForms EmptyText;
+
     /// <summary>
     /// Loads a .achx file directly from disk via <see cref="File.OpenRead(string)"/>. Intended
     /// for tooling (file pickers in the AnimationEditor) where the caller has an absolute path
@@ -235,12 +237,13 @@ public class AnimationChainListSave
         {
             var chain = new AnimationChainSave
             {
-                Name = (string?)chainEl.Element("Name") ?? string.Empty,
                 IsLocked = BoolEl(chainEl, "Locked"),
                 Loop = BoolEl(chainEl, "Loop", true),
                 PingPong = BoolEl(chainEl, "PingPong"),
                 Reverse = BoolEl(chainEl, "Reverse"),
             };
+            chain.Name = chain.EmptyText.Read(chainEl, "Name");
+            chain.ParentFile = chain.EmptyText.ReadOptional(chainEl, "ParentFile");
 
             foreach (var frameEl in chainEl.Elements("Frame"))
                 chain.Frames.Add(ParseFrame(frameEl, $"Animation '{chain.Name}', frame {chain.Frames.Count + 1}"));
@@ -248,8 +251,7 @@ public class AnimationChainListSave
             result.AnimationChains.Add(chain);
         }
 
-        var projectFileEl = root.Element("ProjectFile");
-        if (projectFileEl != null) result.ProjectFile = projectFileEl.Value;
+        result.ProjectFile = result.EmptyText.ReadOptional(root, "ProjectFile");
 
         return result;
     }
@@ -275,8 +277,8 @@ public class AnimationChainListSave
     /// Frame <see cref="AnimationFrameSave.Events"/> (an FRB2 extension) are written last in the frame as
     /// <c>&lt;Events&gt;&lt;Event&gt;&lt;Name/&gt;&lt;Data/&gt;&lt;/Event&gt;&lt;/Events&gt;</c>, only when the frame has any;
     /// <c>Data</c> is omitted when <c>null</c>.
-    /// AxisAlignedCubeSaves and SphereSaves are FRB1 3D placeholders FRB2 does not model — always
-    /// emitted empty for dialect parity.
+    /// FRB1 fields FRB2 does not model (a chain's ParentFile, a shape's Parent, a polygon's RotationZ, cubes and spheres)
+    /// are carried as read, and text that reads as empty keeps its form: left out, self-closed or an empty pair of tags.
     /// </remarks>
     public void Save(string path)
     {
@@ -513,7 +515,8 @@ public class AnimationChainListSave
         foreach (var chain in AnimationChains)
         {
             var chainEl = new XElement("AnimationChain",
-                new XElement("Name", chain.Name));
+                chain.EmptyText.Write("Name", chain.Name),
+                chain.EmptyText.Write("ParentFile", chain.ParentFile));
             // Tooling-only, written only when true so an unlocked/legacy chain round-trips
             // byte-identical (same convention as the frame writer's optional fields below).
             if (chain.IsLocked)
@@ -532,8 +535,7 @@ public class AnimationChainListSave
             root.Add(chainEl);
         }
 
-        if (ProjectFile != null)
-            root.Add(new XElement("ProjectFile", ProjectFile));
+        root.Add(EmptyText.Write("ProjectFile", ProjectFile));
 
         ThrowIfUnstorable(root);
         return new XDocument(new XDeclaration("1.0", "utf-8", null), root);
@@ -560,7 +562,7 @@ public class AnimationChainListSave
         if (frame.FlipHorizontal) el.Add(new XElement("FlipHorizontal", "true"));
         if (frame.FlipVertical) el.Add(new XElement("FlipVertical", "true"));
         if (frame.FlipDiagonal) el.Add(new XElement("FlipDiagonal", "true"));
-        el.Add(new XElement("TextureName", frame.TextureName));
+        el.Add(frame.EmptyText.Write("TextureName", frame.TextureName));
         el.Add(new XElement("FrameLength", FloatStr(frame.FrameLength)));
         el.Add(new XElement("LeftCoordinate", FloatStr(frame.LeftCoordinate)));
         el.Add(new XElement("RightCoordinate", FloatStr(frame.RightCoordinate)));
@@ -582,10 +584,10 @@ public class AnimationChainListSave
         // written back exactly as read, including ones this version does not understand.
         if (frame.SkipOffsetKeyframe) el.Add(new XElement("SkipOffsetKeyframe", "true"));
         if (frame.SkipColorKeyframe) el.Add(new XElement("SkipColorKeyframe", "true"));
-        if (frame.OffsetInterpolation != null) el.Add(new XElement("OffsetInterpolation", frame.OffsetInterpolation));
-        if (frame.OffsetEasing != null) el.Add(new XElement("OffsetEasing", frame.OffsetEasing));
-        if (frame.ColorInterpolation != null) el.Add(new XElement("ColorInterpolation", frame.ColorInterpolation));
-        if (frame.ColorEasing != null) el.Add(new XElement("ColorEasing", frame.ColorEasing));
+        el.Add(frame.EmptyText.Write("OffsetInterpolation", frame.OffsetInterpolation));
+        el.Add(frame.EmptyText.Write("OffsetEasing", frame.OffsetEasing));
+        el.Add(frame.EmptyText.Write("ColorInterpolation", frame.ColorInterpolation));
+        el.Add(frame.EmptyText.Write("ColorEasing", frame.ColorEasing));
 
         // Preserve wrapper presence so every FRB1 file round-trips byte-identical: the loader sets
         // ShapesSave non-null iff the frame had a <ShapeCollectionSave> element. Some FRB1 files
@@ -601,9 +603,9 @@ public class AnimationChainListSave
             var eventsEl = new XElement("Events");
             foreach (var frameEvent in frame.Events)
             {
-                var eventEl = new XElement("Event", new XElement("Name", frameEvent.Name));
-                if (frameEvent.Data != null) eventEl.Add(new XElement("Data", frameEvent.Data));
-                eventsEl.Add(eventEl);
+                eventsEl.Add(new XElement("Event",
+                    frameEvent.EmptyText.Write("Name", frameEvent.Name),
+                    frameEvent.EmptyText.Write("Data", frameEvent.Data)));
             }
             el.Add(eventsEl);
         }
@@ -614,7 +616,7 @@ public class AnimationChainListSave
     {
         // FRB1 groups shapes into typed lists (not one ordered list), in this exact element
         // order: rectangles, cubes, polygons, circles, spheres. Cubes and spheres are FRB1-era
-        // 3D placeholders FRB2 does not model — emitted as empty elements for dialect parity.
+        // 3D placeholders FRB2 does not model — carried as read, and empty elements otherwise.
         var rectsEl = new XElement("AxisAlignedRectangleSaves");
         foreach (var r in shapes.AARectSaves)
             rectsEl.Add(new XElement("AxisAlignedRectangleSave",
@@ -623,7 +625,8 @@ public class AnimationChainListSave
                 new XElement("Z", FloatStr(r.Z)),
                 new XElement("ScaleX", FloatStr(r.ScaleX)),
                 new XElement("ScaleY", FloatStr(r.ScaleY)),
-                new XElement("Name", r.Name),
+                r.EmptyText.Write("Name", r.Name),
+                r.EmptyText.Write("Parent", r.Parent),
                 WriteColor(r), WriteShapeKeyframes(r)));
 
         var polysEl = new XElement("PolygonSaves");
@@ -634,12 +637,16 @@ public class AnimationChainListSave
                 pointsEl.Add(new XElement("Point",
                     new XElement("X", FloatStr(v.X)),
                     new XElement("Y", FloatStr(v.Y))));
+            var nameEl = p.EmptyText.Write("Name", p.Name);
+            // FRB1 always writes RotationZ, so a polygon that has it keeps FRB1's element order: the name after the points.
             polysEl.Add(new XElement("PolygonSave",
-                new XElement("Name", p.Name),
+                p.RotationZ == null ? nameEl : null,
                 new XElement("X", FloatStr(p.X)),
                 new XElement("Y", FloatStr(p.Y)),
                 new XElement("Z", FloatStr(p.Z)),
+                p.RotationZ is { } rotation ? new XElement("RotationZ", FloatStr(rotation)) : null,
                 pointsEl,
+                p.RotationZ == null ? null : nameEl,
                 WriteColor(p), WriteShapeKeyframes(p)));
         }
 
@@ -650,15 +657,16 @@ public class AnimationChainListSave
                 new XElement("Y", FloatStr(c.Y)),
                 new XElement("Z", FloatStr(c.Z)),
                 new XElement("Radius", FloatStr(c.Radius)),
-                new XElement("Name", c.Name),
+                c.EmptyText.Write("Name", c.Name),
+                c.EmptyText.Write("Parent", c.Parent),
                 WriteColor(c), WriteShapeKeyframes(c)));
 
         return new XElement("ShapeCollectionSave",
             rectsEl,
-            new XElement("AxisAlignedCubeSaves"),
+            new XElement(shapes.CubeSaves ?? new XElement("AxisAlignedCubeSaves")),
             polysEl,
             circlesEl,
-            new XElement("SphereSaves"));
+            new XElement(shapes.SphereSaves ?? new XElement("SphereSaves")));
     }
 
     // Shape keyframe interpolation (#1478), an FRB2 extension: written only when set, so existing files stay
@@ -667,37 +675,40 @@ public class AnimationChainListSave
     private static IEnumerable<XElement> WriteShapeKeyframes(ShapeSave shape)
     {
         if (shape.SkipOffsetKeyframe) yield return new XElement("SkipOffsetKeyframe", "true");
-        if (shape.OffsetInterpolation != null) yield return new XElement("OffsetInterpolation", shape.OffsetInterpolation);
-        if (shape.OffsetEasing != null) yield return new XElement("OffsetEasing", shape.OffsetEasing);
+        if (shape.EmptyText.Write("OffsetInterpolation", shape.OffsetInterpolation) is { } elOffsetInterpolation) yield return elOffsetInterpolation;
+        if (shape.EmptyText.Write("OffsetEasing", shape.OffsetEasing) is { } elOffsetEasing) yield return elOffsetEasing;
         if (shape is PolygonSave poly)
         {
             if (poly.SkipPointsKeyframe) yield return new XElement("SkipPointsKeyframe", "true");
-            if (poly.PointsInterpolation != null) yield return new XElement("PointsInterpolation", poly.PointsInterpolation);
-            if (poly.PointsEasing != null) yield return new XElement("PointsEasing", poly.PointsEasing);
+            if (poly.EmptyText.Write("PointsInterpolation", poly.PointsInterpolation) is { } elPointsInterpolation) yield return elPointsInterpolation;
+            if (poly.EmptyText.Write("PointsEasing", poly.PointsEasing) is { } elPointsEasing) yield return elPointsEasing;
             yield break;
         }
         if (shape is not SizedShapeSave sized) yield break;
         if (sized.SkipSizeKeyframe) yield return new XElement("SkipSizeKeyframe", "true");
-        if (sized.SizeInterpolation != null) yield return new XElement("SizeInterpolation", sized.SizeInterpolation);
-        if (sized.SizeEasing != null) yield return new XElement("SizeEasing", sized.SizeEasing);
+        if (sized.EmptyText.Write("SizeInterpolation", sized.SizeInterpolation) is { } elSizeInterpolation) yield return elSizeInterpolation;
+        if (sized.EmptyText.Write("SizeEasing", sized.SizeEasing) is { } elSizeEasing) yield return elSizeEasing;
     }
 
-    private static void ReadShapeKeyframes(XElement el, ShapeSave target)
+    private static void ReadShapeFields(XElement el, ShapeSave target)
     {
+        target.Name = target.EmptyText.Read(el, "Name");
         target.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
-        target.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
-        target.OffsetEasing = (string?)el.Element("OffsetEasing");
+        target.OffsetInterpolation = target.EmptyText.ReadOptional(el, "OffsetInterpolation");
+        target.OffsetEasing = target.EmptyText.ReadOptional(el, "OffsetEasing");
         if (target is PolygonSave poly)
         {
+            poly.RotationZ = el.Element("RotationZ") == null ? null : FloatEl(el, "RotationZ");
             poly.SkipPointsKeyframe = BoolEl(el, "SkipPointsKeyframe");
-            poly.PointsInterpolation = (string?)el.Element("PointsInterpolation");
-            poly.PointsEasing = (string?)el.Element("PointsEasing");
+            poly.PointsInterpolation = poly.EmptyText.ReadOptional(el, "PointsInterpolation");
+            poly.PointsEasing = poly.EmptyText.ReadOptional(el, "PointsEasing");
             return;
         }
         if (target is not SizedShapeSave sized) return;
+        sized.Parent = sized.EmptyText.ReadOptional(el, "Parent");
         sized.SkipSizeKeyframe = BoolEl(el, "SkipSizeKeyframe");
-        sized.SizeInterpolation = (string?)el.Element("SizeInterpolation");
-        sized.SizeEasing = (string?)el.Element("SizeEasing");
+        sized.SizeInterpolation = sized.EmptyText.ReadOptional(el, "SizeInterpolation");
+        sized.SizeEasing = sized.EmptyText.ReadOptional(el, "SizeEasing");
     }
 
     private static void WriteShapeKeyframesJson(JsonObject obj, ShapeSave shape)
@@ -757,7 +768,7 @@ public class AnimationChainListSave
     private static AnimationFrameSave ParseFrame(XElement el, string location)
     {
         var frame = new AnimationFrameSave();
-        frame.TextureName = (string?)el.Element("TextureName") ?? string.Empty;
+        frame.TextureName = frame.EmptyText.Read(el, "TextureName");
         frame.FrameLength = FloatEl(el, "FrameLength");
         frame.LeftCoordinate = FloatEl(el, "LeftCoordinate");
         frame.RightCoordinate = FloatEl(el, "RightCoordinate", 1f);
@@ -775,10 +786,10 @@ public class AnimationChainListSave
         frame.ColorOperation = ColorOperationEl(el, "ColorOperation", location);
         frame.SkipOffsetKeyframe = BoolEl(el, "SkipOffsetKeyframe");
         frame.SkipColorKeyframe = BoolEl(el, "SkipColorKeyframe");
-        frame.OffsetInterpolation = (string?)el.Element("OffsetInterpolation");
-        frame.OffsetEasing = (string?)el.Element("OffsetEasing");
-        frame.ColorInterpolation = (string?)el.Element("ColorInterpolation");
-        frame.ColorEasing = (string?)el.Element("ColorEasing");
+        frame.OffsetInterpolation = frame.EmptyText.ReadOptional(el, "OffsetInterpolation");
+        frame.OffsetEasing = frame.EmptyText.ReadOptional(el, "OffsetEasing");
+        frame.ColorInterpolation = frame.EmptyText.ReadOptional(el, "ColorInterpolation");
+        frame.ColorEasing = frame.EmptyText.ReadOptional(el, "ColorEasing");
         // Frame <Name>/<HasCustomName> in legacy .achx are intentionally ignored: a frame's
         // identity is its index, so the editor always shows a positional "Frame N" label.
 
@@ -791,11 +802,12 @@ public class AnimationChainListSave
         var eventsEl = el.Element("Events");
         if (eventsEl != null)
             foreach (var eventEl in eventsEl.Elements("Event"))
-                frame.Events.Add(new AnimationFrameEvent
-                {
-                    Name = (string?)eventEl.Element("Name") ?? string.Empty,
-                    Data = (string?)eventEl.Element("Data"),
-                });
+            {
+                var frameEvent = new AnimationFrameEvent();
+                frameEvent.Name = frameEvent.EmptyText.Read(eventEl, "Name");
+                frameEvent.Data = frameEvent.EmptyText.ReadOptional(eventEl, "Data");
+                frame.Events.Add(frameEvent);
+            }
 
         return frame;
     }
@@ -812,6 +824,9 @@ public class AnimationChainListSave
         if (nestedShapesEl != null)
             return ParseNestedShapesDialect(nestedShapesEl);
 
+        shapes.CubeSaves = CarriedEl(el, "AxisAlignedCubeSaves");
+        shapes.SphereSaves = CarriedEl(el, "SphereSaves");
+
         // FRB1 dialect: separate typed containers. Read in write order (rects, polygons, circles)
         // so the round-trip is stable; WriteShapes re-groups by type regardless of list order.
         var rectsEl = el.Element("AxisAlignedRectangleSaves");
@@ -821,14 +836,13 @@ public class AnimationChainListSave
             {
                 var rect = new AARectSave
                 {
-                    Name = (string?)r.Element("Name") ?? string.Empty,
                     X = FloatEl(r, "X"),
                     Y = FloatEl(r, "Y"),
                     ScaleX = FloatEl(r, "ScaleX", 16f),
                     ScaleY = FloatEl(r, "ScaleY", 16f),
                 };
                 ReadColor(r, rect);
-                ReadShapeKeyframes(r, rect);
+                ReadShapeFields(r, rect);
                 shapes.Add(rect);
             }
         }
@@ -840,7 +854,6 @@ public class AnimationChainListSave
             {
                 var poly = new PolygonSave
                 {
-                    Name = (string?)p.Element("Name") ?? string.Empty,
                     X = FloatEl(p, "X"),
                     Y = FloatEl(p, "Y"),
                 };
@@ -851,7 +864,7 @@ public class AnimationChainListSave
                         poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                 }
                 ReadColor(p, poly);
-                ReadShapeKeyframes(p, poly);
+                ReadShapeFields(p, poly);
                 shapes.Add(poly);
             }
         }
@@ -863,13 +876,12 @@ public class AnimationChainListSave
             {
                 var circle = new CircleSave
                 {
-                    Name = (string?)c.Element("Name") ?? string.Empty,
                     X = FloatEl(c, "X"),
                     Y = FloatEl(c, "Y"),
                     Radius = FloatEl(c, "Radius", 16f),
                 };
                 ReadColor(c, circle);
-                ReadShapeKeyframes(c, circle);
+                ReadShapeFields(c, circle);
                 shapes.Add(circle);
             }
         }
@@ -892,32 +904,29 @@ public class AnimationChainListSave
                 case "AxisAlignedRectangleSave":
                     var rect = new AARectSave
                     {
-                        Name = (string?)child.Element("Name") ?? string.Empty,
                         X = FloatEl(child, "X"),
                         Y = FloatEl(child, "Y"),
                         ScaleX = FloatEl(child, "ScaleX", 16f),
                         ScaleY = FloatEl(child, "ScaleY", 16f),
                     };
                     ReadColor(child, rect);
-                    ReadShapeKeyframes(child, rect);
+                    ReadShapeFields(child, rect);
                     shapes.Add(rect);
                     break;
                 case "CircleSave":
                     var circle = new CircleSave
                     {
-                        Name = (string?)child.Element("Name") ?? string.Empty,
                         X = FloatEl(child, "X"),
                         Y = FloatEl(child, "Y"),
                         Radius = FloatEl(child, "Radius", 16f),
                     };
                     ReadColor(child, circle);
-                    ReadShapeKeyframes(child, circle);
+                    ReadShapeFields(child, circle);
                     shapes.Add(circle);
                     break;
                 case "PolygonSave":
                     var poly = new PolygonSave
                     {
-                        Name = (string?)child.Element("Name") ?? string.Empty,
                         X = FloatEl(child, "X"),
                         Y = FloatEl(child, "Y"),
                     };
@@ -926,7 +935,7 @@ public class AnimationChainListSave
                         foreach (var v in pointsEl.Elements("Vector2Save"))
                             poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
                     ReadColor(child, poly);
-                    ReadShapeKeyframes(child, poly);
+                    ReadShapeFields(child, poly);
                     shapes.Add(poly);
                     break;
             }
@@ -944,6 +953,10 @@ public class AnimationChainListSave
         target.Green = FloatEl(el, "Green", 1f);
         target.Blue = FloatEl(el, "Blue", 1f);
     }
+
+    // A copy, so it does not keep the whole document it was read from.
+    private static XElement? CarriedEl(XElement parent, string name) =>
+        parent.Element(name) is { HasElements: true } el ? new XElement(el) : null;
 
     private static float FloatEl(XElement parent, string name, float defaultValue = 0f)
     {

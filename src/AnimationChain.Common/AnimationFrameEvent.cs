@@ -16,6 +16,8 @@ public class AnimationFrameEvent
     /// </summary>
     public string? Data { get; set; }
 
+    internal AnimationEditorCommon.EmptyTextForms EmptyText;
+
     /// <summary>Returns a copy, so a frame copy never shares event instances with its source.</summary>
-    public AnimationFrameEvent Clone() => new() { Name = Name, Data = Data };
+    public AnimationFrameEvent Clone() => new() { Name = Name, Data = Data, EmptyText = EmptyText };
 }
