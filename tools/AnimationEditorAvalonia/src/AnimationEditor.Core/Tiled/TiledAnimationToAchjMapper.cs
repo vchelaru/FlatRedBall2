@@ -32,15 +32,13 @@ namespace AnimationEditor.Core.Tiled;
 /// every satellite in that group is treated as its own independent anchor instead, since taking
 /// the bounding box at face value would silently claim the missing cell's tile on the next save.
 /// A chain's name is the tile's
-/// <see cref="NamePropertyName"/> property when present, otherwise its <see cref="DefaultChainName"/>.
+/// <see cref="NamePropertyName"/> property when present, otherwise a synthetic <c>"ID:{tileId}"</c>
+/// label.
 /// </remarks>
 public static class TiledAnimationToAchjMapper
 {
     /// <summary>Custom tile property AnimationEditor writes/reads for a user-assigned animation name.</summary>
     public const string NamePropertyName = "Name";
-
-    /// <summary>Tile property with the name of an animation that an editor before #2136 pushed here from an .achx. Only read.</summary>
-    private const string PushedNamePropertyName = "achjAnimationName";
 
     /// <summary>Custom tile property marking a tile as a multi-tile-group satellite, valued with its anchor tile's id.</summary>
     public const string ParentIdPropertyName = "ParentId";
@@ -246,22 +244,15 @@ public static class TiledAnimationToAchjMapper
     }
 
     /// <summary>A tile's chain name plus whether that name is the synthetic <c>"ID:{tileId}"</c>
-    /// placeholder (no property with a name present) or a real one read
+    /// placeholder (no explicit <see cref="NamePropertyName"/> property present) or a real one read
     /// from disk. The synthetic flag is provenance -- was the property present, at all -- never a
     /// guess from the resulting string's shape, so a real explicit name that happens to look like
     /// <c>"ID:N"</c> is still correctly reported as not synthetic.</summary>
     private static (string Name, bool IsSynthetic) ChainNameInfo(Tile tile)
     {
         var name = FindNameProperty(tile)?.Value;
-        if (string.IsNullOrEmpty(name)) name = FindPushedName(tile);
-        return name is null ? (SyntheticChainName(tile.ID), true) : (name, false);
+        return string.IsNullOrEmpty(name) ? (SyntheticChainName(tile.ID), true) : (name, false);
     }
-
-    /// <summary>The name of a chain on a tile without a <see cref="NamePropertyName"/> property.</summary>
-    internal static string DefaultChainName(Tile tile) => FindPushedName(tile) ?? SyntheticChainName(tile.ID);
-
-    private static string? FindPushedName(Tile tile) =>
-        tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == PushedNamePropertyName)?.Value is { Length: > 0 } name ? name : null;
 
     /// <summary>The <c>Name</c> property the editor reads: the first string one.</summary>
     internal static StringProperty? FindNameProperty(Tile tile) =>

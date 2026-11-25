@@ -214,7 +214,7 @@ public static class NativeTsxAnimationSync
 
     private static IProperty? FindProperty(Tile tile, string name) => tile.Properties.FirstOrDefault(p => p.Name == name);
 
-    /// <summary>Stores a chain's name on its own tile; the name the tile has without one is not stored.</summary>
+    /// <summary>Stores a chain's name on its own tile; the synthetic <c>"ID:N"</c> name is not stored.</summary>
     /// <exception cref="InvalidOperationException">The user's own <c>Name</c> is in the way.</exception>
     private static bool SetName(Tile tile, string chainName, TsxUserProperties userProperties)
     {
@@ -225,15 +225,15 @@ public static class NativeTsxAnimationSync
         if (userProperties.Names.TryGetValue(tile.ID, out var userName) && !TsxUserProperties.IsNoName(tile, userName))
             throw OwnedByUser(tile, TiledAnimationToAchjMapper.NamePropertyName, chainName, $"Rename the animation to \"{userName}\", use");
 
-        var defaultName = TiledAnimationToAchjMapper.DefaultChainName(tile);
-        if (chainName == defaultName)
+        var syntheticName = TiledAnimationToAchjMapper.SyntheticChainName(tile.ID);
+        if (chainName == syntheticName)
             return RemoveOwnName(tile, userProperties);
 
         if (existing is not null)
             existing.Value = chainName;
         // A second property of the name would be invalid in Tiled.
         else if (FindProperty(tile, TiledAnimationToAchjMapper.NamePropertyName) is not null)
-            throw OwnedByUser(tile, TiledAnimationToAchjMapper.NamePropertyName, chainName, $"Rename the animation to \"{defaultName}\", use");
+            throw OwnedByUser(tile, TiledAnimationToAchjMapper.NamePropertyName, chainName, $"Rename the animation to \"{syntheticName}\", use");
         else
             tile.Properties.Add(new StringProperty { Name = TiledAnimationToAchjMapper.NamePropertyName, Value = chainName });
         return true;
