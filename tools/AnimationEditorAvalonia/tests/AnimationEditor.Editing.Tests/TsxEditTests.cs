@@ -217,6 +217,44 @@ public class TsxEditTests : IDisposable
         Directory.GetFiles(_dir, "*.tiledsync").ShouldBeEmpty();
     }
 
+    private sealed class AnyImageProbe : ITextureProbe
+    {
+        public bool CanDecode(string absolutePath) => true;
+    }
+
+    [Theory]
+    [InlineData("other.png")]
+    [InlineData("missing.png")]
+    [InlineData("")]
+    public async Task FrameTextureSetFromText_InATsx_RefusesAnythingButTheTilesetsImage(string text)
+    {
+        var s = await OpenTsx();
+        File.Copy(Path.Combine(_dir, "sheet.png"), Path.Combine(_dir, "other.png"));
+        var walk = s.Document.AnimationChains[0];
+
+        var result = FrameTextureEdit.SetFromText(s.ProjectManager, s.Commands, walk.Frames, text, new AnyImageProbe());
+
+        result.HasError(EditErrorCode.NotSupportedInTsx).ShouldBeTrue();
+        result.Errors.ShouldBe(["A Tiled tileset has one image, so frames can only use the tileset's own image."]);
+        walk.Frames.ShouldAllBe(f => f.TextureName == "sheet.png");
+        s.Undo.CanUndo.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("./sheet.png")]
+    [InlineData("sub/../sheet.png")]
+    public async Task FrameTextureSetFromText_InATsx_TakesTheTilesetsImageInAnySpelling(string text)
+    {
+        var s = await OpenTsx();
+        var walk = s.Document.AnimationChains[0];
+        walk.Frames[0].TextureName = "other.png";
+
+        var result = FrameTextureEdit.SetFromText(s.ProjectManager, s.Commands, walk.Frames, text, new AnyImageProbe());
+
+        result.Success.ShouldBeTrue(string.Join("; ", result.Errors));
+        walk.Frames[0].TextureName.ShouldBe("sheet.png");
+    }
+
     [Fact]
     public async Task AssociateTileset_InATsxProject_IsRefused()
     {

@@ -79,7 +79,9 @@ public static class FrameTextureEdit
         if (input.Length == 0)
         {
             var toClear = frames.Where(f => !string.IsNullOrEmpty(f.TextureName)).ToList();
-            if (toClear.Count > 0) commands.SetFrameTextureName(toClear, string.Empty);
+            if (toClear.Count == 0) return Ok();
+            if (projectManager.IsNativeTsxProject) return Fail(EditErrorCode.NotSupportedInTsx, TsxEdit.OtherImageRefusal);
+            commands.SetFrameTextureName(toClear, string.Empty);
             return Ok();
         }
 
@@ -92,7 +94,7 @@ public static class FrameTextureEdit
             .ToList();
         if (toChange.Count == 0) return Ok();
 
-        return Commit(commands, toChange, absolutePath, storePath, probe);
+        return Commit(projectManager, commands, toChange, absolutePath, storePath, probe);
     }
 
     /// <summary>Resolves <paramref name="pickedPath"/> via <see cref="ResolveForProjectAsync"/>, then applies it.</summary>
@@ -115,32 +117,36 @@ public static class FrameTextureEdit
         string storePath = achxFolder.Length == 0
             ? absolutePath
             : TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
-        return Commit(commands, frames, absolutePath, storePath, probe);
+        return Commit(projectManager, commands, frames, absolutePath, storePath, probe);
     }
 
     // The name is stored only if the image is usable, so no broken reference reaches the undo stack or the saved file.
     private static EditResult Commit(
-        IAppCommands commands, IReadOnlyList<AnimationFrameSave> frames,
+        IProjectManager projectManager, IAppCommands commands, IReadOnlyList<AnimationFrameSave> frames,
         string absolutePath, string storePath, ITextureProbe probe)
     {
+        if (TsxEdit.CheckImage(projectManager, absolutePath) is { } otherImage) return otherImage;
         if (!File.Exists(absolutePath))
             return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absolutePath}");
         if (!probe.CanDecode(absolutePath))
             return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absolutePath}");
 
-        if (CheckWholeTexture(commands, absolutePath, frames) is { } refused) return refused;
+        if (CheckTexture(projectManager, commands, absolutePath, frames) is { } refused) return refused;
 
         commands.SetFrameTextureName(frames, storePath);
         return new EditResult([storePath], [], []);
     }
 
     /// <summary>
-    /// The refusal when a frame would have to show the whole of <paramref name="absolutePath"/> and its size cannot be
-    /// read, so no region can be stored; null when there is nothing to refuse. <paramref name="frames"/> are the frames
-    /// taking the texture (only those with no region yet need its size); null for a new frame, which always does.
+    /// The refusal when frames of the open file cannot take <paramref name="absolutePath"/>: it is not the open .tsx's
+    /// image, or a frame would have to show the whole of it and its size cannot be read, so no region can be stored.
+    /// Null when there is nothing to refuse. <paramref name="frames"/> are the frames taking the texture (only those with
+    /// no region yet need its size); null for a new frame, which always does outside a .tsx.
     /// </summary>
-    public static EditResult? CheckWholeTexture(IAppCommands commands, string absolutePath, IEnumerable<AnimationFrameSave>? frames = null)
+    public static EditResult? CheckTexture(
+        IProjectManager projectManager, IAppCommands commands, string absolutePath, IEnumerable<AnimationFrameSave>? frames = null)
     {
+        if (projectManager.IsNativeTsxProject) return TsxEdit.CheckImage(projectManager, absolutePath);
         if (frames is not null && !frames.Any(f => FrameRegion.IsUnset(f, commands.GetTextureSize))) return null;
         return commands.GetTextureSize(absolutePath) is null
             ? Fail(EditErrorCode.UnsupportedFile,

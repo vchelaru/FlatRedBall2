@@ -111,6 +111,9 @@ namespace AnimationEditor.Core
         /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
         public bool IsNativeTsxProject => _tsx != null;
 
+        /// <inheritdoc/>
+        public Tiled.TilesetAnimationInfo? TsxTileset => _tsx is null ? null : BuildTsxTilesetInfo(_tsx);
+
         /// <summary>The tsx's own tile grid (tile size, margin, spacing), or <see langword="null"/>
         /// for an achx/achj project. A native tsx project's wireframe grid is always this -- it is
         /// not user-configurable (see issue #1140).</summary>

@@ -410,6 +410,7 @@ public class TabSwitchCacheTests : IDisposable
         }
 
         public bool IsNativeTsxProject => _inner.IsNativeTsxProject;
+        public AnimationEditor.Core.Tiled.TilesetAnimationInfo? TsxTileset => _inner.TsxTileset;
         public TileGrid? TsxTileGrid => _inner.TsxTileGrid;
         public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
         public bool MoveTsxProject(FilePath path) => _inner.MoveTsxProject(path);

@@ -25,6 +25,47 @@ public class TsxCommandTests : IDisposable
     private static string ErrorCode(CliOutput r) =>
         JsonDocument.Parse(r.Out).RootElement.GetProperty("errors")[0].GetProperty("code").GetString()!;
 
+    // ---- add-frames-grid ----
+
+    // sheet.png is 48x32: margin 2 and spacing 3 leave room for 2 columns and 1 row of 16px tiles.
+    [Fact]
+    public async Task AddFramesGrid_TilesetWithMarginAndSpacing_FollowsTheTilesetsGrid()
+    {
+        _w.Write("spaced.tsx", """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Hero" tilewidth="16" tileheight="16" spacing="3" margin="2" tilecount="2" columns="2">
+             <image source="sheet.png" width="48" height="32"/>
+            </tileset>
+            """);
+
+        var r = await Edit("spaced.tsx", """
+            {"ops":[{"op":"add-chain","name":"Run"},{"op":"add-frames-grid","chain":"Run","texture":"sheet.png","cellWidth":16,"cellHeight":16,"columns":2,"rows":1}]}
+            """);
+
+        r.Code.ShouldBe(0, r.Out + r.Err);
+        Raw("spaced.tsx").ShouldContain("<frame tileid=\"0\"");
+        Raw("spaced.tsx").ShouldContain("<frame tileid=\"1\"");
+    }
+
+    [Fact]
+    public async Task AddFramesGrid_TilesetGridPastTheImage_IsRefused()
+    {
+        _w.Write("spaced.tsx", """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tileset version="1.10" tiledversion="1.12.2" name="Hero" tilewidth="16" tileheight="16" spacing="3" margin="2" tilecount="2" columns="2">
+             <image source="sheet.png" width="48" height="32"/>
+            </tileset>
+            """);
+
+        var r = await Edit("spaced.tsx", """
+            {"ops":[{"op":"add-chain","name":"Run"},{"op":"add-frames-grid","chain":"Run","texture":"sheet.png","cellWidth":16,"cellHeight":16,"columns":3,"rows":1}]}
+            """, "--json");
+
+        r.Code.ShouldNotBe(0);
+        ErrorCode(r).ShouldBe("InvalidValue");
+        r.Out.ShouldContain("margin 2, spacing 3");
+    }
+
     // ---- describe / check ----
 
     [Fact]

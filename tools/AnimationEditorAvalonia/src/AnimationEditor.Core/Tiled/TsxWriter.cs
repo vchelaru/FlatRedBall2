@@ -231,7 +231,9 @@ public sealed class TsxWriter
     };
 
     /// <exception cref="ArgumentException">A character XML cannot hold.</exception>
-    private static string Escape(string value) => new XAttribute("a", value).ToString()["a=\"".Length..^1].Replace("'", "&apos;");
+    private static string Escape(string value) => StorableText.Problem(value) is { } problem
+        ? throw new InvalidDataException(problem)
+        : new XAttribute("a", value).ToString()["a=\"".Length..^1].Replace("'", "&apos;");
 
     private void SetPropertyValue(TsxElement property, string value)
     {

@@ -46,6 +46,7 @@ public static class ShapeEdit
             name = name.Trim();
             if (name.Length == 0) return Fail(EditErrorCode.EmptyName, "Shape name cannot be empty.");
             if (name.Contains('/')) return Fail(EditErrorCode.InvalidAddress, $"Shape name '{name}' cannot contain '/'.");
+            if (StorableText.Problem(name) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
             if (existing.Contains(name))
                 return Fail(EditErrorCode.DuplicateName, $"A shape named '{name}' already exists in this frame.");
         }

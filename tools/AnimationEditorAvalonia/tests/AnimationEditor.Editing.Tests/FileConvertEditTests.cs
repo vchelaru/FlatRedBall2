@@ -27,6 +27,20 @@ public class FileConvertEditTests : IDisposable
     }
 
     [Fact]
+    public void AchjToAchx_NameXmlCannotStore_FailsNamingTheCharacterAndWritesNothing()
+    {
+        var acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Bad\u0001" });
+        var src = Path.Combine(_root, "bad.achj");
+        acls.SaveJson(src);
+
+        var r = FileConvertEdit.Convert(src, "achx");
+
+        r.Errors.ShouldBe(["Could not convert bad.achj: \"Bad\uFFFD\" contains the character U+0001, which XML cannot store."]);
+        Directory.GetFiles(_root).ShouldBe([src]);
+    }
+
+    [Fact]
     public void AchxToAchj_WritesNewFileAndKeepsSource()
     {
         var src = Write("hero.achx");
