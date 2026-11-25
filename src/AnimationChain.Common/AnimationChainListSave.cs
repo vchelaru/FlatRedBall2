@@ -509,7 +509,20 @@ public class AnimationChainListSave
         if (ProjectFile != null)
             root.Add(new XElement("ProjectFile", ProjectFile));
 
+        ThrowIfUnstorable(root);
         return new XDocument(new XDeclaration("1.0", "utf-8", null), root);
+    }
+
+    // XmlWriter's own refusal names neither the text nor where it is.
+    private static void ThrowIfUnstorable(XElement root)
+    {
+        foreach (var element in root.Descendants().Where(e => !e.HasElements))
+        {
+            if (StorableText.Problem(element.Value) is not { } problem) continue;
+            var chain = element.Ancestors("AnimationChain").FirstOrDefault();
+            var where = chain is null || element.Parent == chain ? "" : $"Animation \"{(string?)chain.Element("Name")}\": ";
+            throw new InvalidDataException(where + problem);
+        }
     }
 
     private static XElement WriteFrame(AnimationFrameSave frame)

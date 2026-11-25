@@ -135,12 +135,14 @@ public static class FrameTextureEdit
     }
 
     /// <summary>
-    /// The refusal when a frame would have to show the whole of <paramref name="absolutePath"/> and its size cannot be
-    /// read, so no region can be stored; null when there is nothing to refuse. <paramref name="frames"/> are the frames
+    /// The refusal when the path has a character XML cannot store, or when a frame would have to show the whole of
+    /// <paramref name="absolutePath"/> and its size cannot be read, so no region can be stored; null when there is
+    /// nothing to refuse. <paramref name="frames"/> are the frames
     /// taking the texture (only those with no region yet need its size); null for a new frame, which always does.
     /// </summary>
     public static EditResult? CheckWholeTexture(IAppCommands commands, string absolutePath, IEnumerable<AnimationFrameSave>? frames = null)
     {
+        if (StorableText.Problem(absolutePath) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
         if (frames is not null && !frames.Any(f => FrameRegion.IsUnset(f, commands.GetTextureSize))) return null;
         return commands.GetTextureSize(absolutePath) is null
             ? Fail(EditErrorCode.UnsupportedFile,

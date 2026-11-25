@@ -370,7 +370,10 @@ public static class EditOps
             int index = 0;
             foreach (var element in array.EnumerateArray())
             {
-                var parsed = ParseOp(index, element, specs);
+                (EditOp? Op, string? Error) parsed;
+                // Valid JSON can still escape half a surrogate pair, which no string holds.
+                try { parsed = ParseOp(index, element, specs); }
+                catch (InvalidOperationException ex) { return Bad($"op {index}: {ex.Message}"); }
                 if (parsed.Error is not null) return Bad(parsed.Error);
                 ops.Add(parsed.Op!);
                 index++;
