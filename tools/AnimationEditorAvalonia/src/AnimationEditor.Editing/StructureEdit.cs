@@ -156,10 +156,7 @@ public static class StructureEdit
         string absoluteTexture, FramePixelRegion? region, float? length, ITextureProbe probe)
     {
         if (chain.IsLocked) return LockedFail(chain);
-        if (!File.Exists(absoluteTexture))
-            return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absoluteTexture}");
-        if (!probe.CanDecode(absoluteTexture))
-            return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absoluteTexture}");
+        if (FrameTextureEdit.CheckImage(absoluteTexture, probe) is { } notAnImage) return notAnImage;
         if (length is { } given && PropertyEdit.CheckLength(
                 FrameLengthUnit.Of(projectManager.AnimationChainListSave), given, $"{chain.Name}/{chain.Frames.Count}") is { } bad)
             return bad;
@@ -174,7 +171,7 @@ public static class StructureEdit
                 return Fail(EditErrorCode.InvalidValue,
                     $"The region {r.X},{r.Y},{r.Width},{r.Height} is not inside the {size.Width}x{size.Height} texture.");
         }
-        else if (FrameTextureEdit.CheckTexture(projectManager, commands, absoluteTexture) is { } refused)
+        else if (FrameTextureEdit.CheckTexture(projectManager, commands, absoluteTexture, probe) is { } refused)
         {
             return refused;
         }
@@ -210,10 +207,7 @@ public static class StructureEdit
         if (chain.IsLocked) return LockedFail(chain);
         if (cellWidth <= 0 || cellHeight <= 0 || columns <= 0 || rows <= 0)
             return Fail(EditErrorCode.InvalidValue, "cellWidth, cellHeight, columns and rows must all be greater than zero.");
-        if (!File.Exists(absoluteTexture))
-            return Fail(EditErrorCode.TextureNotFound, $"Could not load image: {absoluteTexture}");
-        if (!probe.CanDecode(absoluteTexture))
-            return Fail(EditErrorCode.TextureUndecodable, $"Could not load image: {absoluteTexture}");
+        if (FrameTextureEdit.CheckImage(absoluteTexture, probe) is { } notAnImage) return notAnImage;
 
         var size = TextureCoordinateConverter.TryReadPngSize(absoluteTexture);
         if (size is null)

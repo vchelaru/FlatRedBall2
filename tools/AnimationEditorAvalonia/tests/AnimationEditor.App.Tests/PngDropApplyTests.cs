@@ -5,6 +5,7 @@ using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using FlatRedBall2.AnimationEditorCommon;
+using SkiaSharp;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -67,24 +68,29 @@ public class PngDropApplyTests
     public async Task HandlePngDropAsync_TextureInsideAchxFolder_UpdatesFrameTextureNameWithoutPrompt()
     {
         var (window, ctx) = CreateWindow();
+        string folder = Directory.CreateTempSubdirectory("ae-png-drop").FullName;
         try
         {
+            ctx.ProjectManager.FileName = Path.Combine(folder, "Hero.achx");
             var chain = new AnimationChainSave { Name = "Walk" };
             var frame = new AnimationFrameSave { TextureName = "old.png", RightCoordinate = 16, BottomCoordinate = 16 };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             ctx.SelectedState.SelectedFrame = frame;
 
-            // Inside the achx folder (TestPaths.Abs("Project", "Animations")) — no copy prompt
-            // should fire, so this must complete without ShowDialog ever being awaited.
-            string droppedPath = TestPaths.Abs("Project", "Animations", "new.png");
+            // Inside the achx folder — no copy prompt should fire, so this must complete without
+            // ShowDialog ever being awaited.
+            string droppedPath = Path.Combine(folder, "new.png");
+            using (var bitmap = new SKBitmap(16, 16))
+            using (var png = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                File.WriteAllBytes(droppedPath, png.ToArray());
 
             bool applied = await InvokeHandlePngDrop(window, chain, frame, droppedPath, ctrlHeld: false);
 
             Assert.True(applied);
             Assert.Equal("new.png", frame.TextureName);
         }
-        finally { window.Close(); }
+        finally { window.Close(); Directory.Delete(folder, true); }
     }
 
     [AvaloniaFact]

@@ -30,6 +30,19 @@ public static class SkiaFileDecoder
         catch (UnauthorizedAccessException) { return null; }
     }
 
+    /// <summary>True when the file was read and is not an image. A file that cannot be read now may still be one, and one too large to decode is.</summary>
+    public static bool IsNotAnImage(string path)
+    {
+        try
+        {
+            using FileStream stream = File.OpenRead(path);
+            using SKCodec? codec = SKCodec.Create(stream);
+            return codec is null;
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
     /// <summary>
     /// Like <see cref="DecodeFile(string)"/>, and also explains a failure the user can act on:
     /// <paramref name="error"/> is set for an image too large to decode (see <see cref="ImageSizeLimit"/>),

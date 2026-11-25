@@ -1460,23 +1460,24 @@ public partial class MainWindow : Window
         if (_suppressTextureComboChanged) return;
         if (TextureCombo.SelectedItem is not string absolutePath) return;
 
-        WireframeCtrl.LoadTexture(absolutePath);
-
         var frames = InspectorFrames();
-        if (frames.Count == 0) return;
-
-        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? string.Empty
-            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
-        string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
-        if (FrameTextureEdit.CheckTexture(_projectManager, _appCommands, absolutePath, frames) is { } refused)
+        if (frames.Count == 0)
         {
-            ReportTextureResult(refused);
-            SyncTextureCombo();   // the list goes back to the image the frame kept
+            WireframeCtrl.LoadTexture(absolutePath);
             return;
         }
-        _appCommands.SetFrameTextureName(frames, storePath);
-        RefreshPropertyPanel();
+
+        if (frames.All(IsFrameLocked))
+        {
+            ShowLocked(_objectFinder.GetAnimationChainContaining(frames[0])!);
+            SyncTextureCombo();
+            return;
+        }
+
+        var result = FrameTextureEdit.SetResolved(_projectManager, _appCommands, frames, absolutePath, _fileProbe);
+        if (result.Success) WireframeCtrl.LoadTexture(absolutePath);
+        ReportTextureResult(result);
+        if (!result.Success) SyncTextureCombo();   // the list goes back to the image the frame kept
     }
 
     private void OnMoveModeToggled(object? sender, RoutedEventArgs e)
@@ -4127,15 +4128,7 @@ public partial class MainWindow : Window
         }
 
         var (targetChain, targetFrame) = ResolveTreePngDropTarget(e);
-        var wouldApply = TextureDropProcessor.ComputePngDrop(
-            targetChain,
-            targetFrame,
-            firstFile,
-            _projectManager.FileName,
-            e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
-            != TextureDropResult.NotApplied;
-
-        e.DragEffects = wouldApply ? DragDropEffects.Copy : DragDropEffects.None;
+        e.DragEffects = PngDropTargetsRow(e, targetChain, targetFrame, firstFile) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -4195,10 +4188,19 @@ public partial class MainWindow : Window
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
-        bool applied = await HandlePngDropAsync(targetChain, targetFrame, firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
-        if (applied)
-            e.Handled = true;
+        if (!PngDropTargetsRow(e, targetChain, targetFrame, firstFile)) return;
+
+        // Set before the await: the event goes on to the window, which would open an animation file dropped along
+        // with the image under the copy question.
+        e.Handled = true;
+
+        await HandlePngDropAsync(targetChain, targetFrame, firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
     }
+
+    private bool PngDropTargetsRow(DragEventArgs e, AnimationChainSave? targetChain, AnimationFrameSave? targetFrame, string file) =>
+        TextureDropProcessor.ComputePngDrop(
+            targetChain, targetFrame, file, _projectManager.FileName, e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
+        != TextureDropResult.NotApplied;
 
     /// <summary>
     /// Single apply path for every PNG-drop entry point (ANIMATIONS tree — including PNGs
@@ -4225,11 +4227,22 @@ public partial class MainWindow : Window
         if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
             return false;
 
+        // Before the copy question, whose copy would be left behind.
+        var editedChain = targetFrame is null ? targetChain : _objectFinder.GetAnimationChainContaining(targetFrame);
+        if (editedChain is { IsLocked: true })
+        {
+            ShowLocked(editedChain);
+            return false;
+        }
+
         string? resolvedFilePath = await ResolveTextureForProjectAsync(droppedFilePath,
             retried => ApplyResolvedPngDrop(targetChain, targetFrame, retried, createFrameOnCtrl));
         return resolvedFilePath is not null
             && ApplyResolvedPngDrop(targetChain, targetFrame, resolvedFilePath, createFrameOnCtrl);
     }
+
+    private void ShowLocked(AnimationChainSave chain) =>
+        ShowProblem($"⚠ '{chain.Name}' is locked. Unlock the animation to edit.");
 
     private bool ApplyResolvedPngDrop(
         AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
@@ -4242,9 +4255,9 @@ public partial class MainWindow : Window
 
         var refused = result switch
         {
-            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath),
-            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, [targetFrame!]),
-            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, targetChain!.Frames),
+            TextureDropResult.CreatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, _fileProbe),
+            TextureDropResult.UpdatedFrame => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, _fileProbe, [targetFrame!]),
+            TextureDropResult.UpdatedChainFrames => FrameTextureEdit.CheckTexture(_projectManager, _appCommands, resolvedFilePath, _fileProbe, targetChain!.Frames),
             _ => null,
         };
         if (refused is not null)
@@ -4442,10 +4455,10 @@ public partial class MainWindow : Window
         if (tvi?.DataContext is not TreeNodeVm vm)
             return (null, FrameRowHalf.Upper, null);
 
-        // Frame rows are leaves, so the container height is the row height. The half only
-        // matters for frame targets; chain targets always append regardless.
+        // An expanded item's container also spans its child rows; the halves are those of its own row.
         var topLeft = Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), AnimTree) ?? posInTree;
-        double rowHeight = tvi.Bounds.Height;
+        Control row = tvi.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_LayoutRoot") ?? tvi;
+        double rowHeight = row.Bounds.Height;
         var half = (posInTree.Y - topLeft.Y) < rowHeight / 2 ? FrameRowHalf.Upper : FrameRowHalf.Lower;
         return (vm.Data, half, tvi);
     }
@@ -6175,6 +6188,17 @@ public partial class MainWindow : Window
     private ITextureProbe _textureProbe => new WireframeTextureProbe(path => WireframeCtrl.LoadTexture(path));
 
     /// <summary>
+    /// Refuses only a file known not to be an image, leaving the wireframe alone: a drop's target need not be what it
+    /// shows. One in use is left to the copy's own message and Retry, and one too large to the message about its size.
+    /// </summary>
+    private sealed class FileTextureProbe : ITextureProbe
+    {
+        public bool CanDecode(string absolutePath) => !SkiaFileDecoder.IsNotAnImage(absolutePath);
+    }
+
+    private static readonly ITextureProbe _fileProbe = new FileTextureProbe();
+
+    /// <summary>
     /// A rejected image (corrupt/undecodable/missing, issue #479) leaves every frame's name untouched, so no
     /// broken reference reaches the undo stack or the saved .achx; the wireframe is restored to the current
     /// texture and a problem is shown. Success refreshes the inspector.
@@ -6231,6 +6255,12 @@ public partial class MainWindow : Window
         var resolved = await FrameTextureEdit.ResolveForProjectAsync(_projectManager, texturePath,
             async plan =>
             {
+                // Before asking, so a file that would be refused afterwards is not copied into the project first.
+                if (FrameTextureEdit.CheckImage(plan.SourcePath, _fileProbe) is { } notAnImage)
+                {
+                    ReportTextureResult(notAnImage);
+                    return TextureCopyChoice.Cancel;
+                }
                 var answer = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan);
                 choice = answer;
                 return answer;
