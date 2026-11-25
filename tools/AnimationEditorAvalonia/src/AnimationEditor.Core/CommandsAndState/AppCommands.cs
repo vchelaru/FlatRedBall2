@@ -890,6 +890,11 @@ namespace AnimationEditor.Core.CommandsAndState
                 SaveAsRefused?.Invoke(SaveTarget.OpenInAnotherTabMessage(path));
                 return false;
             }
+            if (_pm.IsNativeTsxProject && TiledSyncAssociationScanner.FindAssociationsTargeting(path) is [var owner, ..])
+            {
+                SaveAsRefused?.Invoke(SaveTarget.AssociatedTilesetMessage(path, owner));
+                return false;
+            }
 
             bool toAnotherFile = string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path);
             if (!SaveOpenDocument(path, toAnotherFile)) return false;
@@ -1328,19 +1333,17 @@ namespace AnimationEditor.Core.CommandsAndState
         public bool RenameChain(AnimationChainSave chain, string newName)
         {
             newName = newName.Trim();
+            bool NameTaken(string name) => _pm.AnimationChainListSave?.HasOtherChainNamed(chain, name) == true;
+
             if (newName.Length == 0)
             {
                 if (_pm.IsChainNameAuto(chain)) return true;
-                if (_pm.GetTsxOwnerTileId(chain) is null) return false;
+                if (_pm.GetTsxOwnerTileId(chain) is not { } tileId || NameTaken(TiledAnimationToAchjMapper.SyntheticChainName(tileId))) return false;
                 Rename(null);
                 return true;
             }
             if (chain.Name == newName) return true;
-
-            var acls = _pm.AnimationChainListSave;
-            if (acls is not null &&
-                acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
-                return false;
+            if (NameTaken(newName)) return false;
 
             Rename(newName);
             return true;
@@ -3011,6 +3014,40 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? $"Cut {ShapeUndoLabel.Format(sourcesToRemove.Count > 0 ? sourcesToRemove[0] : clones[0])}"
                 : $"Cut {clones.Count} Shapes";
             _undoManager.Execute(new CompositeCommand(cmds, desc));
+        }
+
+        /// <inheritdoc cref="IAppCommands.CutFromBackgroundTab"/>
+        public bool CutFromBackgroundTab(TabEntry tab, IPendingCutState cut)
+        {
+            var acls = tab.CachedEditorModel!;
+            var deletes = new List<IDeleteCommand>();
+            string desc;
+            switch (cut.Kind)
+            {
+                case CopySelectionKind.Chain:
+                    deletes.Add(new DeleteChainsCommand(cut.Chains, acls, this, _events, _selectedState));
+                    desc = cut.Chains.Count == 1 ? $"Cut Animation '{cut.Chains[0].Name}'" : $"Cut {cut.Chains.Count} Animations";
+                    break;
+
+                case CopySelectionKind.Frame:
+                    var frames = cut.Frames.Select(f => (Frame: f, Chain: PendingCutState.ChainContaining(acls, f)!)).ToList();
+                    foreach (var group in frames.Where(x => !IsChainLocked(x.Chain)).GroupBy(x => x.Chain))
+                        deletes.Add(new DeleteFramesCommand(group.Select(x => x.Frame).ToList(), group.Key, this, _events, _selectedState));
+                    desc = frames.Count == 1 ? $"Cut Frame in '{frames[0].Chain.Name}'" : $"Cut {frames.Count} Frames";
+                    break;
+
+                default:
+                    foreach (var shape in cut.Shapes.OfType<ShapeSave>())
+                        if (PendingCutState.FrameContaining(acls, shape) is { } frame && !IsChainLocked(PendingCutState.ChainContaining(acls, frame)!))
+                            deletes.Add(new DeleteShapeCommand(shape, frame, this, _events, _selectedState));
+                    desc = cut.Shapes.Count == 1 ? $"Cut {ShapeUndoLabel.Format(cut.Shapes[0])}" : $"Cut {cut.Shapes.Count} Shapes";
+                    break;
+            }
+            if (CompositeCommand.Removed(deletes, desc) is not { } command) return false;
+
+            tab.UndoSnapshot = new UndoSnapshot(
+                [.. tab.UndoSnapshot?.UndoStack ?? [], new UndoEntry(command, tab.CachedTsxState)], []);
+            return true;
         }
 
         private List<object> BuildShapeClones(AnimationFrameSave frame, IReadOnlyList<object> shapes)

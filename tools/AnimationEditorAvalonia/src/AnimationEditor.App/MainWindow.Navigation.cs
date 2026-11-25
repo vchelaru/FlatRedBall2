@@ -75,24 +75,24 @@ public partial class MainWindow
 
     private void Undo()
     {
-        CommitPendingRename();
+        SettlePendingInput();
         using (_navigation.Suppress()) _undoManager.Undo();
     }
 
     private void Redo()
     {
-        CommitPendingRename();
+        SettlePendingInput();
         using (_navigation.Suppress()) _undoManager.Redo();
     }
 
     /// <summary>
     /// Applies the name typed into an in-place rename that is still open (a sequence row, a track header, an ANIMATIONS
-    /// tree row), before whatever the user did next. Every way out of a rename other than Enter and Escape funnels here;
-    /// see <see cref="SequenceTabPane.CommitPendingRename"/> and <see cref="CommitPendingTreeRename"/>.
+    /// tree row), and cancels a sequence timeline drag that is still held, before whatever the user did next. Every way out of a rename other than Enter and Escape funnels here;
+    /// see <see cref="SequenceTabPane.SettlePendingInput"/> and <see cref="CommitPendingTreeRename"/>.
     /// </summary>
-    private void CommitPendingRename()
+    private void SettlePendingInput()
     {
-        _sequencePane.CommitPendingRename();
+        _sequencePane.SettlePendingInput();
         CommitPendingTreeRename();
     }
 
@@ -138,7 +138,7 @@ public partial class MainWindow
     private async Task NavigateHistoryAsync(bool back)
     {
         if (_navigatingHistory) return;
-        CommitPendingRename();
+        SettlePendingInput();
         var here = CaptureNavigationLocation() ?? new NavigationLocation(string.Empty);
         _navigatingHistory = true;
         using var suppress = _navigation.Suppress();

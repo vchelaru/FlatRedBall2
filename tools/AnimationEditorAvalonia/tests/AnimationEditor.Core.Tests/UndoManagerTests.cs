@@ -132,7 +132,7 @@ public class UndoManagerTests
         var snapshot = _undo.TakeSnapshot();
 
         Assert.Single(snapshot.UndoStack);
-        Assert.Same(cmd, snapshot.UndoStack[0]);
+        Assert.Same(cmd, snapshot.UndoStack[0].Command);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class UndoManagerTests
 
         Assert.Empty(snapshot.UndoStack);
         Assert.Single(snapshot.RedoStack);
-        Assert.Same(cmd, snapshot.RedoStack[0]);
+        Assert.Same(cmd, snapshot.RedoStack[0].Command);
     }
 
     [Fact]

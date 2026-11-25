@@ -29,6 +29,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
     private int? _trackToSelect;
 
+    // The state from before the gesture that is editing Save in place, or null when none is.
+    private string? _gestureBefore;
+
     // Keyed by the source string as written in the file. A null value is a source that could not be loaded.
     private readonly Dictionary<string, AnimationChainListSave?> _sources = new(StringComparer.OrdinalIgnoreCase);
 
@@ -155,7 +158,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>
     /// Re-reads the file itself after it changed on disk. Keeps the selected sequence (by name, else by position) and
     /// leaves the file alone. A file that can't be read leaves the document as it is and reports why; a later
-    /// successful call recovers.
+    /// successful call recovers. A file that changed ends a gesture in progress, dropping what it did.
     /// </summary>
     public SequenceReloadResult ReloadFromDisk()
     {
@@ -175,12 +178,14 @@ public sealed class SequenceDocument : ISequenceChainLookup
         // Memory equals the file again, so a failed write of edits it already holds, or that are discarded below, no longer applies.
         SaveError = null;
         StaleOnDiskReason = null;
-        if (loaded.ToJsonString() == Save.ToJsonString()) return new SequenceReloadResult(false, null);
+        // During a gesture the file is compared with the state before it: what the gesture did is not in the file.
+        if (loaded.ToJsonString() == (_gestureBefore ?? Save.ToJsonString())) return new SequenceReloadResult(false, null);
 
         string? selectedName = SelectedSequence >= 0 && SelectedSequence < Save.Sequences.Count
             ? Save.Sequences[SelectedSequence].Name
             : null;
         int previous = SelectedSequence;
+        _gestureBefore = null;
         Save = loaded;
         int byName = selectedName is null ? -1 : loaded.Sequences.FindIndex(sequence => sequence.Name == selectedName);
         SelectedSequence = byName >= 0 ? byName : Math.Min(previous, loaded.Sequences.Count - 1);
@@ -1256,29 +1261,44 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
     /// <summary>
     /// Starts a gesture that edits <see cref="Save"/> in place on every pointer move (a drag). Returns the state to pass
-    /// to <see cref="CommitGesture"/> or <see cref="CancelGesture"/> when it ends.
+    /// to <see cref="CommitGesture"/> or <see cref="CancelGesture"/> when it ends. Any edit, undo, redo, save or reload that
+    /// runs meanwhile ends the gesture first, as if cancelled; <see cref="Save"/> is then a new object, and a commit or
+    /// cancel of the ended gesture does nothing.
     /// </summary>
-    public string BeginGesture() => Save.ToJsonString();
+    public string BeginGesture() => _gestureBefore = Save.ToJsonString();
 
     /// <summary>
     /// Records everything since <paramref name="before"/> as one undo entry and saves. Does nothing when nothing changed. A
-    /// gesture that left chains on a track that plays a sequence is put back to <paramref name="before"/> instead.
+    /// gesture that left chains on a track that plays a sequence is cancelled instead.
     /// </summary>
     public void CommitGesture(IUndoManager undo, string description, string before)
     {
+        if (!ReferenceEquals(before, _gestureBefore)) return;
         if (HasTrackWithReferenceAndChains(Save))
         {
-            Restore(before);
+            CancelGesture();
             return;
         }
+        _gestureBefore = null;
         string after = Save.ToJsonString();
         if (after == before) return;
         int? changed = ChangedSequence(before, after);
         undo.Execute(new SnapshotCommand(this, description, before, after, changed, changed));
     }
 
-    /// <summary>Puts <see cref="Save"/> back as it was at <paramref name="before"/>, with no undo entry.</summary>
-    public void CancelGesture(string before) => Restore(before);
+    /// <summary>Puts <see cref="Save"/> back as it was at <paramref name="before"/>, with no undo entry and without writing the file.</summary>
+    public void CancelGesture(string before)
+    {
+        if (ReferenceEquals(before, _gestureBefore)) CancelGesture();
+    }
+
+    private void CancelGesture()
+    {
+        if (_gestureBefore is not { } before) return;
+        _gestureBefore = null;
+        Save = SequenceListSave.FromJsonString(before);
+        Changed?.Invoke();
+    }
 
     /// <summary>
     /// Writes the document to <paramref name="newPath"/> and makes that its file from now on: <see cref="Path"/> changes,
@@ -1289,6 +1309,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// </summary>
     public string? SaveAs(string newPath)
     {
+        CancelGesture();
         var target = new FilePath(newPath);
         if (target.Extension != "seqj")
             return IO.SaveTarget.WrongTypeMessage(newPath, "a .seqj");
@@ -1407,6 +1428,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>Writes the file. A failure is reported through <see cref="SaveError"/>, not thrown.</summary>
     public void SaveToDisk()
     {
+        CancelGesture();
         if (SaveRefusal() is { } refusal)
         {
             SaveError = refusal;
@@ -1434,6 +1456,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
         int? trackBefore = null, int? trackAfter = null, bool selectOnDo = true, (string From, string To)? renamed = null,
         SequenceSelectionState? stateBefore = null, SequenceSelectionState? stateAfter = null, string? coalesceGroup = null)
     {
+        CancelGesture();
         string before = Save.ToJsonString();
         var copy = SequenceListSave.FromJsonString(before);
         mutate(copy);
@@ -1483,6 +1506,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     private void Restore(string json, int? selectedSequence = null, int? selectedTrack = null, SequenceSelectionState? selection = null,
         FilePath? snapshotFolder = null)
     {
+        _gestureBefore = null;
         Save = SequenceListSave.FromJsonString(json);
         if (snapshotFolder is not null) SequenceSourcePaths.Rebase(Save, snapshotFolder, Folder);
         if (selection is not null)
@@ -1547,6 +1571,8 @@ public sealed class SequenceDocument : ISequenceChainLookup
         string? coalesceGroup = null, FilePath? beforeFolder = null, FilePath? afterFolder = null) : IUndoableCommand
     {
         public string Description => description;
+
+        public bool EditsAnimations => false;
 
         // The snapshots hold sources relative to the file's folder at the time; a Save As to another folder since then is
         // undone by rewriting them on restore (SequenceSourcePaths.Rebase).

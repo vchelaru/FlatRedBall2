@@ -209,7 +209,6 @@ public sealed partial class SequenceTimelineControl
         _dragOriginStart = hit.Reference.Start;
         _dragOriginEdge = hit.Reference.End;
         _snapOthers = TimelineSnapTargets.Others(_blocks, Array.Empty<SequenceChainReferenceSave>(), _playhead, _references, _dragReference);
-        _gestureBefore = _document!.BeginGesture();
         e.Pointer.Capture(this);
         ShowCursor(point);
     }
@@ -220,6 +219,7 @@ public sealed partial class SequenceTimelineControl
         if (_drag == DragKind.RefPending)
         {
             if (Math.Abs(point.X - _pressPoint.X) < DragThresholdPixels && Math.Abs(point.Y - _pressPoint.Y) < DragThresholdPixels) return;
+            _gestureBefore = _document!.BeginGesture();
             _drag = _pressedPart == TimelineHitPart.Edge ? DragKind.RefEdge : DragKind.RefMove;
         }
         double dt = (point.X - _pressPoint.X) / Viewport.PixelsPerSecond;

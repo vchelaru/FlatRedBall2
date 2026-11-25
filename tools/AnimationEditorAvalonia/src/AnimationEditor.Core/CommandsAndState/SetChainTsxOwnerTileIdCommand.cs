@@ -4,19 +4,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
     /// Explicitly overrides a native-tsx chain's owner tile (issue #1182) via <see
-    /// cref="IProjectManager.TrySetTsxOwnerTileId"/>, as one undo step. Undo/Redo round-trip the
-    /// whole tsx tracking snapshot (<see cref="IProjectManager.CaptureTsxState"/>/<see
-    /// cref="IProjectManager.RestoreTsxState"/>) rather than just the one dictionary entry: the
-    /// "before" state might have had tracked satellite hints that <see
-    /// cref="IProjectManager.TrySetTsxOwnerTileId"/> deliberately drops on an explicit set, and
-    /// only the full-state capture/restore already used elsewhere for tab-switching knows how to
-    /// put those back. Separately snapshots/restores <see cref="AnimationChainSave.Name"/> itself:
-    /// <see cref="IProjectManager.TrySetTsxOwnerTileId"/> renames an unnamed chain's synthetic
-    /// placeholder to follow its new tile, but that's a chain-level field, not tsx tracking state,
-    /// so <c>CaptureTsxState</c>/<c>RestoreTsxState</c> don't (and shouldn't) round-trip it -- this
-    /// command has to do that itself, the same way <see cref="RenameChainCommand"/> round-trips a
-    /// real rename, or Undo would leave the tree label on the *new* tile's name after reverting the
-    /// tile id back to the old one.
+    /// cref="IProjectManager.TrySetTsxOwnerTileId"/>, as one undo step. <see cref="UndoManager"/>
+    /// brings the tile back; this command brings <see cref="AnimationChainSave.Name"/> back, which
+    /// <see cref="IProjectManager.TrySetTsxOwnerTileId"/> changes when it is the synthetic placeholder.
     /// </summary>
     internal sealed class SetChainTsxOwnerTileIdCommand : IUndoableCommand
     {
@@ -25,12 +15,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IProjectManager _pm;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
-        private object? _before;
         private string? _beforeName;
+        private string? _afterName;
 
         public string Description { get; }
 
-        /// <summary>Validation error from the most recent <see cref="Do"/>/<see cref="Redo"/>, or
+        /// <summary>Validation error from the most recent <see cref="Do"/>, or
         /// <see langword="null"/> after a successful one. A caller reads this right after calling
         /// <see cref="IUndoManager.Execute"/> to surface the reason a set was rejected.</summary>
         public string? Error { get; private set; }
@@ -57,21 +47,30 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 return false;
             }
 
-            _before = _pm.CaptureTsxState();
             _beforeName = _chain.Name;
             Error = _pm.TrySetTsxOwnerTileId(_chain, _tileId);
             if (Error != null)
                 return false;
 
-            _commands.RefreshTreeNode(_chain);
-            _events.RaiseAnimationChainsChanged();
+            _afterName = _chain.Name;
+            RaiseSideEffects();
             return true;
         }
 
         public void Undo()
         {
-            _pm.RestoreTsxState(_before);
             _chain.Name = _beforeName!;
+            RaiseSideEffects();
+        }
+
+        public void Redo()
+        {
+            _chain.Name = _afterName!;
+            RaiseSideEffects();
+        }
+
+        private void RaiseSideEffects()
+        {
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
         }
