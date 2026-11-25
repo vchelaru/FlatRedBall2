@@ -834,13 +834,12 @@ public class WireframeControl : TextureViewport
     private async void OnPngDrop(object? sender, DragEventArgs e)
     {
         var firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
-        if (string.IsNullOrEmpty(firstFile) || HandlePngDrop is null)
+        if (string.IsNullOrEmpty(firstFile) || HandlePngDrop is null || !PngDropHasTarget(e))
             return;
 
         // Set before the await: the event goes on to the window, which would open an animation file dropped along
         // with the image under the copy question.
-        if (PngDropHasTarget(e))
-            e.Handled = true;
+        e.Handled = true;
 
         // SelectedFrame's setter keeps SelectedChain in sync with its parent, so this already
         // falls back to the selected chain (whole-chain retexture/create-first-frame) the same

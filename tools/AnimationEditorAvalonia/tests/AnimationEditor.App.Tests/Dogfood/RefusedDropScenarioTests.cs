@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
+using AnimationEditor.Views.Tests;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using System.Reflection;
@@ -113,16 +114,14 @@ public class RefusedDropScenarioTests : IDisposable
     {
         var (editor, path) = await OpenAsync();
         using var _ = editor;
-        string bad = Path.Combine(editor.ProjectFolder, "bad.png").Replace('\\', '/');
+        string bad = Path.Combine(editor.ProjectFolder, "bad.png");
         File.WriteAllText(bad, "not an image");
         var frame = editor.ChainNamed("Walk").Frames[0];
         editor.ClickRow(frame);
         var combo = editor.Control<ComboBox>("TextureCombo");
         object? own = combo.SelectedItem;
-        combo.Items.Add(bad);
 
-        combo.SelectedItem = bad;
-        editor.Layout();
+        PickInImagesList(editor, bad);
 
         frame.TextureName.ShouldBe("sheet.png");
         editor.ProblemText.ShouldNotBeNull();
@@ -269,5 +268,122 @@ public class RefusedDropScenarioTests : IDisposable
 
         openUnderTheQuestion.ShouldBe("Walk");
         AnimationEditorHarness.ReadSaved(path).AnimationChains[0].Frames[0].TextureName.ShouldBe("new.png");
+    }
+
+    // Nothing was read, so it is not known to be no image: the copy says why it failed and offers Retry (#2076).
+    [AvaloniaFact]
+    public async Task APngFromOutsideInUse_IsStillAskedAbout_AndRetryApplies()
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        string png = Path.Combine(_outside, "held.png");
+        File.Move(editor.WritePng("held.png", 64, 64), png);
+        var frame = editor.ChainNamed("Walk").Frames[0];
+        editor.Dialogs.AnswerNextEditorDialog(content =>
+        {
+            content.GetVisualDescendants().OfType<Button>().First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            return true;
+        });
+
+        using (new FileStream(png, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            await DropOnRow(editor, frame, png);
+        string? problem = editor.ProblemText;
+        editor.Click(editor.Notifications.ErrorBannerRetryBtn);
+        await editor.WaitUntilAsync(() => frame.TextureName == "held.png", TimeSpan.FromSeconds(5));
+
+        problem.ShouldNotBeNull().ShouldStartWith("Could not copy: ");
+        frame.TextureName.ShouldBe("held.png");
+    }
+
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task APngInTheProjectInUse_IsTaken(bool dropped)
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        string png = editor.WritePng("held.png", 64, 64);
+        var frame = editor.ChainNamed("Walk").Frames[0];
+        editor.ClickRow(frame);
+
+        using (new FileStream(png, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            if (dropped) await DropOnRow(editor, frame, png);
+            else PickInImagesList(editor, png);
+        }
+
+        frame.TextureName.ShouldBe("held.png");
+    }
+
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task APngTooLargeToShow_SaysItsSize(bool dropped)
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        string huge = Path.Combine(editor.ProjectFolder, "huge.png");
+        File.Copy(PngHeaderFile.Write("huge.png", 24000, 24000), huge);
+        var frame = editor.ChainNamed("Walk").Frames[0];
+        editor.ClickRow(frame);
+
+        if (dropped) await DropOnRow(editor, frame, huge);
+        else PickInImagesList(editor, huge);
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("24000 x 24000");
+    }
+
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task APngAndAnAnimationFile_WhereNothingTakesThePng_OpensTheAnimationFileWithoutAsking(bool onCanvas)
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        string png = Path.Combine(_outside, "new.png");
+        File.Move(editor.WritePng("new.png", 64, 64), png);
+        string other = editor.WriteAchx("other.achx", AnimationEditorHarness.Chain("Other", "sheet.png", (0, 0, 16, 16)));
+
+        if (onCanvas)
+        {
+            editor.Services.SelectedState.SelectedFrame = null;
+            editor.Services.SelectedState.SelectedChain = null;
+            await Drop(editor, editor.Wireframe, new Point(100, 100), png, other);
+        }
+        else
+        {
+            await Drop(editor, editor.AnimTree, new Point(60, editor.AnimTree.Bounds.Height - 6), png, other);
+        }
+
+        editor.Project.AnimationChains.Single().Name.ShouldBe("Other");
+        editor.Dialogs.Shown.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public async Task PickingInTheImagesList_OnALockedAnimation_SaysSo_AndGoesBack()
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        string other = editor.WritePng("other.png", 32, 32);
+        var walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk.Frames[0]);
+        editor.Services.AppCommands.SetChainLocked(walk, true);
+        var combo = editor.Control<ComboBox>("TextureCombo");
+        object? own = combo.SelectedItem;
+
+        PickInImagesList(editor, other);
+
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("'Walk' is locked");
+        combo.SelectedItem.ShouldBe(own);
+        editor.Wireframe.BitmapSize.ShouldBe((64, 64));
+    }
+
+    private static void PickInImagesList(AnimationEditorHarness editor, string file)
+    {
+        var combo = editor.Control<ComboBox>("TextureCombo");
+        string item = file.Replace('\\', '/');
+        combo.Items.Add(item);
+        combo.SelectedItem = item;
+        editor.Layout();
     }
 }

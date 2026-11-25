@@ -1459,7 +1459,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = FrameTextureEdit.SetResolved(_projectManager, _appCommands, frames, absolutePath, _textureProbe);
+        if (frames.All(IsFrameLocked))
+        {
+            ShowLocked(_objectFinder.GetAnimationChainContaining(frames[0])!);
+            SyncTextureCombo();
+            return;
+        }
+
+        var result = FrameTextureEdit.SetResolved(_projectManager, _appCommands, frames, absolutePath, _fileProbe);
+        if (result.Success) WireframeCtrl.LoadTexture(absolutePath);
         ReportTextureResult(result);
         if (!result.Success) SyncTextureCombo();   // the list goes back to the image the frame kept
     }
@@ -4169,10 +4177,11 @@ public partial class MainWindow : Window
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
+        if (!PngDropTargetsRow(e, targetChain, targetFrame, firstFile)) return;
+
         // Set before the await: the event goes on to the window, which would open an animation file dropped along
         // with the image under the copy question.
-        if (PngDropTargetsRow(e, targetChain, targetFrame, firstFile))
-            e.Handled = true;
+        e.Handled = true;
 
         await HandlePngDropAsync(targetChain, targetFrame, firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
     }
@@ -4211,7 +4220,7 @@ public partial class MainWindow : Window
         var editedChain = targetFrame is null ? targetChain : _objectFinder.GetAnimationChainContaining(targetFrame);
         if (editedChain is { IsLocked: true })
         {
-            ShowProblem($"⚠ '{editedChain.Name}' is locked. Unlock the animation to edit.");
+            ShowLocked(editedChain);
             return false;
         }
 
@@ -4220,6 +4229,9 @@ public partial class MainWindow : Window
         return resolvedFilePath is not null
             && ApplyResolvedPngDrop(targetChain, targetFrame, resolvedFilePath, createFrameOnCtrl);
     }
+
+    private void ShowLocked(AnimationChainSave chain) =>
+        ShowProblem($"⚠ '{chain.Name}' is locked. Unlock the animation to edit.");
 
     private bool ApplyResolvedPngDrop(
         AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
@@ -6149,14 +6161,13 @@ public partial class MainWindow : Window
 
     private ITextureProbe _textureProbe => new WireframeTextureProbe(path => WireframeCtrl.LoadTexture(path));
 
-    /// <summary>Probes by decoding the file, leaving the wireframe alone: a drop's target need not be what it shows.</summary>
+    /// <summary>
+    /// Refuses only a file known not to be an image, leaving the wireframe alone: a drop's target need not be what it
+    /// shows. One in use is left to the copy's own message and Retry, and one too large to the message about its size.
+    /// </summary>
     private sealed class FileTextureProbe : ITextureProbe
     {
-        public bool CanDecode(string absolutePath)
-        {
-            using SKBitmap? bitmap = SkiaFileDecoder.DecodeFile(absolutePath);
-            return bitmap is not null;
-        }
+        public bool CanDecode(string absolutePath) => !SkiaFileDecoder.IsNotAnImage(absolutePath);
     }
 
     private static readonly ITextureProbe _fileProbe = new FileTextureProbe();
