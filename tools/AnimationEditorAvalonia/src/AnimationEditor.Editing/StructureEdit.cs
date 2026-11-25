@@ -308,6 +308,7 @@ public static class StructureEdit
     {
         if (name.Length == 0) return Fail(EditErrorCode.EmptyName, "Chain name cannot be empty.");
         if (name.Contains('/')) return Fail(EditErrorCode.InvalidAddress, $"Chain name '{name}' cannot contain '/'.");
+        if (StorableText.Problem(name) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
         if (projectManager.AnimationChainListSave?.AnimationChains.Any(c => c.Name == name) == true)
             return Fail(EditErrorCode.DuplicateName, $"A chain named '{name}' already exists.");
         return null;

@@ -27,6 +27,7 @@ public static class FrameDetailEdit
         var check = CheckFrame(chain, frame);
         if (check is not null) return check;
         if (string.IsNullOrWhiteSpace(name)) return Fail(EditErrorCode.EmptyName, "An event needs a name.");
+        if ((StorableText.Problem(name) ?? StorableText.Problem(data)) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
 
         int before = frame.Events.Count;
         commands.AddFrameEvent(frame, name, data);
@@ -43,6 +44,7 @@ public static class FrameDetailEdit
         if (check is not null) return check;
         if (name is null && data is null) return Fail(EditErrorCode.InvalidValue, "An event edit needs a name, data or both.");
         if (name is not null && string.IsNullOrWhiteSpace(name)) return Fail(EditErrorCode.EmptyName, "An event name cannot be empty.");
+        if ((StorableText.Problem(name) ?? StorableText.Problem(data)) is { } problem) return Fail(EditErrorCode.InvalidValue, problem);
         var range = CheckEventIndex(chain, frame, index);
         if (range is not null) return range;
 
