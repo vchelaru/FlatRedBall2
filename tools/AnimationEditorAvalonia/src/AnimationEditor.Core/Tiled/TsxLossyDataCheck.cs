@@ -1,7 +1,6 @@
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace AnimationEditor.Core.Tiled;
 
@@ -24,27 +23,12 @@ public static class TsxLossyDataCheck
         {
             var kinds = DroppedKinds(chain, acls.TimeMeasurementUnit);
             if (kinds.Count > 0)
-                warnings.Add($"chain \"{chain.Name}\": {string.Join(", ", kinds)} can't be stored in a .tsx and was not saved.");
+                warnings.Add($"chain \"{chain.Name}\": {ChainData.Describe(kinds)} can't be stored in a .tsx and was not saved.");
         }
         return warnings;
     }
 
     /// <summary>The kinds of data <paramref name="chain"/> carries that the tsx can't hold; empty when it is stored in full.</summary>
-    public static IReadOnlyList<string> DroppedKinds(AnimationChainSave chain, TimeMeasurementUnit unit)
-    {
-        var kinds = new List<string>();
-        if (chain.Frames.Any(f => f.FlipHorizontal || f.FlipVertical || f.FlipDiagonal)) kinds.Add("flip");
-        if (chain.Frames.Any(f => f.RelativeX != 0f || f.RelativeY != 0f)) kinds.Add("sprite offset");
-        if (chain.Frames.Any(f => f.Red is not null || f.Green is not null || f.Blue is not null || f.Alpha is not null || f.ColorOperation is not null)) kinds.Add("color");
-        if (chain.Frames.Any(f => f.ShapesSave?.Shapes.Count > 0)) kinds.Add("collision shape");
-        if (chain.Frames.Any(f => f.Events.Count > 0)) kinds.Add("event");
-        if (chain.Frames.Any(f => f.SkipOffsetKeyframe || f.SkipColorKeyframe || f.OffsetInterpolation is not null
-            || f.OffsetEasing is not null || f.ColorInterpolation is not null || f.ColorEasing is not null)) kinds.Add("keyframe");
-        // Durations are whole milliseconds. Rounding is accepted, except down to no length at all.
-        if (chain.Frames.Any(f => f.FrameLength != 0f && new FrameLengthUnit(unit).ToMilliseconds(f.FrameLength) == 0)) kinds.Add("frame length under a millisecond");
-        if (!chain.Loop) kinds.Add("loop off");
-        if (chain.PingPong) kinds.Add("ping-pong");
-        if (chain.Reverse) kinds.Add("reverse");
-        return kinds;
-    }
+    public static IReadOnlyList<ChainDataKind> DroppedKinds(AnimationChainSave chain, TimeMeasurementUnit unit) =>
+        ChainData.Dropped([chain], unit, ChainDataKind.FrameLength);
 }

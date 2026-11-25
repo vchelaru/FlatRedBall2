@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -13,7 +14,7 @@ namespace AnimationEditor.Core.Export;
 /// </summary>
 /// <remarks>
 /// Fidelity gaps (PixiJS spritesheets cannot carry these, so they are dropped with a warning):
-/// per-frame duration, flip flags, and multiple source textures (PixiJS <c>meta.image</c> is a
+/// every <see cref="ChainDataKind"/>, and multiple source textures (PixiJS <c>meta.image</c> is a
 /// single sheet). Coordinates are read from the in-memory model: UV (0–1) coords are multiplied by
 /// the resolved texture size; Pixel coords are used directly (so the resolver is only consulted for
 /// UV input and for <c>sourceSize</c>).
@@ -37,20 +38,18 @@ public static class PixiJsSpriteSheetExporter
         var warnings = new List<string>();
         var distinctTextures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var orderedTextures = new List<string>();
-        bool anyDurationDropped = false;
 
         foreach (var chain in acls.AnimationChains)
         {
             // Frame keys live in one global map; disambiguate so duplicate chain names can't
             // silently overwrite each other's frames.
             string animationName = ExportNames.MakeUnique(chain.Name, sheet.Animations.Keys);
+            if (animationName != chain.Name) warnings.Add(ExportNames.RenameWarning(chain.Name, animationName));
             var frameKeys = new List<string>(chain.Frames.Count);
 
             for (int i = 0; i < chain.Frames.Count; i++)
             {
                 var frame = chain.Frames[i];
-
-                if (frame.FrameLength != 0f) anyDurationDropped = true;
 
                 if (!string.IsNullOrEmpty(frame.TextureName) && distinctTextures.Add(frame.TextureName))
                     orderedTextures.Add(frame.TextureName);
@@ -82,8 +81,10 @@ public static class PixiJsSpriteSheetExporter
         if (orderedTextures.Count > 1)
             warnings.Add($"This .achx references {orderedTextures.Count} textures, but a PixiJS " +
                          $"spritesheet is a single sheet; meta.image was set to '{firstTexture}'.");
-        if (anyDurationDropped)
-            warnings.Add("Per-frame durations are not part of the PixiJS spritesheet format and were dropped.");
+        // A length under a millisecond is already reported as a frame length.
+        var dropped = ChainData.Dropped(acls.AnimationChains, acls.TimeMeasurementUnit, ChainDataKind.FrameLengthUnderAMillisecond);
+        if (dropped.Count > 0)
+            warnings.Add($"{ChainData.Describe(dropped)} can't be stored in a PixiJS spritesheet and was not exported.");
 
         return new ExportResult(
             JsonSerializer.Serialize(sheet, PixiJsJsonContext.Default.PixiJsSpriteSheet), warnings, orderedTextures);

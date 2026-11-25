@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -21,8 +22,8 @@ namespace AnimationEditor.Core.Export;
 /// <para>Texture paths are written relative to the exported file (Godot resolves a non-<c>res://</c>
 /// path against the <c>.tres</c>'s folder), so export into the Godot project next to the copied
 /// textures. No <c>uid</c>s are written; Godot assigns them on import.</para>
-/// <para>Dropped with a warning: per-frame flip (AtlasTexture has no flip; use the node's
-/// <c>flip_h</c>/<c>flip_v</c>) and per-frame RelativeX/RelativeY offsets.</para>
+/// <para>Stores the frame lengths and Loop; every other <see cref="ChainDataKind"/> is dropped with a warning
+/// (AtlasTexture has no flip; use the node's <c>flip_h</c>/<c>flip_v</c>).</para>
 /// </remarks>
 public static class GodotSpriteFramesExporter
 {
@@ -51,14 +52,14 @@ public static class GodotSpriteFramesExporter
         var animations = new List<string>();
         var animationNames = new List<string>();
         int atlasCount = 0;
-        bool anyFlip = false, anyOffset = false, anyZeroLength = false;
+        bool anyZeroLength = false;
         double secondsDivisor = acls.TimeMeasurementUnit == TimeMeasurementUnit.Millisecond ? 1000.0 : 1.0;
 
         foreach (var chain in acls.AnimationChains)
         {
             string name = ExportNames.MakeUnique(chain.Name, animationNames);
             if (name != chain.Name)
-                warnings.Add($"Another animation is already named '{chain.Name}', so this one was exported as '{name}'.");
+                warnings.Add(ExportNames.RenameWarning(chain.Name, name));
             animationNames.Add(name);
 
             var frames = new List<(int AtlasId, double Seconds)>();
@@ -82,9 +83,6 @@ public static class GodotSpriteFramesExporter
                                  $"'{frame.TextureName}' could not be read to convert UV coordinates to pixels.");
                     continue;
                 }
-
-                anyFlip |= frame.FlipHorizontal || frame.FlipVertical || frame.FlipDiagonal;
-                anyOffset |= frame.RelativeX != 0f || frame.RelativeY != 0f;
 
                 atlasCount++;
                 subResources.Append('\n')
@@ -112,11 +110,11 @@ public static class GodotSpriteFramesExporter
                            "}");
         }
 
-        if (anyFlip)
-            warnings.Add("Some frames are flipped, but a Godot SpriteFrames frame has no flip; " +
-                         "flip the AnimatedSprite2D (flip_h/flip_v) instead.");
-        if (anyOffset)
-            warnings.Add("Some frames have a RelativeX/RelativeY offset, which SpriteFrames cannot store; it was dropped.");
+        var dropped = ChainData.Dropped(acls.AnimationChains, acls.TimeMeasurementUnit,
+            ChainDataKind.FrameLength, ChainDataKind.FrameLengthUnderAMillisecond, ChainDataKind.LoopOff);
+        if (dropped.Count > 0)
+            warnings.Add($"{ChainData.Describe(dropped)} can't be stored in a Godot SpriteFrames and was not exported." +
+                         (dropped.Contains(ChainDataKind.Flip) ? " Flip the AnimatedSprite2D (flip_h/flip_v) instead." : ""));
         if (anyZeroLength)
             warnings.Add($"Some frames have zero duration; they were exported with Godot's minimum relative duration ({Number(MinimumDuration)}).");
         if (orderedTextures.Any(t => System.IO.Path.IsPathRooted(t) || t.Contains(':')))

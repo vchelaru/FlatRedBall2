@@ -44,6 +44,9 @@ public readonly record struct FrameSourceRect(int X, int Y, int Width, int Heigh
 
 internal static class ExportNames
 {
+    public static string RenameWarning(string name, string exportedName) =>
+        $"Another animation is already named '{name}', so this one was exported as '{exportedName}'.";
+
     /// <summary>Returns <paramref name="candidate"/>, or it suffixed <c>_2</c>, <c>_3</c>… if taken.</summary>
     public static string MakeUnique(string candidate, IEnumerable<string> existing)
     {
