@@ -263,6 +263,18 @@ public class TsxEditCommandsStayStorableTests : IDisposable
     }
 
     [Fact]
+    public void AddFrame_AfterAPastedFrameOfAnotherImage_IsTile0OfTheTileset()
+    {
+        OpenTsx(TwoAnimations);
+        Second(_ctx).Frames[0].TextureName = "other.png";
+
+        _ctx.AppCommands.AddFrame(Second(_ctx));
+
+        Second(_ctx).Frames[1].TextureName.ShouldBe("Heroes.png");
+        FrameRegion.Of(Second(_ctx).Frames[1]).ShouldBe(new FrameRegion(0, 0, 16, 16));
+    }
+
+    [Fact]
     public void AddMultipleFrames_OnAnEmptyChainOfATsx_StartsAtTile0()
     {
         OpenTsx("");
