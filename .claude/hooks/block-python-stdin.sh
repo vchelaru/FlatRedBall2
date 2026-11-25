@@ -16,8 +16,9 @@ case "$input" in
 esac
 
 # `python -`, `python3 -`, `python3.14 -`, `python.exe -`, also `python3 -I -` style flags before the dash,
-# and a heredoc straight after the interpreter (`python3 <<EOF`).
-if printf '%s' "$input" | grep -Eq '(^|[^[:alnum:]_./-])python([0-9.]*)(\.exe)?( +-[A-Za-z]+)* +(-( |\n|\r|<|"|$)|<<)'; then
+# and a heredoc straight after the interpreter (`python3 <<EOF`). A line break is a backslash and an n in the
+# JSON, so python at the start of a later line has that n in front.
+if printf '%s' "$input" | grep -Eq '(^|[^[:alnum:]_./-]|\\n)python([0-9.]*)(\.exe)?( +-[A-Za-z]+)* +(-( |\\n|\\r|<|"|$)|<<)'; then
   echo "Refused: python reading its script from stdin (python -, or a heredoc) can hang forever waiting on stdin. Write the script to a file with the Write tool and run python3 <file>." >&2
   exit 2
 fi

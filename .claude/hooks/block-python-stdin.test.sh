@@ -29,6 +29,13 @@ check $blocked "python3 -I -" 'python3 -I - <<EOF\nx\nEOF'
 check $blocked "heredoc straight after interpreter" "python3 <<'EOF'\nprint(1)\nEOF"
 check $blocked "python.exe -" 'python.exe - < a.py'
 check $blocked "python3.14 -" 'python3.14 -'
+check $blocked "python - at the start of a later line" "cd x\npython - <<'E' 2>/dev/null || true\nE\ngit status"
+check $blocked "python3 - at the start of a later line" 'S=a\npython3 - 2>/dev/null </dev/null; ls'
+check $blocked "python heredoc at the start of a later line" 'cd x\npython3 <<EOF\nx\nEOF'
+check $blocked "python - ending a line" 'cd x\npython -\nls'
+check $allowed "python -c at the start of a later line" 'cd x\npython -c \"print(1)\"'
+check $allowed "python -I script at the start of a later line" 'cd x\npython -I tools/x.py - b'
+check $allowed "python -m at the start of a later line" 'cd x\npython -m json.tool < a.json'
 check $allowed "script file" 'python3 tools/x.py --flag'
 check $allowed "python -c" 'python3 -c \"print(1)\"'
 check $allowed "python -m" 'python3 -m json.tool a.json'

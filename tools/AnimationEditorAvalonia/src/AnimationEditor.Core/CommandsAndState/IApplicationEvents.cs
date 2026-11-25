@@ -45,6 +45,13 @@ namespace AnimationEditor.Core.CommandsAndState
         void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle);
         void RaiseAfterCircleChanged(CircleSave circle);
         void RaiseAnimationChainsChanged();
+
+        /// <summary>
+        /// Runs <paramref name="edits"/> and raises <see cref="AnimationChainsChanged"/> once after them if any of them
+        /// raised it, so nothing saves or shows a state between two of them.
+        /// </summary>
+        void RaiseAnimationChainsChangedOnce(Action edits);
+
         void CallAchxLoaded(string newFileName);
         void CallAfterZoomChange();
         void CallAfterWireframePanning();

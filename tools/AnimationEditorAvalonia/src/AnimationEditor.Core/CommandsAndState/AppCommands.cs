@@ -138,7 +138,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (commands.Length == 0) return;
             _undoManager.Execute(commands.Length == 1
                 ? commands[0]
-                : new CompositeCommand(commands, $"Set Locked on {commands.Length} Animations"));
+                : new CompositeCommand(commands, $"Set Locked on {commands.Length} Animations", _events));
         }
 
         public void SetChainLoop(AnimationChainSave chain, bool loop)
@@ -158,7 +158,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (commands.Length == 0) return;
             _undoManager.Execute(commands.Length == 1
                 ? commands[0]
-                : new CompositeCommand(commands, $"Set Loop on {commands.Length} Animations"));
+                : new CompositeCommand(commands, $"Set Loop on {commands.Length} Animations", _events));
         }
 
         public void SetChainsPingPong(IReadOnlyList<AnimationChainSave> chains, bool pingPong) =>
@@ -179,7 +179,7 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(commands.Length == 1
                 ? commands[0]
                 : new CompositeCommand(commands,
-                    $"Set {(mode == ChainPlaybackMode.PingPong ? "Ping-Pong" : "Reverse")} on {commands.Length} Animations"));
+                    $"Set {(mode == ChainPlaybackMode.PingPong ? "Ping-Pong" : "Reverse")} on {commands.Length} Animations", _events));
         }
 
         public string? SetChainTsxOwnerTileId(AnimationChainSave chain, uint tileId)
@@ -1031,7 +1031,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (commands.Count == 0) return;
 
             string desc = commands.Count == 1 ? commands[0].Description : $"Match {commands.Count} Shapes to Frame";
-            _undoManager.Execute(new CompositeCommand(commands, desc));
+            _undoManager.Execute(new CompositeCommand(commands, desc, _events));
         }
 
         // Raw position assignment used by the internal shape-creation paths to set a
@@ -1086,7 +1086,7 @@ namespace AnimationEditor.Core.CommandsAndState
             // text so the History panel reads naturally instead of "Composite Action".
             string desc = total == 1 ? commands[0].Description : $"Delete {total} Shapes";
             _undoManager.Execute(new DeleteWithSelectionCommand(
-                new CompositeCommand(commands, desc), deleted, _selectedState));
+                new CompositeCommand(commands, desc, _events), deleted, _selectedState));
 
             ItemsDeleted?.Invoke(total == 1 ? deleted[0].Name : $"{total} shapes");
         }
@@ -1136,12 +1136,11 @@ namespace AnimationEditor.Core.CommandsAndState
 
             int total = chainList.Count + frameList.Count + shapeList.Count;
             ExecuteRemovingChainNames("Deleting", acls, new DeleteWithSelectionCommand(
-                new CompositeCommand(commands, $"Delete {total} Items"),
+                new CompositeCommand(commands, $"Delete {total} Items", _events),
                 shapes.OfType<ShapeSave>().ToList(), _selectedState));
 
             ItemsDeleted?.Invoke($"{total} items");
             RefreshWireframeRequested?.Invoke();
-            _events.RaiseAnimationChainsChanged();
         }
 
         public void DeleteFrames(List<AnimationFrameSave> frames)
@@ -1168,11 +1167,10 @@ namespace AnimationEditor.Core.CommandsAndState
                     g.Select(x => x.Frame).ToList(), g.Key, this, _events, _selectedState))
                 .ToList();
             string desc = commands.Count == 1 ? commands[0].Description : $"Delete {validFrames.Count} Frames";
-            _undoManager.Execute(new CompositeCommand(commands, desc));
+            _undoManager.Execute(new CompositeCommand(commands, desc, _events));
 
             ItemsDeleted?.Invoke(label);
             RefreshWireframeRequested?.Invoke();
-            _events.RaiseAnimationChainsChanged();
         }
 
         private List<string> GetSelectedFrameShapeNames()
@@ -1746,7 +1744,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (commands.Count == 1)
                 _undoManager.Execute(commands[0]);
             else if (commands.Count > 1)
-                _undoManager.Execute(new CompositeCommand(commands, delta > 0 ? "Move Selection Down" : "Move Selection Up"));
+                _undoManager.Execute(new CompositeCommand(commands, delta > 0 ? "Move Selection Down" : "Move Selection Up", _events));
         }
 
         public void SetFrameFlip(
@@ -1780,7 +1778,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             if (commands.Count == 0) return;
-            _undoManager.Execute(new CompositeCommand(commands, "Set Flip"));
+            _undoManager.Execute(new CompositeCommand(commands, "Set Flip", _events));
         }
 
         public void FlipChainHorizontally(AnimationChainSave chain)
@@ -2233,7 +2231,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var cmds = unlockedFrames
                 .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, GetTextureSize, this, _events))
                 .ToArray();
-            _undoManager.Execute(new CompositeCommand(cmds, "Set Frame Texture"));
+            _undoManager.Execute(new CompositeCommand(cmds, "Set Frame Texture", _events));
         }
 
         public void SetAllFramesTextureName(AnimationChainSave chain, string? textureName)
@@ -2242,7 +2240,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var cmds = chain.Frames
                 .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, GetTextureSize, this, _events))
                 .ToArray();
-            _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
+            _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures", _events));
         }
 
         public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, NumericEdit newLength)
@@ -2603,7 +2601,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             if (steps.Count == 1) _undoManager.Execute(steps[0]);
-            else if (steps.Count > 1) _undoManager.Execute(new CompositeCommand(steps, $"Edit {ShapeUndoLabel.Format(polygon)}"));
+            else if (steps.Count > 1) _undoManager.Execute(new CompositeCommand(steps, $"Edit {ShapeUndoLabel.Format(polygon)}", _events));
             return true;
         }
 
@@ -2920,7 +2918,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     desc = cut.Shapes.Count == 1 ? $"Cut {ShapeUndoLabel.Format(cut.Shapes[0])}" : $"Cut {cut.Shapes.Count} Shapes";
                     break;
             }
-            if (CompositeCommand.Removed(deletes, desc) is not { } command) return false;
+            if (CompositeCommand.Removed(deletes, desc, _events) is not { } command) return false;
 
             tab.UndoSnapshot = new UndoSnapshot(
                 [.. tab.UndoSnapshot?.UndoStack ?? [], new UndoEntry(command, tab.CachedTsxState)], []);
