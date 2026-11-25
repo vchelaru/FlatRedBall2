@@ -36,7 +36,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             if (cmd.CoalesceGroup is { } group && group == _openCoalesceGroup &&
                 _undoStack.Count > 0 && _undoStack.Peek().CoalesceGroup == group)
             {
-                cmd = cmd.CoalesceWith(_undoStack.Pop());
+                if (cmd.CoalesceWith(_undoStack.Pop()) is not { } merged)
+                {
+                    _openCoalesceGroup = null;
+                    StackChanged?.Invoke();
+                    return;
+                }
+                cmd = merged;
             }
             _openCoalesceGroup = cmd.CoalesceGroup;
             Record(cmd);

@@ -44,7 +44,7 @@ internal sealed class SetPolygonPointsCommand : IUndoableCommand
     public void Undo() => Apply(e => e.Before);
     public void Redo() => Apply(e => e.After);
 
-    public IUndoableCommand CoalesceWith(IUndoableCommand previous)
+    public IUndoableCommand? CoalesceWith(IUndoableCommand previous)
     {
         // Keep each polygon's earliest "before", so undo restores the state from before the whole
         // coalesced edit. A polygon only the latest keystroke touched keeps its own "before".
@@ -55,6 +55,7 @@ internal sealed class SetPolygonPointsCommand : IUndoableCommand
                 : e)
             .Concat(p._entries.Where(pe => !_entries.Any(e => ReferenceEquals(e.Polygon, pe.Polygon))))
             .ToList();
+        if (entries.All(e => SamePoints(e.Before, e.After))) return null;
         return new SetPolygonPointsCommand(entries, _commands, _events, Description, CoalesceGroup);
     }
 

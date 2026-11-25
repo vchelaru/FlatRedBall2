@@ -87,6 +87,38 @@ public class UndoFidelityTests : IDisposable
     }
 
     [Fact]
+    public void SetFrameTextureName_ToTheSameTexture_RecordsNoUndoEntry()
+    {
+        Open(DocType.Achx);
+
+        _ctx.AppCommands.SetAllFramesTextureName(Chains[0], Chains[0].Frames[0].TextureName);
+
+        _ctx.UndoManager.UndoHistory.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void FlipChain_WithNoFrames_RecordsNoUndoEntry()
+    {
+        var chain = TestHelpers.MakeChain(_ctx.Acls, "Empty");
+
+        _ctx.AppCommands.FlipChainHorizontally(chain);
+
+        _ctx.UndoManager.UndoHistory.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MatchCircleToFrame_AlreadyMatching_RecordsNoUndoEntry()
+    {
+        var frame = TestHelpers.MakeChain(_ctx.Acls, "Walk", 1).Frames[0];
+        var circle = new CircleSave { Name = "C", Radius = 2 };
+        frame.ShapesSave!.Add(circle);
+
+        _ctx.AppCommands.MatchCircleToFrame(circle, frame);
+
+        _ctx.UndoManager.UndoHistory.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void PasteShapesCut_GivenUp_LeavesTheTargetWithoutAShapeList()
     {
         var frame = TestHelpers.MakeChain(_ctx.Acls, "Walk", 1).Frames[0];
@@ -95,5 +127,38 @@ public class UndoFidelityTests : IDisposable
         _ctx.AppCommands.PasteShapesCut(frame, [new CircleSave { Name = "C" }], sourcesToRemove: [], frame);
 
         frame.ShapesSave.ShouldBeNull();
+    }
+
+    [Fact]
+    public void SetFrameRelative_UpThenBackDown_KeepsOnlyTheEarlierUndoEntry()
+    {
+        var frame = TestHelpers.MakeChain(_ctx.Acls, "Walk", 1).Frames[0];
+        _ctx.AppCommands.SetFrameRelative([frame], 5f, 0f);
+        _ctx.AppCommands.SealPendingEdits();
+
+        _ctx.AppCommands.SetFrameRelative([frame], 6f, 0f);
+        _ctx.AppCommands.SetFrameRelative([frame], 5f, 0f);
+        _ctx.UndoManager.UndoHistory.Count.ShouldBe(1);
+
+        // The run that ended must not fold a later edit into the earlier entry.
+        _ctx.AppCommands.SetFrameRelative([frame], 7f, 0f);
+        _ctx.UndoManager.Undo();
+        frame.RelativeX.ShouldBe(5f);
+    }
+
+    [Fact]
+    public void ShapeFields_UpThenBackDown_RecordNoUndoEntry()
+    {
+        var frame = TestHelpers.MakeChain(_ctx.Acls, "Walk", 1).Frames[0];
+        var circle = new CircleSave { Name = "C", Radius = 2 };
+        var polygon = new PolygonSave { Name = "P", Points = [new() { X = 0, Y = 0 }, new() { X = 1, Y = 0 }, new() { X = 0, Y = 1 }] };
+        frame.ShapesSave!.Add(circle);
+        frame.ShapesSave.Add(polygon);
+
+        foreach (var x in new[] { 1f, 0f }) _ctx.AppCommands.SetCircleProps(frame, circle, "C", x, 0f, 2f);
+        foreach (var x in new[] { 1f, 0f }) _ctx.AppCommands.SetCirclePropsBulk([circle], null, x, null, null);
+        foreach (var x in new[] { 2f, 1f }) _ctx.AppCommands.MovePolygonVertex(polygon, 1, x, 0f);
+
+        _ctx.UndoManager.UndoHistory.ShouldBeEmpty();
     }
 }

@@ -256,6 +256,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
     public void SetFrameTextureName_TheTilesetsOwnImage_IsAllowedInAnySpelling(string spelling)
     {
         OpenTsx(TwoAnimations);
+        foreach (var frame in Frames(_ctx)) frame.TextureName = "other.png"; // naming the image they already show is no edit
 
         _ctx.AppCommands.SetFrameTextureName(Frames(_ctx), spelling);
         _ctx.AppCommands.SetAllFramesTextureName(First(_ctx), Path.Combine(_dir.Path, "Heroes.png"));
