@@ -33,10 +33,9 @@ public static class FrameTextureEdit
     public static async Task<TextureResolveResult> ResolveForProjectAsync(
         IProjectManager projectManager, string texturePath, TextureCopyChooser chooser)
     {
-        var plan = TextureCopyDecider.PlanCopyForProject(projectManager, texturePath);
-        if (plan is null) return new TextureResolveResult(texturePath, Ok());
+        if (Resolved(projectManager, texturePath, out var plan) is { } done) return done;
 
-        return ApplyChoice(plan, await chooser(plan));
+        return ApplyChoice(plan!, await chooser(plan!));
     }
 
     /// <summary>
@@ -46,8 +45,27 @@ public static class FrameTextureEdit
     public static TextureResolveResult ResolveForProject(
         IProjectManager projectManager, string texturePath, TextureCopyChoice choice)
     {
-        var plan = TextureCopyDecider.PlanCopyForProject(projectManager, texturePath);
-        return plan is null ? new TextureResolveResult(texturePath, Ok()) : ApplyChoice(plan, choice);
+        if (Resolved(projectManager, texturePath, out var plan) is { } done) return done;
+
+        return ApplyChoice(plan!, choice);
+    }
+
+    /// <summary>
+    /// The result when <paramref name="texturePath"/> needs no copy, or when a file <paramref name="plan"/> would
+    /// compare cannot be read; null with the plan to carry out otherwise.
+    /// </summary>
+    internal static TextureResolveResult? Resolved(IProjectManager projectManager, string texturePath, out TextureCopyPlan? plan)
+    {
+        plan = null;
+        try
+        {
+            plan = TextureCopyDecider.PlanCopyForProject(projectManager, texturePath);
+            return plan is null ? new TextureResolveResult(texturePath, Ok()) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return CopyFailed(ex);
+        }
     }
 
     internal static TextureResolveResult ApplyChoice(TextureCopyPlan plan, TextureCopyChoice choice)
@@ -61,9 +79,12 @@ public static class FrameTextureEdit
         }
         catch (Exception ex)
         {
-            return new TextureResolveResult(null, Fail(EditErrorCode.TextureCopyFailed, $"Could not copy: {ex.Message}"));
+            return CopyFailed(ex);
         }
     }
+
+    private static TextureResolveResult CopyFailed(Exception ex) =>
+        new(null, Fail(EditErrorCode.TextureCopyFailed, $"Could not copy: {ex.Message}"));
 
     /// <summary>
     /// Applies the text of the texture-name field to <paramref name="frames"/>: empty clears, otherwise the text
