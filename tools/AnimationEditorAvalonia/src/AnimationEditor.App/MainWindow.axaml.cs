@@ -26,6 +26,7 @@ using AnimationEditor.Views.Dialogs;
 using AnimationEditor.Views.Export;
 using AnimationEditor.Views.Services;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -419,6 +420,9 @@ public partial class MainWindow : Window
             Activated += (_, _) => wheelInput.Attach(this);
         }
 
+        OpenEditorWindows = () => Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.Windows.OfType<MainWindow>().ToList()
+            : [this];
         Opened += OnOpened;
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
         Closing += OnWindowClosing;
@@ -438,8 +442,9 @@ public partial class MainWindow : Window
                 () => _appSettings.WindowMaximized = WindowState == WindowState.Maximized,
                 SaveTabsToSettings,
                 // A normal close is not a crash -- clear any stray recovery file so the next
-                // launch doesn't falsely report "closed unexpectedly" (#894).
-                _appCommands.HandleApplicationClosing,
+                // launch doesn't falsely report "closed unexpectedly" (#894). An OS shutdown asked nothing,
+                // so the unsaved documents come back at the next launch (#2074).
+                () => { if (!_closingForOsShutdown) _appCommands.HandleApplicationClosing(); },
                 () => _appCommands.HotReloadWatcher.Dispose(),
                 () => PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged,
                 () => PreviewCtrl.IsPlayingChanged -= UpdatePlayPauseIcon,
@@ -954,6 +959,7 @@ public partial class MainWindow : Window
     /// </summary>
     private bool _closeConfirmed;
     private bool _confirmingClose;
+    private bool _closingForOsShutdown;
 
     /// <summary>
     /// Closing the window with a tab whose last save failed, or an Untitled tab with content, would drop its edits, so it asks first, once per such tab
@@ -963,27 +969,34 @@ public partial class MainWindow : Window
     {
         // Before the settings and tabs are written, so a name typed into an open rename is kept.
         SettlePendingInput();
-        if (_closeConfirmed || e.CloseReason == WindowCloseReason.OSShutdown
+        _closingForOsShutdown = e.CloseReason == WindowCloseReason.OSShutdown;
+        if (_closeConfirmed || _closingForOsShutdown
             || !(_sequencePane.HasUnsavedEdits || _achxPane.HasUnsavedEdits)) return;
 
         e.Cancel = true;
-        if (_confirmingClose) return;
         _ = RunGuardedAsync(() => ConfirmWindowCloseAsync(), "Close");
     }
 
     private async Task ConfirmWindowCloseAsync()
     {
+        if (!await ConfirmUnsavedEditsAsync()) return;
+        _closeConfirmed = true;
+        Close();
+    }
+
+    /// <summary>Asks about every tab whose edits no file has. Returns false when the user cancelled, or is being asked already.</summary>
+    private async Task<bool> ConfirmUnsavedEditsAsync()
+    {
+        if (_confirmingClose) return false;
         _confirmingClose = true;
         try
         {
-            if (!await _sequencePane.ConfirmWindowCloseAsync() || !await _achxPane.ConfirmWindowCloseAsync()) return;
-            _closeConfirmed = true;
+            return await _sequencePane.ConfirmWindowCloseAsync() && await _achxPane.ConfirmWindowCloseAsync();
         }
         finally
         {
             _confirmingClose = false;
         }
-        Close();
     }
 
     /// <summary>Closes the window without the unsaved-edits prompt. For tests that end with a failed save on purpose.</summary>
@@ -1080,6 +1093,15 @@ public partial class MainWindow : Window
 
     // ── Startup ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// A window Detach to New Window made. The session (the tabs, project folder and unsaved documents the next launch
+    /// opens) is the first window's: this one neither restores nor saves it.
+    /// </summary>
+    internal bool IsDetached { get; set; }
+
+    /// <summary>The file the editor was started with (a double-click in Explorer), or null. Tests set it before the window opens.</summary>
+    internal string? LaunchFile { get; set; } = Services.LaunchFile.FromArguments(Environment.GetCommandLineArgs().Skip(1).ToArray());
+
     private void OnOpened(object? sender, EventArgs e)
     {
         _ = RunGuardedAsync(() => HandleStartupAsync(), "Startup");
@@ -1099,70 +1121,65 @@ public partial class MainWindow : Window
             Environment.Exit(0);
         }
 
-        // Consume any crash-recovery file up front, but open it *after* the normal startup
-        // branches below (#1020). Restoring it used to early-out of this whole block, so
-        // accepting the old Restore/Delete prompt silently dropped every other open tab.
-        var recovered = TakeRecoveryFileContent();
-
-        var args = Environment.GetCommandLineArgs();
-        if (args.Length >= 2 && File.Exists(args[1]))
-        {
-            await LoadAnimationFileAsync(args[1]);
-        }
-        else if (_appSettings.OpenTabPaths.Count > 0)
-        {
-            await RestoreTabsAsync();
-        }
-        else if (recovered is null)
-        {
+        if (IsDetached)
             _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        }
-
-        if (recovered is not null)
-        {
-            // Awaited above, so nothing is still in flight to clobber the restored document.
-            OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
-            _tabManager.ActiveTab!.IsRecoveredDocument = true;
-            UpdateRecoveredDocumentBanner();
-        }
-
-        // Independent of which branch above ran -- the Project tab tree isn't tied to which
-        // document tab is open (#772).
-        if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
-            await LoadAndPersistProjectFolderAsync(lastProjectFolder, selectSidebarTab: false);
-
-        // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, the
-        // recovered document, or none of them) did so directly rather than through
-        // ActivateTabAsync, so it never synced the Project list's own selection (#910
-        // follow-up) -- do it once here, now the tree is populated.
-        if (_tabManager.ActiveTab is { } activeTab)
-            SyncProjectPanelSelectionTo(activeTab);
+        else
+            await RestoreSessionAsync();
 
         RefreshFilesPanel();
         _ = RunGuardedAsync(() => RunStartupUpdateDownloadAsync(), "Update");
     }
 
     /// <summary>
-    /// Reads and deletes any crash-recovery file left by <see cref="IIoManager.WriteRecoveryFile"/>
-    /// after an unclean shutdown of an unsaved document (see
-    /// <see cref="AppCommands.SaveCurrentAnimationChainList"/>), returning its content for the
-    /// caller to open as an unsaved document. Returns null when there was nothing to recover or
-    /// the file could not be parsed; the unparseable file is deleted rather than re-offered on
-    /// every subsequent launch.
+    /// What a start of the editor opens: the tabs of the last session, the documents a crash left unsaved, the file it was
+    /// started with in front of them, and the project folder.
     /// </summary>
-    /// <remarks>
-    /// Deleting on read is safe because the content lives in the restored tab from here on, and
-    /// closing that tab is what the user does to discard it (<see cref="CloseTabCoreAsync"/>). There is
-    /// deliberately no "delete permanently?" prompt: the old modal made that call from memory,
-    /// before the user could see what was in the file (#1020).
-    /// </remarks>
-    private AnimationChainListSave? TakeRecoveryFileContent()
+    private async Task RestoreSessionAsync()
     {
-        if (!_ioManager.RecoveryFileExists()) return null;
+        // Each step is guarded on its own: one that fails says so and the rest still run (#2085).
+        // The tabs first: they replace whatever is open. A recovered document never replaces them either (#1020).
+        _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        await RunGuardedAsync(RestoreTabsAsync, "Restoring the open tabs");
+        await RestoreRecoveredDocumentsAsync();
+        if (LaunchFile is { } file)
+            await RunGuardedAsync(() => LoadAnimationFileAsync(file), "Open");
 
-        var recovered = _ioManager.TryReadRecoveryFile();
-        _ioManager.DeleteRecoveryFile();
-        return recovered;
+        // Independent of the steps above -- the Project tab tree isn't tied to which
+        // document tab is open (#772).
+        if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
+            await RunGuardedAsync(() => LoadAndPersistProjectFolderAsync(lastProjectFolder, selectSidebarTab: false), "Open Project Folder");
+
+        // Whichever step above set the active tab (RestoreTabsAsync, the recovered document, the
+        // launch file, or none of them) did so directly rather than through
+        // ActivateTabAsync, so it never synced the Project list's own selection (#910
+        // follow-up) -- do it once here, now the tree is populated.
+        if (_tabManager.ActiveTab is { } activeTab)
+            SyncProjectPanelSelectionTo(activeTab);
+    }
+
+    /// <summary>
+    /// Opens each document a crash left a recovery file of (<see cref="IIoManager.WriteRecoveryFile"/>) as an unsaved
+    /// document, the one edited last in front. There is deliberately no "delete permanently?" prompt: the old modal made
+    /// that call from memory, before the user could see what was in the file (#1020). Closing the tab discards it.
+    /// </summary>
+    private async Task RestoreRecoveredDocumentsAsync()
+    {
+        foreach (string path in _ioManager.FindRecoveryFiles())
+            await RunGuardedAsync(() => { RestoreRecoveredDocument(path); return Task.CompletedTask; }, "Recovering an unsaved document");
+        UpdateRecoveredDocumentBanner();
+    }
+
+    private void RestoreRecoveredDocument(string recoveryFile)
+    {
+        if (_ioManager.TryReadRecoveryFile(recoveryFile) is not { } recovered) return;
+        if (recovered.AnimationChains.Count == 0)
+        {
+            _ioManager.DeleteRecoveryFile(recovered);
+            return;
+        }
+        CaptureLeavingActiveTab();
+        OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
+        _tabManager.ActiveTab!.IsRecoveredDocument = true;
     }
 
     // ── Recovered-document banner ─────────────────────────────────────────────
@@ -1183,20 +1200,40 @@ public partial class MainWindow : Window
 
     private void WireUpdateAvailableBanner()
     {
-        RestartForUpdateBtn.Click += (_, _) => RestartToApplyUpdate();
+        RestartForUpdateBtn.Click += (_, _) => _ = RunGuardedAsync(() => RestartToApplyUpdateAsync(), "Restart");
         RetryUpdateBtn.Click += (_, _) => _ = RunGuardedAsync(() => RunStartupUpdateDownloadAsync(), "Update");
     }
 
     /// <summary>
     /// Applies a downloaded update and restarts. Shared by the persistent banner's Restart
     /// button and the About dialog's (issue #1033) — one restart action, not a copy per surface.
+    /// It ends the process, so every window first asks what closing it asks (#2074).
     /// </summary>
-    private void RestartToApplyUpdate()
+    private async Task RestartToApplyUpdateAsync()
     {
         try
         {
-            SaveTabsToSettings();
-            _applicationUpdater.ApplyUpdateAndRestart();
+            var windows = OpenEditorWindows();
+            foreach (var window in windows)
+            {
+                window.SettlePendingInput();
+                if (!await window.ConfirmUnsavedEditsAsync()) return;
+            }
+            foreach (var window in windows)
+            {
+                window.SaveTabsToSettings();
+                window._appCommands.HandleApplicationClosing();
+            }
+            try
+            {
+                _applicationUpdater.ApplyUpdateAndRestart();
+            }
+            finally
+            {
+                // Still here: it did not restart, and the documents are still open.
+                foreach (var window in windows)
+                    window._achxPane.WriteRecoveryFiles();
+            }
         }
         catch (Exception ex)
         {
@@ -1204,6 +1241,9 @@ public partial class MainWindow : Window
             ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
         }
     }
+
+    /// <summary>The editor windows of this process. Tests, which have no desktop lifetime, replace it.</summary>
+    internal Func<IReadOnlyList<MainWindow>> OpenEditorWindows { get; set; }
 
     private void ShowUpdateDownloadFailure(string message)
     {
@@ -3290,7 +3330,7 @@ public partial class MainWindow : Window
     /// Opening the About dialog behaves as if its "Check for Updates" button were already clicked:
     /// it starts the real update check-and-download immediately and shows a spinner until the
     /// result is in. This is the exact same mechanism (<see cref="RunApplicationUpdateCheckAsync"/>)
-    /// and restart action (<see cref="RestartToApplyUpdate"/>) the persistent startup banner uses —
+    /// and restart action (<see cref="RestartToApplyUpdateAsync"/>) the persistent startup banner uses —
     /// About previously ran its own separate GitHub-release comparison whose "Get Update" button
     /// only opened a browser tab, so it never actually fetched anything (issue #1033).
     /// </summary>
@@ -3298,7 +3338,7 @@ public partial class MainWindow : Window
     {
         var window = BuildAboutWindowWithLiveRefresh(
             refresh: () => RunApplicationUpdateCheckAsync(),
-            onRestart: RestartToApplyUpdate);
+            onRestart: () => _ = RunGuardedAsync(() => RestartToApplyUpdateAsync(), "Restart"));
         await window.ShowDialog(this);
     }
 
@@ -3526,7 +3566,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Builds the About dialog's "Restart Now" button once a download is ready — calls the
-    /// exact same <see cref="RestartToApplyUpdate"/> the persistent banner's button does (issue #1033).</summary>
+    /// exact same <see cref="RestartToApplyUpdateAsync"/> the persistent banner's button does (issue #1033).</summary>
     private static Button BuildRestartButton(Action onRestart)
     {
         var button = new Button { Name = "AboutRestartBtn", Content = "Restart Now" };
@@ -7516,6 +7556,14 @@ public partial class MainWindow : Window
         try
         {
             var settingsFile = SettingsFilePath;
+            if (IsDetached)
+            {
+                // The session is the first window's, which may have changed since this window read it.
+                var saved = SettingsPreload.Read(settingsFile);
+                _appSettings.OpenTabPaths = saved.OpenTabPaths;
+                _appSettings.ActiveTabPath = saved.ActiveTabPath;
+                _appSettings.LastProjectFolderPath = saved.LastProjectFolderPath;
+            }
             // The AnimationEditor subfolder under %APPDATA% won't exist on a fresh install.
             Directory.CreateDirectory(settingsFile.GetDirectoryContainingThis().FullPath);
             File.WriteAllText(settingsFile.FullPath,

@@ -289,7 +289,7 @@ public class PixelDocumentTests : IDisposable
         WritePng("sheet.png", 64, 32);
         _ctx.IoManager.RecoveryFilePath = WriteUvFile(PathOf("sheet.png"));
 
-        var recovered = _ctx.IoManager.TryReadRecoveryFile()!;
+        var recovered = _ctx.IoManager.TryReadRecoveryFile(_ctx.IoManager.RecoveryFilePath)!;
 
         Region(recovered.AnimationChains[0].Frames[0]).ShouldBe((16f, 0f, 32f, 24f));
     }
