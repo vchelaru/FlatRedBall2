@@ -147,7 +147,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     private bool _draggingHGuide;                  // true = horizontal guide
     private bool  _guideDragIsNew;                 // the dragged guide was created by this press
     private float _guideDragStart;                 // its world coordinate when the drag began
-    private Point _guideDragAnchor;
+    private float _guidePressWorld;                // the pointer's world coordinate at the press
+    private float _guideGrab;                      // pointer minus guide; 0 for a new guide, which follows the pointer
 
     // -- Shape drag -----------------------------------------------------------
     private object?    _draggingShape;   // AARectSave or CircleSave
@@ -174,7 +175,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     private List<Vector2Save>? _vertexDragPointsBefore;
     private PolygonVertexEdit  _vertexDragEdit;
     private float              _vertexDragStartX, _vertexDragStartY;
-    private Point              _vertexDragAnchor;
+    private (float X, float Y) _vertexPressWorld;  // the pointer's world point at the press
+    private (float X, float Y) _vertexGrab;        // pointer minus vertex; an inserted vertex sits on the pointer
     private const float        VertexHandleRadius = 5f;
     private int                _hoverVertexIndex = -1;
     private int                _inspectorVertexIndex = -1;
@@ -1827,6 +1829,16 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// </summary>
     private static float DragTo(float start, float delta) => delta == 0f ? start : SnapToPixel(start + delta);
 
+    /// <summary>
+    /// <see cref="DragTo"/> for a drag held in world space, so a zoom or scroll during it keeps the item on the pointer.
+    /// </summary>
+    private static float FollowPointer(float start, float pressWorld, float grab, float pointerWorld)
+    {
+        // A zoom keeps the world point under the pointer only up to float rounding.
+        const float unmoved = 1e-3f;
+        return MathF.Abs(pointerWorld - pressWorld) < unmoved ? start : SnapToPixel(pointerWorld - grab);
+    }
+
     // -- Test helpers (internal) ----------------------------------------------
 
     /// <summary>Horizontal guide world-Y values; exposed for headless tests.</summary>
@@ -1972,15 +1984,14 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         // The cursor must not imply a drag that OnPointerPressed refuses (a locked chain, hidden shapes, or a value
         // whose keyframe is off), so it tests the same locks in the same order (#1032 follow-up).
         var handle = HitTestShapeHandle((float)pos.X, (float)pos.Y);
-        bool handleLocked = handle != HandleKind.None && IsShapeResizeLocked((ShapeSave)_selectedState!.SelectedShape!);
-        if (handle != HandleKind.None && !handleLocked)
+        if (handle != HandleKind.None)
             return GetResizeCursor(handle);
 
         StandardCursorType? cursorType = _draggedGuideIdx >= 0
             ? (_draggingHGuide ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast)
             : GetGuideCursorAt((float)pos.X, (float)pos.Y);
-        if (cursorType is not null || handleLocked) return cursorType;
-        bool draggable = HitTestShape((float)pos.X, (float)pos.Y) is ShapeSave hitShape
+        if (cursorType is not null) return cursorType;
+        bool draggable = HitTestPressedShape((float)pos.X, (float)pos.Y) is ShapeSave hitShape
             ? !IsShapeMoveLocked(hitShape)
             : HitTestFrameSprite((float)pos.X, (float)pos.Y);
         return draggable ? StandardCursorType.SizeAll : null;
@@ -2274,6 +2285,15 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     }
 
     /// <summary>
+    /// The shape a plain press grabs. Where the selected shape's undrawn handles would be, that is what lies under them:
+    /// the shape's own grab margin there must not turn a resize that is refused into a move.
+    /// </summary>
+    private object? HitTestPressedShape(float px, float py) =>
+        HitTestShapeHandle(px, py, drawn: false) == HandleKind.None
+            ? HitTestShape(px, py)
+            : ShapesUnder(px, py).FirstOrDefault(s => !ReferenceEquals(s, _selectedState!.SelectedShape));
+
+    /// <summary>
     /// Every collision shape of the pinned frame under the point, topmost first (polygons render
     /// last, then circles, then rects; later list entries draw on top). Empty outside the ruler
     /// strips or when no frame is pinned. Selection is ignored here — see <see cref="HitTestShape"/>.
@@ -2467,6 +2487,13 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         return result;
     }
 
+    /// <summary>The point under the pointer in shape offsets (Y up).</summary>
+    private (float X, float Y) PointerToShapeWorld(float px, float py)
+    {
+        float om = _appState!.OffsetMultiplier * _zoom;
+        return ((px - GetCenterX()) / om, -(py - GetCenterY()) / om);
+    }
+
     /// <summary>
     /// Starts a vertex gesture on the selected, unlocked polygon when the press lands on one of
     /// its handles: a vertex (drag it; hover it and press Delete to remove it) or an edge midpoint (insert a
@@ -2504,7 +2531,11 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         _vertexDragPointsBefore = before;
         _vertexDragEdit         = edit;
         (_vertexDragStartX, _vertexDragStartY) = PolygonVertices.Get(polygon, vertex);
-        _vertexDragAnchor       = new Point(px, py);
+        _vertexPressWorld       = PointerToShapeWorld(px, py);
+        if (edit.Inserted && DrawnShape(polygon) is var origin)
+            _vertexGrab = (origin.X, origin.Y);
+        else
+            _vertexGrab = (_vertexPressWorld.X - _vertexDragStartX, _vertexPressWorld.Y - _vertexDragStartY);
         InvalidateVisual();
         return true;
     }
@@ -2610,8 +2641,9 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// Returns the resize <see cref="HandleKind"/> under the cursor for the currently selected
     /// shape, or <see cref="HandleKind.None"/> if no resize handle is hit.
     /// Handles are positioned outside the bounding box by <c>Hs</c> pixels.
+    /// <paramref name="drawn"/> false tests where the handles of a shape that cannot be resized would be.
     /// </summary>
-    private HandleKind HitTestShapeHandle(float px, float py)
+    private HandleKind HitTestShapeHandle(float px, float py, bool drawn = true)
     {
         var sel = _selectedState!.SelectedShape;
         if (!_showShapes || sel is null || (_selectedState!.SelectedFrame is null && !IsGroupPreviewActive)) return HandleKind.None;
@@ -2622,12 +2654,12 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         float om = _appState!.OffsetMultiplier * _zoom;
         const float Hs = 5f;
 
-        if (sel is not (AARectSave or CircleSave)) return HandleKind.None;
-        var drawn = DrawnShape((ShapeSave)sel);
-        float sx = cx + drawn.X * om;
-        float sy = cy - drawn.Y * om;
-        float hw = drawn.SizeX * om;
-        float hh = (sel is CircleSave ? drawn.SizeX : drawn.SizeY) * om;
+        if (sel is not (AARectSave or CircleSave) || IsShapeResizeLocked((ShapeSave)sel) == drawn) return HandleKind.None;
+        var shape = DrawnShape((ShapeSave)sel);
+        float sx = cx + shape.X * om;
+        float sy = cy - shape.Y * om;
+        float hw = shape.SizeX * om;
+        float hh = (sel is CircleSave ? shape.SizeX : shape.SizeY) * om;
         float left = sx - hw, right  = sx + hw;
         float top  = sy - hh, bottom = sy + hh;
 
@@ -3018,7 +3050,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             _draggingHGuide  = true;
             _guideDragIsNew  = true;
             _guideDragStart  = wy;
-            _guideDragAnchor = pos;
+            _guidePressWorld = ScreenToWorldY(py);
+            _guideGrab       = 0f;
             e.Pointer.Capture(this);
             OnGuideAdded();
             return;
@@ -3033,7 +3066,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
             _draggingHGuide  = false;
             _guideDragIsNew  = true;
             _guideDragStart  = wx;
-            _guideDragAnchor = pos;
+            _guidePressWorld = ScreenToWorldX(px);
+            _guideGrab       = 0f;
             e.Pointer.Capture(this);
             OnGuideAdded();
             return;
@@ -3052,7 +3086,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                     _draggingHGuide  = true;
                     _guideDragIsNew  = false;
                     _guideDragStart  = _hGuides[i];
-                    _guideDragAnchor = pos;
+                    _guidePressWorld = ScreenToWorldY(py);
+                    _guideGrab       = _guidePressWorld - _guideDragStart;
                     e.Pointer.Capture(this);
                     return;
                 }
@@ -3065,7 +3100,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
                     _draggingHGuide  = false;
                     _guideDragIsNew  = false;
                     _guideDragStart  = _vGuides[i];
-                    _guideDragAnchor = pos;
+                    _guidePressWorld = ScreenToWorldX(px);
+                    _guideGrab       = _guidePressWorld - _guideDragStart;
                     e.Pointer.Capture(this);
                     return;
                 }
@@ -3099,30 +3135,27 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (handleKind != HandleKind.None)
         {
             var sel = (ShapeSave)_selectedState!.SelectedShape!;
-            if (!IsShapeResizeLocked(sel))
+            _draggingShape   = sel;
+            _shapeDragAnchor = pos;
+            if (sel is AARectSave dhr)
             {
-                _draggingShape   = sel;
-                _shapeDragAnchor = pos;
-                if (sel is AARectSave dhr)
-                {
-                    _shapeDragStartX      = dhr.X;
-                    _shapeDragStartY      = dhr.Y;
-                    _shapeDragStartScaleX = dhr.ScaleX;
-                    _shapeDragStartScaleY = dhr.ScaleY;
-                }
-                else if (sel is CircleSave dhc)
-                {
-                    _shapeDragStartX      = dhc.X;
-                    _shapeDragStartY      = dhc.Y;
-                    _shapeDragStartScaleX = dhc.Radius;
-                    _shapeDragStartScaleY = 0f;
-                }
-                _shapeResizeHandle = handleKind;
-                e.Pointer.Capture(this);
+                _shapeDragStartX      = dhr.X;
+                _shapeDragStartY      = dhr.Y;
+                _shapeDragStartScaleX = dhr.ScaleX;
+                _shapeDragStartScaleY = dhr.ScaleY;
             }
+            else if (sel is CircleSave dhc)
+            {
+                _shapeDragStartX      = dhc.X;
+                _shapeDragStartY      = dhc.Y;
+                _shapeDragStartScaleX = dhc.Radius;
+                _shapeDragStartScaleY = 0f;
+            }
+            _shapeResizeHandle = handleKind;
+            e.Pointer.Capture(this);
             return;
         }
-        var hitShape = HitTestShape(px, py);
+        var hitShape = HitTestPressedShape(px, py);
         _hoverShape = null;
         _pendingCycleShape = null;
         if (hitShape is not null)
@@ -3206,11 +3239,10 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
 
         if (_draggingVertexPolygon is not null)
         {
-            float om = _appState!.OffsetMultiplier * _zoom;
-            float dx = (float)(pos.X - _vertexDragAnchor.X) / om;
-            float dy = -(float)(pos.Y - _vertexDragAnchor.Y) / om;
+            var (worldX, worldY) = PointerToShapeWorld((float)pos.X, (float)pos.Y);
             PolygonVertices.Set(_draggingVertexPolygon, _draggingVertexIndex,
-                DragTo(_vertexDragStartX, dx), DragTo(_vertexDragStartY, dy));
+                FollowPointer(_vertexDragStartX, _vertexPressWorld.X, _vertexGrab.X, worldX),
+                FollowPointer(_vertexDragStartY, _vertexPressWorld.Y, _vertexGrab.Y, worldY));
             InvalidateVisual();
             return;
         }
@@ -3256,9 +3288,9 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
         if (_draggedGuideIdx >= 0)
         {
             if (_draggingHGuide)
-                _hGuides[_draggedGuideIdx] = DragTo(_guideDragStart, (float)(pos.Y - _guideDragAnchor.Y) / _zoom);
+                _hGuides[_draggedGuideIdx] = FollowPointer(_guideDragStart, _guidePressWorld, _guideGrab, ScreenToWorldY((float)pos.Y));
             else
-                _vGuides[_draggedGuideIdx] = DragTo(_guideDragStart, (float)(pos.X - _guideDragAnchor.X) / _zoom);
+                _vGuides[_draggedGuideIdx] = FollowPointer(_guideDragStart, _guidePressWorld, _guideGrab, ScreenToWorldX((float)pos.X));
             InvalidateVisual();
         }
 

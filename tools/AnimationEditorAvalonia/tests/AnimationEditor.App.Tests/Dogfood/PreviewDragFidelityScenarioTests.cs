@@ -364,6 +364,109 @@ public class PreviewDragFidelityScenarioTests
         walk.Frames[1].RelativeX.ShouldBe(200f);
     }
 
+    /// <summary>Holds a drag, zooms a wheel notch, moves on, and returns the world point the pointer ends at.</summary>
+    private static (float X, float Y) DragWithAWheelNotch(AnimationEditorHarness editor, Point from)
+    {
+        var mid = new Point(from.X + 20, from.Y + 10);
+        var end = new Point(mid.X + 10, mid.Y + 10);
+        editor.DragHold(from, mid);
+        editor.Wheel(mid, 1);
+        editor.Preview.SettleZoomAnimation();
+        editor.Layout();
+        editor.DragMove(end);
+        Point local = editor.Window.TranslatePoint(end, editor.Preview)!.Value;
+        var world = editor.Preview.ScreenToWorldForTest((float)local.X, (float)local.Y);
+        editor.DragRelease(end);
+        return world;
+    }
+
+    private static float Snap(float value) => MathF.Round(value, MidpointRounding.AwayFromZero);
+
+    [AvaloniaFact]
+    public async Task NewGuideDrag_FollowsThePointer()
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        Point from = editor.PointIn(editor.Preview, 5, 60);
+        var to = new Point(from.X + 23, from.Y + 9);
+
+        editor.DragHold(from, to);
+        Point local = editor.Window.TranslatePoint(to, editor.Preview)!.Value;
+        float pointer = editor.Preview.ScreenToWorldForTest((float)local.X, (float)local.Y).Y;
+        editor.DragRelease(to);
+
+        editor.Preview.HGuides.ShouldBe([Snap(pointer)]);
+    }
+
+    [AvaloniaFact]
+    public async Task NewGuideDrag_WithAWheelNotch_FollowsThePointer()
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        editor.ClickRow(editor.ChainNamed("Walk"));
+
+        var world = DragWithAWheelNotch(editor, editor.PointIn(editor.Preview, 5, 60));
+
+        editor.Preview.HGuides.ShouldBe([Snap(world.Y)]);
+    }
+
+    [AvaloniaFact]
+    public async Task GuideDrag_WithAWheelNotch_FollowsThePointer()
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        editor.ClickRow(editor.ChainNamed("Walk"));
+        editor.Preview.SetGuides([-40f], []);
+
+        var world = DragWithAWheelNotch(editor, editor.PreviewPointAt(-30, 40f / editor.Services.AppState.OffsetMultiplier));
+
+        editor.Preview.HGuides.Single().ShouldBe(Snap(world.Y), tolerance: 1);
+    }
+
+    [AvaloniaFact]
+    public async Task VertexDrag_WithAWheelNotch_FollowsThePointer()
+    {
+        var (editor, path) = await OpenAsync(walk => walk.Frames[0].ShapesSave!.Add(new PolygonSave
+        {
+            Name = "Tri", X = -30, Y = -20,
+            Points = [new() { X = 0, Y = 10 }, new() { X = 10, Y = -10 }, new() { X = -10, Y = -10 }, new() { X = 0, Y = 10 }],
+        }));
+        using var _ = editor;
+        var frame = editor.ChainNamed("Walk").Frames[0];
+        var polygon = frame.ShapesSave!.PolygonSaves.First();
+        editor.Expand(frame);
+        editor.ClickRow(polygon);
+
+        var world = DragWithAWheelNotch(editor, editor.PreviewPointAt(-20, -30));
+
+        float offsetUnit = editor.Services.AppState.OffsetMultiplier;
+        (polygon.X + polygon.Points[1].X).ShouldBe(world.X / offsetUnit, tolerance: 1);
+        (polygon.Y + polygon.Points[1].Y).ShouldBe(-world.Y / offsetUnit, tolerance: 1);
+    }
+
+    [AvaloniaFact]
+    public async Task ClickOnAShapeUnderAnUndrawnHandle_SelectsIt()
+    {
+        var (editor, path) = await OpenAsync(walk =>
+        {
+            foreach (var frame in walk.Frames)
+                frame.ShapesSave!.Add(new CircleSave { Name = "Orb", X = 50, Y = 20.25f, Radius = 6 });
+            walk.Frames[1].ShapesSave!.AARectSaves.First().SkipSizeKeyframe = true;
+        });
+        using var _ = editor;
+        var frame = editor.ChainNamed("Walk").Frames[1];
+        var rect = frame.ShapesSave!.AARectSaves.First();
+        editor.Expand(frame);
+        editor.ClickRow(rect);
+        Point edge = editor.PreviewPointAt(rect.X + rect.ScaleX, rect.Y);
+
+        // Past the rectangle's 5 px grab margin, inside the handle's square.
+        editor.ClickAt(new Point(edge.X + 8, edge.Y));
+
+        editor.Services.SelectedState.SelectedShape.ShouldBe(frame.ShapesSave!.CircleSaves.First());
+    }
+
     [AvaloniaFact]
     public async Task ResizeOfAShape_ReachesTheHandle()
     {
