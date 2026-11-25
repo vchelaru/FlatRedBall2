@@ -2,6 +2,8 @@ using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -10,14 +12,9 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 public class ConvertSequenceSourceScenarioTests
 {
-    /// <summary>Every Project panel command that removes a file sequences play: the confirm's answer is Yes and the files are gone.</summary>
-    [AvaloniaTheory]
-    [InlineData("Delete", "hero.achx", "Deleting hero.achx broke 1 sequence block: attack.seqj (Attack/Body).")]
-    [InlineData("Convert to .achj", "hero.achx", "Converting hero.achx broke 1 sequence block: attack.seqj (Attack/Body).")]
-    [InlineData("Convert Animations to .achj", "Sprites", "Converting 2 files broke 2 sequence blocks: attack.seqj (Attack/Body).")]
-    public async Task RemovingAFile_ThatASequencePlays_NamesTheBrokenBlocks(string item, string row, string banner)
+    /// <summary>hero.achx and enemy.achx in Sprites, and attack.seqj there playing one chain of each. Returns the path of attack.seqj.</summary>
+    private static async Task<string> OpenProjectAsync(AnimationEditorHarness editor)
     {
-        using AnimationEditorHarness editor = new AnimationEditorHarness();
         editor.WritePng("sheet.png", 64, 64);
         Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "Sprites"));
         editor.WriteAchx("Sprites/hero.achx", AnimationEditorHarness.Chain("Walk", "../sheet.png", (0, 0, 16, 16)));
@@ -25,50 +22,190 @@ public class ConvertSequenceSourceScenarioTests
         var track = new SequenceTrackSave { Name = "Body" };
         track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
         track.Chains.Add(new SequenceChainReferenceSave { Source = "enemy.achx", Chain = "Bite", Start = 1 });
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Gone", Start = 2 }); // already broken, so not counted
+        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Gone", Start = 2 }); // already broken, so a delete does not count it
         string seqj = Path.Combine(editor.ProjectFolder, "Sprites", "attack.seqj");
         new SequenceListSave { Sources = { "hero.achx", "enemy.achx" }, Sequences = { new SequenceSave { Name = "Attack", Tracks = { track } } } }.Save(seqj);
-        string before = File.ReadAllText(seqj);
+        editor.WriteAchx("other.achx", AnimationEditorHarness.Chain("Other", "sheet.png", (0, 0, 16, 16)));
         await editor.OpenProjectFolderAsync();
         editor.Window.DeleteToRecycleBin = path => { File.Delete(path); return null; };
+        return seqj;
+    }
+
+    private static void Pick(AnimationEditorHarness editor, string row, string item)
+    {
         ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
         TreeViewItem target = PanelsScenarioTests.RowFor(editor, panel, row);
         editor.RightClickAt(target.TranslatePoint(new Point(target.Bounds.Width / 2, 8), editor.Window)!.Value);
-        editor.Dialogs.AnswerNextConfirm(true);
-
         editor.PickMenuItem(panel.ProjectTree.ContextMenu!, item);
+    }
 
-        (await editor.WaitUntilAsync(() => editor.ProblemText != null, TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        editor.ProblemText.ShouldBe(banner);
-        File.ReadAllText(seqj).ShouldBe(before);
+    private static string[] Sources(string seqj)
+    {
+        var save = SequenceListSave.FromFile(seqj);
+        return save.Sources.Concat(save.Sequences.Single().Tracks.Single().Chains.Select(block => block.Source)).ToArray();
     }
 
     [AvaloniaFact]
-    public async Task Convert_AFileASequencePlays_KeepsTheSequenceOrSaysItBreaks()
+    public async Task Delete_AFileThatASequencePlays_NamesTheBrokenBlocks()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
-        editor.WritePng("sheet.png", 64, 64);
-        Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "Sprites"));
-        editor.WriteAchx("Sprites/hero.achx", AnimationEditorHarness.Chain("Walk", "../sheet.png", (0, 0, 16, 16)));
-        var track = new SequenceTrackSave { Name = "Body" };
-        track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Walk", Start = 0 });
-        string seqj = Path.Combine(editor.ProjectFolder, "Sprites", "attack.seqj");
-        new SequenceListSave { Sources = { "hero.achx" }, Sequences = { new SequenceSave { Name = "Attack", Tracks = { track } } } }.Save(seqj);
-        await editor.OpenProjectFolderAsync();
-        editor.Window.DeleteToRecycleBin = path => { File.Delete(path); return null; };
-        ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
-        TreeViewItem target = PanelsScenarioTests.RowFor(editor, panel, "hero.achx");
-        editor.RightClickAt(target.TranslatePoint(new Point(target.Bounds.Width / 2, 8), editor.Window)!.Value);
-        editor.Dialogs.Shown.Clear();
+        string seqj = await OpenProjectAsync(editor);
+        string before = File.ReadAllText(seqj);
         editor.Dialogs.AnswerNextConfirm(true);
 
-        editor.PickMenuItem(panel.ProjectTree.ContextMenu!, "Convert to .achj");
-        await editor.WaitAsync(TimeSpan.FromMilliseconds(1000));
+        Pick(editor, "hero.achx", "Delete");
 
-        File.Exists(Path.Combine(editor.ProjectFolder, "Sprites", "hero.achx")).ShouldBeFalse();
-        string source = SequenceListSave.FromFile(seqj).Sources.Single();
-        bool plays = File.Exists(Path.Combine(editor.ProjectFolder, "Sprites", source));
-        bool said = editor.ProblemText?.Contains("attack") == true || editor.Dialogs.Shown.Any(text => text.Contains("attack"));
-        (plays || said).ShouldBeTrue($"attack.seqj still names {source}, banner: {editor.ProblemText}, dialogs: {string.Join(";", editor.Dialogs.Shown)}");
+        (await editor.WaitUntilAsync(() => editor.ProblemText != null, TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        editor.ProblemText.ShouldBe("Deleting hero.achx broke 1 sequence block: attack.seqj (Attack/Body).");
+        File.ReadAllText(seqj).ShouldBe(before);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("Convert to .achj", "hero.achx", "hero.achj enemy.achx hero.achj enemy.achx hero.achj")]
+    [InlineData("Convert Animations to .achj", "Sprites", "hero.achj enemy.achj hero.achj enemy.achj hero.achj")]
+    public async Task Convert_AFileASequencePlays_ShowsThePlan_AndTheSequenceKeepsPlaying(string item, string row, string sources)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string seqj = await OpenProjectAsync(editor);
+        string said = "";
+        editor.Dialogs.AnswerNextEditorDialog(content =>
+        {
+            said = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
+            return true;
+        });
+
+        Pick(editor, row, item);
+
+        string hero = Path.Combine(editor.ProjectFolder, "Sprites", "hero.achx");
+        (await editor.WaitUntilAsync(() => !File.Exists(hero) && !editor.Window.IsConverting, TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        editor.Wait(TimeSpan.FromMilliseconds(100));
+        Sources(seqj).ShouldBe(sources.Split(' '));
+        editor.ProblemText.ShouldBeNull();
+        said.ShouldContain("hero.achx → ");
+        said.ShouldContain("attack.seqj");
+        said.ShouldContain("read"); // back the same, the check
+        said.ShouldContain(Path.GetFullPath(editor.ProjectFolder));
+    }
+
+    [AvaloniaFact]
+    public async Task Convert_Cancelled_TouchesNothing()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await OpenProjectAsync(editor);
+        Dictionary<string, string> Files() => Directory.GetFiles(Path.Combine(editor.ProjectFolder, "Sprites")).ToDictionary(path => path, File.ReadAllText);
+        var before = Files();
+        editor.Dialogs.AnswerNextEditorDialog(_ => false);
+
+        Pick(editor, "Sprites", "Convert Animations to .achj");
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(300));
+
+        editor.Dialogs.Shown.ShouldContain("editor dialog: Convert to .achj");
+        Files().ShouldBe(before);
+    }
+
+    // In front, or behind another tab: its document, its file and its history move to the .achj together.
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Convert_AFileAnOpenSequencePlays_UpdatesItsTab_AndUndoStillWorks(bool behind)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string seqj = await OpenProjectAsync(editor);
+        string other = Path.Combine(editor.ProjectFolder, "other.achx");
+        await editor.OpenAsync(other);
+        await editor.OpenAsync(seqj);
+        editor.Control<Button>("AddSequenceButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        editor.Layout();
+        editor.Press(Key.Escape);
+        SequenceListSave.FromFile(seqj).Sequences.Count.ShouldBe(2);
+        if (behind) editor.ClickTab("other.achx");
+        editor.Dialogs.AnswerNextEditorDialog(_ => true);
+
+        Pick(editor, "Sprites", "Convert Animations to .achj");
+        string hero = Path.Combine(editor.ProjectFolder, "Sprites", "hero.achx");
+        (await editor.WaitUntilAsync(() => !File.Exists(hero) && !editor.Window.IsConverting, TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        // Long enough for the live watcher to see its file replaced.
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(1200));
+
+        editor.ProblemText.ShouldBeNull();
+        editor.InfoText.ShouldBeNull("its own write is neither a delete nor an outside change");
+        if (behind) editor.ClickTab("attack.seqj");
+        editor.Press(Key.Z, RawInputModifiers.Control);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+
+        SequenceListSave.FromFile(seqj).Sequences.Count.ShouldBe(1, "undo took the added sequence back");
+        Sources(seqj).ShouldBe(["hero.achj", "enemy.achj", "hero.achj", "enemy.achj", "hero.achj"]);
+    }
+
+    // An outside edit that changes nothing the dialog shows is in the file that is converted, with live reload off too.
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Convert_ASequenceInFrontEditedOutsideUnderTheDialog_KeepsThatEdit(bool hotReload)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string seqj = await OpenProjectAsync(editor);
+        await editor.OpenAsync(seqj);
+        if (!hotReload) editor.ClickMenu("MenuEnableHotReload");
+        editor.Dialogs.AnswerNextEditorDialog(_ =>
+        {
+            var save = SequenceListSave.FromFile(seqj);
+            save.Sequences.Add(new SequenceSave { Name = "Outside" });
+            save.Save(seqj);
+            return true;
+        });
+
+        Pick(editor, "Sprites", "Convert Animations to .achj");
+        (await editor.WaitUntilAsync(() => editor.Dialogs.Shown.Count > 0 && !editor.Window.IsConverting, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+
+        editor.ProblemText.ShouldBeNull();
+        var now = SequenceListSave.FromFile(seqj);
+        now.Sequences.Select(sequence => sequence.Name).ShouldBe(["Attack", "Outside"]);
+        now.Sources.ShouldBe(["hero.achj", "enemy.achj"]);
+    }
+
+    // What the user agreed to is not what would run any more.
+    [AvaloniaTheory]
+    [InlineData("Sprites/hero.achx", "Walk", "Run")]
+    [InlineData("Sprites/attack.seqj", "enemy.achx", "other.achx")]
+    public async Task Convert_FilesChangedUnderTheDialog_ConvertsNothing_AndShowsTheNewPlan(string file, string from, string to)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await OpenProjectAsync(editor);
+        string path = Path.Combine(editor.ProjectFolder, file);
+        Dictionary<string, string> Files() => Directory.GetFiles(Path.Combine(editor.ProjectFolder, "Sprites")).ToDictionary(found => found, File.ReadAllText);
+        Dictionary<string, string> changed = [];
+        string said = "";
+        editor.Dialogs.AnswerNextEditorDialog(_ =>
+        {
+            File.WriteAllText(path, File.ReadAllText(path).Replace(from, to));
+            changed = Files();
+            return true;
+        });
+        editor.Dialogs.AnswerNextEditorDialog(content =>
+        {
+            said = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
+            return false;
+        });
+
+        Pick(editor, "Sprites", "Convert Animations to .achj");
+        (await editor.WaitUntilAsync(() => editor.Dialogs.Shown.Count > 0 && !editor.Window.IsConverting, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+
+        said.ShouldContain("The files are different now. This is the new plan.");
+        Files().ShouldBe(changed);
+    }
+
+    [AvaloniaFact]
+    public async Task Convert_PickedAgainWhileItIsPlanned_ShowsOneDialog()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await OpenProjectAsync(editor);
+        editor.Dialogs.AnswerNextEditorDialog(_ => false);
+
+        var first = editor.Window.ConvertProjectFolderToAchjAsync("Sprites");
+        await editor.Window.ConvertProjectFolderToAchjAsync("Sprites");
+        (await editor.WaitUntilAsync(() => first.IsCompleted, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+
+        editor.Dialogs.Shown.Count(text => text == "editor dialog: Convert to .achj").ShouldBe(1);
     }
 }

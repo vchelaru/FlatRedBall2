@@ -32,6 +32,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// <summary>Raised after <see cref="Execute"/>, <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
         public event Action? StackChanged;
 
+        /// <inheritdoc cref="IUndoManager.CommandRan"/>
+        public event Action? CommandRan;
+
         /// <inheritdoc cref="IUndoManager.Execute"/>
         public void Execute(IUndoableCommand cmd)
         {
@@ -50,12 +53,14 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                         previous.Command.Undo();
                     }
                     _openCoalesceGroup = null;
+                    CommandRan?.Invoke();
                     StackChanged?.Invoke();
                     return;
                 }
                 (cmd, tsxBefore) = (merged, previous.TsxBefore);
             }
             _openCoalesceGroup = cmd.CoalesceGroup;
+            CommandRan?.Invoke();
             Push(cmd, tsxBefore);
         }
 
@@ -94,6 +99,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             entry.Command.Undo();
             _redoStack.Push(entry with { TsxAfter = tsxAfter });
             _openCoalesceGroup = null;
+            CommandRan?.Invoke();
             StackChanged?.Invoke();
         }
 
@@ -106,6 +112,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             entry.Command.Redo();
             _undoStack.Push(entry);
             _openCoalesceGroup = null;
+            CommandRan?.Invoke();
             StackChanged?.Invoke();
         }
 

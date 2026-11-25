@@ -169,8 +169,7 @@ public class AppCommandsChainLockTests
         targetChain.IsLocked = true;
         var targetFrame = targetChain.Frames[0];
 
-        ctx.AppCommands.PasteShapesCut(targetFrame, new object[] { rect },
-            new object[] { rect }, sourceFrame);
+        ctx.AppCommands.PasteShapesCut(targetFrame, new object[] { rect });
 
         Assert.Empty(targetFrame.ShapesSave!.Shapes);
         Assert.Single(sourceFrame.ShapesSave!.Shapes); // cut-from source must not happen either
@@ -190,8 +189,7 @@ public class AppCommandsChainLockTests
         var targetChain = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1);
         var targetFrame = targetChain.Frames[0];
 
-        ctx.AppCommands.PasteShapesCut(targetFrame, new object[] { rect },
-            new object[] { rect }, sourceFrame);
+        ctx.AppCommands.PasteShapesCut(targetFrame, new object[] { rect });
 
         Assert.Single(sourceFrame.ShapesSave!.Shapes); // cut-from-locked-source stays blocked
     }

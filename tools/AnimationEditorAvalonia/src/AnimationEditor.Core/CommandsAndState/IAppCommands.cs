@@ -223,6 +223,12 @@ namespace AnimationEditor.Core.CommandsAndState
         bool SaveDocument(TabEntry tab);
 
         /// <summary>
+        /// Why saving the document at <paramref name="path"/> would be refused (its file changed on disk), or null.
+        /// <paramref name="background"/> is its tab, null for the open document. Nothing is written or reported.
+        /// </summary>
+        string? SaveRefusal(string path, TabEntry? background);
+
+        /// <summary>
         /// The removal half of a cut pasted into another tab: takes the cut items out of <paramref name="tab"/>'s
         /// document and adds that to the tab's own undo history. Saves nothing (<see cref="SaveDocument"/>). Frames
         /// and shapes in a locked chain stay, as in a same-document cut.
@@ -737,17 +743,21 @@ namespace AnimationEditor.Core.CommandsAndState
         /// skipped (bulk skip-locked-entries), same as other multi-target paste/delete operations.</summary>
         void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<object> shapes);
 
-        /// <summary>Paste chains then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
-        void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains,
-            IReadOnlyList<AnimationChainSave> sourcesToRemove);
+        /// <summary>Moves cut chains below the selected ones, or to <paramref name="insertIndex"/>, in one undo step.</summary>
+        void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains, int? insertIndex = null);
 
-        /// <summary>Paste frames then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
-        void PasteFramesCut(AnimationChainSave targetChain, IReadOnlyList<AnimationFrameSave> frames,
-            int? insertIndex, IReadOnlyList<AnimationFrameSave> sourcesToRemove);
+        /// <summary>
+        /// Moves cut frames to <paramref name="insertIndex"/> (the end when null) in one undo step. Frames of a locked
+        /// chain stay there and are copied.
+        /// </summary>
+        void PasteFramesCut(AnimationChainSave targetChain, IReadOnlyList<AnimationFrameSave> frames, int? insertIndex);
 
-        /// <summary>Paste shapes then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
-        void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes,
-            IReadOnlyList<object> sourcesToRemove, AnimationFrameSave sourceFrame);
+        /// <summary>
+        /// Moves cut shapes, each out of the frame it is in, to the end of their type in <paramref name="targetFrame"/> in one
+        /// undo step. A shape whose name is taken there gets a free one. Shapes of a locked chain stay there and
+        /// are copied.
+        /// </summary>
+        void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes);
 
         /// <summary>Duplicates the homogeneous multi-selection as one undo step.</summary>
         void DuplicateSelection(CopySelectionPayload payload);

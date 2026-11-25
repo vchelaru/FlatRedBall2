@@ -128,8 +128,17 @@ namespace AnimationEditor.Core
             }
         }
 
-        public List<AnimationChainSave> SelectedChains =>
-            _selectedNodes.OfType<AnimationChainSave>().ToList();
+        public List<AnimationChainSave> SelectedChains
+        {
+            get
+            {
+                var chains = _selectedNodes.OfType<AnimationChainSave>().ToList();
+                // A chain selected without a tree click (a reload, a tab switched back to) is not in the bag.
+                if (chains.Count == 0 && _selectedChain != null && SelectedFrames.Count == 0 && SelectedShapes.Count == 0)
+                    chains.Add(_selectedChain);
+                return chains;
+            }
+        }
 
         public List<AnimationFrameSave> SelectedFrames
         {

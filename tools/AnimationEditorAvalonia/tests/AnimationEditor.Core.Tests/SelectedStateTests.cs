@@ -99,4 +99,18 @@ public class SelectedStateTests
 
         Assert.Equal(2, ctx.SelectedState.SelectedChains.Count);
     }
+
+    // A reload, a switch back to a tab and opening a file select without a tree click, which leaves the bag empty.
+    [Fact]
+    public void SelectedChains_FallsBackToTheSelectedChain_UnlessAFrameOfItIsSelected()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "A", 1);
+
+        ctx.SelectedState.SelectedChain = chain;
+        Assert.Equal([chain], ctx.SelectedState.SelectedChains);
+
+        ctx.SelectedState.SelectedFrame = chain.Frames[0];
+        Assert.Empty(ctx.SelectedState.SelectedChains);
+    }
 }

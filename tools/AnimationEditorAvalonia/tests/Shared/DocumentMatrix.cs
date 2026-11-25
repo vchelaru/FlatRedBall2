@@ -48,6 +48,7 @@ public enum DocAction
     Detach,
     LeaveDuringRename,
     ConvertOpenTabToAchj,
+    ConvertSequenceSource,
     DuplicateWithUnsavedEdits,
     RecoverAtStartup,
 }
