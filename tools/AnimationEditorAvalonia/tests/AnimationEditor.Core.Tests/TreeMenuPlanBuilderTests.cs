@@ -427,4 +427,73 @@ public class TreeMenuPlanBuilderTests
         Assert.Contains(items, i => i.Header == "Copy");
         Assert.Contains(items, i => i.Header == "Duplicate");
     }
+
+    [Theory]
+    [InlineData("Move To Top", "BDACE")]
+    [InlineData("Move Up", "BADCE")]
+    [InlineData("Move Down", "ACBED")]
+    [InlineData("Move To Bottom", "ACEBD")]
+    public void Build_SeveralFramesOfOneChain_MoveItemsMoveThemAll(string item, string expected)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 5);
+        foreach (var (frame, name) in chain.Frames.Zip("ABCDE")) frame.TextureName = name.ToString();
+        ctx.SelectedState.SelectedNodes = [chain.Frames[1], chain.Frames[3]];
+        ctx.SelectedState.SelectedFrame = chain.Frames[1];
+
+        var items = TreeMenuPlanBuilder.Build(
+            chain.Frames[1], ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+        items.Single(i => i.Header == item).OnClick!();
+
+        Assert.Equal(expected, string.Concat(chain.Frames.Select(f => f.TextureName)));
+        Assert.Single(ctx.UndoManager.UndoHistory);
+    }
+
+    [Theory]
+    [InlineData("Move To Top", "BDAC")]
+    [InlineData("Move Up", "BADC")]
+    [InlineData("Move To Bottom", "ACBD")]
+    public void Build_SeveralChains_MoveItemsMoveThemAll_AndOnlyTheOnesThatCanMove(string item, string expected)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chains = "ABCD".Select(name => TestHelpers.MakeChain(ctx.Acls, name.ToString())).ToList();
+        ctx.SelectedState.SelectedNodes = [chains[1], chains[3]];
+        ctx.SelectedState.SelectedChain = chains[1];
+
+        var items = TreeMenuPlanBuilder.Build(
+            chains[1], ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+        Assert.Equal(-1, IndexOf(items, "Move Down"));
+        items.Single(i => i.Header == item).OnClick!();
+
+        Assert.Equal(expected, string.Concat(ctx.Acls.AnimationChains.Select(c => c.Name)));
+    }
+
+    // They have no group move, and moving only the right-clicked one would leave the rest behind.
+    [Theory]
+    [InlineData("shapes")]
+    [InlineData("frames of two animations")]
+    [InlineData("an animation and a frame")]
+    public void Build_SelectionWithoutAGroupMove_ShowsNoMoveItems(string selection)
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var walk = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var run = TestHelpers.MakeChain(ctx.Acls, "Run", 2);
+        var rects = new[] { "A", "B", "C" }.Select(name => new AARectSave { Name = name }).ToList();
+        rects.ForEach(walk.Frames[0].ShapesSave!.Add);
+        object[] nodes = selection switch
+        {
+            "shapes" => [rects[0], rects[1]],
+            "frames of two animations" => [walk.Frames[0], run.Frames[0]],
+            _ => [walk, run.Frames[0]],
+        };
+        ctx.SelectedState.SelectedNodes = [.. nodes];
+
+        foreach (var node in nodes)
+        {
+            var items = TreeMenuPlanBuilder.Build(
+                node, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+            Assert.DoesNotContain(items, i => i.Header?.StartsWith("Move") == true);
+            Assert.False(items[0].IsSeparator, "the menu starts with a separator");
+        }
+    }
 }
