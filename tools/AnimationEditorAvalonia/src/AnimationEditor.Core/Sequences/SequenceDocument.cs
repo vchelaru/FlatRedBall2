@@ -238,12 +238,12 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     /// <summary>
-    /// Gives each sequence whose name an earlier one already has (ignoring case, like <see cref="NameGenerator"/>) the next
+    /// Gives each sequence whose name an earlier one already has (exactly; names differing by case are two sequences) the next
     /// free numbered name, so every sequence can be reached by name. Returns what was renamed as a sentence, or null.
     /// </summary>
     private static string? NumberDuplicateNames(SequenceListSave save)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>();
         var renames = new List<string>();
         foreach (var sequence in save.Sequences)
         {
