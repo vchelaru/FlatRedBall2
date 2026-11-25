@@ -65,6 +65,9 @@ namespace AnimationEditor.Core
         /// save. See <see cref="ProjectManager.GetTsxOwnerTileId"/>.</summary>
         uint? GetTsxOwnerTileId(AnimationChainSave chain);
 
+        /// <summary>What the next save of the open <c>.tsx</c> would write for each chain; empty for an achx/achj project.</summary>
+        IReadOnlyList<Tiled.MultiTileMappingResult> MapTsxForSave();
+
         /// <summary>Explicitly overrides which tile id a native-tsx chain's animation is written
         /// to. See <see cref="ProjectManager.TrySetTsxOwnerTileId"/>.</summary>
         string? TrySetTsxOwnerTileId(AnimationChainSave chain, uint tileId);

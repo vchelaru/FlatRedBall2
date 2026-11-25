@@ -1,4 +1,6 @@
 using AnimationEditor.Core;
+using AnimationEditor.Core.Tiled;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -52,29 +54,36 @@ internal static class TsxOpPolicy
     }
 
     /// <summary>The state of a .tsx before the ops, so only problems the ops cause are reported.</summary>
-    public sealed record Snapshot(IReadOnlySet<AnimationChainSave> Unmappable, IReadOnlySet<uint> SharedTiles);
+    /// <param name="Unwritable">The chains a save already skips, with what they hold.</param>
+    public sealed record Snapshot(IReadOnlyDictionary<AnimationChainSave, string> Unwritable, IReadOnlySet<uint> SharedTiles);
 
     public static Snapshot Take(EditSession session)
     {
-        var (unmappable, shared) = Scan(session);
-        return new Snapshot(unmappable, shared);
+        var unwritable = new Dictionary<AnimationChainSave, string>(ReferenceEqualityComparer.Instance);
+        foreach (var chain in Skipped(session))
+            unwritable[chain.SourceChain] = Content(session, chain.SourceChain);
+        return new Snapshot(unwritable, SharedTiles(session));
     }
 
     /// <summary>
-    /// Errors for chains the save could not write: frames that do not line up with whole tiles, or an owner tile two
+    /// Errors for changed chains the save would skip: frames that do not line up with whole tiles, or a tile two
     /// chains share (the save would keep one and skip the other with only a warning).
     /// </summary>
     public static EditResult? CheckWritable(EditSession session, Snapshot before)
     {
-        var (unmappable, shared) = Scan(session);
+        var newlyShared = SharedTiles(session).Where(t => !before.SharedTiles.Contains(t)).ToList();
         var errors = new List<string>();
         var codes = new List<EditErrorCode>();
-        foreach (var chain in unmappable.Where(c => !before.Unmappable.Contains(c)))
+        foreach (var result in Skipped(session))
         {
-            errors.Add($"Chain '{chain.Name}' cannot be written to the .tsx: its frames do not line up with whole tiles of the tileset.");
-            codes.Add(EditErrorCode.UnmappableChain);
+            var chain = result.SourceChain;
+            if (before.Unwritable.TryGetValue(chain, out var content) && content == Content(session, chain)) continue;
+            if (session.ProjectManager.GetTsxOwnerTileId(chain) is { } owner && newlyShared.Contains(owner)) continue; // reported below
+
+            errors.Add($"Chain '{chain.Name}' cannot be written to the .tsx: {result.SkipReason}.");
+            codes.Add(result.TileHolder is null ? EditErrorCode.UnmappableChain : EditErrorCode.DuplicateOwnerTile);
         }
-        foreach (var tile in shared.Where(t => !before.SharedTiles.Contains(t)))
+        foreach (var tile in newlyShared)
         {
             var names = session.Document.AnimationChains
                 .Where(c => session.ProjectManager.GetTsxOwnerTileId(c) == tile).Select(c => $"'{c.Name}'");
@@ -84,19 +93,18 @@ internal static class TsxOpPolicy
         return errors.Count == 0 ? null : new EditResult([], errors, [], codes);
     }
 
-    private static (HashSet<AnimationChainSave> Unmappable, HashSet<uint> Shared) Scan(EditSession session)
-    {
-        var unmappable = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
-        var owners = new Dictionary<uint, int>();
-        foreach (var chain in session.Document.AnimationChains)
-        {
-            if (session.ProjectManager.GetTsxOwnerTileId(chain) is { } tile)
-                owners[tile] = owners.GetValueOrDefault(tile) + 1;
-            else if (chain.Frames.Count > 0)
-                unmappable.Add(chain);
-        }
-        return (unmappable, owners.Where(p => p.Value > 1).Select(p => p.Key).ToHashSet());
-    }
+    private static IEnumerable<MultiTileMappingResult> Skipped(EditSession session) =>
+        session.ProjectManager.MapTsxForSave().Where(r => r.SkipReason is not null);
+
+    private static string Content(EditSession session, AnimationChainSave chain) => string.Join("\n",
+    [
+        chain.Name, $"{session.ProjectManager.GetTsxOwnerTileId(chain)}",
+        .. chain.Frames.Select(f => FormattableString.Invariant($"{FrameRegion.Of(f)} {f.FrameLength:R} {f.TextureName}")),
+    ]);
+
+    private static HashSet<uint> SharedTiles(EditSession session) =>
+        session.Document.AnimationChains.Select(session.ProjectManager.GetTsxOwnerTileId).OfType<uint>()
+            .GroupBy(tile => tile).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
 
     private static EditResult Fail(EditErrorCode code, string message) => new([], [message], [], [code]);
 }
