@@ -123,6 +123,10 @@ public class ProjectConvertUnsavedScenarioTests
         File.ReadAllText(hero).ShouldBe(heroText);
         File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
         recycled.ShouldBeEmpty();
+
+        File.AppendAllText(hero, "<!-- edited again -->");
+        editor.WaitUntil(() => editor.ProblemText?.StartsWith("Auto save failed") == true, TimeSpan.FromSeconds(5))
+            .ShouldBeTrue("a change nothing reported yet is still reported");
     }
 
     // Skipped, so its tab stays open, and must know the edits are saved now.
