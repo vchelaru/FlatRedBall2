@@ -16,6 +16,14 @@ public class DiscardedTaskGuardTests
     /// <summary>A lambda handler or dispatched lambda, up to its first await.</summary>
     private static readonly Regex AsyncHandler = new(@"(\+= |InvokeAsync\(|Post\()async\b.*?\bawait (?<call>[\w.]+)\(", RegexOptions.Singleline);
 
+    /// <summary>First awaits of lambdas that need no guard, and why.</summary>
+    private static readonly Dictionary<string, string> HandlerNeedsNoGuard = new()
+    {
+        ["PickCustomAsync"] = "a color dialog, which reads and writes no file",
+        ["InvalidateProjectPanelThumbnailIfTrackedAsync"] = "a thumbnail, not a command",
+        ["CloseTabCoreAsync"] = "the conversion waits for it, so it fails with it",
+    };
+
     private static readonly Regex AsyncVoid = new(@"\basync void (?<call>\w+)\(");
 
     /// <summary>Async void methods that need no guard, and why.</summary>
@@ -39,7 +47,6 @@ public class DiscardedTaskGuardTests
         ["HandlePasteAsync"] = "guards itself",
         ["RunCheckAsync"] = "the updater returns a failure instead of throwing, and About shows it",
         ["InvalidateProjectPanelThumbnailIfTrackedAsync"] = "a thumbnail, not a command",
-        ["PickCustomAsync"] = "a color dialog, which reads and writes no file",
     };
 
     private static string AppSource()
@@ -60,7 +67,7 @@ public class DiscardedTaskGuardTests
     public void EveryAsyncEventHandler_IsGuarded()
     {
         var unguarded = AppFiles()
-            .SelectMany(path => new[] { (Regex: AsyncHandler, Except: NeedNoGuard), (Regex: AsyncVoid, Except: AsyncVoidNeedsNoGuard) }
+            .SelectMany(path => new[] { (Regex: AsyncHandler, Except: HandlerNeedsNoGuard), (Regex: AsyncVoid, Except: AsyncVoidNeedsNoGuard) }
                 .SelectMany(rule => rule.Regex.Matches(File.ReadAllText(path))
                     .Select(match => match.Groups["call"].Value.Split('.').Last())
                     .Where(call => call != "RunGuardedAsync" && !rule.Except.ContainsKey(call))
