@@ -37,11 +37,11 @@ public class UndoFileTests : IDisposable
     {
         Open(DocType.Achx);
         string before = OnDisk;
-        File.SetAttributes(_path, FileAttributes.ReadOnly);
+        Documents.SetWritable(_path, false);
         _ctx.AppCommands.RenameChain(Chains[0], "Renamed");
         _ctx.AppCommands.AddFrame(Chains[0]);
         bool failed = _ctx.UndoManager.SaveState == SaveState.Failed;
-        File.SetAttributes(_path, FileAttributes.Normal);
+        Documents.SetWritable(_path, true);
 
         _ctx.UndoManager.Undo();
         _ctx.UndoManager.Undo();
@@ -56,12 +56,12 @@ public class UndoFileTests : IDisposable
     {
         Open(DocType.Tsx);
         string before = OnDisk;
-        File.SetAttributes(_path, FileAttributes.ReadOnly);
+        Documents.SetWritable(_path, false);
         _ctx.AppCommands.RenameChain(Chains[0], "Renamed");
         _ctx.AppCommands.SetChainTsxOwnerTileId(Chains[0], 9);
         _ctx.AppCommands.DeleteAnimationChains([Chains[1]]);
         bool failed = _ctx.UndoManager.SaveState == SaveState.Failed;
-        File.SetAttributes(_path, FileAttributes.Normal);
+        Documents.SetWritable(_path, true);
 
         _ctx.UndoManager.Undo();
         _ctx.UndoManager.Undo();
