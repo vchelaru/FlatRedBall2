@@ -903,6 +903,7 @@ public partial class MainWindow : Window
         // See the comment in ActivateTabAsync (#1026) -- a pending cut survives this switch too.
         if (tab.CachedEditorModel is not null)
             _projectManager.AnimationChainListSave = tab.CachedEditorModel;
+        RestoreGuides(tab);
         _appCommands.RestoreTabSelection(tab);
         _undoManager.Clear();
         if (tab.UndoSnapshot != null)
@@ -1032,6 +1033,7 @@ public partial class MainWindow : Window
         _selectedState.Reset();
         _undoManager.Clear();
         ClearWireframeTexture();
+        RestoreGuides(null);
         ProjectPanel.SyncSelectionToActiveFile(null);
         RefreshTreeView();
         RefreshFilesPanel();
@@ -1282,6 +1284,8 @@ public partial class MainWindow : Window
         // Tree events — fully wired (WireTreeView connects these after tree is constructed)
         _appCommands.RefreshTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RefreshTreeView);
         _appCommands.RebuildTreeViewRequested           += expandedChainNames => Dispatcher.UIThread.InvokeAsync(() => RebuildTreeView(expandedChainNames));
+        // Raised when another document comes to the front, before its companion file, whose guides win, is applied.
+        _appCommands.RebuildTreeViewRequested           += _ => RestoreGuides(_tabManager.ActiveTab);
         _appCommands.RefreshChainNodeRequested          += c  => Dispatcher.UIThread.InvokeAsync(() => RefreshChainNode(c));
         _appCommands.RefreshFrameNodeRequested          += f  => Dispatcher.UIThread.InvokeAsync(() => RefreshFrameNode(f));
         _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
@@ -1385,9 +1389,10 @@ public partial class MainWindow : Window
                 s.WireframePanX,
                 s.WireframePanY,
                 Math.Clamp(s.WireframeZoomPercent / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom)));
-            // The preview has no texture swap to fight, so it takes its camera in the same turn as the document.
+            // The preview has no texture swap to fight, so it takes its camera and guides in the same turn as the
+            // document: the wireframe's texture load saves the companion.
             if (Dispatcher.UIThread.CheckAccess())
-                ApplyCompanionPreviewCamera(s);
+                ApplyCompanionPreview(s);
             Dispatcher.UIThread.InvokeAsync(() => ApplyCompanionSettings(s));
         };
     }
@@ -2132,12 +2137,13 @@ public partial class MainWindow : Window
         _ioManager.SaveCompanionFileFor(new FilePath(_projectManager.FileName), BuildCompanionSettings());
     }
 
-    private void ApplyCompanionPreviewCamera(AESettingsSave settings)
+    private void ApplyCompanionPreview(AESettingsSave settings)
     {
         bool wasSuppressed = _suppressCompanionSave;
         _suppressCompanionSave = true;
         try
         {
+            PreviewCtrl.SetGuides(settings.HorizontalGuides, settings.VerticalGuides);
             PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);
             PreviewCtrl.SetPan(settings.PreviewPanX, settings.PreviewPanY);
         }
@@ -2146,6 +2152,10 @@ public partial class MainWindow : Window
             _suppressCompanionSave = wasSuppressed;
         }
     }
+
+    /// <summary>Shows the guides <paramref name="tab"/> was left with, none when it has not been shown or there is no tab.</summary>
+    private void RestoreGuides(TabEntry? tab) =>
+        PreviewCtrl.SetGuides(tab?.CachedGuides?.Horizontal ?? [], tab?.CachedGuides?.Vertical ?? []);
 
     private void ApplyCompanionSettings(AESettingsSave settings)
     {
@@ -2163,8 +2173,6 @@ public partial class MainWindow : Window
                     node.IsExpanded = expandedSet.Contains(chain.Name);
             }
             TreeBuilder.ApplyExpandedFrames(_treeRoots, settings.ExpandedFrames);
-
-            PreviewCtrl.SetGuides(settings.HorizontalGuides, settings.VerticalGuides);
         }
         finally
         {
@@ -2988,6 +2996,7 @@ public partial class MainWindow : Window
         // the previously-active tab left behind before content replaces the fresh blank ACLS.
         _projectManager.ResetToBlankDocument();
         _projectManager.AnimationChainListSave = content;
+        RestoreGuides(null);
         _selectedState.Reset();
         if (selectedChain is not null)
             _selectedState.SelectedChain = selectedChain;
@@ -3055,6 +3064,7 @@ public partial class MainWindow : Window
             _appCommands.CloseProject();
             ShowPane(_achxPane);
             ClearWireframeTexture();
+            RestoreGuides(null);
         }
         else
         {

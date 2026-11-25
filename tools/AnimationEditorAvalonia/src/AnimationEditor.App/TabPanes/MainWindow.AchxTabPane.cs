@@ -41,6 +41,7 @@ public partial class MainWindow
             // Before the snapshot, so the rename is in this tab's history, and a held drag cannot add to the next tab's.
             _window.SettlePendingAchxInput();
             _window._tabController.CaptureLeavingTab(tab);
+            tab.CachedGuides = new PreviewGuides(_window.PreviewCtrl.HGuides.ToList(), _window.PreviewCtrl.VGuides.ToList());
             _window.SaveCompanionFile();
         }
 
