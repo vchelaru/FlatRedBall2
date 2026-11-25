@@ -64,6 +64,27 @@ public class SequenceTextureReloadScenarioTests
         SpriteWidthOfFirstCell(editor).ShouldBe(TimelineLayout.FilmHeight, 1e-6, "the frame keeps its 16x16 pixels on a wider sheet (#1952)");
     }
 
+    /// <summary>#2112: the pixels of a UV frame come from the size of its texture.</summary>
+    [AvaloniaFact]
+    public async Task TheSheetOfAUvSourceAppearingOnDisk_ShowsTheWholeFrame_WithoutReopeningTheTab()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string seqj = WriteFixture(editor);
+        File.Delete(Path.Combine(editor.ProjectFolder, "sheet.png"));
+        var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FrameLength = 0.1f, RightCoordinate = 1, BottomCoordinate = 1 });
+        list.AnimationChains.Add(chain);
+        list.Save(Path.Combine(editor.ProjectFolder, "hero.achx"));
+        await editor.OpenProjectFolderAsync();
+        await editor.OpenAsync(seqj);
+
+        editor.WritePng("sheet.png", 64, 32);
+
+        (await editor.WaitUntilAsync(() => Math.Abs(SpriteWidthOfFirstCell(editor) - 2 * TimelineLayout.FilmHeight) < 1e-6, ReloadTimeout))
+            .ShouldBeTrue("the frame is the whole 64x32 texture");
+    }
+
     [AvaloniaFact]
     public async Task ReplacingTheSheetOnDisk_ReRendersTheLibraryChip_WithoutReopeningTheTab()
     {

@@ -262,7 +262,9 @@ public partial class MainWindow
         private void OnTextureChangedOnDisk(string path)
         {
             // Raises PathInvalidated, which the filmstrip, the library chips and the preview redraw from.
-            if (!_watcherDisposed && _document is not null) _window._thumbnailService.InvalidatePath(path);
+            if (_watcherDisposed || _document is null) return;
+            _window._thumbnailService.InvalidatePath(path);
+            _document.ReloadChangedSources();
         }
 
         private void StartWatching(SequenceDocument document)

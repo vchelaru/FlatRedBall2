@@ -35,10 +35,17 @@ public sealed class SequenceDocument : ISequenceChainLookup
     // Keyed by the source string as written in the file. A null value is a source that could not be loaded.
     private readonly Dictionary<string, AnimationChainListSave?> _sources = new(StringComparer.OrdinalIgnoreCase);
 
-    // What each source's file looked like when it was read, so a later change to the file is seen.
-    private readonly Dictionary<string, FileStamp> _stamps = new(StringComparer.OrdinalIgnoreCase);
+    // What each file a source was read from looked like then, so a later change to it is seen.
+    private readonly Dictionary<string, Dictionary<string, FileStamp>> _stamps = new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly record struct FileStamp(bool Exists, DateTime WrittenUtc, long Length);
+    private readonly record struct FileStamp(bool Exists, DateTime WrittenUtc, long Length)
+    {
+        public static FileStamp Of(string path)
+        {
+            var info = new FileInfo(path);
+            return info.Exists ? new FileStamp(true, info.LastWriteTimeUtc, info.Length) : default;
+        }
+    }
 
     // The file as this document last read or wrote it. A file that still holds this has not changed under us.
     private DiskState _diskState;
@@ -265,7 +272,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     }
 
     /// <summary>
-    /// Re-reads every source whose file changed since it was loaded (or could not be read and now can), and raises
+    /// Re-reads every source whose file (or, for a UV source, a texture its pixels come from) changed since it was loaded (or could not be read and now can), and raises
     /// <see cref="Changed"/> when any did. Returns whether any did.
     /// </summary>
     public bool ReloadChangedSources()
@@ -1562,29 +1569,32 @@ public sealed class SequenceDocument : ISequenceChainLookup
     private FilePath SourcePath(string source) =>
         new(System.IO.Path.Combine(Path.GetDirectoryContainingThis().FullPath, source));
 
-    /// <summary>Reads every source in the file whose own file is new or differs from when it was last read. Returns whether any was read.</summary>
+    /// <summary>Reads every source in the file whose own files are new or differ from when it was last read. Returns whether any was read.</summary>
     private bool SyncSources()
     {
         bool any = false;
         foreach (var source in Save.Sources)
         {
             string full = SourcePath(source).FullPath;
-            var info = new FileInfo(full);
-            var stamp = info.Exists ? new FileStamp(true, info.LastWriteTimeUtc, info.Length) : default;
-            if (_stamps.TryGetValue(source, out var known) && known == stamp) continue;
-            _sources[source] = TryLoad(full);
-            _stamps[source] = stamp;
+            if (_stamps.TryGetValue(source, out var known) && known.All(file => FileStamp.Of(file.Key) == file.Value)) continue;
+            var stamps = new Dictionary<string, FileStamp> { [full] = FileStamp.Of(full) };
+            var loaded = TryLoad(full);
+            _sources[source] = loaded?.List;
+            if (loaded is { OnDiskCoordinateType: TextureCoordinateType.UV })
+                foreach (var frame in loaded.List.AnimationChains.SelectMany(chain => chain.Frames))
+                    if (ResolveTexturePath(source, frame) is { } texture) stamps[texture] = FileStamp.Of(texture);
+            _stamps[source] = stamps;
             any = true;
         }
         if (any) SourcesVersion++;
         return any;
     }
 
-    private static AnimationChainListSave? TryLoad(string absolutePath)
+    private static EditorAnimationFile? TryLoad(string absolutePath)
     {
         try
         {
-            return AnimationFileLoader.Load(absolutePath).List;
+            return AnimationFileLoader.Load(absolutePath);
         }
         catch (Exception ex)
         {
