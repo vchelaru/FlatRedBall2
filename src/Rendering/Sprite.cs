@@ -568,25 +568,8 @@ public class Sprite : IRenderable, IAttachable
 
         int previousFrameIndex = _currentFrameIndex;
         int previousVisitIndex = _currentVisitIndex;
-        int wraps = 0;
-        bool finished = false;
-        if (IsLooping)
-        {
-            while (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation -= totalLength;
-                wraps++;
-            }
-        }
-        else
-        {
-            if (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation = totalLength;
-                Animate = false;
-                finished = true;
-            }
-        }
+        (_timeIntoAnimation, int wraps, bool finished) = PlaybackTimeline.Wrap(_timeIntoAnimation, totalLength, IsLooping);
+        if (finished) Animate = false;
 
         LocateCurrentFrame(chain);
 

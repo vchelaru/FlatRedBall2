@@ -253,25 +253,8 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
         if (totalLength <= 0 && IsLooping) return;
 
         int previousVisitIndex = _currentVisitIndex;
-        int wraps = 0;
-        bool finished = false;
-        if (IsLooping)
-        {
-            while (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation -= totalLength;
-                wraps++;
-            }
-        }
-        else
-        {
-            if (_timeIntoAnimation >= totalLength)
-            {
-                _timeIntoAnimation = totalLength;
-                Animate = false;
-                finished = true;
-            }
-        }
+        (_timeIntoAnimation, int wraps, bool finished) = PlaybackTimeline.Wrap(_timeIntoAnimation, totalLength, IsLooping);
+        if (finished) Animate = false;
 
         UpdateFrameIndexFromTime(chain);
 
@@ -338,17 +321,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     private void SeekToTime(AnimationChain<TFrame> chain, double seconds)
     {
         double totalLength = PlaybackTimeline.CycleLength(chain.TotalLength.TotalSeconds, IsPingPong);
-        if (totalLength <= 0)
-        {
-            _timeIntoAnimation = 0;
-            UpdateFrameIndexFromTime(chain);
-            return;
-        }
-
-        _timeIntoAnimation = IsLooping
-            ? seconds % totalLength
-            : seconds >= totalLength ? totalLength : seconds;
-
+        _timeIntoAnimation = PlaybackTimeline.Wrap(seconds, totalLength, IsLooping).CycleTime;
         UpdateFrameIndexFromTime(chain);
     }
 

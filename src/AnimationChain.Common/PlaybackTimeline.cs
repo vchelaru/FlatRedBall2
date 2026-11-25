@@ -8,6 +8,12 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <param name="IsBackward">Whether that timeline is being played mirrored at this instant.</param>
 public readonly record struct TimelinePoint(double ForwardTime, bool IsBackward);
 
+/// <summary>Where a playing time falls in the cycle.</summary>
+/// <param name="CycleTime">Seconds into the cycle.</param>
+/// <param name="Wraps">How many times a looping player passed the cycle's end.</param>
+/// <param name="AtEnd">Whether a non-looping player is at the cycle's end.</param>
+public readonly record struct CyclePoint(double CycleTime, int Wraps, bool AtEnd);
+
 /// <summary>Where playback is: the frame shown and the forward-timeline position to evaluate it at.</summary>
 /// <param name="FrameIndex">The frame shown.</param>
 /// <param name="ElapsedInFrame">Forward seconds into that frame (0 = its start, its length = its end), whichever direction plays.
@@ -33,6 +39,18 @@ public static class PlaybackTimeline
 {
     /// <summary>Length of one cycle: T, or 2T for a ping-pong. A looping player wraps here; a non-looping one stops here.</summary>
     public static double CycleLength(double forwardLength, bool pingPong) => pingPong ? 2 * forwardLength : forwardLength;
+
+    /// <summary>
+    /// Brings <paramref name="time"/> into a cycle of <paramref name="cycleLength"/> seconds: a looping player wraps, a
+    /// non-looping one holds the end. Takes the same time however many cycles that is.
+    /// </summary>
+    public static CyclePoint Wrap(double time, double cycleLength, bool loop)
+    {
+        if (time < cycleLength) return new(time, 0, false);
+        if (!loop || cycleLength <= 0) return new(cycleLength, 0, !loop);
+        double wraps = Math.Floor(time / cycleLength);
+        return new(Math.Max(0, time - wraps * cycleLength), (int)Math.Min(wraps, int.MaxValue), false);
+    }
 
     /// <summary>
     /// The forward time shown <paramref name="cycleTime"/> seconds into a cycle (clamped to the cycle), and whether the
