@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
 using System.Collections.Generic;
@@ -42,8 +43,21 @@ public readonly record struct FrameSourceRect(int X, int Y, int Width, int Heigh
     private static int Round(float value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 }
 
+internal static class ExportWarning
+{
+    /// <summary>One sentence naming every kind an export dropped.</summary>
+    public static string Dropped(IReadOnlyList<ChainDataKind> kinds, string format)
+    {
+        string names = ChainData.Describe(kinds);
+        return $"{char.ToUpperInvariant(names[0])}{names[1..]} can't be stored in {format} and {(kinds.Count == 1 ? "was" : "were")} not exported.";
+    }
+}
+
 internal static class ExportNames
 {
+    public static string RenameWarning(string name, string exportedName) =>
+        $"Another animation is already named '{name}', so this one was exported as '{exportedName}'.";
+
     /// <summary>Returns <paramref name="candidate"/>, or it suffixed <c>_2</c>, <c>_3</c>… if taken.</summary>
     public static string MakeUnique(string candidate, IEnumerable<string> existing)
     {

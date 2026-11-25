@@ -22,12 +22,12 @@ public class FrameLengthUnitGuardTests
         "Core/IO/AnimationCloneHelper.cs",
         "Core/IO/ClipboardPayload.cs",
         "Core/Export/GodotSpriteFramesExporter.cs",
-        "Core/Export/PixiJsSpriteSheetExporter.cs",
         "Core/Tiled/AchjSyncSnapshot.cs",
         "Core/Tiled/AchjToTiledAnimationMapper.cs",
         "Core/Tiled/MultiTileToTiledAnimationMapper.cs",
         "Core/Tiled/TiledAnimationToAchjMapper.cs",
-        "Core/Tiled/TsxLossyDataCheck.cs", // rounds via FrameLengthUnit with the list's unit
+        "Core/Tiled/TsxLossyDataCheck.cs", // names the kind of data, reads no length
+        "Core/Utilities/ChainData.cs", // rounds via FrameLengthUnit with the list's unit
         "Core/ViewModels/TimelineStripSignature.cs",
         "Core/CommandsAndState/PlaybackController.cs",
         "App/MainWindow.axaml.cs",
