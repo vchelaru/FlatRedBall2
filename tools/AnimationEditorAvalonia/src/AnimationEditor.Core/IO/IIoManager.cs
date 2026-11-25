@@ -52,15 +52,25 @@ namespace AnimationEditor.Core.IO
         /// <exception cref="System.IO.IOException">The <c>.tiledsync</c> cannot be written.</exception>
         void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile);
 
-        void WriteRecoveryFile(AnimationChainListSave? animationChainListSave);
-        void DeleteRecoveryFile();
-        bool RecoveryFileExists();
+        /// <summary>
+        /// Writes the crash-recovery copy of an unsaved document. Each document keeps its own file: the first one is
+        /// <see cref="RecoveryFilePath"/>, or that name with a number when the name is taken.
+        /// </summary>
+        void WriteRecoveryFile(AnimationChainListSave? document);
+
+        /// <summary>Deletes the recovery file of <paramref name="document"/>, if it has one, and no other document's.</summary>
+        void DeleteRecoveryFile(AnimationChainListSave? document);
+
+        /// <summary>Deletes the recovery file of every document written or read here. Another window's are left alone.</summary>
+        void DeleteRecoveryFiles();
+
+        /// <summary>Every recovery file on disk, the one written last at the end.</summary>
+        IReadOnlyList<string> FindRecoveryFiles();
 
         /// <summary>
-        /// Reads back a recovery file written by <see cref="WriteRecoveryFile"/>. Returns null
-        /// when no recovery file exists or it fails to parse — callers should treat a null result
-        /// the same as "nothing to restore" and delete the stale file.
+        /// Reads back a recovery file. It stays on disk as the file of the returned document, until that document is saved
+        /// or discarded. A file that does not parse is deleted and null is returned.
         /// </summary>
-        AnimationChainListSave? TryReadRecoveryFile();
+        AnimationChainListSave? TryReadRecoveryFile(string path);
     }
 }

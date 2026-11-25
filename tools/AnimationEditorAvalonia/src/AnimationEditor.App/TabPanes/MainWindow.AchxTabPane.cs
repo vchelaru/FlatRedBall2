@@ -4,6 +4,7 @@ using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Dialogs;
+using FlatRedBall2.AnimationEditorCommon;
 using System.Linq;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -184,12 +185,13 @@ public partial class MainWindow
         /// #928): the live model for the active tab, or the snapshot captured when a background
         /// tab was last left (<see cref="TabController.CaptureLeavingTab"/>).
         /// </summary>
-        private bool UntitledTabHasContent(TabEntry tab) =>
-            (tab == _window._tabManager.ActiveTab ? _window._projectManager.AnimationChainListSave : tab.CachedEditorModel)
-                is { AnimationChains.Count: > 0 };
+        private bool UntitledTabHasContent(TabEntry tab) => UntitledDocument(tab) is { AnimationChains.Count: > 0 };
+
+        private AnimationChainListSave? UntitledDocument(TabEntry tab) =>
+            tab == _window._tabManager.ActiveTab ? _window._projectManager.AnimationChainListSave : tab.CachedEditorModel;
 
         /// <summary>
-        /// Closing an untitled tab is an explicit discard of its unsaved content, so clear the
+        /// Closing an untitled tab is an explicit discard of its unsaved content, so delete the
         /// crash-recovery file autosave-on-edit wrote for it, or the next launch offers to restore
         /// already-discarded content (#927).
         /// </summary>
@@ -197,7 +199,7 @@ public partial class MainWindow
         {
             _window.CommitPendingTreeRename();
             if (IsUntitledTab(tab))
-                _window._ioManager.DeleteRecoveryFile();
+                _window._ioManager.DeleteRecoveryFile(UntitledDocument(tab));
         }
 
         public TabStatus Status(TabEntry? tab)

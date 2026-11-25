@@ -24,7 +24,7 @@ public class SaveAsToAnotherFolderTests : IDisposable
 
     public void Dispose()
     {
-        _ctx.IoManager.DeleteRecoveryFile();
+        _ctx.IoManager.DeleteRecoveryFiles();
         _dir.Dispose();
     }
 

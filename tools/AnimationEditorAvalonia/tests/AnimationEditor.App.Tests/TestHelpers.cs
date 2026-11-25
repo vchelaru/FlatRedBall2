@@ -164,3 +164,9 @@ internal static class TestHelpers
     /// </summary>
     internal static TestServices BuildServices() => new TestServices();
 }
+
+/// <summary>Whether any unsaved document has a crash-recovery file.</summary>
+internal static class RecoveryFileTestExtensions
+{
+    public static bool RecoveryFileExists(this IIoManager ioManager) => ioManager.FindRecoveryFiles().Count > 0;
+}

@@ -153,7 +153,9 @@ public class SweepScenarioTests
         restarted.Control<Control>("RecoveredDocumentBanner").IsVisible.ShouldBeTrue("the user is told a document was recovered");
         restarted.Project.AnimationChains.Select(chain => chain.Name).ShouldContain("Recovered");
         restarted.TabLabels.ShouldContain(label => label.StartsWith("Untitled"), "the recovered document is an untitled tab");
-        File.Exists(recoveryCopy).ShouldBeFalse("the recovery file is consumed once restored");
+        File.Exists(recoveryCopy).ShouldBeTrue("a second crash must not lose the document");
+        restarted.Window.CloseWithoutPrompt();
+        File.Exists(recoveryCopy).ShouldBeFalse("a normal close is not a crash");
     }
 
     [AvaloniaFact]

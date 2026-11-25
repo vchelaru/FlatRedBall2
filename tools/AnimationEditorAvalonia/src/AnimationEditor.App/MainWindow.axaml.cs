@@ -1100,11 +1100,6 @@ public partial class MainWindow : Window
             Environment.Exit(0);
         }
 
-        // Consume any crash-recovery file up front, but open it *after* the normal startup
-        // branches below (#1020). Restoring it used to early-out of this whole block, so
-        // accepting the old Restore/Delete prompt silently dropped every other open tab.
-        var recovered = TakeRecoveryFileContent();
-
         var args = Environment.GetCommandLineArgs();
         if (args.Length >= 2 && File.Exists(args[1]))
         {
@@ -1114,18 +1109,14 @@ public partial class MainWindow : Window
         {
             await RestoreTabsAsync();
         }
-        else if (recovered is null)
+        else
         {
             _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         }
 
-        if (recovered is not null)
-        {
-            // Awaited above, so nothing is still in flight to clobber the restored document.
-            OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
-            _tabManager.ActiveTab!.IsRecoveredDocument = true;
-            UpdateRecoveredDocumentBanner();
-        }
+        // After the branches above, awaited, so nothing is still in flight to clobber a recovered document, and a recovery
+        // never replaces the tabs the session had open (#1020).
+        RestoreRecoveredDocuments();
 
         // Independent of which branch above ran -- the Project tab tree isn't tied to which
         // document tab is open (#772).
@@ -1144,26 +1135,20 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Reads and deletes any crash-recovery file left by <see cref="IIoManager.WriteRecoveryFile"/>
-    /// after an unclean shutdown of an unsaved document (see
-    /// <see cref="AppCommands.SaveCurrentAnimationChainList"/>), returning its content for the
-    /// caller to open as an unsaved document. Returns null when there was nothing to recover or
-    /// the file could not be parsed; the unparseable file is deleted rather than re-offered on
-    /// every subsequent launch.
+    /// Opens each document a crash left a recovery file of (<see cref="IIoManager.WriteRecoveryFile"/>) as an unsaved
+    /// document, the one edited last in front. There is deliberately no "delete permanently?" prompt: the old modal made
+    /// that call from memory, before the user could see what was in the file (#1020). Closing the tab discards it.
     /// </summary>
-    /// <remarks>
-    /// Deleting on read is safe because the content lives in the restored tab from here on, and
-    /// closing that tab is what the user does to discard it (<see cref="CloseTabCoreAsync"/>). There is
-    /// deliberately no "delete permanently?" prompt: the old modal made that call from memory,
-    /// before the user could see what was in the file (#1020).
-    /// </remarks>
-    private AnimationChainListSave? TakeRecoveryFileContent()
+    private void RestoreRecoveredDocuments()
     {
-        if (!_ioManager.RecoveryFileExists()) return null;
-
-        var recovered = _ioManager.TryReadRecoveryFile();
-        _ioManager.DeleteRecoveryFile();
-        return recovered;
+        foreach (string path in _ioManager.FindRecoveryFiles())
+        {
+            if (_ioManager.TryReadRecoveryFile(path) is not { } recovered) continue;
+            CaptureLeavingActiveTab();
+            OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
+            _tabManager.ActiveTab!.IsRecoveredDocument = true;
+        }
+        UpdateRecoveredDocumentBanner();
     }
 
     // ── Recovered-document banner ─────────────────────────────────────────────

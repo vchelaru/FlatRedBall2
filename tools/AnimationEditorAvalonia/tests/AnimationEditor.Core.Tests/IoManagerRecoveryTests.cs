@@ -114,7 +114,7 @@ public class IoManagerRecoveryTests : IDisposable
         ctx.IoManager.WriteRecoveryFile(ctx.ProjectManager.AnimationChainListSave);
         Assert.True(ctx.IoManager.RecoveryFileExists());
 
-        ctx.IoManager.DeleteRecoveryFile();
+        ctx.IoManager.DeleteRecoveryFiles();
 
         Assert.False(ctx.IoManager.RecoveryFileExists());
     }
@@ -124,7 +124,7 @@ public class IoManagerRecoveryTests : IDisposable
     {
         Assert.False(ctx.IoManager.RecoveryFileExists());
 
-        var ex = Record.Exception(() => ctx.IoManager.DeleteRecoveryFile());
+        var ex = Record.Exception(() => ctx.IoManager.DeleteRecoveryFiles());
 
         Assert.Null(ex);
     }
