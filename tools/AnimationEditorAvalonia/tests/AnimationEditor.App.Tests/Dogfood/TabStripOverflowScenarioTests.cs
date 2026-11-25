@@ -130,17 +130,49 @@ public class TabStripOverflowScenarioTests
     }
 
     [AvaloniaFact]
-    public async Task ClickATabAlreadyInFullView_LeavesTheScrollOffset()
+    public async Task SwitchToATabAlreadyInFullView_LeavesTheScrollOffset()
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         List<string> names = await OpenTabsAsync(editor, 12);
         ScrollViewerOf(editor).Offset = new Vector(50, 0);
         editor.Layout();
 
-        editor.ClickTab(names[2]);
+        await editor.OpenAsync(Path.Combine(editor.ProjectFolder, names[2]));
 
         ShouldShowActiveTab(editor, names[2]);
         ScrollViewerOf(editor).Offset.X.ShouldBe(50);
+    }
+
+    // Scrolling on a click would slide the tab's close button under the pointer, and a double click would close it.
+    [AvaloniaTheory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ClickATabCutOffAtTheEdge_LeavesTheScrollOffset_AndADoubleClickDoesNotCloseIt(int clicks)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        List<string> names = await OpenTabsAsync(editor, 14);
+        ScrollViewer viewer = ScrollViewerOf(editor);
+        Border tab = editor.TabFor(names[5]);
+        double offset = tab.Bounds.X + 60 - viewer.Viewport.Width;
+        viewer.Offset = new Vector(offset, 0);
+        editor.Layout();
+        editor.Layout();
+        Point target = editor.PointIn(tab, 50, 10);
+
+        for (int click = 0; click < clicks; click++)
+        {
+            editor.Window.MouseMove(target);
+            editor.Window.MouseDown(target, MouseButton.Left);
+            editor.Window.MouseUp(target, MouseButton.Left);
+            editor.Layout();
+            editor.Layout();
+        }
+        await editor.Window.WhenTabSwitchSettled();
+        editor.Layout();
+
+        editor.TabLabels.Count.ShouldBe(14);
+        editor.Tabs.ActiveTab!.DisplayName.ShouldBe(names[5]);
+        viewer.Offset.X.ShouldBe(offset);
     }
 
     private static void ScrollToStart(AnimationEditorHarness editor)
