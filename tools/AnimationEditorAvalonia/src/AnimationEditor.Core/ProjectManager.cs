@@ -578,7 +578,9 @@ namespace AnimationEditor.Core
             mapped = YieldCollidingClaims(mapped, satelliteHintsForMap, state, out var releasedHints);
 
             var workingTileset = Tiled.NativeTsxAnimationSync.CloneForSave(state.Tileset);
-            Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped, state.UserProperties);
+            // The undo history keeps the state of each edit, so one that changed nothing shares the tileset.
+            if (!Tiled.NativeTsxAnimationSync.Apply(workingTileset, mapped, state.UserProperties).Changed)
+                workingTileset = state.Tileset;
             state.File.Save(workingTileset, target);
 
             // Commits this save's tile assignments (including a brand-new chain's freshly-chosen
@@ -952,7 +954,7 @@ namespace AnimationEditor.Core
 
             // The save refuses a tile achx-push owns or the user put a property on that it would overwrite.
             var name = _tsx.SyntheticNamedChains.Contains(chain) ? Tiled.TiledAnimationToAchjMapper.SyntheticChainName(tileId) : chain.Name;
-            if (name != chain.Name && AnimationChainListSave.AnimationChains.Any(c => c.Name == name))
+            if (name != chain.Name && AnimationChainListSave.HasOtherChainNamed(chain, name))
                 return $"A chain named '{name}' already exists.";
             try
             {
@@ -970,19 +972,7 @@ namespace AnimationEditor.Core
             return null;
         }
 
-        /// <summary>
-        /// Marks a chain's name as a real, user-given one from now on -- called on an actual rename
-        /// (<see cref="AppCommands.RenameChain"/>) so <see cref="TrySetTsxOwnerTileId"/> never
-        /// overwrites it again. No-op outside a native-tsx project or for a chain that was already
-        /// marked. Returns whether the chain *was* still tracked as synthetic. Replaces the whole
-        /// set rather than calling <see cref="HashSet{T}.Remove"/> on the existing instance in
-        /// place: <see cref="CaptureTsxState"/> hands out this exact set by reference on the promise
-        /// (see its own doc comment) that it's only ever replaced wholesale, never mutated -- an
-        /// in-place <c>Remove</c> would silently corrupt an already-taken "before" snapshot (e.g.
-        /// <see cref="CommandsAndState.Commands.RenameChainCommand"/>'s own <c>_before</c>, captured
-        /// one line earlier in the same <c>Do()</c>), erasing the chain from it too and making Undo
-        /// unable to restore synthetic tracking.
-        /// </summary>
+        /// <inheritdoc/>
         public bool IsChainNameAuto(AnimationChainSave chain) => _tsx?.SyntheticNamedChains.Contains(chain) == true;
 
         /// <summary>
@@ -1000,6 +990,13 @@ namespace AnimationEditor.Core
             return true;
         }
 
+        /// <summary>
+        /// Marks a chain's name as a real, user-given one from now on -- called on an actual rename
+        /// (<see cref="AppCommands.RenameChain"/>) so <see cref="TrySetTsxOwnerTileId"/> never
+        /// overwrites it again. No-op outside a native-tsx project or for a chain that was already
+        /// marked. Returns whether the chain *was* still tracked as synthetic. Replaces the whole
+        /// set, because a captured state (<see cref="CaptureTsxState"/>) holds it by reference.
+        /// </summary>
         public bool MarkChainNameExplicit(AnimationChainSave chain)
         {
             if (_tsx == null || !_tsx.SyntheticNamedChains.Contains(chain))

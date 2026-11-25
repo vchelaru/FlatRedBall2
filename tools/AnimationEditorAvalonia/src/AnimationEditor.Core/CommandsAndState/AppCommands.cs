@@ -1309,8 +1309,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public bool RenameChain(AnimationChainSave chain, string newName)
         {
             newName = newName.Trim();
-            bool NameTaken(string name) =>
-                _pm.AnimationChainListSave?.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == name) == true;
+            bool NameTaken(string name) => _pm.AnimationChainListSave?.HasOtherChainNamed(chain, name) == true;
 
             if (newName.Length == 0)
             {

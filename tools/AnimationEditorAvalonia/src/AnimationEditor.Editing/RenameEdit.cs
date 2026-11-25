@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Tiled;
+using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
 
 namespace AnimationEditor.Editing;
@@ -22,8 +23,7 @@ public static class RenameEdit
         IProjectManager projectManager, IAppCommands commands, AnimationChainSave chain, string newName)
     {
         newName = newName.Trim();
-        bool NameTaken(string name) =>
-            projectManager.AnimationChainListSave?.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == name) == true;
+        bool NameTaken(string name) => projectManager.AnimationChainListSave?.HasOtherChainNamed(chain, name) == true;
         EditResult Duplicate(string name) => Fail(EditErrorCode.DuplicateName, $"A chain named '{name}' already exists.");
 
         if (newName.Length == 0)
