@@ -2945,12 +2945,12 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     /// </summary>
     private void OnTopLevelKeyDownForDragCancel(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape || !CancelActiveDrag()) return;
+        if (e.Key != Key.Escape || !CancelDrag()) return;
         e.Handled = true;
     }
 
     /// <summary>Restores the in-progress drag's start state and ends it; false when no drag is active.</summary>
-    private bool CancelActiveDrag()
+    public bool CancelDrag()
     {
         if (_draggingVertexPolygon is { } polygon)
         {

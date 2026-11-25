@@ -1168,7 +1168,7 @@ public partial class MainWindow
 
         /// <summary>
         /// Applies the name typed into any open in-place rename (a sequence row or a track header), as Enter would, and
-        /// cancels a timeline drag that is still held, as Escape would. This is the one path for every way of leaving a
+        /// cancels a timeline or guide drag that is still held, as Escape would. This is the one path for every way of leaving a
         /// rename that Enter and Escape are not: another tab or file, closing the tab or the window, undo and redo, Back
         /// and Forward, a hotkey, and a press that moves no focus. A name that fails validation shows the banner and
         /// keeps the old name, as on a click-away. Does nothing when no rename or drag is open.
@@ -1177,6 +1177,7 @@ public partial class MainWindow
         {
             if (_document is not { } document) return;
             _window.SequenceTimeline.CancelDrag();
+            _window.SequencePreview.CancelDrag();
             for (int index = 0; index < _items.Count; index++)
             {
                 if (_items[index].IsEditing) CommitListRename(document, index);

@@ -87,13 +87,36 @@ public partial class MainWindow
 
     /// <summary>
     /// Applies the name typed into an in-place rename that is still open (a sequence row, a track header, an ANIMATIONS
-    /// tree row), and cancels a sequence timeline drag that is still held, before whatever the user did next. Every way out of a rename other than Enter and Escape funnels here;
+    /// tree row), and cancels a drag that is still held, before whatever the user did next. Every way out of a rename other than Enter and Escape funnels here;
     /// see <see cref="SequenceTabPane.SettlePendingInput"/> and <see cref="CommitPendingTreeRename"/>.
     /// </summary>
     private void SettlePendingInput()
     {
         _sequencePane.SettlePendingInput();
+        SettlePendingAchxInput();
+    }
+
+    /// <summary>The .achx part of <see cref="SettlePendingInput"/>: its drags and its open renames.</summary>
+    private void SettlePendingAchxInput()
+    {
+        CancelAchxDrags();
         CommitPendingTreeRename();
+    }
+
+    /// <summary>
+    /// Cancels a drag that is still held on the wireframe, the preview or an ANIMATIONS row, as Escape does. A drag holds objects
+    /// of the document as it was when pressed, so it ends when a command runs, the file is reloaded or another tab is shown.
+    /// </summary>
+    private void CancelAchxDrags()
+    {
+        WireframeCtrl.CancelDrag();
+        PreviewCtrl.CancelDrag();
+        // The OS still holds a row drag until the release; without its source the drop does nothing.
+        _pendingFrameDrag = null;
+        _pendingChainDrag = null;
+        _pendingShapeDrag = null;
+        ClearFrameDragCandidate();
+        RemoveFrameDropIndicators();
     }
 
     /// <summary>-1 for the mouse Back button, +1 for Forward, null for any other press.</summary>
