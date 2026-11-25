@@ -16,25 +16,26 @@ public class PlayheadStepsTests
 
     private static readonly AnimationChainSave Walk = ChainOf("Walk", false, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f);
     private static readonly AnimationChainSave Run = ChainOf("Run", false, 0.1f, 0.1f);
+    private static readonly AnimationChainSave Slow = ChainOf("Slow", true, 0.7f, 0.7f);
+    private static readonly AnimationChainSave Short = ChainOf("Short", true, Enumerable.Repeat(0.1f, 10).ToArray());
     private static readonly AnimationChainSave Spin = ChainOf("Spin", true, 0.1f, 0.2f);
 
     private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
         new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
     private static AnimationChainSave? Find(SequenceChainReferenceSave reference) =>
-        reference.Chain switch { "Walk" => Walk, "Run" => Run, "Spin" => Spin, _ => null };
-
-    private static double? Cycle(SequenceChainReferenceSave reference) =>
-        Find(reference) is { } chain ? chain.Frames.Sum(frame => (double)frame.FrameLength) : null;
+        reference.Chain switch { "Walk" => Walk, "Run" => Run, "Spin" => Spin, "Slow" => Slow, "Short" => Short, _ => null };
 
     private static IReadOnlyList<double> Boundaries(params SequenceTrackSave[] tracks)
     {
         var sequence = new SequenceSave();
         sequence.Tracks.AddRange(tracks);
-        var blocks = TimelineLayout.Blocks(sequence, Cycle);
-        double length = SequenceTimeline.Length([sequence], sequence, reference => Cycle(reference) ?? 0);
-        return PlayheadSteps.Boundaries(sequence, blocks, Find, _ => AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds, length).Select(time => Math.Round(time, 4)).ToList();
+        return FileBoundaries(sequence);
     }
+
+    // Of the first sequence of the file.
+    private static IReadOnlyList<double> FileBoundaries(params SequenceSave[] file) =>
+        PlayheadSteps.Boundaries(file, file[0], Find, _ => AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).Select(time => Math.Round(time, 4)).ToList();
 
     private static SequenceTrackSave Track(bool visible, params SequenceChainReferenceSave[] chains) =>
         new() { Visible = visible, Chains = chains.ToList() };
@@ -69,6 +70,80 @@ public class PlayheadStepsTests
         // Walk would run to 0.5 but Run starts at 0.25 on the same track, so Walk is cut there.
         Boundaries(Track(true, Ref("Walk", 0), Ref("Run", 0.25)))
             .ShouldBe(new[] { 0, 0.1, 0.2, 0.25, 0.35, 0.45 });
+    }
+
+    private static SequenceSave Sequence(string name, bool loop, params SequenceTrackSave[] tracks)
+    {
+        var sequence = new SequenceSave { Name = name, Loop = loop };
+        sequence.Tracks.AddRange(tracks);
+        return sequence;
+    }
+
+    private static SequenceTrackSave Clips(bool visible, params SequenceReferenceSave[] clips) => new() { Visible = visible, References = [.. clips] };
+
+    private static SequenceReferenceSave Clip(string target, double start, double? length = null) => new() { Sequence = target, Start = start, Length = length };
+
+    [Fact]
+    public void Boundaries_OfAClip_AreItsEdgesAndTheFramesOfTheSequenceItPlays_CutByTheNextClip()
+    {
+        // Run is 0.1 + 0.1. The first clip would last 0.2 but the next starts 0.15 after it.
+        FileBoundaries(
+            Sequence("Host", true, Clips(true, Clip("A", 1), Clip("A", 1.15))),
+            Sequence("A", true, Track(true, Ref("Run", 0)), Track(false, Ref("Walk", 0, length: 0.2))))
+            .ShouldBe(new[] { 0, 1, 1.1, 1.15, 1.25, 1.35 });
+    }
+
+    [Theory]
+    [InlineData(true, new[] { 0, 0.1, 0.2, 0.3, 0.4, 0.5 })]
+    [InlineData(false, new[] { 0, 0.1, 0.5 })] // holds its last frame
+    public void Boundaries_OfALongClip_RepeatWhenItsTargetLoops(bool loop, double[] expected)
+    {
+        FileBoundaries(
+            Sequence("Host", true, Clips(true, Clip("A", 0, length: 0.5))),
+            Sequence("A", loop, Track(true, Ref("Run", 0))))
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Boundaries_GoThroughASequencePlayedByAPlayedSequence()
+    {
+        FileBoundaries(
+            Sequence("Host", true, Clips(true, Clip("Outer", 1))),
+            Sequence("Outer", true, Clips(true, Clip("Inner", 0.5))),
+            Sequence("Inner", true, Track(true, Ref("Run", 0.25))))
+            .ShouldBe(new[] { 0, 1, 1.5, 1.75, 1.85, 1.95 });
+    }
+
+    [Fact]
+    public void Boundaries_LeaveOutAHiddenClipTrack_AMissingTarget_AndAClipThatPlaysItsHolderBack()
+    {
+        FileBoundaries(
+            Sequence("Host", true, Track(true, Ref("Run", 0)), Clips(false, Clip("A", 0.05)), Clips(true, Clip("Gone", 0.05), Clip("Host", 0.15))),
+            Sequence("A", true, Track(true, Ref("Walk", 0, length: 0.03))))
+            .ShouldBe(new[] { 0, 0.1, 0.2 });
+    }
+
+    [Fact]
+    public void Boundaries_ThatOnlyDifferByFloatErrorLateInTheSequence_AreOne()
+    {
+        // Summed as floats, Spin's boundary at 400 s would be a few microseconds past the start of Run.
+        Boundaries(Track(true, Ref("Spin", 0, length: 500)), Track(true, Ref("Run", 400)))
+            .Count(time => Math.Abs(time - 400) < 0.01).ShouldBe(1);
+    }
+
+    [Fact]
+    public void Boundaries_LateInALoop_AreWhereTheirFrameShows()
+    {
+        // Slow's boundary and Short's eighth frame are both at 70.7 s. Summed as floats, Slow's would be microseconds before it.
+        var sequence = Sequence("Host", true, Track(true, Ref("Slow", 0, length: 800)), Track(true, Ref("Short", 70)));
+
+        var steps = PlayheadSteps.Boundaries([sequence], sequence, Find, _ => AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+        foreach (int frame in Enumerable.Range(1, 9))
+        {
+            double step = PlayheadSteps.Next(steps, 70 + 0.1 * frame - 0.05);
+            AnimationEditor.Core.Rendering.ChainClock.Locate(Short, step - 70, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).FrameIndex.ShouldBe(frame);
+        }
     }
 
     [Fact]

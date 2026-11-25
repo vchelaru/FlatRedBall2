@@ -122,8 +122,7 @@ public partial class MainWindow
         public void StepPlayhead(int direction)
         {
             if (_document is not { } document || CurrentSequence is not { } sequence) return;
-            var blocks = TimelineLayout.Blocks(sequence, document.CycleLength);
-            var steps = PlayheadSteps.Boundaries(sequence, blocks, document.FindChain, document.UnitOf, _window.SequenceTimeline.SequenceLength);
+            var steps = PlayheadSteps.Boundaries(document.Save.Sequences, sequence, document.FindChain, document.UnitOf);
             double now = _window.SequenceTimeline.Playhead;
             SeekPrimary(direction > 0 ? PlayheadSteps.Next(steps, now) : PlayheadSteps.Previous(steps, now));
         }

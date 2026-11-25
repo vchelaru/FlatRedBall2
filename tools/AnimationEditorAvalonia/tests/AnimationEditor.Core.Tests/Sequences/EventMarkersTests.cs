@@ -171,6 +171,16 @@ public class EventMarkersTests
         EventMarkers.Occurrences(new[] { F(0.1, "A") }, false, false, 0).ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Occurrences_ABlockOfWholeCycles_FiresNothingAtItsEnd()
+    {
+        // 0.7f is a hair under 0.7: summed as floats, ten cycles would end before the 7 s block does and an eleventh would start.
+        var chain = new AnimationChainSave { Frames = { new AnimationFrameSave { FrameLength = 0.7f } } };
+        chain.Frames[0].Events.Add(new FlatRedBall2.Animation.AnimationFrameEvent { Name = "Step" });
+
+        EventMarkers.Occurrences(EventMarkers.FramesOf(chain, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds), false, false, 7).Count.ShouldBe(10);
+    }
+
     // ---- every cycle of a chain reference's block fires (#1730), through the real block geometry
 
     // A chain of 0.1 s frames, each carrying the events named at its index.

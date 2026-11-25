@@ -1709,8 +1709,9 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
             {
                 var mark = new Pen(new SolidColorBrush(color, 0.8), 1, new DashStyle(new double[] { 2, 2 }, 0));
                 double markTop = block.IsMissing ? body.Top + 2 : top + TimelineLayout.FilmTop;
-                for (int k = 1; k * block.CycleLength < block.Played - 1e-9; k++)
+                foreach (int k in TimelineCulling.VisibleCycles(Viewport, block.Start, block.Played, block.CycleLength, Bounds.Width))
                 {
+                    if (k == 0) continue;
                     double x = Snap(left + k * block.CycleLength * pps);
                     context.DrawLine(mark, new Point(x, markTop), new Point(x, body.Bottom - 2));
                 }

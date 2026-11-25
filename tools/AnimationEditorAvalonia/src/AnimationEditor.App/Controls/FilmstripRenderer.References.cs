@@ -36,18 +36,17 @@ internal sealed partial class FilmstripRenderer
     // At most this long per paint is spent cutting new composite cells (one is always cut), the rest wait for the next paint.
     private const double ReferenceBudgetMs = 6;
 
-    // A clip's cells at one zoom and clip length, with each cell's pose worked out the first time it is visible.
-    private sealed class ClipCells(double pixelsPerSecond, double length, ReferenceCell[] cells)
+    // The poses of a clip's cells at one zoom and clip length by the time they are sampled at, each worked out the first time
+    // its cell is visible.
+    private sealed class ClipPoses(double pixelsPerSecond, double length)
     {
         public readonly double PixelsPerSecond = pixelsPerSecond;
         public readonly double Length = length;
-        public readonly ReferenceCell[] Cells = cells;
-        public readonly ScenePose?[] Poses = new ScenePose?[cells.Length];
-        public readonly bool[] Known = new bool[cells.Length];
+        public readonly Dictionary<double, ScenePose?> ByTime = new();
     }
 
     // Rebuilt with the timeline's references on every edit, so a new instance starts with no poses.
-    private readonly ConditionalWeakTable<TimelineReference, ClipCells> _clips = new();
+    private readonly ConditionalWeakTable<TimelineReference, ClipPoses> _clips = new();
     private long _referenceTicks;
     private int _cutThisPass;
 
@@ -75,32 +74,28 @@ internal sealed partial class FilmstripRenderer
             || SequenceReferences.Find(document.Save.Sequences, clip.Reference.Sequence) is not { } target) return 0;
         if (!_clips.TryGetValue(clip, out var info) || info.PixelsPerSecond != pixelsPerSecond || info.Length != clip.Length)
         {
-            info = new ClipCells(pixelsPerSecond, clip.Length,
-                ReferenceFilmstrip.Cells(clip.TargetLength, clip.Reference.Length, pixelsPerSecond).ToArray());
+            info = new ClipPoses(pixelsPerSecond, clip.Length);
             _clips.AddOrUpdate(clip, info);
         }
-        var all = info.Cells;
-        if (all.Length == 0) return 0;
+        // A long clip of a short target has millions of cells, so only the visible ones are ever made.
+        var cells = ReferenceFilmstrip.Cells(clip.TargetLength, clip.Reference.Length, pixelsPerSecond, minX - film.X, maxX - film.X + 1);
+        if (cells.Count == 0) return 0;
 
         Atlas.BeginFrame();
         int height = Math.Max(1, (int)Math.Round(film.Height * scaling));
         var stats = ReferenceStats;
         int pending = 0;
         _draws.Clear();
-        for (int i = FirstVisibleCell(all, minX - film.X); i < all.Length; i++)
+        foreach (var cell in cells)
         {
-            var cell = all[i];
             double left = Math.Round(film.X + cell.X);
             if (left > maxX) break;
             double right = Math.Max(left + 1, Math.Round(film.X + cell.X + cell.Width));
 
-            if (!info.Known[i])
-            {
-                info.Poses[i] = ReferenceFilmstrip.PoseAt(clip.Reference, target, cell.Time, document, document.Save.Sequences);
-                info.Known[i] = true;
-            }
+            if (!info.ByTime.TryGetValue(cell.Time, out var pose))
+                info.ByTime[cell.Time] = pose = ReferenceFilmstrip.PoseAt(clip.Reference, target, cell.Time, document, document.Save.Sequences);
             AtlasEntry? entry = null;
-            if (info.Poses[i] is { } pose)
+            if (pose is not null)
             {
                 if (Atlas.TryGetComposite(pose, height, out entry)) stats.CacheHits++;
                 else if (_cutThisPass == 0 || Stopwatch.GetElapsedTime(_referenceTicks).TotalMilliseconds < ReferenceBudgetMs)
@@ -125,24 +120,11 @@ internal sealed partial class FilmstripRenderer
                 spriteLeft = Math.Round(film.X + cell.X + (cell.FullWidth - sprite.Width / scaling) / 2);
                 spriteTop = film.Y + Math.Round((film.Height - sprite.Height / scaling) / 2);
             }
-            _draws.Add(new FilmstripCellDraw(left, right, i > 0, false, entry ?? default, entry is not null, spriteLeft, spriteTop));
+            _draws.Add(new FilmstripCellDraw(left, right, cell.X > 0, false, entry ?? default, entry is not null, spriteLeft, spriteTop));
         }
 
         if (_draws.Count > 0)
             context.Custom(new FilmstripOp(_draws.ToArray(), Atlas.Snapshot(), film, boundary, Probe, PerCellDraws, WaitForGpu));
         return pending;
-    }
-
-    // The first cell that ends at or after x (cells are in order of X).
-    private static int FirstVisibleCell(ReferenceCell[] cells, double x)
-    {
-        int low = 0, high = cells.Length;
-        while (low < high)
-        {
-            int mid = (low + high) / 2;
-            if (cells[mid].X + cells[mid].Width < x) low = mid + 1;
-            else high = mid;
-        }
-        return low;
     }
 }
