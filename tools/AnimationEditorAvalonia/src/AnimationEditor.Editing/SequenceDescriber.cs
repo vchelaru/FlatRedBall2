@@ -89,7 +89,7 @@ public static class SequenceDescriber
                 w.WriteString("sequence", sequence.Name);
                 w.WriteString("name", track.Name);
                 w.WriteNumber("blocks", blocks.Count);
-                w.WriteNumber("length", Math.Round(blocks.Count == 0 ? 0 : blocks.Max(b => b.End), 6));
+                w.WriteReal("length", Math.Round(blocks.Count == 0 ? 0 : blocks.Max(b => b.End), 6));
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -112,7 +112,7 @@ public static class SequenceDescriber
             w.WriteStartObject();
             w.WriteString("name", sequence.Name);
             w.WriteBoolean("loop", sequence.Loop);
-            w.WriteNumber("length", Math.Round(Length(save, sequence, sources), 6));
+            w.WriteReal("length", Math.Round(Length(save, sequence, sources), 6));
             w.WriteStartArray("tracks");
             foreach (var track in sequence.Tracks.Where(filter.Includes))
             {
@@ -137,12 +137,12 @@ public static class SequenceDescriber
                         w.WriteBoolean("missingSource", b.MissingSource);
                         w.WriteBoolean("missingChain", b.MissingChain);
                     }
-                    w.WriteNumber("start", Math.Round(b.Start, 6));
+                    w.WriteReal("start", Math.Round(b.Start, 6));
                     if (b.PlaysSequence is null && !b.MissingSource && !b.MissingChain)
-                        w.WriteNumber("chainLength", Math.Round(b.ChainLength, 6));
-                    if (b.Length is { } length) w.WriteNumber("length", Math.Round(length, 6));
+                        w.WriteReal("chainLength", Math.Round(b.ChainLength, 6));
+                    if (b.Length is { } length) w.WriteReal("length", Math.Round(length, 6));
                     else w.WriteNull("length");
-                    w.WriteNumber("end", Math.Round(b.End, 6));
+                    w.WriteReal("end", Math.Round(b.End, 6));
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
