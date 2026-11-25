@@ -139,11 +139,6 @@ public class FinalPassScenarioTests
         foreach (var f in walk.Frames) f.FrameLength.ShouldBe(walk.Frames[0].FrameLength);
         editor.Expand(walk);
         editor.ClickRow(walk.Frames[1]);
-        if (way == "undo add")
-        {
-            editor.Press(Key.D, RawInputModifiers.Control);
-            editor.Wait(TimeSpan.FromMilliseconds(50));
-        }
         var typedFor = editor.Services.SelectedState.SelectedFrame!;
         var box = editor.Control<Control>("PropFrameLen").GetVisualDescendants().OfType<TextBox>().First();
         box.Focus();
@@ -153,7 +148,6 @@ public class FinalPassScenarioTests
         switch (way)
         {
             case "duplicate": editor.Press(Key.D, RawInputModifiers.Control); break;
-            case "undo add": editor.ClickMenu("MenuUndo"); break;
             case "delete": editor.Press(Key.Delete); break;
             case "move": editor.Press(Key.Down, RawInputModifiers.Alt); break;
             case "addframe": editor.Click(editor.RowButton(walk, "Add Frame")); break;

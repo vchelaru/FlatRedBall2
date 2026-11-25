@@ -1,5 +1,8 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
 
@@ -12,8 +15,11 @@ public class DeletedToastUndoScenarioTests
     {
         editor.WritePng("sheet.png", 64, 64);
         string other = editor.WriteAchx("other.achx", AnimationEditorHarness.Chain("Other", "sheet.png", (0, 0, 16, 16)));
+        var walk = AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16));
+        walk.Frames[0].ShapesSave = new ShapesSave();
+        walk.Frames[0].ShapesSave!.Add(new AARectSave { Name = "Hit", ScaleX = 4, ScaleY = 4 });
         string hero = editor.WriteAchx("hero.achx",
-            AnimationEditorHarness.Chain("Walk", "sheet.png", (0, 0, 16, 16)), AnimationEditorHarness.Chain("Run", "sheet.png", (0, 0, 16, 16)));
+            walk, AnimationEditorHarness.Chain("Run", "sheet.png", (0, 0, 16, 16)));
         await editor.OpenAsync(other);
         editor.Services.AppCommands.AddAnimationChainWithName("Added");
         await editor.OpenAsync(hero);
@@ -89,5 +95,88 @@ public class DeletedToastUndoScenarioTests
 
         AnimationEditorHarness.ReadSaved(hero).AnimationChains.Select(c => c.Name).ShouldBe(["Walk", "Run", "First"]);
         editor.DeletedToastText.ShouldBeNull();
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SeqjTabInFront_ToastIsGone_AndSequenceKept(bool edit)
+    {
+        using var editor = new AnimationEditorHarness();
+        string boss = editor.WriteSeqj("boss.seqj", "Idle");
+        await editor.OpenAsync(boss);
+        editor.Click(editor.Control<Button>("AddSequenceButton"));
+        editor.SequenceNames.Count.ShouldBe(2);
+        await OpenAndDeleteRunAsync(editor);
+
+        editor.ClickTab("boss.seqj");
+        if (edit) editor.Click(editor.Control<Button>("AddSequenceButton"));
+        editor.Layout();
+        editor.DeletedToastText.ShouldBeNull();
+        RaiseUndoClick(editor);
+
+        editor.SequenceNames.Count.ShouldBe(edit ? 3 : 2);
+    }
+
+    [AvaloniaFact]
+    public async Task SeqjOpenedFresh_ToastIsGone()
+    {
+        using var editor = new AnimationEditorHarness();
+        string boss = editor.WriteSeqj("boss.seqj", "Idle");
+        await OpenAndDeleteRunAsync(editor);
+
+        await editor.OpenAsync(boss);
+
+        editor.DeletedToastText.ShouldBeNull();
+    }
+
+    // Raised rather than clicked: a click takes the focus, which commits the name before Undo runs.
+    [AvaloniaTheory]
+    [InlineData("tree")]
+    [InlineData("tree-unchanged")]
+    [InlineData("inspector")]
+    public async Task NameBeingTyped_ToastUndo(string where)
+    {
+        using var editor = new AnimationEditorHarness();
+        var (hero, _) = await OpenAndDeleteRunAsync(editor);
+        var walk = editor.ChainNamed("Walk");
+        if (where == "inspector")
+        {
+            editor.Expand(walk);
+            editor.Expand(walk.Frames[0]);
+            editor.ClickRow(walk.Frames[0].ShapesSave!.AARectSaves.First());
+            var box = editor.Control<TextBox>("PropRectName");
+            box.Focus();
+            editor.Layout();
+            box.SelectAll();
+        }
+        else
+        {
+            editor.ClickRow(walk);
+            editor.Press(Key.F2);
+            editor.Wait(TimeSpan.FromMilliseconds(50));
+            editor.NodeFor(walk).IsEditing.ShouldBeTrue();
+        }
+        if (where != "tree-unchanged") editor.Type("Stroll");
+        editor.DeletedToastText.ShouldNotBeNull();
+
+        RaiseUndoClick(editor);
+        await editor.WaitAsync(TimeSpan.FromMilliseconds(100));
+
+        var saved = AnimationEditorHarness.ReadSaved(hero).AnimationChains;
+        saved.Select(c => c.Name).ShouldBe(where switch
+        {
+            "tree" => ["Stroll", "First"],
+            "tree-unchanged" => ["Walk", "Run", "First"],
+            _ => ["Walk", "First"],
+        });
+        saved[0].Frames[0].ShapesSave!.AARectSaves.First().Name.ShouldBe(where == "inspector" ? "Stroll" : "Hit");
+        editor.DeletedToastText.ShouldBeNull();
+    }
+
+    private static void RaiseUndoClick(AnimationEditorHarness editor)
+    {
+        editor.Notifications.ItemDeletedToastUndoBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        editor.Layout();
     }
 }
