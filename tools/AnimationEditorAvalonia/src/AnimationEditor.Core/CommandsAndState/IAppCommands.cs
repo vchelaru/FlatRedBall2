@@ -461,12 +461,9 @@ namespace AnimationEditor.Core.CommandsAndState
         void CloseProject();
 
         /// <summary>
-        /// Call when the application window is closing normally (not a crash). Deletes any
-        /// crash-recovery file for an unsaved document (<c>ProjectManager.FileName</c> is null) so
-        /// a clean close doesn't leave a stray recovery file that falsely triggers the "closed
-        /// unexpectedly" prompt on next launch (#894). A no-op once the document has a
-        /// <c>FileName</c>, since <see cref="AppCommands.SaveCurrentAnimationChainList"/> only ever
-        /// writes a recovery file for a nameless document.
+        /// Call when the application window is closing normally (not a crash). Deletes the
+        /// crash-recovery files of this window's unsaved documents so a clean close doesn't leave a
+        /// stray one that falsely triggers the "closed unexpectedly" banner on next launch (#894).
         /// </summary>
         void HandleApplicationClosing();
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY);
@@ -663,7 +660,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Ends the current edit session for the coalescing NumericUpDown fields (rect/circle
         /// props, frame length/offset/pixel-region/color/alpha — see <see cref="SetRectProps"/> and
         /// siblings) so the next edit records a fresh undo entry instead of merging into the last
-        /// one. Call on focus loss of the editing control (see
+        /// one. Called on Enter and focus loss in the Inspector, and on a selection change (see
         /// <see cref="Commands.IUndoManager.SealCoalescing"/> for why this boundary matters).
         /// </summary>
         void SealPendingEdits();

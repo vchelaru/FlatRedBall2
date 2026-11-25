@@ -2,7 +2,6 @@
 using AnimationEditor.Core.IO;
 using Avalonia;
 using System;
-using System.IO;
 using System.Runtime.Versioning;
 using Velopack;
 
@@ -28,7 +27,7 @@ class Program
             AddFileAssociationHooks(velopack);
         velopack.Run();
 
-        string? fileArg = args.Length >= 1 && File.Exists(args[0]) ? args[0] : null;
+        string? fileArg = LaunchFile.FromArguments(args);
 
         var singleInstance = new SingleInstanceServer();
         AppLog.Info(singleInstance.IsOwner

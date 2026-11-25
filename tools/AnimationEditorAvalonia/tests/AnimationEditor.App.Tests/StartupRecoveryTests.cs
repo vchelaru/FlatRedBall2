@@ -55,10 +55,9 @@ public class StartupRecoveryTests
     }
 
     [AvaloniaFact]
-    public void RecoveryFilePresent_DeletesRecoveryFileAfterRestore()
+    public void RecoveryFilePresent_IsDeletedByANormalClose_NotByTheRestore()
     {
-        // Otherwise the same recovery file re-announces itself on every subsequent launch,
-        // whether or not the user goes on to Save As the restored content.
+        // Kept until then for a second crash (#2067); kept longer, it re-announces itself on every subsequent launch.
         var ctx = TestHelpers.BuildServices();
         SeedRecoveryFile(ctx, "Recovered");
 
@@ -67,9 +66,10 @@ public class StartupRecoveryTests
         Dispatcher.UIThread.RunJobs();
         try
         {
-            Assert.False(ctx.IoManager.RecoveryFileExists());
+            Assert.True(ctx.IoManager.RecoveryFileExists());
         }
         finally { window.Close(); }
+        Assert.False(ctx.IoManager.RecoveryFileExists());
     }
 
     [AvaloniaFact]
