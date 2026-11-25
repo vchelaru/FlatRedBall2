@@ -1318,13 +1318,18 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (IsChainLocked(chain) || IsTextureBlocked(textureName)) return;
 
+            _undoManager.Execute(new AddFrameCommand(NewFrame(textureName, region), chain, this, _events, _selectedState));
+        }
+
+        private AnimationFrameSave NewFrame(string textureName, FrameRegion region)
+        {
             var frame = new AnimationFrameSave
             {
                 TextureName = textureName,
                 FrameLength = CurrentFrameLengthUnit.DefaultFrameLength,
             };
             region.ApplyTo(frame);
-            _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
+            return frame;
         }
 
         /// <summary>
@@ -2182,6 +2187,25 @@ namespace AnimationEditor.Core.CommandsAndState
             CreateAndAddFrame(chain, textureName, region);
         }
 
+        /// <inheritdoc/>
+        public void AddFrameFromPixelBounds(
+            IReadOnlyList<AnimationChainSave> chains,
+            string textureName,
+            int minX, int minY, int maxX, int maxY)
+        {
+            if (IsTextureBlocked(textureName)) return;
+            var region = new FrameRegion(minX, minY, maxX, maxY);
+            var commands = chains
+                .Where(c => !IsChainLocked(c) && Tiled.TsxFrameSize.Refusal(_pm, c, [region]) is null)
+                .Select(c => (IUndoableCommand)new AddFrameCommand(
+                    NewFrame(textureName, region), c, this, _events, _selectedState, select: false))
+                .ToArray();
+            if (commands.Length == 0) return;
+            _undoManager.Execute(commands.Length == 1
+                ? commands[0]
+                : new CompositeCommand(commands, $"Add Frame to {commands.Length} Animations", _events));
+        }
+
         // ── Texture assignment (WF10b — write direction) ─────────────────────────
 
         /// <summary>
@@ -2475,15 +2499,16 @@ namespace AnimationEditor.Core.CommandsAndState
                         // Order matters: SetX/SetY preserve each frame's own current width/height, so
                         // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
                         // (possibly just-moved) Left/Top.
-                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value.Apply(FrameDisplayValues.GetPixelX(f)));
-                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value.Apply(FrameDisplayValues.GetPixelY(f)));
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f)));
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f)));
+                        if (pixelX is { } ex && ex.TryApply(FrameDisplayValues.GetPixelX(f), out int x)) PixelFrameEditor.SetX(f, x);
+                        if (pixelY is { } ey && ey.TryApply(FrameDisplayValues.GetPixelY(f), out int y)) PixelFrameEditor.SetY(f, y);
+                        SetSize(f);
                     }
-                    foreach (var f in siblings)
+                    foreach (var f in siblings) SetSize(f);
+
+                    void SetSize(AnimationFrameSave f)
                     {
-                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value.Apply(FrameDisplayValues.GetPixelWidth(f)));
-                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value.Apply(FrameDisplayValues.GetPixelHeight(f)));
+                        if (pixelW is { } ew && ew.TryApply(FrameDisplayValues.GetPixelWidth(f), out int w)) PixelFrameEditor.SetWidth(f, w);
+                        if (pixelH is { } eh && eh.TryApply(FrameDisplayValues.GetPixelHeight(f), out int h)) PixelFrameEditor.SetHeight(f, h);
                     }
                 },
                 this, _events, true, "Set Region", coalesceKind: "PixelRegion"));
