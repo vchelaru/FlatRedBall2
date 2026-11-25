@@ -25,6 +25,7 @@ public class ConvertSequenceSourceScenarioTests
         track.Chains.Add(new SequenceChainReferenceSave { Source = "hero.achx", Chain = "Gone", Start = 2 }); // already broken, so a delete does not count it
         string seqj = Path.Combine(editor.ProjectFolder, "Sprites", "attack.seqj");
         new SequenceListSave { Sources = { "hero.achx", "enemy.achx" }, Sequences = { new SequenceSave { Name = "Attack", Tracks = { track } } } }.Save(seqj);
+        editor.WriteAchx("other.achx", AnimationEditorHarness.Chain("Other", "sheet.png", (0, 0, 16, 16)));
         await editor.OpenProjectFolderAsync();
         editor.Window.DeleteToRecycleBin = path => { File.Delete(path); return null; };
         return seqj;
@@ -76,7 +77,7 @@ public class ConvertSequenceSourceScenarioTests
         Pick(editor, row, item);
 
         string hero = Path.Combine(editor.ProjectFolder, "Sprites", "hero.achx");
-        (await editor.WaitUntilAsync(() => !File.Exists(hero), TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await editor.WaitUntilAsync(() => !File.Exists(hero) && !editor.Window.IsConverting, TimeSpan.FromSeconds(5))).ShouldBeTrue();
         editor.Wait(TimeSpan.FromMilliseconds(100));
         Sources(seqj).ShouldBe(sources.Split(' '));
         editor.ProblemText.ShouldBeNull();
@@ -110,7 +111,7 @@ public class ConvertSequenceSourceScenarioTests
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         string seqj = await OpenProjectAsync(editor);
-        string other = editor.WriteAchx("other.achx", AnimationEditorHarness.Chain("Other", "sheet.png", (0, 0, 16, 16)));
+        string other = Path.Combine(editor.ProjectFolder, "other.achx");
         await editor.OpenAsync(other);
         await editor.OpenAsync(seqj);
         editor.Control<Button>("AddSequenceButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
@@ -122,7 +123,7 @@ public class ConvertSequenceSourceScenarioTests
 
         Pick(editor, "Sprites", "Convert Animations to .achj");
         string hero = Path.Combine(editor.ProjectFolder, "Sprites", "hero.achx");
-        (await editor.WaitUntilAsync(() => !File.Exists(hero), TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await editor.WaitUntilAsync(() => !File.Exists(hero) && !editor.Window.IsConverting, TimeSpan.FromSeconds(5))).ShouldBeTrue();
         // Long enough for the live watcher to see its file replaced.
         await editor.WaitAsync(TimeSpan.FromMilliseconds(1200));
 
@@ -134,5 +135,77 @@ public class ConvertSequenceSourceScenarioTests
 
         SequenceListSave.FromFile(seqj).Sequences.Count.ShouldBe(1, "undo took the added sequence back");
         Sources(seqj).ShouldBe(["hero.achj", "enemy.achj", "hero.achj", "enemy.achj", "hero.achj"]);
+    }
+
+    // An outside edit that changes nothing the dialog shows is in the file that is converted, with live reload off too.
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Convert_ASequenceInFrontEditedOutsideUnderTheDialog_KeepsThatEdit(bool hotReload)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        string seqj = await OpenProjectAsync(editor);
+        await editor.OpenAsync(seqj);
+        if (!hotReload) editor.ClickMenu("MenuEnableHotReload");
+        editor.Dialogs.AnswerNextEditorDialog(_ =>
+        {
+            var save = SequenceListSave.FromFile(seqj);
+            save.Sequences.Add(new SequenceSave { Name = "Outside" });
+            save.Save(seqj);
+            return true;
+        });
+
+        Pick(editor, "Sprites", "Convert Animations to .achj");
+        (await editor.WaitUntilAsync(() => editor.Dialogs.Shown.Count > 0 && !editor.Window.IsConverting, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+
+        editor.ProblemText.ShouldBeNull();
+        var now = SequenceListSave.FromFile(seqj);
+        now.Sequences.Select(sequence => sequence.Name).ShouldBe(["Attack", "Outside"]);
+        now.Sources.ShouldBe(["hero.achj", "enemy.achj"]);
+    }
+
+    // What the user agreed to is not what would run any more.
+    [AvaloniaTheory]
+    [InlineData("Sprites/hero.achx", "Walk", "Run")]
+    [InlineData("Sprites/attack.seqj", "enemy.achx", "other.achx")]
+    public async Task Convert_FilesChangedUnderTheDialog_ConvertsNothing_AndShowsTheNewPlan(string file, string from, string to)
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await OpenProjectAsync(editor);
+        string path = Path.Combine(editor.ProjectFolder, file);
+        Dictionary<string, string> Files() => Directory.GetFiles(Path.Combine(editor.ProjectFolder, "Sprites")).ToDictionary(found => found, File.ReadAllText);
+        Dictionary<string, string> changed = [];
+        string said = "";
+        editor.Dialogs.AnswerNextEditorDialog(_ =>
+        {
+            File.WriteAllText(path, File.ReadAllText(path).Replace(from, to));
+            changed = Files();
+            return true;
+        });
+        editor.Dialogs.AnswerNextEditorDialog(content =>
+        {
+            said = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
+            return false;
+        });
+
+        Pick(editor, "Sprites", "Convert Animations to .achj");
+        (await editor.WaitUntilAsync(() => editor.Dialogs.Shown.Count > 0 && !editor.Window.IsConverting, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+
+        said.ShouldContain("The files are different now. This is the new plan.");
+        Files().ShouldBe(changed);
+    }
+
+    [AvaloniaFact]
+    public async Task Convert_PickedAgainWhileItIsPlanned_ShowsOneDialog()
+    {
+        using AnimationEditorHarness editor = new AnimationEditorHarness();
+        await OpenProjectAsync(editor);
+        editor.Dialogs.AnswerNextEditorDialog(_ => false);
+
+        var first = editor.Window.ConvertProjectFolderToAchjAsync("Sprites");
+        await editor.Window.ConvertProjectFolderToAchjAsync("Sprites");
+        (await editor.WaitUntilAsync(() => first.IsCompleted, TimeSpan.FromSeconds(10))).ShouldBeTrue();
+
+        editor.Dialogs.Shown.Count(text => text == "editor dialog: Convert to .achj").ShouldBe(1);
     }
 }

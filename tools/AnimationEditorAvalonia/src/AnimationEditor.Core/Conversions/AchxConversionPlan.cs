@@ -5,7 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Xml.Linq;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Conversions;
@@ -26,14 +29,18 @@ public sealed record OpenDocuments(
 public sealed record ConversionProblem(string Why, string Detail = "");
 
 /// <summary>
-/// One <c>.achx</c> of a plan. One that converts was converted in memory and read back, and every animation, frame, shape
-/// and event compared equal; one that did not is skipped.
+/// One <c>.achx</c> of a plan. One that converts holds only elements the AnimationEditor reads (<see cref="AchxElementCheck"/>),
+/// and what was read from it equals what is read back from its <c>.achj</c>, made in memory (<see cref="AnimationListComparison"/>).
+/// One that does not is left alone.
 /// </summary>
 /// <param name="Problem">Why the file is left alone, or null when it is converted.</param>
 /// <param name="IsOpen">Its tab closes.</param>
 /// <param name="SavesEdits">Its tab holds edits its file lacks, which are saved first.</param>
+/// <param name="HasComments">It holds XML comments, which no save keeps.</param>
+/// <param name="Content">Identifies the text of the file the plan was made from; empty when it was not looked at.</param>
 public sealed record PlannedFile(
-    string Source, string Target, ConversionProblem? Problem = null, int Animations = 0, int Frames = 0, bool IsOpen = false, bool SavesEdits = false)
+    string Source, string Target, ConversionProblem? Problem = null, int Animations = 0, int Frames = 0, bool IsOpen = false, bool SavesEdits = false,
+    bool HasComments = false, string Content = "")
 {
     public bool Converts => Problem is null;
 }
@@ -63,14 +70,24 @@ public sealed record AchxConversionPlan(
     public IEnumerable<PlannedSequence> Updated => Sequences.Where(sequence => sequence.Updates);
     public IEnumerable<PlannedSequence> NotUpdated => Sequences.Where(sequence => !sequence.Updates);
 
-    public static AchxConversionPlan Build(IEnumerable<string> sources, string searchedFolder, OpenDocuments open)
+    /// <summary>Whether running <paramref name="other"/> is what running this plan is.</summary>
+    public bool SameAs(AchxConversionPlan other) =>
+        SearchedFolder == other.SearchedFolder && Files.SequenceEqual(other.Files) && Sequences.Select(Key).SequenceEqual(other.Sequences.Select(Key));
+
+    private static (string, string, int, bool, ConversionProblem?) Key(PlannedSequence sequence) =>
+        (sequence.Path, string.Join('|', sequence.Plays.Order(StringComparer.Ordinal)), sequence.Blocks, sequence.IsOpen, sequence.Problem);
+
+    /// <param name="before">An earlier plan; a file that is as it was then is not checked again.</param>
+    public static AchxConversionPlan Build(IEnumerable<string> sources, string searchedFolder, OpenDocuments open, AchxConversionPlan? before = null)
     {
-        var files = sources.Select(source => PlanFile(source, open)).ToList();
+        var check = new AchxElementCheck();
+        var known = (before?.Files ?? []).ToDictionary(file => file.Source);
+        var files = sources.AsParallel().AsOrdered().Select(source => PlanFile(source, open, check, known.GetValueOrDefault(source))).ToList();
         return new AchxConversionPlan(searchedFolder, files,
             FindSequences(searchedFolder, files.Where(file => file.Converts).Select(file => file.Source), open));
     }
 
-    private static PlannedFile PlanFile(string source, OpenDocuments open)
+    private static PlannedFile PlanFile(string source, OpenDocuments open, AchxElementCheck check, PlannedFile? before)
     {
         string target = Path.ChangeExtension(source, TargetExtension);
         bool isOpen = open.Animations.TryGetValue(new FilePath(source), out var tab);
@@ -81,17 +98,27 @@ public sealed record AchxConversionPlan(
             return skipped with { Problem = new("Unsaved edits can't be saved", reason) };
         try
         {
-            var list = AnimationFileLoader.Read(new FilePath(source));
+            string text = File.ReadAllText(source);
+            string content = ContentOf(text);
+            if (before is not null && before.Content == content && before.IsOpen == isOpen && before.SavesEdits == tab.UnsavedEdits) return before;
+            skipped = skipped with { Content = content };
+
+            var list = AnimationFileLoader.Parse(text, new FilePath(source));
+            var document = XDocument.Parse(text);
+            if (check.FirstUnread(document, list) is { } unread)
+                return skipped with { Problem = new($"{unread} would be lost", $"The AnimationEditor does not read {unread}, so the .achj would not hold it.") };
             if (AnimationListComparison.FirstDifference(list, AnimationChainListSave.FromJsonString(list.ToJsonString())) is { } difference)
                 return skipped with { Problem = new($"Not exact: {difference}", "The .achj would not hold the same data there.") };
             return new PlannedFile(source, target, null, list.AnimationChains.Count,
-                list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits);
+                list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits, document.DescendantNodes().OfType<XComment>().Any(), content);
         }
         catch (Exception ex)
         {
             return skipped with { Problem = new("Can't be read", ex.Message) };
         }
     }
+
+    internal static string ContentOf(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
     /// <summary>
     /// The <c>.seqj</c> files under <paramref name="folder"/>, not under <c>bin</c> or <c>obj</c>, that use one of

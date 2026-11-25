@@ -39,6 +39,9 @@ public sealed class EditorDialog<T>
     public Action Confirm { get; set; } = () => { };
     public Action Cancel { get; set; } = () => { };
 
+    /// <summary>While set, the dialog's window does not close.</summary>
+    public bool IsBusy { get; set; }
+
     internal event Action? CloseRequested;
     internal Task<T> Result => _completion.Task;
 
@@ -77,6 +80,7 @@ public sealed class WindowEditorDialogHost(Window owner) : IEditorDialogHost
             window.MaxHeight = Math.Min(maxHeight, owner.ClientSize.Height);
 
         dialog.CloseRequested += window.Close;
+        window.Closing += (_, e) => e.Cancel |= dialog.IsBusy;
         window.Closed += (_, _) => dialog.CloseWithoutResult();
         DialogKeyboard.Wire(window, options.EnterConfirms ? dialog.Confirm : () => { }, dialog.Cancel);
 

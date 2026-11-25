@@ -10,7 +10,8 @@ A conversion changes a file the user already has into another form. The rule: **
 
 How Convert to .achj follows the rule (`AnimationEditor.Core/Conversions`):
 
-- `AchxConversionPlan.Build` writes nothing. It converts each file in memory, reads it back and compares every field the `.achx` format holds (`AnimationListComparison`). A file that differs is left alone and listed.
-- `AchxConversion.Run` runs that plan: write and compare each `.achj`, then the sequences, then recycle. An `.achx` that a sequence still needs is kept.
-- What is on disk afterwards is compared with the plan. A difference is a problem banner.
+- `AchxConversionPlan.Build` writes nothing. It checks two things for each file. Every element in its text must be one that is read: an element no value of which makes a difference to what is read is not (`AchxElementCheck`). And what was read from it must equal what is read back from its `.achj`, made in memory, as the `.achx` writer writes both, with an empty text in either of its XML forms being the same (`AnimationListComparison`). A file that fails one is left alone and listed. Comments are not kept, and the row says so.
+- Right before anything is written, every open document catches up with disk and the plan is made again, including the content of each `.achx`. A different plan is shown instead of run.
+- `AchxConversion.Run` runs that plan: write and compare each `.achj`, then the sequences, then recycle. Right before that the folder is searched again, and an `.achx` something still plays is kept. The work is off the UI thread, and the dialog stays open and says what is being done.
+- A recycled file must really be gone. What is on disk afterwards is compared with the plan. A difference is a problem banner.
 - An open `.seqj` goes through its document. The conversion is not an undo entry, because undo would name a file that is gone. Earlier entries are rewritten when restored, as Save As does with folders.

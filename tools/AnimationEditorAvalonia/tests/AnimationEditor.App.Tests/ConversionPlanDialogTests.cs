@@ -22,11 +22,13 @@ public class ConversionPlanDialogTests
             .Concat(Enumerable.Range(1, skipped).Select(i => new PlannedFile($"/game/Bad{i}.achx", $"/game/Bad{i}.achj", new ConversionProblem("Can't be read", "Line 1.")))).ToList(),
         [new PlannedSequence("/game/attack.seqj", ["/game/Character001.achx"], 2)]);
 
-    private static (Window Owner, Window Dialog, Task<bool> Answer) Show(AchxConversionPlan plan, double ownerHeight = 700)
+    private static (Window Owner, Window Dialog, Task<string?> Answer) Show(
+        AchxConversionPlan plan, double ownerHeight = 700, Func<IProgress<string>, Task<string>>? convert = null)
     {
         var owner = new Window { Width = 900, Height = ownerHeight };
         owner.Show();
-        var answer = EditorDialogs.ShowConversionPlanAsync(new WindowEditorDialogHost(owner), plan);
+        var answer = EditorDialogs.ShowConversionPlanAsync(
+            new WindowEditorDialogHost(owner), plan, isNewPlan: false, convert ?? (_ => Task.FromResult("done")));
         var dialog = owner.OwnedWindows.Single();
         Settle(dialog);
         return (owner, dialog, answer);
@@ -67,7 +69,7 @@ public class ConversionPlanDialogTests
 
         Press(dialog, key);
 
-        (await answer).ShouldBe(converts);
+        (await answer).ShouldBe(converts ? "done" : null);
         owner.Close();
     }
 
@@ -84,7 +86,7 @@ public class ConversionPlanDialogTests
         Shows(dialog, "Line 1.").ShouldBeTrue();
         answer.IsCompleted.ShouldBeFalse();
         Press(dialog, Key.Escape);
-        (await answer).ShouldBeFalse();
+        (await answer).ShouldBeNull();
         owner.Close();
     }
 
@@ -95,7 +97,7 @@ public class ConversionPlanDialogTests
 
         Press(dialog, Key.Enter);
 
-        (await answer).ShouldBeFalse();
+        (await answer).ShouldBeNull();
         owner.Close();
     }
 
@@ -130,6 +132,43 @@ public class ConversionPlanDialogTests
 
         dialog.ClientSize.Height.ShouldBeLessThanOrEqualTo(400);
         Text(dialog, "Cancel").TranslatePoint(default, dialog)!.Value.Y.ShouldBeInRange(0, 400);
+        owner.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task WhileItConverts_TheDialogStays_AndSaysWhatItIsDoing()
+    {
+        var work = new TaskCompletionSource<string>();
+        IProgress<string>? progress = null;
+        int runs = 0;
+        var (owner, dialog, answer) = Show(Plan(3), convert: report => { runs++; progress = report; return work.Task; });
+
+        Press(dialog, Key.Enter);
+        progress!.Report("Converting 2 of 3");
+        Settle(dialog);
+        Shows(dialog, "Converting 2 of 3").ShouldBeTrue();
+        Press(dialog, Key.Escape);
+        Press(dialog, Key.Enter);
+        dialog.Close();
+        Settle(dialog);
+        (answer.IsCompleted, dialog.IsVisible, runs).ShouldBe((false, true, 1));
+
+        work.SetResult("done");
+        Settle(dialog);
+        (await answer).ShouldBe("done");
+        dialog.IsVisible.ShouldBeFalse();
+        owner.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task WhenItThrows_TheDialogCloses_AndTheErrorIsTheCallers()
+    {
+        var (owner, dialog, answer) = Show(Plan(3), convert: _ => throw new InvalidOperationException("no"));
+
+        Press(dialog, Key.Enter);
+
+        dialog.IsVisible.ShouldBeFalse();
+        (await Should.ThrowAsync<InvalidOperationException>(answer)).Message.ShouldBe("no");
         owner.Close();
     }
 }

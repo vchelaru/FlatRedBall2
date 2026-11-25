@@ -84,7 +84,8 @@ public sealed class AchxConversionTests : IDisposable
         var plan = AchxConversionPlan.Build([hero, taken, At("Sprites/broken.achx"), stale], _dir.Path, open);
 
         Contents().ShouldBe(before);
-        plan.Converted.Single().ShouldBe(new PlannedFile(hero, At("Sprites/hero.achj"), null, Animations: 1, Frames: 1, IsOpen: true, SavesEdits: true));
+        plan.Converted.Single().ShouldBe(new PlannedFile(hero, At("Sprites/hero.achj"), null, Animations: 1, Frames: 1, IsOpen: true, SavesEdits: true,
+            Content: AchxConversionPlan.ContentOf(File.ReadAllText(hero))));
         plan.Skipped.Select(file => (file.Source, file.Problem!.Why)).ShouldBe(
             [(taken, "taken.achj exists"), (At("Sprites/broken.achx"), "Can't be read"), (stale, "Unsaved edits can't be saved")]);
         plan.Files[2].Problem!.Detail.ShouldNotBeEmpty();
@@ -138,7 +139,7 @@ public sealed class AchxConversionTests : IDisposable
         File.Exists(hero).ShouldBeTrue();
         File.ReadAllText(attack).ShouldBe(before);
         outcome.Converted.ShouldBe([boss]);
-        outcome.Differences.ShouldBe(["attack.seqj: not updated (in use), so hero.achx stays for it, beside the new .achj"]);
+        outcome.Differences.ShouldBe(["attack.seqj: not updated (in use). hero.achx is kept beside the .achj. To finish, delete the .achj and convert again"]);
         Directory.GetFiles(_dir.Path, "*.tmp").ShouldBeEmpty();
     }
 
@@ -163,23 +164,28 @@ public sealed class AchxConversionTests : IDisposable
         string taken = Achx("taken.achx");
         string refused = Achx("refused.achx");
         string unsaved = Achx("unsaved.achx");
-        var plan = AchxConversionPlan.Build([hero, taken, refused, unsaved], _dir.Path, OpenDocuments.None with
+        string lied = Achx("lied.achx");
+        string edited = Achx("edited.achx");
+        var plan = AchxConversionPlan.Build([hero, taken, refused, unsaved, lied, edited], _dir.Path, OpenDocuments.None with
         {
             Animations = new Dictionary<FilePath, (bool, string?)> { [new FilePath(unsaved)] = (true, null) },
         });
         File.WriteAllText(At("taken.achj"), "another file");
-        Seqj("late.seqj", "hero.achx");
+        Seqj("late.seqj", "hero.achx", "refused.achx");
+        File.WriteAllText(edited, File.ReadAllText(edited).Replace("Walk", "Run"));
 
-        var outcome = AchxConversion.Run(plan, Steps(path => path == refused ? "no bin" : Recycle(path), _ => "disk full"));
+        var outcome = AchxConversion.Run(plan, Steps(path => path == lied ? null : Recycle(path), _ => "disk full"));
 
         outcome.Differences.ShouldBe(
         [
             "taken.achx: not converted, taken.achj already exists",
             "unsaved.achx: not converted, its unsaved edits could not be saved (disk full)",
-            "refused.achx: converted, but the original could not be recycled (no bin)",
-            "late.seqj: still plays hero.achx, which was converted",
+            "edited.achx: not converted, it is not the file the plan is for any more",
+            "late.seqj: plays hero.achx and refused.achx since the plan. hero.achx and refused.achx are kept beside the .achj. To finish, delete the .achj and convert again",
+            "lied.achx: converted, but the original could not be recycled (it is still there)",
         ]);
-        outcome.Message(plan).ShouldStartWith("⚠ Converted 1, 4 problems: taken.achx: ");
+        outcome.Message(plan).ShouldStartWith("⚠ Converted 0, 5 problems: taken.achx: ");
+        (File.Exists(hero), File.Exists(refused)).ShouldBe((true, true));
         File.ReadAllText(At("taken.achj")).ShouldBe("another file");
     }
 
@@ -289,7 +295,10 @@ public sealed class AchxConversionTests : IDisposable
                 <Name>Walk</Name>
                 <Frame>
                   <TextureName>a.png</TextureName>
+                  <FlipHorizontal>true</FlipHorizontal>
+                  <FlipVertical>false</FlipVertical>
                   <FrameLength>100.5</FrameLength>
+                  <RelativeX>0</RelativeX>
                   <LeftCoordinate>0.333333343</LeftCoordinate>
                   <RightCoordinate>1</RightCoordinate>
                   <TopCoordinate>0</TopCoordinate>
@@ -309,6 +318,98 @@ public sealed class AchxConversionTests : IDisposable
             """);
 
         Plan(At("old.achx")).Files.Single().Problem.ShouldBeNull();
+    }
+
+    // Cubes and spheres have no place in an .achj.
+    [Theory]
+    [InlineData("<Custom>5</Custom>", "", "<Custom> would be lost")]
+    [InlineData("", "<Custom><Part>5</Part></Custom>", "<Custom> would be lost")]
+    [InlineData("", "<ShapeCollectionSave><CircleSaves><CircleSave><Radius>2</Radius><Custom>5</Custom></CircleSave></CircleSaves></ShapeCollectionSave>", "<Custom> would be lost")]
+    [InlineData("", "<Tagged by=\"me\" />", "<Tagged> would be lost")]
+    [InlineData("", "<RelativeX by=\"me\">4</RelativeX>", "the attribute by would be lost")]
+    [InlineData("", "<ShapeCollectionSave><SphereSaves><SphereSave><Radius>2</Radius></SphereSave></SphereSaves></ShapeCollectionSave>", "Not exact: animation 'Walk', frame 1")]
+    [InlineData("", "<ShapeCollectionSave><AxisAlignedCubeSaves><AxisAlignedCubeSave><X>1</X></AxisAlignedCubeSave></AxisAlignedCubeSaves></ShapeCollectionSave>", "Not exact: animation 'Walk', frame 1")]
+    [InlineData("<ProjectFile></ProjectFile><Custom />", "<FlipVertical>false</FlipVertical><RelativeY>0</RelativeY><Events />", null)]
+    public void Build_AnElementThatIsNotRead_IsLeftAlone(string inList, string inFrame, string? problem)
+    {
+        File.WriteAllText(At("a.achx"), $"<AnimationChainArraySave>{inList}<AnimationChain><Name>Walk</Name><Frame><TextureName>a.png</TextureName>{inFrame}<FrameLength>1</FrameLength></Frame></AnimationChain></AnimationChainArraySave>");
+
+        Plan(At("a.achx")).Files.Single().Problem?.Why.ShouldBe(problem);
+        Plan(At("a.achx")).Files.Single().Converts.ShouldBe(problem is null);
+    }
+
+    [Fact]
+    public void Build_AFileWithComments_SaysTheyAreNotKept()
+    {
+        string hero = Achx("hero.achx");
+        File.WriteAllText(hero, File.ReadAllText(hero).Replace("<Name>", "<!-- note --><Name>"));
+
+        var view = ConversionPlanView.Of(Plan(hero));
+
+        view.Animations.Items.Single().Note.ShouldBe("comments are not kept");
+        view.Animations.GroupSummary.ShouldBe("1 animation · 1 frame · 1 loses comments");
+    }
+
+    [Fact]
+    public void SameAs_IsTrueUntilWhatWouldRunDiffers()
+    {
+        string hero = Achx("hero.achx");
+        string boss = Achx("boss.achx");
+        string attack = Seqj("attack.seqj", "hero.achx");
+        var plan = Plan(hero, boss);
+        bool Same() => AchxConversionPlan.Build([hero, boss], _dir.Path, OpenDocuments.None, plan).SameAs(plan);
+        void Changes(string path, string from, string to)
+        {
+            string text = File.ReadAllText(path);
+            File.WriteAllText(path, text.Replace(from, to));
+            Same().ShouldBeFalse($"{Path.GetFileName(path)}: {from} to {to}");
+            File.WriteAllText(path, text);
+        }
+
+        Same().ShouldBeTrue();
+        Changes(hero, "Walk", "Run");
+        Changes(hero, "<Name>Walk</Name>", "");
+        Changes(attack, "\"source\": \"hero.achx\"", "\"source\": \"gone.achx\"");
+        Changes(attack, "\"hero.achx\"\r\n  ]".Replace("\r\n", Environment.NewLine), "\"hero.achx\", \"boss.achx\"]");
+        Seqj("late.seqj", "boss.achx");
+        Same().ShouldBeFalse("a sequence appeared");
+        File.Delete(At("late.seqj"));
+        File.WriteAllText(At("boss.achj"), "{}");
+        Same().ShouldBeFalse("the .achj appeared");
+    }
+
+    [Fact]
+    public void Run_TheRecycleBinTakesNothingButSaysSo_LeavesTheSequenceAsItWas()
+    {
+        string hero = Achx("hero.achx");
+        string attack = Seqj("attack.seqj", "hero.achx");
+        string before = File.ReadAllText(attack);
+
+        var outcome = AchxConversion.Run(Plan(hero), Steps(_ => null));
+
+        File.ReadAllText(attack).ShouldBe(before);
+        File.Exists(hero).ShouldBeTrue();
+        outcome.Differences.Single().ShouldStartWith("attack.seqj: not updated (it is still there). hero.achx is kept");
+        Directory.GetFiles(_dir.Path, "*.tmp").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_TheUpdatedSequenceCannotTakeItsPlace_IsKept_AndTheMessageSaysWhereBothAre()
+    {
+        string hero = Achx("hero.achx");
+        string attack = Seqj("attack.seqj", "hero.achx");
+
+        var outcome = AchxConversion.Run(Plan(hero), Steps(path =>
+        {
+            Recycle(path);
+            if (path == attack) Directory.CreateDirectory(path);
+            return null;
+        }));
+
+        string updated = Directory.GetFiles(_dir.Path, "attack.seqj.*.tmp").Single();
+        SequenceListSave.FromFile(updated).Sources.ShouldBe(["hero.achj"]);
+        outcome.Differences.Single().ShouldContain($"The original is in the Recycle Bin and the updated one is {Path.GetFileName(updated)}");
+        File.Exists(hero).ShouldBeTrue();
     }
 
     [Fact]

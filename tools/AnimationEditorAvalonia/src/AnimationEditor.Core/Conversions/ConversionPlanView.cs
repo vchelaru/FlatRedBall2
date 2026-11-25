@@ -52,7 +52,7 @@ public sealed record ConversionPlanView(
             plan.Skipped.Select(file => Issue(ConversionMark.LeftAlone, file.Source, file.Problem!.Why, file.Problem.Detail)).ToList(),
             $"{converted.Count} {Plural.Noun(converted.Count, "becomes", "become")} .achj", AnimationsSummary(converted),
             converted.Select(file => new ConversionItem(Folder(file.Source), Path.GetFileName(file.Source), Path.GetFileName(file.Target),
-                Join(", ", file.SavesEdits ? "saves edits" : "", file.IsOpen ? "tab closes" : ""),
+                Join(", ", file.SavesEdits ? "saves edits" : "", file.IsOpen ? "tab closes" : "", file.HasComments ? "comments are not kept" : ""),
                 Plural.Format(file.Animations, "animation"), Plural.Format(file.Frames, "frame"))).ToList());
         if (converted.Count == 0) return new ConversionPlanView(animations, null, []);
 
@@ -92,10 +92,12 @@ public sealed record ConversionPlanView(
 
     private static string AnimationsSummary(IReadOnlyCollection<PlannedFile> files)
     {
-        int tabs = files.Count(file => file.IsOpen), saves = files.Count(file => file.SavesEdits);
-        return Join(" · ", Amount(files.Sum(file => file.Animations), "animation"), Amount(files.Sum(file => file.Frames), "frame"),
+        int tabs = files.Count(file => file.IsOpen), saves = files.Count(file => file.SavesEdits), comments = files.Count(file => file.HasComments);
+        bool isLong = new[] { tabs, saves, comments }.Count(count => count > 0) > 2;
+        return Join(" · ", isLong ? "" : Amount(files.Sum(file => file.Animations), "animation"), Amount(files.Sum(file => file.Frames), "frame"),
             tabs == 0 ? "" : $"{Plural.Format(tabs, "tab")} {Plural.Noun(tabs, "closes", "close")}",
-            saves == 0 ? "" : $"{saves} {Plural.Noun(saves, "saves", "save")} edits");
+            saves == 0 ? "" : $"{saves} {Plural.Noun(saves, "saves", "save")} edits",
+            comments == 0 ? "" : $"{comments} {Plural.Noun(comments, "loses", "lose")} comments");
     }
 
     private static string SequencesSummary(IReadOnlyCollection<PlannedSequence> sequences)

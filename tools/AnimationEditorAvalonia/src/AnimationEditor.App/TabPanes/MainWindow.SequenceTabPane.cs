@@ -442,16 +442,23 @@ public partial class MainWindow
         /// <summary>Every open document.</summary>
         public IEnumerable<SequenceDocument> Documents => _documents.Values;
 
-        /// <summary>
-        /// <see cref="SequenceDocument.ChangeSourceExtension"/> on the open document at <paramref name="path"/>, in front or
-        /// not, once it holds what its file does.
-        /// </summary>
+        /// <summary>Has every open document hold what its file does, live reload or not, except one with edits its file lacks.</summary>
+        public void CatchUpWithDisk()
+        {
+            foreach (var document in _documents.Values.Where(document => !document.HasUnsavedEdits).ToList())
+            {
+                if (document == _document) ReloadShownFromDisk(document);
+                else if (_window._tabManager.Tabs.FirstOrDefault(open => open.Path == document.Path) is { } tab) CatchUpWithDisk(tab, document);
+            }
+        }
+
+        /// <summary><see cref="SequenceDocument.ChangeSourceExtension"/> on the open document at <paramref name="path"/>, in front or not.</summary>
         public string? ChangeSourceExtension(string path, IReadOnlyCollection<string> files, string extension, Func<SequenceListSave, string, string?> write)
         {
-            var tab = _window._tabManager.Tabs.First(open => open.Path == new FilePath(path));
-            var document = _documents[tab.Path];
-            if (document != _document) CatchUpWithDisk(tab, document); // the live watcher keeps the one in front up to date
-            return document.ChangeSourceExtension(files, extension, write);
+            var document = _documents[new FilePath(path)];
+            return document.HasChangedOnDisk
+                ? "it is not the file the plan is for any more"
+                : document.ChangeSourceExtension(files, extension, write);
         }
 
         /// <summary>The open documents holding edits their files lack.</summary>

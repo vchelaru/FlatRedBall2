@@ -1395,6 +1395,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return null;
     }
 
+    /// <summary>Whether the file holds something other than what this document last read or wrote.</summary>
+    public bool HasChangedOnDisk => _diskState.HasChanged(Path);
+
     // Each conversion of sources: the files it converted and their new extension. A snapshot remembers how many it has.
     private readonly List<(IReadOnlyCollection<string> Files, string Extension)> _conversions = new();
 

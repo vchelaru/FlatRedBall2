@@ -10,6 +10,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using FlatRedBall2.AnimationEditorCommon;
+using System.Runtime.ExceptionServices;
 
 namespace AnimationEditor.Views.Dialogs;
 
@@ -119,18 +120,40 @@ public static class EditorDialogs
         };
 
     /// <summary>
-    /// Shows everything <paramref name="plan"/> will do. True for Convert. A plan that converts nothing only says why, with
-    /// Close in place of Convert and Cancel. Enter presses the focused button and never converts from elsewhere.
+    /// Shows everything <paramref name="plan"/> will do, below a line saying the files changed when <paramref name="isNewPlan"/>.
+    /// Convert runs <paramref name="convert"/>, which reports what it is doing, while the dialog stays open and cannot be closed.
+    /// Returns its result, or null for Cancel. A plan that converts nothing only says why, with Close in place of Convert and
+    /// Cancel. Enter presses the focused button and never converts from elsewhere.
     /// </summary>
-    public static Task<bool> ShowConversionPlanAsync(IEditorDialogHost host, AchxConversionPlan plan)
+    public static async Task<T?> ShowConversionPlanAsync<T>(
+        IEditorDialogHost host, AchxConversionPlan plan, bool isNewPlan, Func<IProgress<string>, Task<T>> convert) where T : class
     {
         var view = ConversionPlanView.Of(plan);
-        EditorDialog<bool>? dialog = null;
-        dialog = new EditorDialog<bool>(ConversionPlanDialog.Options,
-            ConversionPlanDialog.Build(view, () => dialog!.Confirm(), () => dialog!.Cancel()), cancelResult: false);
-        dialog.Confirm = () => dialog.Complete(view.CanConvert);
-        dialog.Cancel = () => dialog.Complete(false);
-        return host.ShowAsync(dialog);
+        ExceptionDispatchInfo? failure = null;
+        EditorDialog<T?>? dialog = null;
+        var content = new ConversionPlanDialog(view, isNewPlan, () => dialog!.Confirm(), () => dialog!.Cancel());
+        dialog = new EditorDialog<T?>(ConversionPlanDialog.Options, content.Root, cancelResult: null);
+        dialog.Cancel = () =>
+        {
+            if (!dialog.IsBusy) dialog.Complete(null);
+        };
+        dialog.Confirm = async () =>
+        {
+            if (dialog.IsBusy) return;
+            T? result = null;
+            if (view.CanConvert)
+            {
+                dialog.IsBusy = true;
+                content.ShowProgress("Checking the files");
+                try { result = await convert(new Progress<string>(content.ShowProgress)); }
+                catch (Exception ex) { failure = ExceptionDispatchInfo.Capture(ex); }
+                dialog.IsBusy = false;
+            }
+            dialog.Complete(result);
+        };
+        var answer = await host.ShowAsync(dialog);
+        failure?.Throw();
+        return answer;
     }
 
     public static Task<string?> PromptStringAsync(

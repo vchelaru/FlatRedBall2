@@ -13,12 +13,15 @@ using SvgIcon = Avalonia.Svg.Skia.Svg;
 namespace AnimationEditor.Views.Dialogs;
 
 /// <summary>The Convert dialog's content: a card per kind of file in one scroll area, then the facts and the buttons, which stay put.</summary>
-internal static class ConversionPlanDialog
+internal sealed class ConversionPlanDialog
 {
     private const double Width = 760;
     private const double Gutter = 16;
     private const double LeftWidth = 168;
     private const double RowHeight = 24;
+
+    /// <summary>The longest note that leaves room for the file beside it. A longer one goes below.</summary>
+    private const int LongestInlineNote = 24;
 
     private const string Minus = "M8 12h8";
     private const string Cross = "M9 9l6 6m0-6-6 6";
@@ -31,7 +34,23 @@ internal static class ConversionPlanDialog
     public static EditorDialogOptions Options =>
         new("Convert to .achj", Width, SizeToContentHeight: true) { MaxHeight = 712, EnterConfirms = false };
 
-    public static Control Build(ConversionPlanView view, Action convert, Action cancel)
+    private readonly StackPanel _buttons = new() { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
+    private readonly TextBlock _progress = Text("", 12, "InkMid");
+    private readonly DockPanel _progressRow;
+
+    /// <summary>The dialog's content.</summary>
+    public Control Root { get; }
+
+    /// <summary>Says what is being done, in place of taking any input.</summary>
+    public void ShowProgress(string text)
+    {
+        _progress.Text = text;
+        _progressRow.IsVisible = true;
+        _buttons.IsEnabled = false;
+    }
+
+    /// <param name="isNewPlan">The files changed since the plan shown before.</param>
+    public ConversionPlanDialog(ConversionPlanView view, bool isNewPlan, Action convert, Action cancel)
     {
         var cards = new StackPanel { Spacing = 14, Width = Width - 2 * Gutter, HorizontalAlignment = HorizontalAlignment.Left };
         // The scroll bar is in the margin, so the cards are as wide with it as without.
@@ -39,19 +58,29 @@ internal static class ConversionPlanDialog
         cards.Children.Add(BuildCard(view.Animations, "IconChain", scroller));
         if (view.Sequences is { } sequences) cards.Children.Add(BuildCard(sequences, "IconSequence", scroller));
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         if (view.CanConvert)
         {
             var confirm = DialogButton("Convert", convert);
             confirm.Classes.Add("primary");
-            buttons.Children.Add(confirm);
+            _buttons.Children.Add(confirm);
         }
-        buttons.Children.Add(DialogButton(view.CanConvert ? "Cancel" : "Close", cancel));
+        _buttons.Children.Add(DialogButton(view.CanConvert ? "Cancel" : "Close", cancel));
 
         // The buttons come first, so the dialog opens with Convert focused.
         var root = new DockPanel { Margin = new Thickness(Gutter) };
-        DockPanel.SetDock(buttons, Dock.Bottom);
-        root.Children.Add(buttons);
+        var bar = new ProgressBar { IsIndeterminate = true, Width = 120, MinWidth = 0, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        _progressRow = new DockPanel { IsVisible = false, Margin = new Thickness(Gutter, 0, 0, 0), Children = { bar, _progress } };
+        DockPanel.SetDock(_buttons, Dock.Right);
+        var bottom = new DockPanel { Children = { _buttons, _progressRow } };
+        DockPanel.SetDock(bottom, Dock.Bottom);
+        root.Children.Add(bottom);
+        if (isNewPlan)
+        {
+            var line = Text("The files are different now. This is the new plan.", 13, "AccentSoft");
+            line.Margin = new Thickness(0, 0, 0, 14);
+            DockPanel.SetDock(line, Dock.Top);
+            root.Children.Add(line);
+        }
         if (view.Facts.Count > 0)
         {
             var facts = BuildFacts(view.Facts);
@@ -69,7 +98,7 @@ internal static class ConversionPlanDialog
 
         var background = new Border { Child = root };
         Bind(background, Border.BackgroundProperty, "BgApp");
-        return background;
+        Root = background;
     }
 
     private static Button DialogButton(string label, Action click)
@@ -191,10 +220,24 @@ internal static class ConversionPlanDialog
 
     private static Control BuildItem(ConversionItem item)
     {
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,78,60"), ColumnSpacing = 8, Height = RowHeight, Margin = new Thickness(37, 0, 33, 0) };
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,78,60"), RowDefinitions = new RowDefinitions($"{RowHeight},Auto"),
+            ColumnSpacing = 8, Margin = new Thickness(37, 0, 33, 0),
+        };
         grid.Children.Add(FilePath(item.Folder, item.Becomes.Length == 0 ? item.Name : $"{item.Name} → {Path.GetExtension(item.Becomes)}", "Ink", 12));
+        string note = item.Note;
+        if (note.Length > LongestInlineNote)
+        {
+            var below = Text(note, 12, "InkMid");
+            below.Margin = new Thickness(0, 0, 0, 5);
+            Grid.SetRow(below, 1);
+            Grid.SetColumnSpan(below, 4);
+            grid.Children.Add(below);
+            note = "";
+        }
         // A sequence has one amount, in the last column.
-        var amounts = item.Frames.Length == 0 ? new[] { item.Note, "", item.Amount } : new[] { item.Note, item.Amount, item.Frames };
+        var amounts = item.Frames.Length == 0 ? new[] { note, "", item.Amount } : new[] { note, item.Amount, item.Frames };
         for (int i = 0; i < amounts.Length; i++)
         {
             var text = Text(amounts[i], 12, "InkMid");

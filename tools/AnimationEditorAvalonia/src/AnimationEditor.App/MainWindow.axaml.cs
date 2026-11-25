@@ -2614,7 +2614,7 @@ public partial class MainWindow : Window
         var sourcePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (sourcePath is null) return;
 
-        await ConvertToAchjAsync(new[] { sourcePath });
+        await ConvertToAchjAsync(() => new[] { sourcePath });
     }
 
     /// <summary>
@@ -2626,48 +2626,88 @@ public partial class MainWindow : Window
         var folder = ResolveProjectFolderAbsolutePath(relativePath);
         if (folder is null) return;
 
-        var sources = AchxToAchjBatch.FindSources(folder);
-        if (sources.Count == 0)
+        if (AchxToAchjBatch.FindSources(folder).Count == 0)
         {
             ShowStatusMessage("No .achx files to convert in this folder.");
             return;
         }
 
-        await ConvertToAchjAsync(sources);
+        await ConvertToAchjAsync(() => AchxToAchjBatch.FindSources(folder));
     }
 
-    /// <summary>
-    /// Shows the plan (<see cref="AchxConversionPlan"/>) and, once the user agrees, runs it. The tab of a converted file is
-    /// closed, same reason as <see cref="DeleteProjectFileAsync"/>.
-    /// </summary>
-    private async Task ConvertToAchjAsync(IReadOnlyList<string> sources)
-    {
-        TabEntry? OpenTab(string source) => _tabManager.Tabs.FirstOrDefault(open => open.Path == new FilePath(source));
+    /// <summary>A conversion is planned, shown or run.</summary>
+    internal bool IsConverting { get; private set; }
 
-        var folder = _projectManager.ProjectFolderPath!;
+    /// <summary>
+    /// Shows the plan (<see cref="AchxConversionPlan"/>) and, once the user agrees, makes it again from disk: the same one
+    /// runs, a different one is shown instead. The tab of a converted file is closed, same reason as
+    /// <see cref="DeleteProjectFileAsync"/>.
+    /// </summary>
+    private async Task ConvertToAchjAsync(Func<IReadOnlyList<string>> findSources)
+    {
+        if (IsConverting) return; // picked again while it is planned
+        IsConverting = true;
+        try
+        {
+            var folder = _projectManager.ProjectFolderPath!;
+            var plan = await PlanConversionAsync(findSources(), folder, null);
+            for (bool isNewPlan = false; ; isNewPlan = true)
+            {
+                var run = await EditorDialogs.ShowConversionPlanAsync(_dialogHost, plan, isNewPlan, async progress =>
+                {
+                    _sequencePane.CatchUpWithDisk();
+                    var now = await PlanConversionAsync(findSources(), folder, plan);
+                    return (Plan: now, Outcome: now.SameAs(plan) ? await RunConversionAsync(now, progress) : null).ToTuple();
+                });
+                if (run is null) return;
+                plan = run.Item1;
+                if (run.Item2 is not { } outcome) continue;
+
+                if (outcome.Differences.Count > 0)
+                    // Posted because a failed save's own banner is, and would replace this one.
+                    await Dispatcher.UIThread.InvokeAsync(() => ShowProblem(outcome.Message(plan)));
+                else
+                {
+                    if (plan.Converted.Any(file => file.SavesEdits)) Notifications.HideProblem(AutoSaveFailedPrefix);
+                    ShowStatusMessage(outcome.Message(plan));
+                }
+                return;
+            }
+        }
+        finally
+        {
+            IsConverting = false;
+        }
+    }
+
+    private Task<AchxConversionPlan> PlanConversionAsync(IReadOnlyList<string> sources, string folder, AchxConversionPlan? before)
+    {
         var openDocuments = new OpenDocuments(
-            sources.Select(OpenTab).OfType<TabEntry>().ToDictionary(tab => tab.Path, tab => _achxPane.UnsavedEdits(tab)),
+            sources.Select(OpenTabOf).OfType<TabEntry>().ToDictionary(tab => tab.Path, tab => _achxPane.UnsavedEdits(tab)),
             _sequencePane.Documents.ToDictionary(document => document.Path,
                 document => document.HasUnsavedEdits ? SequenceListSave.FromJsonString(document.Save.ToJsonString()) : null));
-        var plan = await Task.Run(() => AchxConversionPlan.Build(sources, folder, openDocuments));
-        if (!await EditorDialogs.ShowConversionPlanAsync(_dialogHost, plan)) return;
+        return Task.Run(() => AchxConversionPlan.Build(sources, folder, openDocuments, before));
+    }
 
-        var outcome = AchxConversion.Run(plan, new ConversionSteps(
-            source => SaveFailedEditsOf(source).Error,
+    private TabEntry? OpenTabOf(string path) => _tabManager.Tabs.FirstOrDefault(open => open.Path == new FilePath(path));
+
+    /// <summary>Runs <paramref name="plan"/> off the UI thread, and on it only what needs an open document.</summary>
+    private Task<ConversionOutcome> RunConversionAsync(AchxConversionPlan plan, IProgress<string> progress)
+    {
+        var steps = new ConversionSteps(
+            source => Dispatcher.UIThread.Invoke(() => SaveFailedEditsOf(source).Error),
             DeleteToRecycleBin,
-            (path, files) => _sequencePane.ChangeSourceExtension(path, files, AchxConversionPlan.TargetExtension,
-                (save, target) => AchxConversion.ReplaceRecyclingOriginal(save, target, DeleteToRecycleBin))));
-        foreach (var source in outcome.Converted)
-            if (OpenTab(source) is { } openTab) await CloseTabCoreAsync(openTab);
-
-        if (outcome.Differences.Count > 0)
-            // Posted because a failed save's own banner is, and would replace this one.
-            await Dispatcher.UIThread.InvokeAsync(() => ShowProblem(outcome.Message(plan)));
-        else
+            (path, files) => Dispatcher.UIThread.Invoke(() => _sequencePane.ChangeSourceExtension(path, files, AchxConversionPlan.TargetExtension,
+                (save, target) => AchxConversion.ReplaceRecyclingOriginal(save, target, DeleteToRecycleBin))))
         {
-            if (plan.Converted.Any(file => file.SavesEdits)) Notifications.HideProblem(AutoSaveFailedPrefix);
-            ShowStatusMessage(outcome.Message(plan));
-        }
+            // Closed at once, so nothing tells the user that the open file is gone.
+            Recycled = source => Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (OpenTabOf(source) is { } openTab) await CloseTabCoreAsync(openTab);
+            }).GetAwaiter().GetResult(),
+            Progress = progress.Report,
+        };
+        return Task.Run(() => AchxConversion.Run(plan, steps));
     }
 
     /// <summary>

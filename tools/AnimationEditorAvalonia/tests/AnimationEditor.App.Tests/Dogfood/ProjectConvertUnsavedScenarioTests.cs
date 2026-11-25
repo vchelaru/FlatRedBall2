@@ -58,6 +58,7 @@ public class ProjectConvertUnsavedScenarioTests
             return confirm;
         });
         editor.PickMenuItem(panel.ProjectTree.ContextMenu!, item);
+        editor.WaitUntil(() => editor.Dialogs.Shown.Count > 0 && !editor.Window.IsConverting, TimeSpan.FromSeconds(10)).ShouldBeTrue();
         editor.Wait(TimeSpan.FromMilliseconds(100));
     }
 

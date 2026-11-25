@@ -38,7 +38,11 @@ public class ProjectFileConvertTests
     {
         public bool Convert { get; init; } = true;
 
-        public Task<T> ShowAsync<T>(EditorDialog<T> dialog) => Task.FromResult((T)(object)Convert);
+        public Task<T> ShowAsync<T>(EditorDialog<T> dialog)
+        {
+            (Convert ? dialog.Confirm : dialog.Cancel)();
+            return dialog.Result;
+        }
     }
 
     private static TabManager GetTabManager(MainWindow window) =>
@@ -66,7 +70,7 @@ public class ProjectFileConvertTests
         {
             await ctx.OpenProjectFolderAsync(window, dir);
             var recycled = new List<string>();
-            window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
+            window.DeleteToRecycleBin = path => { recycled.Add(path); File.Delete(path); return null; };
 
             await window.ConvertProjectFileToAchjAsync("hero.achx");
 
@@ -89,7 +93,7 @@ public class ProjectFileConvertTests
         {
             await ctx.OpenProjectFolderAsync(window, dir);
             var recycled = new List<string>();
-            window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
+            window.DeleteToRecycleBin = path => { recycled.Add(path); File.Delete(path); return null; };
 
             await window.ConvertProjectFileToAchjAsync("hero.achx");
 
@@ -115,7 +119,7 @@ public class ProjectFileConvertTests
         {
             await ctx.OpenProjectFolderAsync(window, dir);
             var recycled = new List<string>();
-            window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
+            window.DeleteToRecycleBin = path => { recycled.Add(path); File.Delete(path); return null; };
 
             await window.ConvertProjectFileToAchjAsync("hero.achx");
 
@@ -140,7 +144,7 @@ public class ProjectFileConvertTests
         {
             await ctx.OpenProjectFolderAsync(window, dir);
             await window.OpenFileAsTab(achx);
-            window.DeleteToRecycleBin = _ => null;
+            window.DeleteToRecycleBin = path => { File.Delete(path); return null; };
 
             await window.ConvertProjectFileToAchjAsync("hero.achx");
 
@@ -197,7 +201,7 @@ public class ProjectFileConvertTests
         {
             await ctx.OpenProjectFolderAsync(window, dir);
             var recycled = new List<string>();
-            window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
+            window.DeleteToRecycleBin = path => { recycled.Add(path); File.Delete(path); return null; };
 
             await window.ConvertProjectFolderToAchjAsync("Sprites");
 

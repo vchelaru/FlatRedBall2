@@ -42,10 +42,12 @@ To convert one file, right-click an `.achx` file in the **Animations** tab and s
 
 Conversion changes only the file format. Before anything is written, a dialog shows what the conversion does:
 
-* **Animations** lists the files that become `.achj`, and the files that are left alone with the reason. A file is left alone if an `.achj` with the same name exists, if it can't be read, if its tab has unsaved edits that can't be saved, or if the `.achj` would not hold exactly the same data.
+* **Animations** lists the files that become `.achj`, and the files that are left alone with the reason. A file is left alone if an `.achj` with the same name exists, if it can't be read, if its tab has unsaved edits that can't be saved, if it holds XML elements that the AnimationEditor does not read, or if the data read back from the `.achj` is not the same.
 * **Sequences** lists the `.seqj` files that play a converted file. The conversion points them at the `.achj`, so they keep playing. A `.seqj` that can't be updated, for example because it is read-only, is listed as one that stops playing.
 
-Click a row with an arrow to see its details. Click **Convert** to run what the dialog shows, or **Cancel** to leave every file as it is. If the result differs from what the dialog shows, the AnimationEditor tells you what is different.
+XML comments are not kept, as with any save. The dialog marks the files that have comments.
+
+Click a row with an arrow to see its details. Click **Convert** to run what the dialog shows, or **Cancel** to leave every file as it is. If files change while the dialog is open, **Convert** converts nothing and shows the new plan instead. If the result differs from what the dialog shows, the AnimationEditor tells you what is different.
 
 The AnimationEditor searches the project folder for sequences. Sequences in other folders, and game code that loads an `.achx` by name, are not changed.
 
