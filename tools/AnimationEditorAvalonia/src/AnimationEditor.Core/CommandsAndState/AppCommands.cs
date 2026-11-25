@@ -1486,7 +1486,8 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveFrames(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave sourceChain, AnimationChainSave targetChain, int insertIndex)
         {
-            if (frames.Count == 0 || IsChainLocked(sourceChain) || IsChainLocked(targetChain) || IsMoveBlocked(targetChain, frames, insertIndex)) return;
+            if (frames.Count == 0 || IsChainLocked(sourceChain) || IsChainLocked(targetChain)) return;
+            if (IsMoveBlocked(targetChain, MoveFramesCommand.InOrder(frames, sourceChain), insertIndex)) return;
             _undoManager.Execute(new MoveFramesCommand(
                 frames, sourceChain, targetChain, insertIndex, this, _events, _selectedState));
         }

@@ -4067,7 +4067,7 @@ public partial class MainWindow : Window
             {
                 // A refused frame stays droppable so the drop can explain why.
                 e.DragEffects = DragDropEffects.Move;
-                if (TsxEdit.CheckFrameMove(_projectManager, target.Chain!, drag.Frames, target.InsertIndex) is null) ShowFrameDropIndicator(e);
+                if (TsxEdit.CheckFrameDrag(_projectManager, drag.SourceChain!, target.Chain!, drag.Frames, target.InsertIndex) is null) ShowFrameDropIndicator(e);
                 else RemoveFrameDropIndicators();
             }
             else
@@ -4142,7 +4142,7 @@ public partial class MainWindow : Window
             var target = ResolveFrameDrop(e, drag);
             if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
             {
-                if (TsxEdit.CheckFrameMove(_projectManager, target.Chain, drag.Frames, target.InsertIndex) is { } refused)
+                if (TsxEdit.CheckFrameDrag(_projectManager, drag.SourceChain, target.Chain, drag.Frames, target.InsertIndex) is { } refused)
                     ShowProblem($"⚠ {refused.Errors[0]}");
                 else
                     _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);

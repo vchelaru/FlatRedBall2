@@ -85,6 +85,20 @@ public class TsxMoveKeepsFramesTests : IDisposable
         Save().ShouldBe("5 6 9");
     }
 
+    /// <summary>A drag puts the frames down in their order in the animation, whatever order they were selected in.</summary>
+    [Fact]
+    public void FramesDraggedInSelectionOrder_AreRefusedByTheFirstOfTheirAnimation()
+    {
+        var target = Open();
+        _ctx.AppCommands.AddFrameFromPixelBounds(Chain("Blink"), "Heroes.png", 48, 16, 64, 32);
+        Save().ShouldBe("5 6 7 9");
+
+        Move("drag", [Chain("Blink").Frames[1], Chain("Blink").Frames[0]], Chain("Blink"), target);
+
+        target.Frames.ShouldBeEmpty();
+        Save().ShouldBe("5 6 7 9");
+    }
+
     /// <summary>The tile need not be the source's: Glow holds tile 9, which Blink's second frame shows here.</summary>
     [Theory, InlineData("cut"), InlineData("drag")]
     public void FrameShowingAThirdAnimationsTile_IsRefused(string how)

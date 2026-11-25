@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Tiled;
 using AnimationEditor.Core.Utilities;
 using FlatRedBall2.AnimationEditorCommon;
@@ -38,6 +39,11 @@ public static class TsxEdit
     public static EditResult? CheckFrameMove(
         IProjectManager projectManager, AnimationChainSave target, IReadOnlyList<AnimationFrameSave> frames, int insertIndex) =>
         TsxFrameMove.Refusal(projectManager, target, frames, insertIndex) is { } reason ? Fail(EditErrorCode.NotSupportedInTsx, reason) : null;
+
+    /// <summary>The same for a drag, which puts the frames down in their order in <paramref name="source"/>.</summary>
+    public static EditResult? CheckFrameDrag(
+        IProjectManager projectManager, AnimationChainSave source, AnimationChainSave target, IReadOnlyList<AnimationFrameSave> frames, int insertIndex) =>
+        CheckFrameMove(projectManager, target, MoveFramesCommand.InOrder(frames, source), insertIndex);
 
     /// <summary>
     /// Moves a native-.tsx chain's animation to <paramref name="tileId"/>. Fails with

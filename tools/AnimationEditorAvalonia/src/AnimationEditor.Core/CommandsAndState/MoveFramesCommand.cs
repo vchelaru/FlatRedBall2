@@ -36,7 +36,7 @@ internal sealed class MoveFramesCommand : IUndoableCommand
         IAppCommands commands,
         IApplicationEvents events,
         ISelectedState selectedState)
-        : this(frames.Where(sourceChain.Frames.Contains).OrderBy(f => sourceChain.Frames.IndexOf(f)).ToArray(),
+        : this(InOrder(frames, sourceChain),
             [sourceChain], targetChain, insertIndex,
             (frames.Count, ReferenceEquals(sourceChain, targetChain)) switch
             {
@@ -48,6 +48,10 @@ internal sealed class MoveFramesCommand : IUndoableCommand
             commands, events, selectedState)
     {
     }
+
+    /// <summary>The frames of <paramref name="chain"/> among <paramref name="frames"/>, in their order there.</summary>
+    public static AnimationFrameSave[] InOrder(IReadOnlyList<AnimationFrameSave> frames, AnimationChainSave chain) =>
+        frames.Where(chain.Frames.Contains).OrderBy(f => chain.Frames.IndexOf(f)).ToArray();
 
     /// <param name="frames">The block. A frame that is in none of the chains is added.</param>
     /// <param name="insertIndex">Where the block lands in the target chain, interpreted
