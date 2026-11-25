@@ -26,14 +26,15 @@ public static class TimelineCulling
     /// The whole cycles (0 = the first) of a block or clip that starts at <paramref name="start"/>, plays
     /// <paramref name="played"/> seconds and repeats every <paramref name="cycleLength"/>, that fall inside a view
     /// <paramref name="viewWidth"/> pixels wide: what a long block draws per cycle is bounded by the view, not by its length.
-    /// Cycles narrower than a pixel are thinned to about one per pixel. None when there is no cycle.
+    /// Cycles narrower than a pixel are thinned to one or two per pixel. None when there is no cycle.
     /// </summary>
     public static IEnumerable<int> VisibleCycles(TimelineViewport viewport, double start, double played, double cycleLength, double viewWidth)
     {
         if (cycleLength <= 0) yield break;
         double cyclePixels = cycleLength * viewport.PixelsPerSecond;
-        int step = Math.Max(1, (int)Math.Ceiling(1 / cyclePixels));
-        int first = (int)Math.Max(0, (viewport.ColumnWidth - viewport.XAt(start)) / cyclePixels);
+        int step = Math.Max(1, (int)(1 / cyclePixels));
+        // On a multiple of the step, so the same cycles are picked wherever the view is scrolled.
+        int first = (int)Math.Max(0, (viewport.ColumnWidth - viewport.XAt(start)) / cyclePixels) / step * step;
         for (int cycle = first; cycle * cycleLength < played - 1e-9 && viewport.XAt(start + cycle * cycleLength) <= viewWidth; cycle += step)
             yield return cycle;
     }

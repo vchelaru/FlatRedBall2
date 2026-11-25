@@ -16,13 +16,15 @@ public class PlayheadStepsTests
 
     private static readonly AnimationChainSave Walk = ChainOf("Walk", false, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f);
     private static readonly AnimationChainSave Run = ChainOf("Run", false, 0.1f, 0.1f);
+    private static readonly AnimationChainSave Slow = ChainOf("Slow", true, 0.7f, 0.7f);
+    private static readonly AnimationChainSave Short = ChainOf("Short", true, Enumerable.Repeat(0.1f, 10).ToArray());
     private static readonly AnimationChainSave Spin = ChainOf("Spin", true, 0.1f, 0.2f);
 
     private static SequenceChainReferenceSave Ref(string chain, double start, double? length = null) =>
         new() { Source = "hero.achx", Chain = chain, Start = start, Length = length };
 
     private static AnimationChainSave? Find(SequenceChainReferenceSave reference) =>
-        reference.Chain switch { "Walk" => Walk, "Run" => Run, "Spin" => Spin, _ => null };
+        reference.Chain switch { "Walk" => Walk, "Run" => Run, "Spin" => Spin, "Slow" => Slow, "Short" => Short, _ => null };
 
     private static IReadOnlyList<double> Boundaries(params SequenceTrackSave[] tracks)
     {
@@ -124,9 +126,24 @@ public class PlayheadStepsTests
     [Fact]
     public void Boundaries_ThatOnlyDifferByFloatErrorLateInTheSequence_AreOne()
     {
-        // Spin's frames are floats: its boundary at 400 s adds up to a few microseconds past the start of Run.
+        // Summed as floats, Spin's boundary at 400 s would be a few microseconds past the start of Run.
         Boundaries(Track(true, Ref("Spin", 0, length: 500)), Track(true, Ref("Run", 400)))
             .Count(time => Math.Abs(time - 400) < 0.01).ShouldBe(1);
+    }
+
+    [Fact]
+    public void Boundaries_LateInALoop_AreWhereTheirFrameShows()
+    {
+        // Slow's boundary and Short's eighth frame are both at 70.7 s. Summed as floats, Slow's would be microseconds before it.
+        var sequence = Sequence("Host", true, Track(true, Ref("Slow", 0, length: 800)), Track(true, Ref("Short", 70)));
+
+        var steps = PlayheadSteps.Boundaries([sequence], sequence, Find, _ => AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds);
+
+        foreach (int frame in Enumerable.Range(1, 9))
+        {
+            double step = PlayheadSteps.Next(steps, 70 + 0.1 * frame - 0.05);
+            AnimationEditor.Core.Rendering.ChainClock.Locate(Short, step - 70, AnimationEditor.Core.Utilities.FrameLengthUnit.Seconds).FrameIndex.ShouldBe(frame);
+        }
     }
 
     [Fact]
@@ -164,9 +181,5 @@ public class PlayheadStepsTests
         var steps = new[] { 0, 0.1, 0.3, 0.6 };
         PlayheadSteps.Next(steps, 0.1 + 0.2).ShouldBe(0.6);
         PlayheadSteps.Previous(steps, 0.1 + 0.2).ShouldBe(0.1);
-        // Late in a sequence the sums are further off.
-        var late = new[] { 400, 400.1, 400.2 };
-        PlayheadSteps.Next(late, 400.100006 - 0.00001).ShouldBe(400.2);
-        PlayheadSteps.Previous(late, 400.100006).ShouldBe(400);
     }
 }

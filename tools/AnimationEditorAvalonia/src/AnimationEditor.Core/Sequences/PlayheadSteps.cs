@@ -15,8 +15,8 @@ namespace AnimationEditor.Core.Sequences;
 /// </summary>
 public static class PlayheadSteps
 {
-    // A boundary this close to the end of a block is its end. Two boundaries within SequenceTimeline.CycleSlack are one.
-    private const double Tolerance = SequenceTimeline.BoundaryTolerance;
+    // Two times closer than this are the same boundary (float frame lengths summed in different orders).
+    private const double Tolerance = 1e-6;
 
     // A chain asking for thousands of cycles of tiny frames must not stall a key press.
     private const int MaxBoundariesPerChain = 20000;
@@ -73,7 +73,7 @@ public static class PlayheadSteps
         times.Sort();
         var result = new List<double>(times.Count);
         foreach (double time in times.Where(time => time >= 0 && time <= length + Tolerance))
-            if (result.Count == 0 || time - result[^1] > SequenceTimeline.CycleSlack(time)) result.Add(Math.Min(time, length));
+            if (result.Count == 0 || time - result[^1] > Tolerance) result.Add(Math.Min(time, length));
         return result;
     }
 
@@ -103,7 +103,7 @@ public static class PlayheadSteps
     public static double Next(IReadOnlyList<double> boundaries, double playhead)
     {
         foreach (double time in boundaries)
-            if (time > playhead + SequenceTimeline.CycleSlack(time)) return time;
+            if (time > playhead + Tolerance) return time;
         return boundaries.Count > 0 ? boundaries[^1] : playhead;
     }
 
@@ -111,7 +111,7 @@ public static class PlayheadSteps
     public static double Previous(IReadOnlyList<double> boundaries, double playhead)
     {
         for (int i = boundaries.Count - 1; i >= 0; i--)
-            if (boundaries[i] < playhead - SequenceTimeline.CycleSlack(playhead)) return boundaries[i];
+            if (boundaries[i] < playhead - Tolerance) return boundaries[i];
         return boundaries.Count > 0 ? boundaries[0] : playhead;
     }
 }

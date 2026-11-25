@@ -48,7 +48,11 @@ public readonly record struct FrameLengthUnit(TimeMeasurementUnit Unit)
     public float DefaultFrameLength => FromSeconds(DefaultSeconds);
 
     /// <summary>How long a frame plays, in seconds. A length that is not positive plays as the default.</summary>
-    public double PlaybackSeconds(float length) => length > 0 ? ToSeconds(length) : DefaultSeconds;
+    public double PlaybackSeconds(float length) => length > 0 ? ToSeconds(AsWritten(length)) : DefaultSeconds;
+
+    // The number the file holds: 0.1, not the 0.10000000149 that 0.1f widens to, which drifts as cycles add up. Decimal
+    // keeps a float's 7 digits; a length far outside its range would throw or become 0.
+    private static double AsWritten(float length) => length is > 1e-9f and < 1e9f ? (double)(decimal)length : length;
 
     /// <summary>Label suffix: <c>s</c> or <c>ms</c>.</summary>
     public string Suffix => IsMilliseconds ? "ms" : "s";

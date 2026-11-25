@@ -91,8 +91,15 @@ public class TimelineCullingTests
     }
 
     [Fact]
-    public void VisibleCycles_NarrowerThanAPixel_AreAboutOnePerPixel()
+    public void VisibleCycles_NarrowerThanAPixel_CoverEveryPixel_AndAreTheSameOnesWhereverTheViewIsScrolled()
     {
-        TimelineCulling.VisibleCycles(new TimelineViewport(), 0, 100, 0.00001, ViewWidth).Count().ShouldBeInRange(900, 1001);
+        // 0.003 s cycles are 0.36 px: every second one, 0.72 px apart.
+        var viewport = new TimelineViewport();
+        var cycles = TimelineCulling.VisibleCycles(viewport, 0, 100, 0.003, ViewWidth).ToList();
+        cycles.Select(k => (int)viewport.XAt(k * 0.003)).Distinct().Count().ShouldBe(1000); // 120 to 1119
+        cycles.Count.ShouldBeLessThan(2000);
+
+        viewport.ScrollHorizontally(0.36); // one cycle
+        TimelineCulling.VisibleCycles(viewport, 0, 100, 0.003, ViewWidth).Where(k => k <= cycles[^1]).ShouldBe(cycles);
     }
 }
