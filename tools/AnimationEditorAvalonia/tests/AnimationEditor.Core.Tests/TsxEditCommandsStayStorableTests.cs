@@ -104,7 +104,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
         // A name is not enough for an overloaded command: each of these is run, or adds no data, on its own.
         typeof(IAppCommands).GetMethods().Where(m => !m.IsSpecialName).GroupBy(m => m.Name).Where(g => g.Count() > 1)
             .SelectMany(g => g).Select(Signature).OrderBy(s => s, StringComparer.Ordinal)
-            .ShouldBe(Overloads, "a new overload of a command needs its own row");
+            .ShouldBe(Overloads);
     }
 
     private static string Signature(MethodInfo m) => $"{m.Name}({string.Join(", ", m.GetParameters().Select(p => TypeName(p.ParameterType)))})";
