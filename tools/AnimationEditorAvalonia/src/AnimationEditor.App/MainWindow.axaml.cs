@@ -1081,6 +1081,12 @@ public partial class MainWindow : Window
 
     // ── Startup ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// A window Detach to New Window made. The session (the tabs, project folder and unsaved documents the next launch
+    /// opens) is the first window's: this one neither restores nor saves it.
+    /// </summary>
+    internal bool IsDetached { get; set; }
+
     private void OnOpened(object? sender, EventArgs e)
     {
         _ = HandleStartupAsync();
@@ -1100,6 +1106,21 @@ public partial class MainWindow : Window
             Environment.Exit(0);
         }
 
+        if (IsDetached)
+            _projectManager.AnimationChainListSave = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        else
+            await RestoreSessionAsync();
+
+        RefreshFilesPanel();
+        _ = RunStartupUpdateDownloadAsync();
+    }
+
+    /// <summary>
+    /// What a start of the editor opens: the file it was started with or the tabs of the last session, the documents a
+    /// crash left unsaved, and the project folder.
+    /// </summary>
+    private async Task RestoreSessionAsync()
+    {
         // Each step is guarded on its own: one that fails says so and the rest still run (#2085).
         var args = Environment.GetCommandLineArgs();
         if (args.Length >= 2 && File.Exists(args[1]))
@@ -1130,9 +1151,6 @@ public partial class MainWindow : Window
         // follow-up) -- do it once here, now the tree is populated.
         if (_tabManager.ActiveTab is { } activeTab)
             SyncProjectPanelSelectionTo(activeTab);
-
-        RefreshFilesPanel();
-        _ = RunStartupUpdateDownloadAsync();
     }
 
     /// <summary>
@@ -7503,6 +7521,14 @@ public partial class MainWindow : Window
         try
         {
             var settingsFile = SettingsFilePath;
+            if (IsDetached)
+            {
+                // The session is the first window's, which may have changed since this window read it.
+                var saved = SettingsPreload.Read(settingsFile);
+                _appSettings.OpenTabPaths = saved.OpenTabPaths;
+                _appSettings.ActiveTabPath = saved.ActiveTabPath;
+                _appSettings.LastProjectFolderPath = saved.LastProjectFolderPath;
+            }
             // The AnimationEditor subfolder under %APPDATA% won't exist on a fresh install.
             Directory.CreateDirectory(settingsFile.GetDirectoryContainingThis().FullPath);
             File.WriteAllText(settingsFile.FullPath,

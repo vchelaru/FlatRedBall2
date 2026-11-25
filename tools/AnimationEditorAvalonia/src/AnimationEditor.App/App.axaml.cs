@@ -218,13 +218,13 @@ public partial class App : Application
     /// folder. Tests pass a temp folder.
     /// </param>
     /// <param name="recoveryFilePath">
-    /// Crash-recovery file the window clears on close; null is the shared one in the temp folder. Tests pass their own,
-    /// since closing a window deletes it.
+    /// Crash-recovery file of the window's unsaved documents; null is the shared one in the temp folder. Tests pass their own.
     /// </param>
     internal static MainWindow CreateDetachedWindow(string? settingsRoot = null, string? recoveryFilePath = null)
     {
         var services = BuildServices(settingsRoot, recoveryFilePath);
         var window = services.GetRequiredService<MainWindow>();
+        window.IsDetached = true;
         window.Icon = LoadAppIcon();
         RegisterNativeMenu(window);
         return window;

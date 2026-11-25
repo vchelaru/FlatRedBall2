@@ -108,6 +108,19 @@ public class IoManagerRecoveryTests : IDisposable
     // ── DeleteRecoveryFile ────────────────────────────────────────────────────
 
     [Fact]
+    public void DeleteRecoveryFiles_LeavesAnotherWindowsDocument()
+    {
+        var detachedWindow = new IoManager(ctx.AppState, ctx.IoManager.RecoveryFilePath);
+        ctx.IoManager.WriteRecoveryFile(new AnimationChainListSave());
+        detachedWindow.WriteRecoveryFile(new AnimationChainListSave { AnimationChains = { new AnimationChainSave { Name = "Detached" } } });
+
+        ctx.IoManager.DeleteRecoveryFiles();
+
+        string left = Assert.Single(ctx.IoManager.FindRecoveryFiles());
+        Assert.Contains("Detached", File.ReadAllText(left));
+    }
+
+    [Fact]
     public void DeleteRecoveryFile_WhenInUse_IsTriedAgainByDeleteRecoveryFiles()
     {
         var document = new AnimationChainListSave();
