@@ -1,6 +1,7 @@
 using AnimationEditor.Core.Utilities;
 using DotTiled;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace AnimationEditor.Core.Tiled;
@@ -125,7 +126,7 @@ public static class TilesetAnimationSync
                 var owningSource = GetStringProperty(tile!, SourceFilePropertyName);
                 if (owningSource != null && !IsOwn(owningSource))
                 {
-                    warnings.Add($"chain \"{result.ChainName}\": tile {tileId} is already owned by \"{owningSource}\" - skipped.");
+                    warnings.Add($"chain \"{result.ChainName}\": tile {tileId} is already owned by \"{owningSource}\" - skipped.{ReplacedNote(owningSource, sourceLabel)}");
                     continue;
                 }
                 if (owningSource == null && tile!.Animation.Count > 0)
@@ -176,6 +177,13 @@ public static class TilesetAnimationSync
     /// when that still holds something the model does not.</summary>
     private static bool IsTileEmpty(Tile tile) =>
         string.IsNullOrEmpty(tile.Type) && tile.Properties.Count == 0 && tile.Animation.Count == 0;
+
+    /// <summary>What to do when the owner is the .achx of this .achj, or the reverse, because Save As and aecli convert leave
+    /// both. Empty for any other owner.</summary>
+    private static string ReplacedNote(string owner, string sourceLabel) =>
+        Path.ChangeExtension(owner, null).Equals(Path.ChangeExtension(sourceLabel, null), System.StringComparison.OrdinalIgnoreCase)
+            ? $" Delete {Path.GetFileName(owner)} if {Path.GetFileName(sourceLabel)} replaced it."
+            : "";
 
     private static bool AnimationEquals(List<Frame> a, List<Frame> b)
     {

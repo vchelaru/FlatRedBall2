@@ -100,12 +100,9 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
         Assert.Equal(3, _ctx.ProjectManager.AnimationChainListSave.AnimationChains.Count);
     }
 
-    // The copy's owner tile (4, from its first successful save) is pinned from then on -- moving
-    // its frames back onto Walk's own cells (Undo) doesn't migrate the owner back to 0, so it
-    // doesn't collide with Walk either: same frame *content* as Walk, but a different physical
-    // tile carries it, so no yield.
+    // The copy got its owner tile (4) with the move, so undoing the move takes it away again.
     [Fact]
-    public void MoveDuplicateThenUndo_CopyStaysOnItsPinnedTile_RedoMovesContentBack()
+    public void MoveDuplicateThenUndo_CopyIsUnsavedAgain_RedoPutsItBackOnItsTile()
     {
         var walk = OpenTsx();
         var copy = _ctx.AppCommands.DuplicateChains([walk]).Single(); // yields Walk's tile 0 at first
@@ -113,11 +110,10 @@ public class AppCommandsTsxUndoRedoTests : IDisposable
         Assert.Equal([((uint)4, 200), ((uint)5, 200)], Anim(Disk(), 4));
         _warnings.Clear();
 
-        _ctx.UndoManager.Undo(); // copy's frames back on Walk's cells; its owner stays tile 4
+        _ctx.UndoManager.Undo();
         AssertSaved();
-        Assert.Empty(_warnings);
-        Assert.Equal([((uint)0, 200), ((uint)1, 200)], Anim(Disk(), 4));
-        Assert.Equal("Walk2", NameOf(Disk(), 4));
+        Assert.Single(_warnings);
+        Assert.DoesNotContain(Disk().Tiles, t => t.ID == 4);
         Assert.Equal([((uint)0, 200), ((uint)1, 200)], Anim(Disk(), 0));
         Assert.Equal("Walk", NameOf(Disk(), 0));
 

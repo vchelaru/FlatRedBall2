@@ -4,7 +4,7 @@ using System;
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>Removes one shape from a frame; undo puts it back at its original index.</summary>
-    internal sealed class DeleteShapeCommand : IUndoableCommand
+    internal sealed class DeleteShapeCommand : IDeleteCommand
     {
         private readonly ShapeSave _shape;
         private readonly AnimationFrameSave _frame;
@@ -27,12 +27,18 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             Description = $"Delete {ShapeUndoLabel.FormatForAddDelete(shape)}";
         }
 
-        public bool Do()
+        public bool Remove()
         {
             _originalIndex = _frame.ShapesSave!.IndexOf(_shape);
             if (_originalIndex < 0) return false;
 
             _frame.ShapesSave!.Remove(_shape);
+            return true;
+        }
+
+        public bool Do()
+        {
+            if (!Remove()) return false;
             Refresh();
             _selectedState.SelectShape(null);
             return true;

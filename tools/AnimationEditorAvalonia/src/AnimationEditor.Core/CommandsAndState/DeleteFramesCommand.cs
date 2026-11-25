@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
-    internal sealed class DeleteFramesCommand : IUndoableCommand
+    internal sealed class DeleteFramesCommand : IDeleteCommand
     {
         private readonly IReadOnlyList<AnimationFrameSave> _frames;
         private readonly AnimationChainSave _chain;
@@ -35,7 +35,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 : $"Delete {frames.Count} Frames";
         }
 
-        public bool Do()
+        public bool Remove()
         {
             // Capture every original index BEFORE removing anything — removing one
             // frame would shift the indices of those still to be captured.
@@ -51,7 +51,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
             foreach (var (frame, _) in _removed)
                 _chain.Frames.Remove(frame);
+            return true;
+        }
 
+        public bool Do()
+        {
+            if (!Remove()) return false;
             ClearSelectionForRemovedFrames();
             _commands.RefreshTreeNode(_chain);
             _commands.RefreshWireframe();

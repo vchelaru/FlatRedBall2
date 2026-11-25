@@ -48,7 +48,7 @@ namespace AnimationEditor.Core.Models
 
         /// <summary>
         /// Raised whenever the open-tab set changes in a way worth persisting: a tab is opened,
-        /// focused, activated, closed, moved, renamed, registered, or the whole list is restored.
+        /// focused, activated, closed, moved, renamed, or the whole list is restored.
         /// Unlike <see cref="ActiveChanged"/> this also fires for changes that leave
         /// <see cref="ActiveTab"/> untouched — closing a background tab or reordering — so session
         /// persistence can save on every change instead of only on graceful window close (issue #439).
@@ -287,24 +287,6 @@ namespace AnimationEditor.Core.Models
                 SetActive(desired ?? _tabs[0]);
             }
 
-            RaiseTabsChanged();
-        }
-
-        // ── Private helpers ───────────────────────────────────────────────────
-
-        /// <summary>
-        /// Adds <paramref name="path"/> as a tab at position 0 without making it active
-        /// and without raising <see cref="ActiveChanged"/>. Intended for preserving the
-        /// currently open file as the first tab before a different file is opened.
-        /// Does nothing if <paramref name="path"/> is already tracked.
-        /// </summary>
-        /// <param name="displayNameOverride">
-        /// Tab label override — use <c>"Untitled"</c> for unsaved files with no on-disk path.
-        /// </param>
-        public void RegisterBackground(FilePath path, string? displayNameOverride = null)
-        {
-            if (FindTab(path) != null) return;
-            _tabs.Insert(0, new TabEntry(path, displayNameOverride));
             RaiseTabsChanged();
         }
 

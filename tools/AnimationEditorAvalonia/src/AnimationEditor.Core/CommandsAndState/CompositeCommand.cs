@@ -22,6 +22,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             Description = description;
         }
 
+        /// <summary>The deletes as one step that <see cref="IDeleteCommand.Remove"/> already did. Null when there was nothing to remove.</summary>
+        public static CompositeCommand? Removed(IEnumerable<IDeleteCommand> deletes, string description)
+        {
+            var removed = deletes.Where(d => d.Remove()).ToArray();
+            return removed.Length == 0 ? null : new CompositeCommand(removed, description) { _executed = removed };
+        }
+
         public bool Do()
         {
             _executed = _commands.Where(c => c.Do()).ToArray();

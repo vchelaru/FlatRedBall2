@@ -125,7 +125,8 @@ public static class TexturePathHelper
         }
     }
 
-    private static bool IsAbsolute(string path)
+    /// <summary>Also true for a drive path on an OS without drives, unlike <see cref="Path.IsPathRooted(string)"/>.</summary>
+    public static bool IsAbsolute(string path)
         => Path.IsPathRooted(path)
            || (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':');
 }
