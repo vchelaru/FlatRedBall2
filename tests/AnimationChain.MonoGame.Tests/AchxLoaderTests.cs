@@ -328,6 +328,22 @@ public class AchxLoaderTests
         Assert.Equal(beforeRunFrames, list["Run"]!.Count);
     }
 
+    [Fact]
+    public void TryReload_ValueThatDoesNotParse_ReturnsFalse()
+    {
+        const string text = "<AnimationChainArraySave><AnimationChain><Loop>fals</Loop></AnimationChain></AnimationChainArraySave>";
+        var list = AnimationChainListSave.FromFile("dummy.achx", XmlStream(SimpleAchx)).ToAnimationChainList(_ => null);
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.achx");
+        File.WriteAllText(path, text);
+
+        try
+        {
+            Assert.False(list.TryReload(path, _ => null));
+            Assert.False(list.TryReload(new MemoryStream(Encoding.UTF8.GetBytes(text)), _ => null));
+        }
+        finally { File.Delete(path); }
+    }
+
     // ─── AnimationChainList.TryReload(path) — .achj (JSON) dispatch by extension ─────────
 
     [Fact]

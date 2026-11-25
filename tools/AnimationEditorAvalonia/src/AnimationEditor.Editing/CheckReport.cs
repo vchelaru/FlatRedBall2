@@ -6,12 +6,12 @@ namespace AnimationEditor.Editing;
 
 public enum CheckSeverity { Error, Warning }
 
-/// <param name="Code">Stable kebab-case identifier: missing-texture, duplicate-chain-name, duplicate-shape-name, unit-undefined, region-outside-texture, empty-chain, zero-length-frame, texture-case.</param>
+/// <param name="Code">Stable kebab-case identifier: missing-texture, duplicate-chain-name, duplicate-shape-name, unnamed-shape, shape-name-two-kinds, unit-undefined, region-outside-texture, empty-chain, zero-length-frame, texture-case.</param>
 public sealed record CheckIssue(CheckSeverity Severity, string Code, string Message);
 
 /// <summary>
 /// Validation of a loaded animation file (#1811). Errors are things a game would trip on (a texture that
-/// is not there, a name that is not unique); warnings are legal but suspect. Edits are judged by
+/// is not there, a name that is not unique, a shape name it throws on); warnings are legal but suspect. Edits are judged by
 /// <see cref="NewErrors"/>: a file that already had errors can still be edited, but not if the edit makes more errors of any code. Warnings
 /// never block an edit; <see cref="RaisedWarnings"/> says which an edit made more of.
 /// </summary>
@@ -36,6 +36,7 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
                 $"{group.Count()} chains are named '{group.Key}'."));
 
         var textures = new Dictionary<string, Texture>();
+        var namedShapes = new List<(string Name, string Kind, string Frame)>();
         for (int c = 0; c < doc.AnimationChains.Count; c++)
         {
             var chain = doc.AnimationChains[c];
@@ -57,11 +58,28 @@ public sealed record CheckReport(IReadOnlyList<CheckIssue> Issues)
                     issues.Add(new(CheckSeverity.Warning, "zero-length-frame",
                         $"Frame {chain.Name}/{f} has a length of 0 or less in a chain of {chain.Frames.Count} frames."));
 
-                var shapes = frame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? [];
+                var shapes = (frame.ShapesSave?.Shapes.OfType<ShapeSave>() ?? []).ToList();
+                foreach (var shape in shapes)
+                {
+                    var kind = EditAddress.TypeName(shape);
+                    if (string.IsNullOrEmpty(shape.Name))
+                        issues.Add(new(CheckSeverity.Error, "unnamed-shape", $"A {kind} in frame {chain.Name}/{f} has no name."));
+                    else
+                        namedShapes.Add((shape.Name, kind, $"{chain.Name}/{f}"));
+                }
                 foreach (var dup in shapes.GroupBy(s => s.Name).Where(g => g.Count() > 1))
                     issues.Add(new(CheckSeverity.Error, "duplicate-shape-name",
                         $"{dup.Count()} shapes are named '{dup.Key}' in frame {chain.Name}/{f}."));
             }
+        }
+
+        // A game attaches one shape per name to the entity, so every chain of the file must agree on what it is.
+        foreach (var shape in namedShapes.GroupBy(s => s.Name))
+        {
+            var kinds = shape.DistinctBy(s => s.Kind).ToList();
+            if (kinds.Count > 1)
+                issues.Add(new(CheckSeverity.Error, "shape-name-two-kinds",
+                    $"Shape name '{shape.Key}' is used for {string.Join(" and ", kinds.Select(k => $"a {k.Kind} (frame {k.Frame})"))}; a name keeps one kind in all chains."));
         }
 
         foreach (var (name, texture) in textures)
