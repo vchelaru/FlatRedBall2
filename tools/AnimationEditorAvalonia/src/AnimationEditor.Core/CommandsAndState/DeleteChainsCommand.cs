@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
-    internal sealed class DeleteChainsCommand : IUndoableCommand
+    internal sealed class DeleteChainsCommand : IDeleteCommand
     {
         private readonly IReadOnlyList<AnimationChainSave> _chains;
         private readonly AnimationChainListSave _acls;
@@ -35,7 +35,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 : $"Delete {chains.Count} Animations";
         }
 
-        public bool Do()
+        public bool Remove()
         {
             // Capture every original index BEFORE removing anything — removing one
             // chain would shift the indices of those still to be captured.
@@ -51,7 +51,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
             foreach (var (chain, _) in _removed)
                 _acls.AnimationChains.Remove(chain);
+            return true;
+        }
 
+        public bool Do()
+        {
+            if (!Remove()) return false;
             ClearSelectionForRemovedChains();
             _commands.RefreshTreeView();
             _commands.RefreshAnimationFrameDisplay();

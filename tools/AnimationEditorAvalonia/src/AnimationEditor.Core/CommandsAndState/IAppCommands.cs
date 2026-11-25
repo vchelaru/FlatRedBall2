@@ -223,6 +223,14 @@ namespace AnimationEditor.Core.CommandsAndState
         bool SaveDocument(TabEntry tab);
 
         /// <summary>
+        /// The removal half of a cut pasted into another tab: takes the cut items out of <paramref name="tab"/>'s
+        /// document and adds that to the tab's own undo history. Saves nothing (<see cref="SaveDocument"/>). Frames
+        /// and shapes in a locked chain stay, as in a same-document cut.
+        /// </summary>
+        /// <returns>False when nothing was removed.</returns>
+        bool CutFromBackgroundTab(TabEntry tab, IPendingCutState cut);
+
+        /// <summary>
         /// True when the current document's last save wrote <paramref name="chains"/> in full. A cut into this
         /// document removes its source only then. An untitled document, which has no file to fail, counts as stored.
         /// </summary>

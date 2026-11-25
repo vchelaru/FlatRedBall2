@@ -2991,6 +2991,40 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
+        /// <inheritdoc cref="IAppCommands.CutFromBackgroundTab"/>
+        public bool CutFromBackgroundTab(TabEntry tab, IPendingCutState cut)
+        {
+            var acls = tab.CachedEditorModel!;
+            var deletes = new List<IDeleteCommand>();
+            string desc;
+            switch (cut.Kind)
+            {
+                case CopySelectionKind.Chain:
+                    deletes.Add(new DeleteChainsCommand(cut.Chains, acls, this, _events, _selectedState));
+                    desc = cut.Chains.Count == 1 ? $"Cut Animation '{cut.Chains[0].Name}'" : $"Cut {cut.Chains.Count} Animations";
+                    break;
+
+                case CopySelectionKind.Frame:
+                    var frames = cut.Frames.Select(f => (Frame: f, Chain: PendingCutState.ChainContaining(acls, f)!)).ToList();
+                    foreach (var group in frames.Where(x => !IsChainLocked(x.Chain)).GroupBy(x => x.Chain))
+                        deletes.Add(new DeleteFramesCommand(group.Select(x => x.Frame).ToList(), group.Key, this, _events, _selectedState));
+                    desc = frames.Count == 1 ? $"Cut Frame in '{frames[0].Chain.Name}'" : $"Cut {frames.Count} Frames";
+                    break;
+
+                default:
+                    foreach (var shape in cut.Shapes.OfType<ShapeSave>())
+                        if (PendingCutState.FrameContaining(acls, shape) is { } frame && !IsChainLocked(PendingCutState.ChainContaining(acls, frame)!))
+                            deletes.Add(new DeleteShapeCommand(shape, frame, this, _events, _selectedState));
+                    desc = cut.Shapes.Count == 1 ? $"Cut {ShapeUndoLabel.Format(cut.Shapes[0])}" : $"Cut {cut.Shapes.Count} Shapes";
+                    break;
+            }
+            if (CompositeCommand.Removed(deletes, desc) is not { } command) return false;
+
+            tab.UndoSnapshot = new UndoSnapshot(
+                [.. tab.UndoSnapshot?.UndoStack ?? [], new UndoEntry(command, tab.CachedTsxState)], []);
+            return true;
+        }
+
         private List<object> BuildShapeClones(AnimationFrameSave frame, IReadOnlyList<object> shapes)
         {
             if (IsFrameLocked(frame)) return new List<object>();

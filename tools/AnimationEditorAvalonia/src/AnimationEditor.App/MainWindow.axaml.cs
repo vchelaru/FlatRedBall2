@@ -8311,12 +8311,12 @@ public partial class MainWindow : Window
     {
         if (!_appCommands.LastSaveStored(pastedInto)) return;
         var source = _pendingCutState.SourceDocument;
-        if (source is null) return;
-        var namesBefore = source.AnimationChains.Select(chain => chain.Name).ToList();
-        if (!_pendingCutState.RemoveSourcesFrom(source)) return; // all of them in locked chains
-
         var sourceTab = _tabManager.Tabs.FirstOrDefault(tab => ReferenceEquals(tab.CachedEditorModel, source));
-        if (sourceTab is null || sourceTab.Kind != TabKind.Achx || IsUntitledTab(sourceTab)) return;
+        if (source is null || sourceTab is null) return;
+        var namesBefore = source.AnimationChains.Select(chain => chain.Name).ToList();
+        if (!_appCommands.CutFromBackgroundTab(sourceTab, _pendingCutState)) return; // all of them in locked chains
+
+        if (sourceTab.Kind != TabKind.Achx || IsUntitledTab(sourceTab)) return;
         if (!_appCommands.SaveDocument(sourceTab)) return; // the file still has them
         WarnAboutBrokenSequences(sourceTab.Path.FullPath, new RemovedChainNames(source, "Cutting",
             namesBefore.Except(source.AnimationChains.Select(chain => chain.Name)).ToList()));
