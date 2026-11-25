@@ -439,7 +439,12 @@ namespace AnimationEditor.Core.CommandsAndState
         void SortAnimationsAlphabetically();
         void AdjustOffsetsJustifyBottom(AnimationChainSave chain, float offsetMultiplier = 1f);
         void AdjustOffsetsAdjustAll(AnimationChainSave chain, float? deltaX, float? deltaY, bool relative);
-        void ScaleFrameTimesProportional(AnimationChainSave chain, float targetTotalDuration);
+        /// <summary>
+        /// Scales all frame lengths so the total duration of <paramref name="chain"/>
+        /// equals <paramref name="targetTotalDuration"/>, keeping ratios proportional.
+        /// </summary>
+        /// <param name="fromLengths">The lengths (one per frame) whose ratios to keep; null keeps the current ones.</param>
+        void ScaleFrameTimesProportional(AnimationChainSave chain, float targetTotalDuration, IReadOnlyList<float>? fromLengths = null);
         void ScaleFrameTimesSetAllSame(AnimationChainSave chain, float targetTotalDuration);
         bool AddMultipleFrames(AnimationChainSave chain, int count, bool incrementUV);
         void NewFile();
@@ -666,8 +671,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>
         /// Reverts the in-progress coalesced edit started since the last <see cref="SealPendingEdits"/>
         /// boundary — e.g. Cancel on a live-preview dialog like "Adjust All Frame Time" that applies
-        /// each change immediately so the preview stays in sync. No-op if nothing is on the undo
-        /// stack. This is a thin wrapper over <see cref="Commands.IUndoManager.Undo"/>, so the
+        /// each change immediately so the preview stays in sync. No-op if no coalesced edit has
+        /// been made since then. This is a thin wrapper over <see cref="Commands.IUndoManager.Undo"/>, so the
         /// discarded edit still lands on the redo stack like any other undo.
         /// </summary>
         void DiscardPendingEdits();

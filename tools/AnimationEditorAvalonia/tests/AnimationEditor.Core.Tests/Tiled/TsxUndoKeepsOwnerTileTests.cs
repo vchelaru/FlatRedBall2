@@ -128,6 +128,36 @@ public class TsxUndoKeepsOwnerTileTests : IDisposable
     [Fact]
     public async Task Undo_OneEntryOfSeveralSteps_GivesBackTheTileTheFirstOneFreed()
     {
+        var (path, wide) = await OpenWideWithOneWaitingAsync();
+        string before = File.ReadAllText(path);
+        int entries = _ctx.UndoManager.UndoHistory.Count;
+
+        _ctx.AppCommands.SetFramePixelRegion(wide.Frames, null, null, 16, null);
+        _ctx.AppCommands.SetFramePixelRegion(wide.Frames, null, 16, null, null);
+        Documents.TileAnimations(path).ShouldBe(new[] { "0: 4@100", "1: 1@100" });
+        _ctx.UndoManager.Undo();
+
+        _ctx.UndoManager.UndoHistory.Count.ShouldBe(entries);
+        File.ReadAllText(path).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task SeveralStepsBackToTheFirstValue_GiveBackTheTileTheyFreed()
+    {
+        var (path, wide) = await OpenWideWithOneWaitingAsync();
+        string before = File.ReadAllText(path);
+        int entries = _ctx.UndoManager.UndoHistory.Count;
+
+        _ctx.AppCommands.SetFramePixelRegion(wide.Frames, null, null, 16, null);
+        _ctx.AppCommands.SetFramePixelRegion(wide.Frames, null, null, 32, null);
+
+        _ctx.UndoManager.UndoHistory.Count.ShouldBe(entries);
+        File.ReadAllText(path).ShouldBe(before);
+    }
+
+    // One animation two tiles wide, and one that waits for its second tile.
+    private async Task<(string Path, AnimationChainSave Wide)> OpenWideWithOneWaitingAsync()
+    {
         string path = Path.Combine(_dir.Path, "Heroes.tsx");
         File.WriteAllText(path, """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -152,15 +182,6 @@ public class TsxUndoKeepsOwnerTileTests : IDisposable
         var wide = _ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Single();
         var waiting = _ctx.AppCommands.AddAnimationChainWithName("Waiting")!;
         _ctx.AppCommands.AddFrameFromPixelBounds(waiting, "Heroes.png", 16, 0, 32, 16);
-        string before = File.ReadAllText(path);
-        int entries = _ctx.UndoManager.UndoHistory.Count;
-
-        _ctx.AppCommands.SetFramePixelRegion(wide.Frames, null, null, 16, null);
-        _ctx.AppCommands.SetFramePixelRegion(wide.Frames, null, 16, null, null);
-        Documents.TileAnimations(path).ShouldBe(new[] { "0: 4@100", "1: 1@100" });
-        _ctx.UndoManager.Undo();
-
-        _ctx.UndoManager.UndoHistory.Count.ShouldBe(entries);
-        File.ReadAllText(path).ShouldBe(before);
+        return (path, wide);
     }
 }

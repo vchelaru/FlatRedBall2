@@ -70,10 +70,12 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
         CoalesceGroup = $"ShapeProps:{RuntimeHelpers.GetHashCode(shape)}";
     }
 
+    private bool ChangesNothing =>
+        _oldName == _newName && _oldX == _newX && _oldY == _newY && _oldP1 == _newP1 && _oldP2 == _newP2;
+
     public bool Do()
     {
-        if (_oldName == _newName && _oldX == _newX && _oldY == _newY &&
-            _oldP1 == _newP1 && _oldP2 == _newP2) return false;
+        if (ChangesNothing) return false;
         Apply(_newName, _newX, _newY, _newP1, _newP2);
         return true;
     }
@@ -86,14 +88,15 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
     /// already-applied "after" state, so undoing the merged entry restores the value from before
     /// the whole coalesced edit (see <see cref="IUndoableCommand.CoalesceWith"/>).
     /// </summary>
-    public IUndoableCommand CoalesceWith(IUndoableCommand previous)
+    public IUndoableCommand? CoalesceWith(IUndoableCommand previous)
     {
         var p = (SetShapePropsCommand)previous;
-        return new SetShapePropsCommand(
+        var merged = new SetShapePropsCommand(
             _frame, _shape, p._oldName, _newName,
             p._oldX, p._oldY, p._oldP1, p._oldP2,
             _newX, _newY, _newP1, _newP2,
             _commands, _events, Description);
+        return merged.ChangesNothing ? null : merged;
     }
 
     private void Apply(string name, float x, float y, float p1, float p2)

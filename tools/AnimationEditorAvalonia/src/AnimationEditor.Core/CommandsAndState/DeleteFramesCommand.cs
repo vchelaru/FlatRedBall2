@@ -66,7 +66,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            foreach (var (frame, idx) in _removed)
+            // Lowest index first: an index is right only once everything before it is back.
+            foreach (var (frame, idx) in _removed.OrderBy(r => r.OriginalIndex))
             {
                 int safeIdx = Math.Min(idx, _chain.Frames.Count);
                 _chain.Frames.Insert(safeIdx, frame);

@@ -37,26 +37,25 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
-            var result = Apply(_newName, _newRegion);
+            if (_newName == _oldName && _newRegion == _oldRegion) return false;
+            Apply(_newName, _newRegion);
             // Arm the wireframe to fit the frame into view on the next texture load in case the new
             // texture makes its region larger than the viewport (#616). Undo does not re-arm — reverting
             // a texture shouldn't surprise-zoom the user.
             _events.RaiseFitFrameToViewRequested();
-            return result;
+            return true;
         }
 
         public void Undo() => Apply(_oldName, _oldRegion);
 
         // Assigns the name verbatim — null stays null, "" stays "" — so "clear the
-        // texture" round-trips exactly. Always returns true: a same-value reassignment
-        // is filtered out by the caller before a command is ever constructed.
-        private bool Apply(string? name, FrameRegion region)
+        // texture" round-trips exactly.
+        private void Apply(string? name, FrameRegion region)
         {
             region.ApplyTo(_frame);
             _frame.TextureName = name!;
             _commands.RefreshTreeNode(_frame);
             _events.RaiseAnimationChainsChanged();
-            return true;
         }
     }
 }

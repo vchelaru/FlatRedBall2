@@ -132,9 +132,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// Combines <paramref name="previous"/>'s original "before" snapshot with this command's
         /// already-captured "after" snapshot (see <see cref="IUndoableCommand.CoalesceWith"/>).
         /// </summary>
-        public IUndoableCommand CoalesceWith(IUndoableCommand previous)
+        public IUndoableCommand? CoalesceWith(IUndoableCommand previous)
         {
             var p = (BulkFrameEditCommand)previous;
+            if (p._before.SequenceEqual(_after)) return null;
             return new BulkFrameEditCommand(
                 _frames, _mutate, _commands, _events, _refreshWireframe,
                 Description, CoalesceGroup, p._before, _after);

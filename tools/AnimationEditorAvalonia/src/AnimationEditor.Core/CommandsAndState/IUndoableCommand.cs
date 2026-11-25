@@ -53,8 +53,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// should replace both on the stack — typically <paramref name="previous"/>'s original
         /// "before" state combined with this command's already-applied "after" state, so undoing
         /// the merged entry restores the value from before the whole coalesced edit, not just the
-        /// last increment. Only called when <see cref="CoalesceGroup"/> is non-null.
+        /// last increment. Null when that "before" equals the "after" (wheel up, then down): the whole
+        /// edit changed nothing and leaves no entry. Only called when <see cref="CoalesceGroup"/> is non-null.
         /// </summary>
-        IUndoableCommand CoalesceWith(IUndoableCommand previous) => this;
+        IUndoableCommand? CoalesceWith(IUndoableCommand previous) => this;
     }
 }

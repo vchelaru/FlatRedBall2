@@ -17,6 +17,9 @@ internal sealed class PasteShapesCommand : IUndoableCommand
     private readonly ISelectedState _selectedState;
     private readonly List<object> _preSelection;
 
+    // Captured by Do(): the frames whose shape list this paste created.
+    private AnimationFrameSave[] _framesWithoutList = [];
+
     public string Description { get; }
 
     public PasteShapesCommand(
@@ -54,6 +57,7 @@ internal sealed class PasteShapesCommand : IUndoableCommand
     {
         var all = AllShapes();
         if (all.Count == 0) return false;
+        _framesWithoutList = _groups.Select(g => g.Frame).Where(f => f.ShapesSave is null).ToArray();
         foreach (var (frame, shapes) in _groups)
         {
             frame.ShapesSave ??= new ShapesSave();
@@ -71,6 +75,9 @@ internal sealed class PasteShapesCommand : IUndoableCommand
         foreach (var (frame, shapes) in _groups)
             foreach (var shape in shapes)
                 frame.ShapesSave!.Remove(shape);
+        // See AddShapeCommand.Undo: an empty list would still be written to the file.
+        foreach (var frame in _framesWithoutList)
+            frame.ShapesSave = null;
         RaiseSideEffects();
         _selectedState.SelectedNodes = _preSelection;
         _selectedState.SelectShape(_preSelection.FirstOrDefault(n => n is ShapeSave));

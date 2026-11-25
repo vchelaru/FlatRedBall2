@@ -12,7 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -84,15 +83,7 @@ public class UndoFuzzTests
             bool saved = !_unwritable && _ctx.UndoManager.SaveState != SaveState.Failed;
             string model = Acls.ToJsonString();
             string? file = saved ? File.ReadAllText(_path) + (_pushed is null ? "" : File.ReadAllText(_pushed)) : null;
-            return (WithoutEmptyShapes(model), file is null ? null : WithoutEmptyShapes(file));
-        }
-
-        // Until #2083: an undone paste leaves an empty shape list.
-        private static string WithoutEmptyShapes(string text)
-        {
-            text = text.Replace("\r\n", "\n");
-            text = Regex.Replace(text, @",?\n\s*""\w*shape\w*"": (\[\s*\]|\{\s*(""\w+"": \[\s*\],?\s*)*\})", "", RegexOptions.IgnoreCase);
-            return Regex.Replace(text, @"\n\s*<ShapeCollectionSave( />|>\s*(<\w+ />\s*)*</ShapeCollectionSave>)", "");
+            return (model, file);
         }
 
         // Two animations (one a 2x1 tile footprint) beside what Tiled itself keeps on tiles.
@@ -312,10 +303,6 @@ public class UndoFuzzTests
             var frames = Some(Frames);
             var chains = Some(Acls.AnimationChains);
             var shapes = Some(Shapes);
-            // Until #2078: a delete of items picked out of order is undone into the wrong order.
-            var all = Frames;
-            frames = frames.OrderBy(all.IndexOf).ToList();
-            chains = chains.OrderBy(Acls.AnimationChains.IndexOf).ToList();
             var owner = frame is null ? null : Acls.AnimationChains.First(x => x.Frames.Contains(frame));
             var shapeFrame = shape is null ? null : Frames.First(f => f.ShapesSave?.Shapes.Contains(shape) == true);
             var rects = shapes.OfType<AARectSave>().ToList();

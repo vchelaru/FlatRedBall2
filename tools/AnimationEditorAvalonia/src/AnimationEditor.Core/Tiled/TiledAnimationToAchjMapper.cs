@@ -281,7 +281,7 @@ public static class TiledAnimationToAchjMapper
     /// so safe to omit from the write / silently re-derive, rather than a real user-given name) and
     /// with <see cref="ProjectManager.TrySetTsxOwnerTileId"/> (which re-derives it for the chain's
     /// *new* owner tile so an unnamed chain's tree label follows its owner instead of going stale).</summary>
-    public static string SyntheticChainName(uint tileId) => $"ID:{tileId}";
+    internal static string SyntheticChainName(uint tileId) => $"ID:{tileId}";
 
     /// <summary>A negative <c>ParentId</c> (hand-edited or corrupt file) is treated the same as a
     /// missing one rather than unchecked-cast into a huge <see cref="uint"/> -- silently wrapping

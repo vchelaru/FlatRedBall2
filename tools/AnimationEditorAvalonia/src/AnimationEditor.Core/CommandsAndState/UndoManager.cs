@@ -38,12 +38,22 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             var tsxBefore = CaptureTsx(cmd);
             if (!cmd.Do()) return;
 
-            if (cmd.CoalesceGroup is { } group && group == _openCoalesceGroup &&
-                _undoStack.Count > 0 && _undoStack.Peek().Command.CoalesceGroup == group)
+            if (HasOpenCoalescedEdit && cmd.CoalesceGroup == _openCoalesceGroup)
             {
                 var previous = _undoStack.Pop();
-                cmd = cmd.CoalesceWith(previous.Command);
-                tsxBefore = previous.TsxBefore;
+                if (cmd.CoalesceWith(previous.Command) is not { } merged)
+                {
+                    if (previous.TsxBefore is not null)
+                    {
+                        // The values are back, but a save in between may have given a tile away.
+                        RestoreTsx(previous.TsxBefore);
+                        previous.Command.Undo();
+                    }
+                    _openCoalesceGroup = null;
+                    StackChanged?.Invoke();
+                    return;
+                }
+                (cmd, tsxBefore) = (merged, previous.TsxBefore);
             }
             _openCoalesceGroup = cmd.CoalesceGroup;
             Push(cmd, tsxBefore);
@@ -65,6 +75,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             if (state is not null) projectManager!.RestoreTsxState(state);
         }
+
+        /// <inheritdoc cref="IUndoManager.HasOpenCoalescedEdit"/>
+        public bool HasOpenCoalescedEdit =>
+            _openCoalesceGroup is not null && CanUndo && _undoStack.Peek().Command.CoalesceGroup == _openCoalesceGroup;
 
         /// <inheritdoc cref="IUndoManager.SealCoalescing"/>
         public void SealCoalescing() => _openCoalesceGroup = null;

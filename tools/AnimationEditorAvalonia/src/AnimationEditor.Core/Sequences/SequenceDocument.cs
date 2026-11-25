@@ -1560,10 +1560,10 @@ public sealed class SequenceDocument : ISequenceChainLookup
         public string? CoalesceGroup => coalesceGroup is null ? null : $"{System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(document)}:{coalesceGroup}";
 
         // The merged entry undoes to where the first one started and redoes to where this one ended.
-        public IUndoableCommand CoalesceWith(IUndoableCommand previous) => previous is SnapshotCommand first
-            ? new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
-                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup, first.BeforeFolder, _afterFolder)
-            : this;
+        public IUndoableCommand? CoalesceWith(IUndoableCommand previous) => previous is not SnapshotCommand first ? this
+            : first.Before == after && first.BeforeFolder == _afterFolder ? null
+            : new SnapshotCommand(document, description, first.Before, after, first.SelectBefore, selectAfter, first.TrackBefore, trackAfter,
+                selectOnDo, renamed, first.StateBefore, stateAfter, coalesceGroup, first.BeforeFolder, _afterFolder);
 
         private string Before => before;
         private int? SelectBefore => selectBefore;
