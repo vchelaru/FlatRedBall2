@@ -344,19 +344,19 @@ public partial class MainWindow : Window
         SequencePreview.InitializeServices(new SelectedState(_projectManager), _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowProblem(msg));
         SequencePreview.PauseAutoPlayback();
         FilesPanel.Initialize(_thumbnailService, this,
-            msg => ShowProblem(msg), OpenPngAsTab);
+            msg => ShowProblem(msg), OpenPngAsTab, CopyTextToClipboard);
         ProjectPanel.Initialize(_projectTreeThumbnailService);
         ProjectPanel.FolderRevealRequested += relativePath => RevealProjectFolderInExplorer(relativePath);
         ProjectPanel.FileRevealRequested += relativePath => RevealProjectFileInExplorer(relativePath);
         ProjectPanel.FileCopyPathRequested += relativePath => CopyProjectFilePathToClipboard(relativePath);
-        ProjectPanel.FileDeleteRequested += relativePath => _ = DeleteProjectFileAsync(relativePath);
-        ProjectPanel.FileDuplicateRequested += relativePath => _ = DuplicateProjectFileAsync(relativePath);
-        ProjectPanel.FileConvertToAchjRequested += relativePath => _ = ConvertProjectFileToAchjAsync(relativePath);
-        ProjectPanel.FolderConvertToAchjRequested += relativePath => _ = ConvertProjectFolderToAchjAsync(relativePath);
+        ProjectPanel.FileDeleteRequested += relativePath => _ = RunGuardedAsync(() => DeleteProjectFileAsync(relativePath), "Delete");
+        ProjectPanel.FileDuplicateRequested += relativePath => _ = RunGuardedAsync(() => DuplicateProjectFileAsync(relativePath), "Duplicate");
+        ProjectPanel.FileConvertToAchjRequested += relativePath => _ = RunGuardedAsync(() => ConvertProjectFileToAchjAsync(relativePath), "Convert to .achj");
+        ProjectPanel.FolderConvertToAchjRequested += relativePath => _ = RunGuardedAsync(() => ConvertProjectFolderToAchjAsync(relativePath), "Convert to .achj");
         // Right-clicking blank space in the tree offers "New Animation" (#908) -- same flow as
         // File > New.
         ProjectPanel.NewAnimationRequested += () => OnNewClick(null, null!);
-        ProjectPanel.NewAnimationFileRequested += request => _ = CreateNewAnimationFileAsync(request);
+        ProjectPanel.NewAnimationFileRequested += request => _ = RunGuardedAsync(() => CreateNewAnimationFileAsync(request), "New file");
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
@@ -371,7 +371,7 @@ public partial class MainWindow : Window
         {
             // Inert on a sequence tab (BrowserClickOpensPreview false): pressing a row to drag it onto the library must not switch tabs.
             if (entry.File is DiskEditorFile diskFile && ActivePane.BrowserClickOpensPreview)
-                _ = LoadAnimationFileAsync(diskFile.FullPath, asPreview: true);
+                _ = RunGuardedAsync(() => LoadAnimationFileAsync(diskFile.FullPath, asPreview: true), "Open");
         };
         ProjectPanel.FileDoubleClicked += entry =>
         {
@@ -385,7 +385,7 @@ public partial class MainWindow : Window
                 RebuildTabStrip();
             }
             else
-                _ = LoadAnimationFileAsync(diskFile.FullPath);
+                _ = RunGuardedAsync(() => LoadAnimationFileAsync(diskFile.FullPath), "Open");
         };
         ProjectPanel.DragPathFor = entry => (entry.File as DiskEditorFile)?.FullPath;
         // A texture changed on disk (whichever watcher saw it): the .seqj rows that draw it re-render.
@@ -544,7 +544,7 @@ public partial class MainWindow : Window
                 Margin = new Avalonia.Thickness(2, 0, 2, 0),
             };
             Grid.SetColumn(closeBtn, 1);
-            closeBtn.Click += (_, _) => _ = CloseTabAsync(captured);
+            closeBtn.Click += (_, _) => _ = RunGuardedAsync(() => CloseTabAsync(captured), "Close Tab");
 
             row.Children.Add(label);
             row.Children.Add(closeBtn);
@@ -562,7 +562,7 @@ public partial class MainWindow : Window
                 tabMenu.Items.Add(new MenuItem
                 {
                     Header = "Detach to New Window",
-                    Command = new RelayCommand(() => _ = DetachTabAsync(captured)),
+                    Command = new RelayCommand(() => _ = RunGuardedAsync(() => DetachTabAsync(captured), "Detach")),
                 });
             // Issue #881: same action as the title-bar "Open Containing Folder", but for the
             // right-clicked tab (which may not be the active one).
@@ -581,13 +581,12 @@ public partial class MainWindow : Window
             tabMenu.Items.Add(new MenuItem
             {
                 Header = "Copy Full Path",
-                Command = new RelayCommand(() =>
-                    _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured.Path.FullPath)),
+                Command = new RelayCommand(() => CopyTextToClipboard(captured.Path.FullPath)),
             });
             tabMenu.Items.Add(new MenuItem
             {
                 Header = "Close Tab",
-                Command = new RelayCommand(() => _ = CloseTabAsync(captured)),
+                Command = new RelayCommand(() => _ = RunGuardedAsync(() => CloseTabAsync(captured), "Close Tab")),
             });
             tabBorder.ContextMenu = tabMenu;
 
@@ -663,7 +662,7 @@ public partial class MainWindow : Window
 
                 if (uk == PointerUpdateKind.MiddleButtonReleased)
                 {
-                    _ = CloseTabAsync(captured);
+                    _ = RunGuardedAsync(() => CloseTabAsync(captured), "Close Tab");
                     args.Handled = true;
                     return;
                 }
@@ -696,7 +695,7 @@ public partial class MainWindow : Window
                 else
                 {
                     _stripClickedTab = captured;
-                    _tabSwitchInFlight = ActivateTabAsync(captured);
+                    _tabSwitchInFlight = RunGuardedAsync(() => ActivateTabAsync(captured), "Open");
                     _stripClickedTab = null;
                 }
 
@@ -850,7 +849,7 @@ public partial class MainWindow : Window
     public void OpenPngAsTab(string path)
     {
         if (string.IsNullOrEmpty(path)) return;
-        _ = OpenNonDocumentTabAsync(path);
+        _ = RunGuardedAsync(() => OpenNonDocumentTabAsync(path), "Open");
     }
 
     // Lets tests await both background operations a PNG tab kicks off (history load + texture decode)
@@ -969,7 +968,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         if (_confirmingClose) return;
-        _ = ConfirmWindowCloseAsync();
+        _ = RunGuardedAsync(() => ConfirmWindowCloseAsync(), "Close");
     }
 
     private async Task ConfirmWindowCloseAsync()
@@ -1083,7 +1082,7 @@ public partial class MainWindow : Window
 
     private void OnOpened(object? sender, EventArgs e)
     {
-        _ = HandleStartupAsync();
+        _ = RunGuardedAsync(() => HandleStartupAsync(), "Startup");
     }
 
     private async Task HandleStartupAsync()
@@ -1140,7 +1139,7 @@ public partial class MainWindow : Window
             SyncProjectPanelSelectionTo(activeTab);
 
         RefreshFilesPanel();
-        _ = RunStartupUpdateDownloadAsync();
+        _ = RunGuardedAsync(() => RunStartupUpdateDownloadAsync(), "Update");
     }
 
     /// <summary>
@@ -1185,7 +1184,7 @@ public partial class MainWindow : Window
     private void WireUpdateAvailableBanner()
     {
         RestartForUpdateBtn.Click += (_, _) => RestartToApplyUpdate();
-        RetryUpdateBtn.Click += (_, _) => _ = RunStartupUpdateDownloadAsync();
+        RetryUpdateBtn.Click += (_, _) => _ = RunGuardedAsync(() => RunStartupUpdateDownloadAsync(), "Update");
     }
 
     /// <summary>
@@ -1905,7 +1904,7 @@ public partial class MainWindow : Window
     {
         if (candidates.Count == 1)
         {
-            _ = NavigateToUsageChainAsync(candidates[0]);
+            _ = RunGuardedAsync(() => NavigateToUsageChainAsync(candidates[0]), "Go to Definition");
             return;
         }
 
@@ -1916,7 +1915,7 @@ public partial class MainWindow : Window
             _usageChainPickerMenu.Items.Add(new MenuItem
             {
                 Header = $"{candidate.Chain.Name} — {candidate.Entry.FileName}",
-                Command = new RelayCommand(() => _ = NavigateToUsageChainAsync(candidate)),
+                Command = new RelayCommand(() => _ = RunGuardedAsync(() => NavigateToUsageChainAsync(candidate), "Go to Definition")),
             });
         }
         _usageChainPickerMenu.Placement = PlacementMode.Pointer;
@@ -2501,7 +2500,7 @@ public partial class MainWindow : Window
         var absolutePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (absolutePath is null) return;
 
-        _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(absolutePath);
+        CopyTextToClipboard(absolutePath);
     }
 
     /// <summary>
@@ -2526,6 +2525,7 @@ public partial class MainWindow : Window
             $"Delete \"{fileName}\"? This cannot be undone.", "Delete File");
         if (!confirmed) return;
 
+        var chains = ChainNamesIn(absolutePath);
         var error = DeleteToRecycleBin(absolutePath);
         if (error is not null)
         {
@@ -2538,6 +2538,8 @@ public partial class MainWindow : Window
         // the user already confirmed a destructive, non-undoable action.
         if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(absolutePath)) is { } openTab)
             await CloseTabCoreAsync(openTab);
+
+        if (await BrokenByRemovedFilesAsync("Deleting", new Dictionary<string, IReadOnlyCollection<string>> { [absolutePath] = chains }) is { } broken) ShowProblem(broken);
     }
 
     /// <summary>
@@ -2612,7 +2614,7 @@ public partial class MainWindow : Window
     /// put. Recycling is the safety net for an accidental convert, which is why the confirm names
     /// it. Open tabs on a recycled original are closed, same reason as
     /// <see cref="DeleteProjectFileAsync"/>; one whose last save failed is saved first, and when that
-    /// fails again its file is left out and named.
+    /// fails again its file is left out and named. The sequences that played a recycled original are named too.
     /// </summary>
     private async Task ConvertToAchjAsync(IReadOnlyList<string> sources, string confirmText)
     {
@@ -2636,12 +2638,14 @@ public partial class MainWindow : Window
         }
 
         var batch = AchxToAchjBatch.Convert(ready);
-        int converted = 0, skipped = batch.Skipped.Count();
+        var recycled = new Dictionary<string, IReadOnlyCollection<string>>();
+        int skipped = batch.Skipped.Count();
         problems.AddRange(batch.Failed.Select(f => $"{new FilePath(f.SourcePath).NoPath}: {f.Error}"));
         foreach (var file in batch.Converted)
         {
             var source = file.SourcePath;
             var name = new FilePath(source).NoPath;
+            var chains = ChainNamesIn(source);
             var error = DeleteToRecycleBin(source);
             if (error is not null)
             {
@@ -2649,18 +2653,21 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            converted++;
+            recycled[source] = chains;
             if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(source)) is { } openTab)
                 await CloseTabCoreAsync(openTab);
         }
 
+        int converted = recycled.Count;
+        var broken = await BrokenByRemovedFilesAsync("Converting", recycled);
         if (problems.Count > 0)
             // Posted because a failed save's own banner is, and would replace this one.
             await Dispatcher.UIThread.InvokeAsync(() =>
-                ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}"));
+                ShowProblem($"⚠ Converted {converted}, {Plural.Format(problems.Count, "problem")}: {string.Join("; ", problems)}{(broken is null ? "" : $". {broken}")}"));
         else
         {
             if (savedEdits) Notifications.HideProblem(AutoSaveFailedPrefix);
+            if (broken is not null) ShowProblem(broken);
             ShowStatusMessage(skipped > 0
                 ? $"Converted {converted} to .achj; skipped {skipped} (an .achj already exists)."
                 : $"Converted {converted} to .achj.");
@@ -2707,7 +2714,7 @@ public partial class MainWindow : Window
     private void OnTitleFileCopyPathClick(object? sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrEmpty(_projectManager.FileName))
-            _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(_projectManager.FileName);
+            CopyTextToClipboard(_projectManager.FileName);
     }
 
     private void OnMinimizeBtnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -2740,7 +2747,7 @@ public partial class MainWindow : Window
     private void WireMenuEvents()
     {
         MenuNew.Click    += OnNewClick;
-        MenuNewSequence.Click += (_, _) => _ = NewSequenceFileAsync();
+        MenuNewSequence.Click += (_, _) => _ = RunGuardedAsync(() => NewSequenceFileAsync(), "New Sequence File");
         MenuLoad.Click   += OnLoadClick;
         MenuOpenProjectFolder.Click += OnOpenProjectFolderClick;
         MenuCloseProject.Click += OnCloseProjectClick;
@@ -2750,8 +2757,8 @@ public partial class MainWindow : Window
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
         MenuExportGodot.Click += OnExportGodotClick;
-        MenuExportGif.Click += (_, _) => _ = ExportAnimatedImageAsync(AnimatedImageFormat.Gif);
-        MenuExportWebp.Click += (_, _) => _ = ExportAnimatedImageAsync(AnimatedImageFormat.Webp);
+        MenuExportGif.Click += (_, _) => _ = RunGuardedAsync(() => ExportAnimatedImageAsync(AnimatedImageFormat.Gif), "GIF export");
+        MenuExportWebp.Click += (_, _) => _ = RunGuardedAsync(() => ExportAnimatedImageAsync(AnimatedImageFormat.Webp), "WebP export");
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
         MenuOpenLogFolder.Click += OnOpenLogFolderClick;
@@ -2942,7 +2949,7 @@ public partial class MainWindow : Window
 
         OpenAsNewUnsavedDocument(new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel });
 
-        _ = _appCommands.SaveCurrentAnimationChainListAsync();
+        _ = RunGuardedAsync(() => _appCommands.SaveCurrentAnimationChainListAsync(), "Save");
     }
 
     /// <summary>
@@ -2980,7 +2987,7 @@ public partial class MainWindow : Window
         UpdateTitle();
     }
 
-    private void OnLoadClick(object? sender, RoutedEventArgs e) => _ = LoadAsync();
+    private void OnLoadClick(object? sender, RoutedEventArgs e) => _ = RunGuardedAsync(() => LoadAsync(), "Open");
 
     private async Task LoadAsync()
     {
@@ -2989,7 +2996,7 @@ public partial class MainWindow : Window
             await LoadAnimationFileAsync(path);
     }
 
-    private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = OpenProjectFolderAsync();
+    private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = RunGuardedAsync(() => OpenProjectFolderAsync(), "Open Project Folder");
 
     private void OnCloseProjectClick(object? sender, RoutedEventArgs e) => CloseProjectFolder();
 
@@ -3032,7 +3039,7 @@ public partial class MainWindow : Window
             // The active tab was in the folder: load the one the manager fell back to. An
             // untouched active tab is the live document and must not be reset or reloaded.
             if (_tabManager.ActiveTab != activeBefore)
-                _ = ShowActiveTabAsync();
+                _ = RunGuardedAsync(() => ShowActiveTabAsync(), "Open");
         }
 
         RebuildTabStrip();
@@ -3203,9 +3210,9 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = ActivePane.SaveAsync(_tabManager.ActiveTab);
+    private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = RunGuardedAsync(() => ActivePane.SaveAsync(_tabManager.ActiveTab), "Save");
 
-    private void OnSaveAsClick(object? sender, RoutedEventArgs e) => _ = ActivePane.SaveAsAsync(_tabManager.ActiveTab);
+    private void OnSaveAsClick(object? sender, RoutedEventArgs e) => _ = RunGuardedAsync(() => ActivePane.SaveAsAsync(_tabManager.ActiveTab), "Save As");
 
     /// <summary>"Associate Tiled Tileset…" menu command (issue #1133) -- picks a .tsx via the
     /// same open-file dialog seam as everything else, then hands off to
@@ -3220,10 +3227,10 @@ public partial class MainWindow : Window
     }
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
-        _ = _appCommands.ExportAsync(ExportFormat.PixiJs);
+        _ = RunGuardedAsync(() => _appCommands.ExportAsync(ExportFormat.PixiJs), "PixiJS export");
 
     private void OnExportGodotClick(object? sender, RoutedEventArgs e) =>
-        _ = _appCommands.ExportAsync(ExportFormat.Godot);
+        _ = RunGuardedAsync(() => _appCommands.ExportAsync(ExportFormat.Godot), "Godot export");
 
     // Remembered for the session so a second export starts from the last choices.
     private readonly Dictionary<AnimatedImageFormat, AnimationExportOptions> _animatedExportOptions = new();
@@ -3261,30 +3268,23 @@ public partial class MainWindow : Window
             return;
         }
 
-        try
-        {
-            ShowStatusMessage($"Exporting {format.Name}…");
-            // Resolved here, on the UI thread, because it reads project state.
-            var texturePaths = new Dictionary<AnimationFrameSave, string?>(ReferenceEqualityComparer.Instance);
-            foreach (var frame in sources.SelectMany(source => source.Chain.Frames))
-                texturePaths[frame] = _thumbnailService.ResolveTexturePath(frame);
-            float offsetMultiplier = _appState.OffsetMultiplier;
+        ShowStatusMessage($"Exporting {format.Name}…");
+        // Resolved here, on the UI thread, because it reads project state.
+        var texturePaths = new Dictionary<AnimationFrameSave, string?>(ReferenceEqualityComparer.Instance);
+        foreach (var frame in sources.SelectMany(source => source.Chain.Frames))
+            texturePaths[frame] = _thumbnailService.ResolveTexturePath(frame);
+        float offsetMultiplier = _appState.OffsetMultiplier;
 
-            byte[] image = await Task.Run(() => AnimatedImageRenderers.Render(
-                format, sources, frame => texturePaths.GetValueOrDefault(frame), offsetMultiplier, options));
-            await File.WriteAllBytesAsync(path, image);
-            ShowInfo($"Exported {Path.GetFileName(path)}");
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
-        {
-            ShowProblem($"{format.Name} export failed: {ex.Message}");
-        }
+        byte[] image = await Task.Run(() => AnimatedImageRenderers.Render(
+            format, sources, frame => texturePaths.GetValueOrDefault(frame), offsetMultiplier, options));
+        await File.WriteAllBytesAsync(path, image);
+        ShowInfo($"Exported {Path.GetFileName(path)}");
     }
 
     internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
 
     private void OnAboutClick(object? sender, RoutedEventArgs e)
-        => _ = ShowAboutDialogAsync();
+        => _ = RunGuardedAsync(() => ShowAboutDialogAsync(), "About");
 
     /// <summary>
     /// Opening the About dialog behaves as if its "Check for Updates" button were already clicked:
@@ -5800,8 +5800,9 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Puts <paramref name="text"/> on the system clipboard; shared by every Copy Qualified Name menu item.</summary>
-    internal void CopyTextToClipboard(string text) => _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(text);
+    /// <summary>Puts <paramref name="text"/> on the system clipboard; shared by every Copy Qualified Name and Copy Full Path menu item.</summary>
+    internal void CopyTextToClipboard(string text) =>
+        _ = RunGuardedAsync(() => TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask, "Copy");
 
     private void OnTreeContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
     {
@@ -5850,10 +5851,10 @@ public partial class MainWindow : Window
                 AddMenuItem("Adjust Frame Time…", TreeMenuIcon.FrameTime, () => AskAdjustFrameTime(chain));
                 break;
             case TreeMenuHostSlot.AddMultipleFrames when nodeData is AnimationChainSave chain:
-                AddMenuItem("Add Multiple Frames…", TreeMenuIcon.Frame, () => _ = AskAddMultipleFramesAsync(chain));
+                AddMenuItem("Add Multiple Frames…", TreeMenuIcon.Frame, () => _ = RunGuardedAsync(() => AskAddMultipleFramesAsync(chain), "Add Multiple Frames"));
                 break;
             case TreeMenuHostSlot.AdjustOffsets when nodeData is AnimationChainSave chain:
-                AddMenuItem("Adjust Offsets…", TreeMenuIcon.Offsets, () => _ = AskAdjustOffsetsAsync(chain));
+                AddMenuItem("Adjust Offsets…", TreeMenuIcon.Offsets, () => _ = RunGuardedAsync(() => AskAdjustOffsetsAsync(chain), "Adjust Offsets"));
                 break;
             case TreeMenuHostSlot.ViewTextureInExplorer when nodeData is AnimationFrameSave frame:
                 AddMenuItem("Reveal Texture in File Manager", TreeMenuIcon.RevealFile, () => ViewTextureInExplorer(frame));
@@ -5866,7 +5867,7 @@ public partial class MainWindow : Window
 
     private void AskAdjustFrameTime(AnimationChainSave chain)
     {
-        _ = EditorDialogs.ShowAdjustFrameTimeAsync(_dialogHost, _appCommands, chain, CurrentFrameLengthUnit);
+        _ = RunGuardedAsync(() => EditorDialogs.ShowAdjustFrameTimeAsync(_dialogHost, _appCommands, chain, CurrentFrameLengthUnit), "Adjust Frame Time");
     }
 
     // ── Frame events (#1121) ──────────────────────────────────────────────────
@@ -7819,7 +7820,7 @@ public partial class MainWindow : Window
                     ? new[] { new HotkeyGesture(Key.OemOpenBrackets.ToString(), Command, Forbidden: Shift | Alt) }
                     : new[] { new HotkeyGesture("Left", Alt) },
                 Scope = HotkeyScope.App,
-                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: true); },
+                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = RunGuardedAsync(() => NavigateHistoryAsync(back: true), "Back"); },
             },
             new()
             {
@@ -7828,7 +7829,7 @@ public partial class MainWindow : Window
                     ? new[] { new HotkeyGesture(Key.OemCloseBrackets.ToString(), Command, Forbidden: Shift | Alt) }
                     : new[] { new HotkeyGesture("Right", Alt) },
                 Scope = HotkeyScope.App,
-                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = NavigateHistoryAsync(back: false); },
+                Action = () => { if (!IsMacOS) _altMenuActivationSuppressor.ArmFromAltArrowReorder(); _ = RunGuardedAsync(() => NavigateHistoryAsync(back: false), "Forward"); },
             },
             new()
             {
@@ -7842,7 +7843,7 @@ public partial class MainWindow : Window
                 Id = "load", Description = "Open…", Category = "File",
                 Gestures = new[] { new HotkeyGesture("O", Command) },
                 Scope = HotkeyScope.App,
-                Action = () => _ = LoadAsync(),
+                Action = () => _ = RunGuardedAsync(() => LoadAsync(), "Open"),
             },
             new()
             {
@@ -8073,10 +8074,9 @@ public partial class MainWindow : Window
         ?? _selectedState.SelectedFrame
         ?? (object?)_selectedState.SelectedChain;
 
-    // Copy/Paste are invoked fire-and-forget (_ = HandleCopyAsync()), so an exception
-    // inside them would otherwise vanish as an unobserved task exception — which is how
-    // a clipboard-serialization failure silently produced "nothing happened". Route both
-    // through this guard so any failure surfaces as a visible error instead.
+    // A command is invoked fire-and-forget (_ = RunGuardedAsync(...)), so an exception inside it would
+    // otherwise vanish as an unobserved task exception — which is how a clipboard-serialization failure
+    // silently produced "nothing happened". DiscardedTaskGuardTests keeps every discarded task on this guard.
     internal async Task RunGuardedAsync(Func<Task> action, string actionName)
     {
         try
@@ -8085,6 +8085,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            Services.AppLog.Error($"{actionName} failed.", ex);
             ShowProblem($"⚠ {actionName} failed: {ex.Message}");
         }
     }

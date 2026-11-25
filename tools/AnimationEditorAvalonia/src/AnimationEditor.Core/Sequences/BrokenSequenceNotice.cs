@@ -43,7 +43,14 @@ public static class BrokenSequenceNotice
     /// The banner text, or null when no file has a broken block: the edit, then each file with the places (sequence/track) of its
     /// blocks while those are few, else with how many it has.
     /// </summary>
-    public static string? Message(RemovedChainNames removed, IEnumerable<BrokenSequenceFile> files)
+    public static string? Message(RemovedChainNames removed, IEnumerable<BrokenSequenceFile> files) =>
+        Message(removed.Verb, removed.Names.Count == 1 ? $"'{removed.Names.First()}'" : Plural.Format(removed.Names.Count, "animation"), files);
+
+    /// <summary>The same banner for files that are gone: <paramref name="verb"/> is what removed <paramref name="paths"/>.</summary>
+    public static string? Message(string verb, IReadOnlyCollection<string> paths, IEnumerable<BrokenSequenceFile> files) =>
+        Message(verb, paths.Count == 1 ? Path.GetFileName(paths.First()) : Plural.Format(paths.Count, "file"), files);
+
+    private static string? Message(string verb, string subject, IEnumerable<BrokenSequenceFile> files)
     {
         var broken = files.Where(file => file.Blocks.Count > 0).ToList();
         if (broken.Count == 0) return null;
@@ -52,8 +59,7 @@ public static class BrokenSequenceNotice
         var listed = string.Join(", ", broken.Take(MaxFiles)
             .Select(file => $"{Path.GetFileName(file.Path)} ({(named ? string.Join(", ", Places(file)) : file.Blocks.Count)})"));
         int more = broken.Count - MaxFiles;
-        var chains = removed.Names.Count == 1 ? $"'{removed.Names.First()}'" : Plural.Format(removed.Names.Count, "animation");
-        return $"{removed.Verb} {chains} broke {Plural.Format(broken.Sum(file => file.Blocks.Count), "sequence block")}: {listed}"
+        return $"{verb} {subject} broke {Plural.Format(broken.Sum(file => file.Blocks.Count), "sequence block")}: {listed}"
             + (more > 0 ? $" and {more} more {Plural.Noun(more, "file")}." : ".");
     }
 
