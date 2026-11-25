@@ -137,6 +137,11 @@ namespace AnimationEditor.Core.Models
         public Dictionary<object, bool>? CachedTreeExpandState { get; set; }
 
         /// <summary>
+        /// The preview's guides when this tab was last deactivated. The companion file's, when it has one, win over them.
+        /// </summary>
+        public PreviewGuides? CachedGuides { get; set; }
+
+        /// <summary>
         /// The UI layer's per-tab animation tree (its <c>TreeView</c>, node view-models and the model
         /// they were built for), kept so switching back to this tab shows the tree again instead of
         /// rebuilding it. Opaque here because Core has no UI types; <see cref="TabManager.Rename"/>
@@ -166,4 +171,7 @@ namespace AnimationEditor.Core.Models
             _displayNameOverride
             ?? (string.IsNullOrEmpty(Path.Original) ? "Untitled" : Path.NoPath);
     }
+
+    /// <summary>The preview's guides, as world coordinates.</summary>
+    public sealed record PreviewGuides(IReadOnlyList<float> Horizontal, IReadOnlyList<float> Vertical);
 }

@@ -376,11 +376,11 @@ namespace AnimationEditor.Core
             else
             {
                 // No parseable project file — fall back to all .png files relative to project dir
-                // Directory.EnumerateFiles' "*.png" filter is case-sensitive on Linux — it would
+                // A "*.png" pattern is case-sensitive on Linux — it would
                 // miss "Hero.PNG". Match the extension ourselves so Windows-authored sheets
                 // (which commonly use mixed casing) are picked up on every platform.
                 ReferencedPngs = Directory.Exists(projectDirectory)
-                    ? Directory.EnumerateFiles(projectDirectory, "*", SearchOption.AllDirectories)
+                    ? FolderWalk.Files(projectDirectory)
                         .Where(f => Path.GetExtension(f).Equals(".png", StringComparison.OrdinalIgnoreCase))
                         .Select(item => new FilePath(item))
                         .ToArray()

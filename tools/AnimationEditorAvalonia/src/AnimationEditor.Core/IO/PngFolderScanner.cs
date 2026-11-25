@@ -27,7 +27,7 @@ public static class PngFolderScanner
         var normalizedRoot = Path.GetFullPath(rootFolder);
         var files = new List<PngFileEntry>();
 
-        foreach (var file in Directory.EnumerateFiles(normalizedRoot, "*", SearchOption.AllDirectories))
+        foreach (var file in FolderWalk.Files(normalizedRoot))
         {
             if (!Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase))
                 continue;

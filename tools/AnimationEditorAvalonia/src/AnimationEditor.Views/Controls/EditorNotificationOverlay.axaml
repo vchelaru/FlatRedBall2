@@ -7,7 +7,7 @@
         (top-centre, ShowProblem, optional ErrorBannerRetryBtn). ItemDeletedToastPanel is the info kind
         with an Undo button.
 
-        #1130 follow-up: this root UserControl (and the Panel below it) used to carry
+        #1130 follow-up: this root UserControl (and the panel below it) used to carry
         IsHitTestVisible="False", on the theory that each panel's own IsHitTestVisible="True"
         would "re-enable" hit-testing for itself. It doesn't: Avalonia's hit-test walk prunes an
         element's entire subtree once an ancestor is IsHitTestVisible=False, so none of
@@ -15,13 +15,19 @@
         reachable by a real pointer click (confirmed by simulating a click at the actual button
         bounds in a headless test; it did nothing until this was removed). The "pass clicks
         through when nothing is shown" goal this was trying to achieve doesn't need it anyway:
-        neither the UserControl nor the Panel sets a Background, and an element with no Background
+        neither the UserControl nor the panel sets a Background, and an element with no Background
         brush is already excluded from hit-testing on its own account, so empty overlay space was
         always click-through. Each Border's own IsVisible="False" default (not IsHitTestVisible)
         is what keeps a hidden panel out of the way.
     -->
-    <Panel>
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- The problem banner's row, as high as MainWindow's title bar without one; the info toast starts below it. -->
+            <RowDefinition Height="Auto" MinHeight="36" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
         <Border x:Name="ItemDeletedToastPanel" x:FieldModifier="Public"
+                Grid.RowSpan="2"
                 IsVisible="False"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
@@ -109,15 +115,15 @@
 
         <!-- #1130: floating top-right card instead of a bottom chrome-colored bar, so a
              confirmation reads like a phone/desktop notification instead of blending into the
-             window rail. ZIndex above ErrorBanner (60) since this is the most frequent overlay
-             and must never end up hidden behind it; top-right (not ErrorBanner's top-center)
-             so the two never occupy the same screen region if both are visible at once.
+             window rail. Top-right (not ErrorBanner's top-center) and
+             in the row below the banner's, so the two never occupy the same screen region if both
+             are visible at once, however narrow the window.
              InfoBannerBg + AccentCool left stripe reuses MainWindow's existing "tier-2
              actionable info" styling instead of inventing a new
              color language, while staying distinct from ErrorBanner's red and
              ItemDeletedToastPanel's plain #333.
 
-             Top margin (44) clears MainWindow's 36px custom title bar (WindowDecorations="None"
+             The banner row's MinHeight clears MainWindow's 36px custom title bar (WindowDecorations="None"
              means Minimize/Maximize/CloseBtn are ordinary in-tree controls at the top-right
              corner, not native OS chrome the overlay can't reach). This overlay auto-hides on a
              timer, so a user's click can land after the panel has vanished; if any part of it
@@ -127,7 +133,8 @@
                 IsVisible="False"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
-                Margin="0,44,16,0"
+                Grid.Row="1"
+                Margin="0,8,16,0"
                 MaxWidth="420"
                 Background="{DynamicResource InfoBannerBg}"
                 BorderBrush="{DynamicResource LineBrush}"
@@ -188,5 +195,5 @@
                 </DockPanel>
             </DockPanel>
         </Border>
-    </Panel>
+    </Grid>
 </UserControl>

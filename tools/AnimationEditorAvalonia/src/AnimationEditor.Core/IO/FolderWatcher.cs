@@ -30,7 +30,8 @@ public sealed class FolderWatcher : IDisposable
     /// Raised when the underlying <see cref="FileSystemWatcher"/> reports a buffer overflow (too
     /// many changes between flushes, e.g. a large <c>git pull</c>/checkout). The individual
     /// changed paths are lost at that point — callers should treat this as "assume anything under
-    /// the watched folder may have changed" and rescan.
+    /// the watched folder may have changed" and rescan. Any other error raises it too: the folder went away, or, on
+    /// Linux, a subfolder that may not be listed.
     /// </summary>
     public event Action? Overflowed;
 
@@ -66,6 +67,18 @@ public sealed class FolderWatcher : IDisposable
         }
 
         _flushTimer.Change(100, 100);
+    }
+
+    /// <summary>
+    /// Watches the folder again when the OS stopped the watcher (the folder went away). A watcher that only reported an
+    /// error goes on: starting it again would report the same one.
+    /// </summary>
+    public void RestartIfStopped()
+    {
+        string? folder;
+        lock (_lock)
+            folder = _watcher is { EnableRaisingEvents: false } ? _watcher.Path : null;
+        if (folder is not null) Watch(folder);
     }
 
     public void Dispose()

@@ -333,6 +333,16 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
             _cameraMemory.Remember(_loadedTexturePath, new TextureCamera(_panX, _panY, _zoom));
     }
 
+    // For the texture already showing. The camera it is showing with stays as it is, inside the clamp band or not: that is
+    // a tab that was left and came back with nothing shown in between (the other one's file did not load).
+    private void ApplyReboundCamera(string norm)
+    {
+        if (_cameraMemory.Remembers(norm, new TextureCamera(_panX, _panY, _zoom)))
+            _memoryRebound = false;
+        else
+            ApplyRememberedCamera(norm);
+    }
+
     // Applies the memory's camera for `norm`, or centres the texture when it has none.
     private void ApplyRememberedCamera(string norm)
     {
@@ -623,7 +633,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         {
             // A newly bound memory (another tab showing the same texture) still decides the camera.
             if (_memoryRebound && norm != null && _bitmap != null)
-                ApplyRememberedCamera(norm);
+                ApplyReboundCamera(norm);
             // Texture hasn't changed, but the selected frame may have, so update frame rects.
             OnTextureLoaded(_bitmap);
             return true;
@@ -662,7 +672,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         if (_loadedTexturePath == norm && _bitmap != null)
         {
             if (_memoryRebound && norm != null)
-                ApplyRememberedCamera(norm);
+                ApplyReboundCamera(norm);
             OnTextureLoaded(_bitmap);
             return true;
         }

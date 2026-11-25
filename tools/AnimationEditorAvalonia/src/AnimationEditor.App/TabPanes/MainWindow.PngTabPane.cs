@@ -91,6 +91,10 @@ public partial class MainWindow
 
         public Task<TabEntry?> PrepareCloseAsync(TabEntry tab) => Task.FromResult<TabEntry?>(tab);
 
+        public bool HasFailedSave(TabEntry tab) => false;
+
+        public string? SaveFailedEdits(TabEntry tab) => null;
+
         // Never reached: Save is document-scoped, which this pane refuses.
         public Task SaveAsync(TabEntry? tab) => Task.CompletedTask;
 
