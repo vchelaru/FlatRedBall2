@@ -509,6 +509,28 @@ public class AppCommandsTiledSyncTests
     }
 
     [Fact]
+    public async Task SaveAs_FromAnotherNameNextToAFileThatOwnsTheTile_WarnsAndLeavesTheTile()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var tsxPath = WriteFixtureTileset(dir.Path);
+        var achxPath = Path.Combine(dir.Path, "Hero.achx");
+        ctx.ProjectManager.FileName = achxPath;
+        ctx.AppCommands.AddAssociatedTiledTileset(tsxPath);
+        TestHelpers.MakeChain(ctx.Acls, "Walk").Frames.Add(Tile0Frame("Heroes.png"));
+        ctx.AppCommands.SaveCurrentAnimationChainList(achxPath);
+        ctx.ProjectManager.FileName = Path.Combine(dir.Path, "Other.achx");
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(Path.Combine(dir.Path, "Hero.achj"));
+        IReadOnlyList<string> raised = [];
+        ctx.AppCommands.TiledSyncWarned += w => raised = w;
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        raised.Single().ShouldContain("already owned by \"Hero.achx\"");
+        Loader.Default().LoadTileset(tsxPath).Tiles.Single().GetProperty<StringProperty>("achjSourceFile").Value.ShouldBe("Hero.achx");
+    }
+
+    [Fact]
     public void SaveCurrentAnimationChainList_CorruptTiledSyncFile_RaisesTiledSyncFailed()
     {
         var ctx = TestHelpers.SetupFreshAcls();
