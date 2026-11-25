@@ -21,10 +21,7 @@ public class DocumentWriteGuardTests
         ["AppCommands.SaveOpenDocument"] = [DocAction.Save, DocAction.Autosave, DocAction.WriteRecovery, DocAction.SaveAs, DocAction.FailedSaveAs,
             DocAction.SaveAsOntoAnotherFormat, DocAction.SaveAsOntoOpenTab],
         ["AppCommands.SaveDocument"] = [DocAction.SaveBackgroundDocument, DocAction.CutChain, DocAction.CutFrame, DocAction.CutShape],
-        ["AppCommands.WriteDocument"] = [DocAction.Save, DocAction.SaveAs, DocAction.SaveBackgroundDocument, DocAction.PushFromBackground,
-            DocAction.CutChainOutOfPushSource, DocAction.ConvertOpenPushSource],
-        ["AppCommands.SyncAssociatedTiledTilesets"] = [DocAction.PushToTileset, DocAction.PushFromBackground],
-        ["TiledTilesetSyncRunner.SyncAll"] = [DocAction.PushToTileset, DocAction.PushFromBackground],
+        ["AppCommands.WriteDocument"] = [DocAction.Save, DocAction.SaveAs, DocAction.SaveBackgroundDocument],
         ["AppCommands.ExportAsync"] = [DocAction.Export],
         ["ProjectManager.SaveTsx"] = [DocAction.Save, DocAction.SaveBackgroundDocument, DocAction.CutChain, DocAction.CutFrame],
         ["ProjectManager.SaveAnimationChainList"] = [DocAction.Save, DocAction.SaveBackgroundDocument],
@@ -33,7 +30,7 @@ public class DocumentWriteGuardTests
         ["AchxConversion.Write"] = [DocAction.ConvertOpenTabToAchj],
         ["AchxConversion.ReplaceRecyclingOriginal"] = [DocAction.ConvertSequenceSource],
         ["TsxFile.Save"] = [DocAction.Save, DocAction.SaveBackgroundDocument, DocAction.SaveAsToAnotherFolder],
-        ["TsxWriter.Write"] = [DocAction.Save, DocAction.PushToTileset],
+        ["TsxWriter.Write"] = [DocAction.Save],
         ["PreviewControl.CommitChainDrag"] = [DocAction.Save, DocAction.Autosave],
         ["PreviewControl.CommitFrameDrag"] = [DocAction.Save, DocAction.Autosave],
         ["PreviewControl.CommitShapeDrag"] = [DocAction.Save, DocAction.Autosave],
@@ -66,7 +63,6 @@ public class DocumentWriteGuardTests
         ["NewAnimationFileWriter.WriteEmpty"] = "a new, empty file",
         ["RecycleBin.MoveToLinuxTrash"] = "the recycle bin itself",
         ["TextureCopyDecider.Apply"] = "a texture",
-        ["IoManager.AddAssociatedTiledTilesetPath"] = "the .tiledsync beside a document",
         ["XmlFile.Serialize"] = "the .aeproperties beside a document",
         ["DiskEditorFolder.OpenWriteAsync"] = "opens the stream NewAnimationFileWriter fills",
         ["ProjectTreeThumbnailService.TrySaveToDisk"] = "the thumbnail cache",
@@ -92,7 +88,7 @@ public class DocumentWriteGuardTests
         @"\bFile\.(Write\w+|Append\w+|Move|Copy|Replace|Create\w*|Open|OpenWrite)\(|\bnew (StreamWriter|FileStream)\(|\.(MoveTo|OpenWrite|CreateText|AppendText)\("
         + @"|\bnew FileInfo\([^)]*\)\.\w+To\(|\bAtomicFile\.Write\(|\bTsxWriter\.\w+\(|\.Save(Json|As)?\([^)\s]"
         + @"|(?<!void |Task |bool |bool> |string> )\b(SaveCurrentAnimationChainList(Async)?|SaveOpenDocument|WriteDocument|SaveDocument|SaveToDisk"
-        + @"|WriteRecoveryFile|SyncAssociatedTiledTilesets)\(|\bTiledTilesetSyncRunner\.\w+\(|\bAchxToAchj\w+\.Convert\(|\bDeleteToRecycleBin\(",
+        + @"|WriteRecoveryFile)\(|\bAchxToAchj\w+\.Convert\(|\bDeleteToRecycleBin\(",
         RegexOptions.Compiled);
 
     // A member declaration: at member indentation, a modifier or a type, then the name before its parameters.

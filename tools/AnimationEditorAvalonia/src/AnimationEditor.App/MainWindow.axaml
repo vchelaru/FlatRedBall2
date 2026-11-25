@@ -453,8 +453,6 @@
                         <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
                         <MenuItem Header="Enable _Hot Reload"   x:Name="MenuEnableHotReload" ToggleType="CheckBox" IsChecked="True" />
                         <Separator />
-                        <MenuItem Header="_Associate Tiled Tileset…" x:Name="MenuAssociateTiledTileset" />
-                        <Separator />
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>
                     <MenuItem Header="_View">
@@ -676,23 +674,6 @@
                                FontFamily="{DynamicResource MonoFont}"
                                Foreground="{DynamicResource InkMid}"
                                VerticalAlignment="Center" />
-                    <!-- Tiled tileset sync status (issue #1139), hidden until a sync has
-                         actually written a change, left something out, or failed. -->
-                    <StackPanel x:Name="TiledSyncStatusPanel"
-                                Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
-                                IsVisible="False">
-                        <Image Source="avares://AnimationEditor/Assets/icons/tiled-icon-128.png"
-                               Width="12" Height="12"
-                               IsHitTestVisible="False" />
-                        <Ellipse x:Name="TiledSyncDot"
-                                 Width="6" Height="6"
-                                 Fill="{DynamicResource AccentSoft}" />
-                        <TextBlock x:Name="TiledSyncLabel"
-                                   FontSize="11"
-                                   FontFamily="{DynamicResource MonoFont}"
-                                   Foreground="{DynamicResource InkMid}"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
                 </StackPanel>
                 <!-- right: cursor, selection -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="16"

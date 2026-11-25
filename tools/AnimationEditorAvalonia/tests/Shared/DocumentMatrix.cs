@@ -16,7 +16,7 @@ public enum DocType { Achx, Achj, Tsx, Seqj, Untitled }
 
 /// <summary>
 /// Every action that writes or moves a document's content, run for the (front, background) pairs of <see cref="DocType"/>:
-/// up to <see cref="PushToTileset"/> in <c>DocumentWriteMatrixTests</c> (Core), the rest, which need the window, in
+/// up to <see cref="ConvertToAchj"/> in <c>DocumentWriteMatrixTests</c> (Core), the rest, which need the window, in
 /// <c>DocumentWriteMatrixScenarioTests</c>. A value without rows fails there.
 /// </summary>
 public enum DocAction
@@ -35,12 +35,9 @@ public enum DocAction
     WriteRecovery,
     Export,
     ConvertToAchj,
-    PushFromBackground,
-    PushToTileset,
 
     CutChain,
     CutChainATilesetCannotStore,
-    CutChainOutOfPushSource,
     CutFrame,
     CutShape,
     CutSequence,
@@ -51,7 +48,6 @@ public enum DocAction
     Detach,
     LeaveDuringRename,
     ConvertOpenTabToAchj,
-    ConvertOpenPushSource,
     ConvertSequenceSource,
     DuplicateWithUnsavedEdits,
     RecoverAtStartup,

@@ -50,9 +50,8 @@ public class AppCommandsHotReloadTsxTests : IDisposable
 
     /// <summary>
     /// Live bug: opening a .tsx never started the hot-reload watcher at all, so an external edit
-    /// to the file (hand-editing the raw XML, another tab's "sync associated Tiled tilesets"
-    /// writing to it) was never picked up no matter how long you waited or how many times you
-    /// saved -- AchxChangedOnDisk can only fire for a path the watcher was told to watch, and
+    /// to the file (hand-editing the raw XML, saving it in Tiled) was never picked up no matter how
+    /// long you waited or how many times you saved -- AchxChangedOnDisk can only fire for a path the watcher was told to watch, and
     /// OpenTsxWorkflowAsync never called HotReloadWatcher.StartWatching (it hand-duplicates
     /// FinishLoadIntoEditor's steps instead of calling it, and dropped that one on the way).
     /// </summary>
@@ -112,9 +111,8 @@ public class AppCommandsHotReloadTsxTests : IDisposable
         Assert.NotEmpty(_ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
 
         // Simulates the tsx changing on disk while this tab is the active/watched one (e.g. a
-        // different tab's "sync associated Tiled tilesets" writing to this same file, or a hand
-        // edit) -- the watcher fires AchxChangedOnDisk for whatever path IProjectManager.FileName
-        // currently is, tsx or achx alike.
+        // save from Tiled or a hand edit) -- the watcher fires AchxChangedOnDisk for whatever path
+        // IProjectManager.FileName currently is, tsx or achx alike.
         _ctx.AppCommands.ReloadAchxFromDisk(tsxPath);
 
         Assert.True(_ctx.ProjectManager.IsNativeTsxProject);

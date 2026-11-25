@@ -143,80 +143,6 @@ public class TsxEditTests : IDisposable
         save.Warnings.ShouldNotBeEmpty();
     }
 
-    [Fact]
-    public async Task AssociateTileset_WritesTheCompanionFile()
-    {
-        Copy("sheet.png");
-        Copy("tiles.tsx");
-        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
-
-        var result = TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, Path.Combine(_dir, "tiles.tsx"));
-
-        result.Success.ShouldBeTrue(string.Join("; ", result.Errors));
-        Directory.GetFiles(_dir, "*.tiledsync").Length.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Save_AssociatedTilesetGone_SavesAndWarnsNamingTheTileset()
-    {
-        Copy("sheet.png");
-        var tsx = Copy("tiles.tsx");
-        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
-        TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, tsx).Success.ShouldBeTrue();
-        File.Delete(tsx);
-
-        var save = s.Save();
-
-        save.Success.ShouldBeTrue(string.Join("; ", save.Errors));
-        save.Warnings.ShouldHaveSingleItem().ShouldStartWith("Associated tileset tiles.tsx was not updated: ");
-    }
-
-    [Fact]
-    public async Task Save_ChainOnAnotherImageOfTheSameName_WarnsNamingTheTilesetAndBothImages()
-    {
-        Copy("sheet.png");
-        var tsx = Copy("tiles.tsx");
-        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
-        TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, tsx).Success.ShouldBeTrue();
-        s.Document.AnimationChains.RemoveRange(1, s.Document.AnimationChains.Count - 1);
-        foreach (var frame in s.Document.AnimationChains[0].Frames) frame.TextureName = "sub/sheet.png";
-
-        var save = s.Save();
-
-        var warning = save.Warnings.ShouldHaveSingleItem();
-        warning.ShouldStartWith($"Associated tileset tiles.tsx: chain \"{s.Document.AnimationChains[0].Name}\": ");
-        warning.ShouldContain("/sub/sheet.png\"");
-        warning.ShouldContain("/sheet.png\".");
-    }
-
-    // The .achx is not a tileset, so the warning must not name it as one (#1996).
-    [Fact]
-    public async Task Save_UnreadableSyncFile_SavesAndWarnsNamingTheSyncFile()
-    {
-        Copy("sheet.png");
-        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
-        File.WriteAllText(Path.Combine(_dir, "hero.tiledsync"), "{ not json");
-
-        var save = s.Save();
-
-        save.Success.ShouldBeTrue(string.Join("; ", save.Errors));
-        var warning = save.Warnings.ShouldHaveSingleItem();
-        warning.ShouldStartWith("Associated tilesets were not updated: Could not read the Tiled sync file hero.tiledsync");
-        warning.ShouldNotContain("hero.achx");
-    }
-
-    [Fact]
-    public async Task AssociateTileset_MissingFile_FailsAndWritesNothing()
-    {
-        Copy("sheet.png");
-        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
-
-        var result = TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, Path.Combine(_dir, "nope.tsx"));
-
-        result.HasError(EditErrorCode.NotFound).ShouldBeTrue();
-        Directory.GetFiles(_dir, "*.tiledsync").ShouldBeEmpty();
-    }
-
     private sealed class AnyImageProbe : ITextureProbe
     {
         public bool CanDecode(string absolutePath) => true;
@@ -253,29 +179,5 @@ public class TsxEditTests : IDisposable
 
         result.Success.ShouldBeTrue(string.Join("; ", result.Errors));
         walk.Frames[0].TextureName.ShouldBe("sheet.png");
-    }
-
-    [Fact]
-    public async Task AssociateTileset_InATsxProject_IsRefused()
-    {
-        var s = await OpenTsx();
-
-        var result = TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, Path.Combine(_dir, "tiles.tsx"));
-
-        result.HasError(EditErrorCode.WrongFileKind).ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task AssociateTileset_ThenOpeningThatTsxNatively_IsRefusedUpFront()
-    {
-        Copy("sheet.png");
-        Copy("tiles.tsx");
-        var s = (await EditSession.OpenAsync(Copy("hero.achx"))).Session!;
-        TsxEdit.AssociateTileset(s.Commands, s.ProjectManager, Path.Combine(_dir, "tiles.tsx")).Success.ShouldBeTrue();
-
-        var open = await EditSession.OpenAsync(Path.Combine(_dir, "tiles.tsx"));
-
-        open.Session.ShouldBeNull();
-        open.Result.Errors[0].ShouldContain("associated");
     }
 }

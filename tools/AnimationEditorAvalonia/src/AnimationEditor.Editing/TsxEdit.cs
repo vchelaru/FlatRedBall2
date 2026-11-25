@@ -6,8 +6,8 @@ using FlatRedBall2.AnimationEditorCommon;
 namespace AnimationEditor.Editing;
 
 /// <summary>
-/// Tiled tileset ops (#1811): associating a .tsx with an .achx/.achj (the editor's achx-push feature) and choosing
-/// which tile owns a native-.tsx chain's animation. Never touches selection; an owner change is one undo step.
+/// Tiled tileset ops (#1811): choosing which tile owns a native-.tsx chain's animation. Never touches selection; an
+/// owner change is one undo step.
 /// </summary>
 public static class TsxEdit
 {
@@ -49,54 +49,6 @@ public static class TsxEdit
             return Fail(EditErrorCode.InvalidValue,
                 $"The first frame of '{chain.Name}' is not one whole tile, so there is no single tile to return to; give one with tile.");
         return SetChainOwnerTile(projectManager, commands, chain, tile);
-    }
-
-    /// <summary>
-    /// Checks that <paramref name="tsxPath"/> can be associated with the open .achx/.achj, without writing anything.
-    /// </summary>
-    public static EditResult CheckAssociation(IProjectManager projectManager, string tsxPath)
-    {
-        if (projectManager.IsNativeTsxProject)
-            return Fail(EditErrorCode.WrongFileKind, ProjectManager.NativeTsxAssociationRefusal);
-        if (!string.Equals(Path.GetExtension(tsxPath), ".tsx", StringComparison.OrdinalIgnoreCase))
-            return Fail(EditErrorCode.InvalidValue, $"'{tsxPath}' is not a .tsx file.");
-        if (!File.Exists(tsxPath))
-            return Fail(EditErrorCode.NotFound, $"Tileset not found: {tsxPath}");
-        try
-        {
-            TsxLoader.LoadTileset(tsxPath);
-        }
-        catch (Exception ex)
-        {
-            return Fail(EditErrorCode.InvalidValue, $"Could not read tileset {Path.GetFileName(tsxPath)}: {ex.Message}");
-        }
-        return new([tsxPath], [], []);
-    }
-
-    /// <summary>
-    /// Records <paramref name="tsxPath"/> in the open file's Tiled-sync companion file, so every later save of the
-    /// .achx/.achj pushes its animations onto that tileset. Not undoable, and it writes immediately; the sync itself
-    /// happens on the next save.
-    /// </summary>
-    public static EditResult AssociateTileset(IAppCommands commands, IProjectManager projectManager, string tsxPath)
-    {
-        tsxPath = Path.GetFullPath(tsxPath);
-        var check = CheckAssociation(projectManager, tsxPath);
-        if (!check.Success) return check;
-
-        try
-        {
-            commands.AddAssociatedTiledTileset(tsxPath);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Fail(EditErrorCode.InvalidValue, ex.Message);
-        }
-        catch (Exception ex) when (ex is IOException or InvalidDataException)
-        {
-            return Fail(EditErrorCode.IoFailed, ex.Message);
-        }
-        return check;
     }
 
     private static EditResult NotTsx() =>
