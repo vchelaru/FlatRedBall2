@@ -124,6 +124,28 @@ public class TabSwitchCacheTsxTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveDocument_BackgroundTsxTabSavedTwice_KeepsANewChainOnTheTileOfItsFirstSave()
+    {
+        string path = WriteTsx("Heroes.tsx");
+        var tab = new TabEntry(new FilePath(path));
+        await _ctx.AppCommands.OpenTsxWorkflowAsync(path);
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(WriteAchx("Other.achx", "Idle"));
+        var onTile5 = new AnimationFrameSave { TextureName = "Heroes.png", FrameLength = 0.1f,
+            LeftCoordinate = 16, RightCoordinate = 32, TopCoordinate = 16, BottomCoordinate = 32 };
+        var added = new AnimationChainSave { Name = "New" };
+        added.Frames.Add(onTile5);
+        tab.CachedEditorModel!.AnimationChains.Add(added);
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        (onTile5.LeftCoordinate, onTile5.RightCoordinate) = (32, 48); // tile 6
+        _ctx.AppCommands.SaveDocument(tab).ShouldBeTrue();
+
+        File.ReadAllText(path).ShouldContain("<tile id=\"5\">");
+        File.ReadAllText(path).ShouldNotContain("<tile id=\"6\">");
+    }
+
+    [Fact]
     public async Task LastSaveStored_AfterABackgroundTsxSave_StillAnswersForTheCurrentDocument()
     {
         string path = WriteTsx("Heroes.tsx");
