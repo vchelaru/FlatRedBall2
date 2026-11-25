@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FlatRedBall2.AnimationEditorCommon;
 
@@ -53,4 +54,12 @@ public class AnimationChainSave
     /// flag the same way <see cref="Loop"/> does (see e.g. <c>Sprite.IsReversed</c>).
     /// </summary>
     public bool Reverse;
+
+    /// <summary>A deep copy of everything the chain holds, modelled or only carried.</summary>
+    internal AnimationChainSave Clone()
+    {
+        var copy = (AnimationChainSave)MemberwiseClone();
+        copy.Frames = Frames.Select(f => f.Clone()).ToList();
+        return copy;
+    }
 }

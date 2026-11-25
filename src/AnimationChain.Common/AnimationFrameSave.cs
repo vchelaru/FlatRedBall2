@@ -154,7 +154,16 @@ public class AnimationFrameSave
     /// without events stay byte-identical. An FRB2 extension: Gum and FRB1 ignore these and drop
     /// them if they re-save the file.
     /// </summary>
-    public List<AnimationFrameEvent> Events { get; } = new();
+    public List<AnimationFrameEvent> Events { get; private set; } = new();
 
     internal EmptyTextForms EmptyText;
+
+    /// <summary>A deep copy of everything the frame holds, modelled or only carried.</summary>
+    internal AnimationFrameSave Clone()
+    {
+        var copy = (AnimationFrameSave)MemberwiseClone();
+        copy.ShapesSave = ShapesSave?.Clone();
+        copy.Events = Events.Select(e => e.Clone()).ToList();
+        return copy;
+    }
 }

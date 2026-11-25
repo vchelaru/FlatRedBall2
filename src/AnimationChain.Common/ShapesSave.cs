@@ -13,7 +13,7 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <remarks>Serialized as <c>&lt;ShapeCollectionSave&gt;</c> in .achx XML.</remarks>
 public class ShapesSave
 {
-    private readonly List<object> _shapes = new();
+    private List<object> _shapes = new();
 
     // FRB1's 3D shapes, which FRB2 does not model. Only carried, so saving a file keeps them.
     internal XElement? CubeSaves;
@@ -122,6 +122,14 @@ public class ShapesSave
 
     /// <summary>All polygons, projected from <see cref="Shapes"/> in their stored order.</summary>
     public IEnumerable<PolygonSave> PolygonSaves => _shapes.OfType<PolygonSave>();
+
+    /// <summary>A deep copy of everything the collection holds, modelled or only carried.</summary>
+    internal ShapesSave Clone()
+    {
+        var copy = (ShapesSave)MemberwiseClone();
+        copy._shapes = _shapes.OfType<ShapeSave>().Select(s => (object)s.Clone()).ToList();
+        return copy;
+    }
 }
 
 /// <summary>

@@ -141,6 +141,77 @@ public class AnimationCloneHelperTests
         differences.ShouldBeEmpty();
     }
 
+    // What an .achx holds beside the modelled fields: FRB1's own, and how each empty text was written.
+    private const string Frb1Text = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <AnimationChainArraySave>
+          <FileRelativeTextures>true</FileRelativeTextures>
+          <TimeMeasurementUnit>Second</TimeMeasurementUnit>
+          <CoordinateType>Pixel</CoordinateType>
+          <AnimationChain>
+            <Name />
+            <ColorKey>7</ColorKey>
+            <ParentFile>walk.gif</ParentFile>
+            <Frame>
+              <FrameLength>0.1</FrameLength>
+              <LeftCoordinate>0</LeftCoordinate>
+              <RightCoordinate>16</RightCoordinate>
+              <TopCoordinate>0</TopCoordinate>
+              <BottomCoordinate>16</BottomCoordinate>
+              <ShapeCollectionSave>
+                <AxisAlignedRectangleSaves>
+                  <AxisAlignedRectangleSave><X>0</X><Y>0</Y><ScaleX>8</ScaleX><ScaleY>8</ScaleY><Name /><Parent>Body</Parent></AxisAlignedRectangleSave>
+                </AxisAlignedRectangleSaves>
+                <AxisAlignedCubeSaves><AxisAlignedCubeSave><ScaleX>1</ScaleX></AxisAlignedCubeSave></AxisAlignedCubeSaves>
+                <PolygonSaves>
+                  <PolygonSave><X>0</X><Y>0</Y><RotationZ>1.5</RotationZ><Points /><Name>Poly</Name></PolygonSave>
+                </PolygonSaves>
+                <CircleSaves>
+                  <CircleSave><X>0</X><Y>0</Y><Radius>4</Radius><Parent>Head</Parent></CircleSave>
+                </CircleSaves>
+                <SphereSaves><SphereSave><Radius>1</Radius></SphereSave></SphereSaves>
+              </ShapeCollectionSave>
+              <Events><Event><Name /><Data /></Event></Events>
+            </Frame>
+          </AnimationChain>
+          <FileName>c:/art/walk.achx</FileName>
+        </AnimationChainArraySave>
+        """;
+
+    [Theory]
+    [MemberData(nameof(CopyPaths))]
+    public void Copy_Frb1FieldsAndEmptyTextForms_SaveTheSameText(string path)
+    {
+        var file = AnimationChainListSave.FromString(Frb1Text);
+        string before = file.ToXmlString();
+        before.ShouldContain("RotationZ");
+        var chain = file.AnimationChains[0];
+        var shapes = chain.Frames[0].ShapesSave!.Shapes;
+
+        switch (path)
+        {
+            case "Clone":
+                file.AnimationChains[0] = AnimationCloneHelper.CloneChain(chain);
+                break;
+            case "Clipboard chain":
+                file.AnimationChains[0] = RoundTrip(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = [chain] }).Chains![0];
+                break;
+            case "Clipboard frame":
+                chain.Frames[0] = RoundTrip(new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = [chain.Frames[0]] }).Frames![0];
+                break;
+            case "Clipboard shapes":
+                foreach (var shape in shapes.ToList())
+                {
+                    var alone = RoundTrip(new CopySelectionPayload { Kind = CopySelectionKind.Shape, Shapes = [shape] }).Shapes![0];
+                    chain.Frames[0].ShapesSave!.Remove(shape);
+                    chain.Frames[0].ShapesSave!.Add(alone);
+                }
+                break;
+        }
+
+        file.ToXmlString().ShouldBe(before);
+    }
+
     private static (List<AnimationChainSave>? Chains, List<AnimationFrameSave>? Frames, List<object>? Shapes) RoundTrip(
         CopySelectionPayload payload)
     {
