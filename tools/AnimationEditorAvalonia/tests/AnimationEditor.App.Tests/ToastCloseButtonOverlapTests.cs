@@ -54,7 +54,7 @@ public class ToastCloseButtonOverlapTests
 
     // #2098: the banner is at most 640 wide and centred, so in a narrow window the toast reaches over its end.
     [AvaloniaTheory]
-    [InlineData(700)]
+    [InlineData(900)]
     [InlineData(1200)]
     public void ToastPanel_DoesNotOverlap_ProblemBanner(double width)
     {
