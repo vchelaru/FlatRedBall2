@@ -87,7 +87,7 @@ internal static class TextureCoordinateConverter
     internal static Func<string, (int Width, int Height)?> SizesIn(string directory) => name =>
         string.IsNullOrEmpty(name)
             ? null
-            : TryReadPngSize(System.IO.Path.IsPathRooted(name) ? name : System.IO.Path.Combine(directory, name));
+            : TryReadPngSize(System.IO.Path.IsPathRooted(name) ? name : System.IO.Path.Combine(directory, name.Replace('\\', '/')));
 
     private static FrameRegion ToPixels(FrameRegion uv, (int Width, int Height) size) =>
         new(uv.Left * size.Width, uv.Top * size.Height, uv.Right * size.Width, uv.Bottom * size.Height);
