@@ -171,8 +171,9 @@ public static class AnimationChainListSaveExtensions
     /// Re-parses the .achx/.achj at <paramref name="achxPath"/> and applies changes to
     /// <paramref name="list"/> in place so any live <see cref="AnimationPlayer{TFrame}"/> reference
     /// keeps working. For each chain in the reloaded file, matches by
-    /// <see cref="AnimationChain{TFrame}.Name"/>: existing chains have their frames replaced in
-    /// place (instance identity preserved); new chains are appended.
+    /// <see cref="AnimationChain{TFrame}.Name"/> (the nth chain of a name matches the nth): existing
+    /// chains take the file's frames and Loop, PingPong and Reverse in place (instance identity
+    /// preserved); new chains are appended.
     /// <para>
     /// Returns <c>false</c> on I/O or parse failure (e.g. file mid-write) — XML or JSON, depending
     /// on <paramref name="achxPath"/>'s extension. Callers should retry after the next
@@ -245,20 +246,6 @@ public static class AnimationChainListSaveExtensions
         return true;
     }
 
-    private static void ApplyReloadedChains(AnimationChainList<AnimationFrame> list, AnimationChainList<AnimationFrame> fresh)
-    {
-        foreach (var freshChain in fresh)
-        {
-            var existing = list[freshChain.Name];
-            if (existing != null)
-            {
-                existing.Clear();
-                existing.AddRange(freshChain);
-            }
-            else
-            {
-                list.Add(freshChain);
-            }
-        }
-    }
+    private static void ApplyReloadedChains(AnimationChainList<AnimationFrame> list, AnimationChainList<AnimationFrame> fresh) =>
+        ChainReload.Apply<AnimationChain<AnimationFrame>, AnimationFrame>(list, fresh);
 }

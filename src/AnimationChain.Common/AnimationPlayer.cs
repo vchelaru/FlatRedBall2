@@ -22,6 +22,8 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     private double _timeIntoAnimation;
     // Bumped whenever playback switches chain, so event dispatch can tell a handler replaced the animation.
     private int _playbackVersion;
+    // Null until game code sets the property, so a hot reloaded chain's own values apply to a playing player.
+    private bool? _isLooping, _isPingPong, _isReversed;
 
     /// <summary>
     /// The frame currently being displayed, or <c>null</c> if no animation is playing.
@@ -111,29 +113,39 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     public bool Animate { get; set; } = true;
 
     /// <summary>
-    /// When <c>true</c>, the animation wraps back to frame 0 at the end. Seeded from the played
-    /// chain's <see cref="AnimationChain{TFrame}.Loop"/> each time <see cref="Play(string)"/> or
-    /// <see cref="Play(AnimationChain{TFrame})"/> switches to a new chain; set this afterward to
-    /// override per-instance.
+    /// When <c>true</c>, the animation wraps back to frame 0 at the end. Follows the played chain's
+    /// <see cref="AnimationChain{TFrame}.Loop"/>; set this to override it per instance until
+    /// <see cref="Play(string)"/> or <see cref="Play(AnimationChain{TFrame})"/> switches to a new chain.
     /// </summary>
-    public bool IsLooping { get; set; } = true;
+    public bool IsLooping
+    {
+        get => _isLooping ?? CurrentChain?.Loop ?? true;
+        set => _isLooping = value;
+    }
 
     /// <summary>
     /// When <c>true</c>, each cycle plays the chain forward and then mirrored (backward), so a cycle is twice the
     /// chain's length and the end frames show for twice their length across the turnaround. Keyframe glides play
     /// backward on the way back. When <see cref="IsLooping"/> is <c>false</c> one full cycle plays, then it stops.
-    /// Seeded from <see cref="AnimationChain{TFrame}.PingPong"/> by <see cref="Play(string)"/> like
-    /// <see cref="IsLooping"/>; set it afterward to override per instance. See <see cref="PlaybackTimeline"/>.
+    /// Follows <see cref="AnimationChain{TFrame}.PingPong"/> until set, like <see cref="IsLooping"/>.
+    /// See <see cref="PlaybackTimeline"/>.
     /// </summary>
-    public bool IsPingPong { get; set; }
+    public bool IsPingPong
+    {
+        get => _isPingPong ?? CurrentChain?.PingPong ?? false;
+        set => _isPingPong = value;
+    }
 
     /// <summary>
     /// When <c>true</c>, the chain's forward timeline plays mirrored: it starts at the end of the last frame and runs
     /// to the start of the first, keyframe glides included. With <see cref="IsPingPong"/> the mirrored half comes
-    /// first. Seeded from <see cref="AnimationChain{TFrame}.Reversed"/> by <see cref="Play(string)"/> like
-    /// <see cref="IsLooping"/>; set it afterward to override per instance.
+    /// first. Follows <see cref="AnimationChain{TFrame}.Reversed"/> until set, like <see cref="IsLooping"/>.
     /// </summary>
-    public bool IsReversed { get; set; }
+    public bool IsReversed
+    {
+        get => _isReversed ?? CurrentChain?.Reversed ?? false;
+        set => _isReversed = value;
+    }
 
     /// <summary>Multiplier applied to frame time. 2.0 plays twice as fast; 0.5 plays half-speed.</summary>
     public float AnimationSpeed { get; set; } = 1f;
@@ -174,7 +186,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
                 if (_currentChainIndex == i) return; // already playing — no restart
                 _currentChainIndex = i;
                 Animate = true;
-                SeedFrom(_chains[i]);
+                ClearOverrides();
                 ResetPlaybackPosition();
                 RaiseFrameZeroEvents();
                 return;
@@ -197,7 +209,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
                 if (_currentChainIndex == i) return;
                 _currentChainIndex = i;
                 Animate = true;
-                SeedFrom(chain);
+                ClearOverrides();
                 ResetPlaybackPosition();
                 RaiseFrameZeroEvents();
                 return;
@@ -289,12 +301,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
             RaiseEvents(chain[_currentFrameIndex], _playbackVersion);
     }
 
-    private void SeedFrom(AnimationChain<TFrame> chain)
-    {
-        IsLooping = chain.Loop;
-        IsPingPong = chain.PingPong;
-        IsReversed = chain.Reversed;
-    }
+    private void ClearOverrides() => _isLooping = _isPingPong = _isReversed = null;
 
     // Returns false once a handler has switched chain, so the caller stops raising the old chain's events.
     private bool RaiseEvents(TFrame frame, int playbackVersion)

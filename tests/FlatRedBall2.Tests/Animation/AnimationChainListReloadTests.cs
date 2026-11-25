@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using FlatRedBall2.Animation;
 using FlatRedBall2.AnimationEditorCommon;
+using FlatRedBall2.Rendering;
 using Shouldly;
 using Xunit;
 
@@ -204,6 +205,23 @@ public class AnimationChainListReloadTests
         list.TryReloadFrom(path, content).ShouldBeTrue();
 
         list["Walk"]!.Count.ShouldBe(6);
+    }
+
+    [Fact]
+    public void TryReloadFrom_TwoChainsShareAName_EachTakesItsOwnFramesAndFlags()
+    {
+        var content = MakeContent();
+        var list = LoadFresh(WriteAchx("anim.achx", ("Walk", 1), ("Walk", 2)), content);
+        var sprite = new Sprite { AnimationChains = list };
+        sprite.PlayAnimation(list[1]);
+        const string frame = "<Frame><FrameLength>0.1</FrameLength></Frame>";
+        WriteRaw("anim.achx", $"<AnimationChainArraySave><AnimationChain><Name>Walk</Name>{frame}</AnimationChain>"
+            + $"<AnimationChain><Name>Walk</Name><Loop>false</Loop><PingPong>true</PingPong><Reverse>true</Reverse>{frame}{frame}{frame}</AnimationChain></AnimationChainArraySave>");
+
+        list.TryReloadFrom("anim.achx", content).ShouldBeTrue();
+
+        list.ConvertAll(c => (c.Count, c.Loop, c.PingPong, c.Reversed)).ShouldBe([(1, true, false, false), (3, false, true, true)]);
+        (sprite.IsLooping, sprite.IsPingPong, sprite.IsReversed).ShouldBe((false, true, true));
     }
 
     [Fact]

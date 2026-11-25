@@ -280,6 +280,20 @@ public class AchxLoaderTests
     }
 
     [Fact]
+    public void TryReload_TwoChainsShareAName_EachTakesItsOwnFramesAndFlags()
+    {
+        const string frame = "<Frame><FrameLength>0.1</FrameLength></Frame>";
+        string Xml(string secondChain) => "<AnimationChainArraySave><AnimationChain><Name>Walk</Name>" + frame + "</AnimationChain>"
+            + "<AnimationChain><Name>Walk</Name>" + secondChain + "</AnimationChain></AnimationChainArraySave>";
+        var list = AnimationChainListSave.FromString(Xml(frame)).ToAnimationChainList(_ => null);
+        using var reloadStream = new MemoryStream(Encoding.UTF8.GetBytes(Xml("<Loop>false</Loop><PingPong>true</PingPong><Reverse>true</Reverse>" + frame + frame)));
+
+        Assert.True(list.TryReload(reloadStream, _ => null));
+
+        Assert.Equal(new[] { (1, true, false, false), (2, false, true, true) }, list.Select(c => (c.Count, c.Loop, c.PingPong, c.Reversed)));
+    }
+
+    [Fact]
     public void TryReloadFrom_Stream_InvalidXml_ReturnsFalseAndLeavesListUntouched()
     {
         var list = AnimationChainListSave.FromFile("dummy.achx", XmlStream(SimpleAchx))

@@ -57,9 +57,10 @@ public class AnimationChainList : List<AnimationChain>
     /// <summary>
     /// Re-parses the .achx/.achj at <paramref name="path"/> and applies the result in place so any
     /// live <see cref="FlatRedBall2.Rendering.Sprite.CurrentAnimation"/> reference keeps working.
-    /// For each chain in the reloaded file, matches by <see cref="AnimationChain.Name"/>: if the
-    /// name exists in this list the existing chain's frames are replaced (instance identity
-    /// preserved); otherwise the fresh chain is appended. Chains only in this list (removed from
+    /// For each chain in the reloaded file, matches by <see cref="AnimationChain.Name"/> (the nth chain
+    /// of a name matches the nth): if the name exists in this list the existing chain takes the file's
+    /// frames and Loop, PingPong and Reverse (instance identity preserved); otherwise the fresh chain is
+    /// appended. Chains only in this list (removed from
     /// the file) are left alone — sprites still playing them keep rendering their old art until
     /// the caller switches them.
     /// <para>
@@ -80,21 +81,7 @@ public class AnimationChainList : List<AnimationChain>
         catch (XmlException) { return false; }
         catch (System.Text.Json.JsonException) { return false; }
 
-        foreach (var freshChain in fresh)
-        {
-            var existing = this[freshChain.Name];
-            if (existing != null)
-            {
-                // Replace frames in place — preserves the AnimationChain instance and therefore
-                // any Sprite.CurrentAnimation reference that points at it.
-                existing.Clear();
-                existing.AddRange(freshChain);
-            }
-            else
-            {
-                Add(freshChain);
-            }
-        }
+        ChainReload.Apply<AnimationChain, AnimationFrame>(this, fresh);
         return true;
     }
 }
