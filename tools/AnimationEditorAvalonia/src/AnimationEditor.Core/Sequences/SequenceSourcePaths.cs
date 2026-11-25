@@ -53,35 +53,35 @@ public static class SequenceSourcePaths
 
     /// <summary>
     /// Which of <paramref name="files"/> (a <see cref="FileSet"/>) are sources of <paramref name="save"/>, stored in
-    /// <paramref name="folder"/>, and how many blocks play one of them. A block whose source is not in the library plays nothing.
+    /// <paramref name="folder"/>, and how many blocks play one of them.
     /// </summary>
     public static (IReadOnlyCollection<string> Files, int Blocks) Using(SequenceListSave save, FilePath folder, IReadOnlySet<string> files)
     {
-        var used = save.Sources.Select(source => Resolve(folder, source)).OfType<string>().Where(files.Contains).ToHashSet();
-        int blocks = Blocks(save).Count(block =>
-            save.Sources.Contains(block.Source, StringComparer.OrdinalIgnoreCase)
-            && Resolve(folder, block.Source) is { } file && files.Contains(file));
-        return (used, blocks);
+        var listed = Listed(save, folder, files);
+        return (listed.Select(source => Resolve(folder, source)!).ToHashSet(), Blocks(save, listed).Count());
     }
 
     /// <summary>
-    /// Gives every source of <paramref name="save"/> (the source list and each block) that is one of <paramref name="files"/>
-    /// the extension <paramref name="extension"/>, leaving the rest of the path as written.
+    /// Gives every source of <paramref name="save"/> that is one of <paramref name="files"/> (in the source list, and in each
+    /// block that plays it) the extension <paramref name="extension"/>, leaving the rest of the path as written.
     /// </summary>
     public static void ChangeExtension(SequenceListSave save, FilePath folder, IEnumerable<string> files, string extension)
     {
-        var changing = FileSet(files);
-        string Rewrite(string source) =>
-            Resolve(folder, source) is { } file && changing.Contains(file) ? System.IO.Path.ChangeExtension(source, extension) : source;
-
+        var listed = Listed(save, folder, FileSet(files));
+        foreach (var block in Blocks(save, listed))
+            block.Source = System.IO.Path.ChangeExtension(block.Source, extension);
         // The library may already list the new file, missing until now; a source is listed once.
-        save.Sources = save.Sources.Select(Rewrite).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        foreach (var block in Blocks(save))
-            block.Source = Rewrite(block.Source);
+        save.Sources = save.Sources.Select(source => listed.Contains(source) ? System.IO.Path.ChangeExtension(source, extension) : source)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private static IEnumerable<SequenceChainReferenceSave> Blocks(SequenceListSave save) =>
-        save.Sequences.SelectMany(sequence => sequence.Tracks).SelectMany(track => track.Chains);
+    // Case-insensitive like the document's own source lookup, so a block spelled another way follows its source.
+    private static HashSet<string> Listed(SequenceListSave save, FilePath folder, IReadOnlySet<string> files) => save.Sources
+        .Where(source => Resolve(folder, source) is { } file && files.Contains(file))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static IEnumerable<SequenceChainReferenceSave> Blocks(SequenceListSave save, HashSet<string> sources) => save.Sequences
+        .SelectMany(sequence => sequence.Tracks).SelectMany(track => track.Chains).Where(block => sources.Contains(block.Source));
 
     private static string? Resolve(FilePath folder, string source)
     {

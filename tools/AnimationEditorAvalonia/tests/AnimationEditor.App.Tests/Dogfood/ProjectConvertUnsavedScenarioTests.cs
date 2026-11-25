@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using Shouldly;
 using Xunit;
@@ -13,7 +14,7 @@ namespace AnimationEditor.App.Tests.Dogfood;
 
 /// <summary>
 /// The Animations tab's Convert to .achj on a file whose tab holds edits its last save could not write: they are saved
-/// first, and a file whose save is refused again is left alone and named in the problem banner.
+/// first, and a file whose edits cannot be saved, or whose .achj exists, is left alone and listed before the user agrees.
 /// </summary>
 public class ProjectConvertUnsavedScenarioTests
 {
@@ -42,13 +43,20 @@ public class ProjectConvertUnsavedScenarioTests
         return (hero, boss, recycled);
     }
 
+    /// <summary>What the last Convert dialog said.</summary>
+    private static string PlanText = "";
+
     private static void PickFromRow(AnimationEditorHarness editor, string row, string item, bool confirm = true)
     {
         ProjectPanelControl panel = editor.Control<ProjectPanelControl>("ProjectPanel");
         TreeViewItem target = PanelsScenarioTests.RowFor(editor, panel, row);
         editor.RightClickAt(target.TranslatePoint(new Point(target.Bounds.Width / 2, 8), editor.Window)!.Value);
         editor.Dialogs.Shown.Clear();
-        editor.Dialogs.AnswerNextConfirm(confirm);
+        editor.Dialogs.AnswerNextEditorDialog(content =>
+        {
+            PlanText = string.Join("\n", content.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Inlines?.Text ?? block.Text));
+            return confirm;
+        });
         editor.PickMenuItem(panel.ProjectTree.ContextMenu!, item);
         editor.Wait(TimeSpan.FromMilliseconds(100));
     }
@@ -119,17 +127,17 @@ public class ProjectConvertUnsavedScenarioTests
 
         PickFromRow(editor, "hero.achx", "Convert to .achj");
 
-        editor.ProblemText!.ShouldStartWith("Converted 0, 1 problem: hero.achx: not converted, its unsaved edits could not be saved (");
+        PlanText.ShouldContain("hero.achx   Its unsaved edits cannot be saved: ");
         File.ReadAllText(hero).ShouldBe(heroText);
         File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
         recycled.ShouldBeEmpty();
     }
 
-    // Skipped, so its tab stays open, and must know the edits are saved now.
+    // Skipped, so nothing of it is touched, and its tab still knows the edits are unsaved.
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Convert_TabWithAFailedSave_WhoseAchjExists_IsSaved_AndItsTabKnows(bool folderWithTheTabBehind)
+    public async Task Convert_TabWithAFailedSave_WhoseAchjExists_IsLeftAlone(bool folderWithTheTabBehind)
     {
         using AnimationEditorHarness editor = new AnimationEditorHarness();
         var (hero, _, recycled) = await OpenAndFailASaveAsync(editor);
@@ -148,13 +156,10 @@ public class ProjectConvertUnsavedScenarioTests
 
         File.ReadAllText(Path.ChangeExtension(hero, ".achj")).ShouldBe("another file");
         recycled.ShouldNotContain("hero.achx");
-        SavedX(hero).ShouldBe(8);
+        SavedX(hero).ShouldBe(0);
         editor.ClickTab("hero.achx");
         editor.PixelRectOf(editor.ChainNamed("Walk").Frames[0]).X.ShouldBe(8);
-        editor.UndoManager.SaveState.ShouldBe(SaveState.AutoSaveOn);
-        editor.Dialogs.Shown.Clear();
-        editor.CloseTab("hero.achx");
-        editor.Dialogs.Shown.ShouldBeEmpty();
+        editor.UndoManager.SaveState.ShouldBe(SaveState.Failed);
     }
 
     // Closing a tab behind the front one leaves the front document, its failed save and its undo alone.
@@ -210,7 +215,7 @@ public class ProjectConvertUnsavedScenarioTests
         {
             PickFromRow(editor, "hero.achx", "Convert to .achj");
 
-            editor.ProblemText!.ShouldStartWith("Converted 0, 1 problem: hero.achx: not converted, its unsaved edits could not be saved (");
+            PlanText.ShouldContain("hero.achx   Its unsaved edits cannot be saved: ");
             File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
             recycled.ShouldBeEmpty();
             editor.TabLabels.ShouldContain("hero.achx");
@@ -234,7 +239,7 @@ public class ProjectConvertUnsavedScenarioTests
 
         PickFromRow(editor, "Sprites", "Convert Animations to .achj");
 
-        editor.ProblemText!.ShouldStartWith("Converted 1, 1 problem: hero.achx: not converted, its unsaved edits could not be saved (");
+        PlanText.ShouldContain("hero.achx   Its unsaved edits cannot be saved: ");
         File.ReadAllText(hero).ShouldBe(heroText);
         File.Exists(Path.ChangeExtension(hero, ".achj")).ShouldBeFalse();
         File.Exists(Path.ChangeExtension(boss, ".achj")).ShouldBeTrue();

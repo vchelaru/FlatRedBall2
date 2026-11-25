@@ -211,7 +211,7 @@ public class DocumentWriteMatrixScenarioTests
                     File.Delete(path);
                     return null;
                 };
-                editor.Dialogs.AnswerNextConfirm(true);
+                editor.Dialogs.AnswerNextEditorDialog(_ => true);
                 await editor.Window.ConvertProjectFileToAchjAsync(Path.GetRelativePath(editor.ProjectFolder, back.Path!).Replace('\\', '/'));
                 editor.Layout();
                 written.Add(back.Path);

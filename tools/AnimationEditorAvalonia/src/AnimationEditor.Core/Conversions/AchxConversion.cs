@@ -104,8 +104,8 @@ public static class AchxConversion
     {
         try
         {
-            return AnimationFileLoader.Read(new FilePath(file.Target)).ToJsonString()
-                == AnimationFileLoader.Read(new FilePath(file.Source)).ToJsonString();
+            return AnimationListComparison.FirstDifference(
+                AnimationFileLoader.Read(new FilePath(file.Source)), AnimationFileLoader.Read(new FilePath(file.Target))) is null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
         {

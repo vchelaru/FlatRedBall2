@@ -73,7 +73,7 @@ public sealed record ConversionPlanText(IReadOnlyList<ConversionLine> Summary, I
             if (converted.Count == 0) return [];
             return
             [
-                "Every animation, frame and shape is kept. Only the file format changes.",
+                "Checked: every animation, frame, shape and event reads back the same from the .achj.",
                 updated.Count > 0
                     ? "The original .achx and .seqj files move to the Recycle Bin. To go back, restore them and delete the .achj."
                     : "The original .achx files move to the Recycle Bin. To go back, restore them and delete the .achj.",

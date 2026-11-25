@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
+using AnimationEditor.Views.Dialogs;
 using Avalonia.Headless.XUnit;
 using FlatRedBall2.AnimationEditorCommon;
 using System;
@@ -32,6 +33,14 @@ public class ProjectFileConvertTests
         return path;
     }
 
+    /// <summary>Answers the Convert dialog.</summary>
+    private sealed class AnsweringDialogHost : IEditorDialogHost
+    {
+        public bool Convert { get; init; } = true;
+
+        public Task<T> ShowAsync<T>(EditorDialog<T> dialog) => Task.FromResult((T)(object)Convert);
+    }
+
     private static TabManager GetTabManager(MainWindow window) =>
         (TabManager)typeof(MainWindow)
             .GetField("_tabManager", BindingFlags.NonPublic | BindingFlags.Instance)!
@@ -50,12 +59,12 @@ public class ProjectFileConvertTests
         var dir = NewTempDir();
         WriteAchx(dir, "hero.achx");
         var ctx = TestHelpers.BuildServices();
+        ctx.EditorDialogHost = new AnsweringDialogHost { Convert = false };
         var window = ctx.CreateMainWindow();
         window.Show();
         try
         {
             await ctx.OpenProjectFolderAsync(window, dir);
-            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(false);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
 
@@ -73,12 +82,12 @@ public class ProjectFileConvertTests
         var dir = NewTempDir();
         var achx = WriteAchx(dir, "hero.achx");
         var ctx = TestHelpers.BuildServices();
+        ctx.EditorDialogHost = new AnsweringDialogHost();
         var window = ctx.CreateMainWindow();
         window.Show();
         try
         {
             await ctx.OpenProjectFolderAsync(window, dir);
-            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
 
@@ -99,12 +108,12 @@ public class ProjectFileConvertTests
         WriteAchx(dir, "hero.achx");
         File.WriteAllText(Path.Combine(dir, "hero.achj"), "keep me");
         var ctx = TestHelpers.BuildServices();
+        ctx.EditorDialogHost = new AnsweringDialogHost();
         var window = ctx.CreateMainWindow();
         window.Show();
         try
         {
             await ctx.OpenProjectFolderAsync(window, dir);
-            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
 
@@ -124,13 +133,13 @@ public class ProjectFileConvertTests
         var dir = NewTempDir();
         var achx = WriteAchx(dir, "hero.achx");
         var ctx = TestHelpers.BuildServices();
+        ctx.EditorDialogHost = new AnsweringDialogHost();
         var window = ctx.CreateMainWindow();
         window.Show();
         try
         {
             await ctx.OpenProjectFolderAsync(window, dir);
             await window.OpenFileAsTab(achx);
-            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             window.DeleteToRecycleBin = _ => null;
 
             await window.ConvertProjectFileToAchjAsync("hero.achx");
@@ -148,6 +157,7 @@ public class ProjectFileConvertTests
         var tsx = Path.Combine(dir, "walk.tsx");
         File.WriteAllText(tsx, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><tileset name=\"walk\" tilewidth=\"16\" tileheight=\"16\" tilecount=\"4\" columns=\"4\"><image source=\"walk.png\" width=\"64\" height=\"16\"/></tileset>");
         var ctx = TestHelpers.BuildServices();
+        ctx.EditorDialogHost = new AnsweringDialogHost();
         var window = ctx.CreateMainWindow();
         window.Show();
         try
@@ -159,7 +169,6 @@ public class ProjectFileConvertTests
             ctx.AppCommands.AddAssociatedTiledTileset(tsx);
             ctx.AppCommands.SaveCurrentAnimationChainList();
             Assert.Contains("value=\"hero.achx\"", File.ReadAllText(tsx));
-            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             window.DeleteToRecycleBin = path => { File.Delete(path); return null; };
             IReadOnlyList<string> warnings = [];
             ctx.AppCommands.TiledSyncWarned += w => warnings = w;
@@ -186,12 +195,12 @@ public class ProjectFileConvertTests
         var nested = WriteAchx(Path.Combine(dir, "Sprites", "Enemies"), "b.achx");
         var outside = WriteAchx(dir, "c.achx");
         var ctx = TestHelpers.BuildServices();
+        ctx.EditorDialogHost = new AnsweringDialogHost();
         var window = ctx.CreateMainWindow();
         window.Show();
         try
         {
             await ctx.OpenProjectFolderAsync(window, dir);
-            ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
             var recycled = new List<string>();
             window.DeleteToRecycleBin = path => { recycled.Add(path); return null; };
 

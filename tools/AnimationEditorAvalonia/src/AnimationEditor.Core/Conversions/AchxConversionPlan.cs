@@ -21,7 +21,10 @@ public sealed record OpenDocuments(
         new Dictionary<FilePath, (bool, string?)>(), new Dictionary<FilePath, SequenceListSave?>());
 }
 
-/// <summary>One <c>.achx</c> of a plan.</summary>
+/// <summary>
+/// One <c>.achx</c> of a plan. One that converts was converted in memory and read back, and every animation, frame, shape
+/// and event compared equal; one that did not is skipped.
+/// </summary>
 /// <param name="SkipReason">Why the file is left alone, or null when it is converted.</param>
 /// <param name="IsOpen">Its tab closes.</param>
 /// <param name="SavesEdits">Its tab holds edits its file lacks, which are saved first.</param>
@@ -69,12 +72,14 @@ public sealed record AchxConversionPlan(
         bool isOpen = open.Animations.TryGetValue(new FilePath(source), out var tab);
         var skipped = new PlannedFile(source, target, IsOpen: isOpen);
 
-        if (File.Exists(target)) return skipped with { SkipReason = $"{Path.GetFileName(target)} already exists" };
+        if (File.Exists(target)) return skipped with { SkipReason = "an .achj with that name already exists" };
         if (tab.UnsavedEdits && (tab.CannotSave ?? WriteProtection(source)) is { } reason)
             return skipped with { SkipReason = $"its unsaved edits cannot be saved: {reason}" };
         try
         {
             var list = AnimationFileLoader.Read(new FilePath(source));
+            if (AnimationListComparison.FirstDifference(list, AnimationChainListSave.FromJsonString(list.ToJsonString())) is { } difference)
+                return skipped with { SkipReason = $"it would not be kept exactly: {difference}" };
             return new PlannedFile(source, target, null, list.AnimationChains.Count,
                 list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits);
         }
