@@ -4113,15 +4113,7 @@ public partial class MainWindow : Window
         }
 
         var (targetChain, targetFrame) = ResolveTreePngDropTarget(e);
-        var wouldApply = TextureDropProcessor.ComputePngDrop(
-            targetChain,
-            targetFrame,
-            firstFile,
-            _projectManager.FileName,
-            e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
-            != TextureDropResult.NotApplied;
-
-        e.DragEffects = wouldApply ? DragDropEffects.Copy : DragDropEffects.None;
+        e.DragEffects = PngDropTargetsRow(e, targetChain, targetFrame, firstFile) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -4181,10 +4173,18 @@ public partial class MainWindow : Window
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
-        bool applied = await HandlePngDropAsync(targetChain, targetFrame, firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
-        if (applied)
+        // Set before the await: the event goes on to the window, which would open an animation file dropped along
+        // with the image under the copy question.
+        if (PngDropTargetsRow(e, targetChain, targetFrame, firstFile))
             e.Handled = true;
+
+        await HandlePngDropAsync(targetChain, targetFrame, firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
     }
+
+    private bool PngDropTargetsRow(DragEventArgs e, AnimationChainSave? targetChain, AnimationFrameSave? targetFrame, string file) =>
+        TextureDropProcessor.ComputePngDrop(
+            targetChain, targetFrame, file, _projectManager.FileName, e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
+        != TextureDropResult.NotApplied;
 
     /// <summary>
     /// Single apply path for every PNG-drop entry point (ANIMATIONS tree — including PNGs

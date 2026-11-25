@@ -157,8 +157,8 @@ jobs:
       - name: Test AnimationEditor.App (shard ${{ matrix.shard }})
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal" --blame-hang-timeout 180s --blame-hang-dump-type none --filter "$(python3 scripts/app_test_shards.py ${{ matrix.shard }})"
 
-      # Names the exception behind a headless-session death (every later test fails with "idle test
-      # context"); written by UnhandledExceptionLog in AnimationEditor.App.Tests.
+      # Lists exceptions nothing handled, written by UnhandledExceptionLog in AnimationEditor.App.Tests. An
+      # "idle test context" session death (every later test fails) is not one of them and logs nothing (#2169).
       - name: Show unhandled exceptions from AnimationEditor.App tests (shard ${{ matrix.shard }})
         if: failure()
         run: |

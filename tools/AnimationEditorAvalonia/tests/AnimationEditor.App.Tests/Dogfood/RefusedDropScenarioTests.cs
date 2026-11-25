@@ -242,4 +242,32 @@ public class RefusedDropScenarioTests : IDisposable
 
         editor.Project.AnimationChains.Select(c => c.Name).ShouldBe(["Run", "Walk"]);
     }
+
+    // The copy question is a real dialog here: the drop event has gone on to the window before it is answered.
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task APngAndAnAnimationFile_OnAFrame_TheAnimationFileDoesNotOpenUnderTheCopyQuestion(bool onCanvas)
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        typeof(MainWindow).GetField("_dialogHost", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(editor.Window, new AnimationEditor.Views.Dialogs.WindowEditorDialogHost(editor.Window));
+        string png = Path.Combine(_outside, "new.png");
+        File.Move(editor.WritePng("new.png", 64, 64), png);
+        Directory.CreateDirectory(Path.Combine(editor.ProjectFolder, "sub"));
+        string other = editor.WriteAchx(Path.Combine("sub", "other.achx"), AnimationEditorHarness.Chain("Other", "sheet.png", (0, 0, 16, 16)));
+        var frame = editor.ChainNamed("Walk").Frames[0];
+        editor.ClickRow(frame);
+
+        if (onCanvas) await Drop(editor, editor.Wireframe, new Point(100, 100), png, other);
+        else await DropOnRow(editor, frame, png, other);
+        string openUnderTheQuestion = editor.Project.AnimationChains[0].Name;
+        editor.Window.OwnedWindows.Single().GetVisualDescendants().OfType<Button>()
+            .First(b => (b.Content as string ?? "").StartsWith("Copy")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await editor.WaitUntilAsync(() => frame.TextureName == "new.png", TimeSpan.FromSeconds(5));
+
+        openUnderTheQuestion.ShouldBe("Walk");
+        AnimationEditorHarness.ReadSaved(path).AnimationChains[0].Frames[0].TextureName.ShouldBe("new.png");
+    }
 }
