@@ -8229,8 +8229,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentFrameLengthUnit, CurrentAchxFolder));
-        _pendingCutState.Set(payload, _projectManager.AnimationChainListSave!);
+        var text = ClipboardPayload.SerializeFromPayload(payload, CurrentFrameLengthUnit, CurrentAchxFolder);
+        await clipboard.SetTextAsync(text);
+        _pendingCutState.Set(payload, _projectManager.AnimationChainListSave!, text);
         SyncPendingCutHighlights();
     }
 
@@ -8242,6 +8243,13 @@ public partial class MainWindow : Window
 
         var text = await clipboard.TryGetTextAsync();
         if (string.IsNullOrWhiteSpace(text)) return;
+
+        // Something else was copied since the cut, in another window or program: this paste is a plain copy of that.
+        if (!_pendingCutState.IsOnClipboard(text))
+        {
+            _pendingCutState.Clear();
+            SyncPendingCutHighlights();
+        }
 
         bool ok = ClipboardPayload.TryDeserialize(text, CurrentFrameLengthUnit, _projectManager.GetTextureSizeInPixels,
             out var chains, out var frames, out var shapes);
@@ -8262,7 +8270,6 @@ public partial class MainWindow : Window
 
         if (chains is { Count: > 0 })
         {
-            if (completingCut && _pendingCutState.Kind != CopySelectionKind.Chain) return;
             QueuePastedChainExpandFromSources(chains, chains);
             if (completingCutAcrossDocuments)
             {
@@ -8276,7 +8283,6 @@ public partial class MainWindow : Window
         }
         else if (frames is { Count: > 0 })
         {
-            if (completingCut && _pendingCutState.Kind != CopySelectionKind.Frame) return;
             var (targetChain, insertIndex) = PastePlacementLogic.ResolveFramePasteTarget(
                 acls, selectedData, _objectFinder, _selectedState);
             if (targetChain is null) return;
@@ -8296,7 +8302,6 @@ public partial class MainWindow : Window
         }
         else if (shapes is { Count: > 0 })
         {
-            if (completingCut && _pendingCutState.Kind != CopySelectionKind.Shape) return;
             if (_projectManager.IsNativeTsxProject)
             {
                 ShowProblem($"⚠ {TsxEdit.ShapesRefusal}");

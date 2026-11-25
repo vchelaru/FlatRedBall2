@@ -50,7 +50,14 @@ public interface IPendingCutState
     /// </summary>
     AnimationChainListSave? SourceDocument { get; }
 
-    void Set(CopySelectionPayload payload, AnimationChainListSave sourceDocument);
+    /// <summary>
+    /// True while the system clipboard, holding <paramref name="clipboardText"/>, still has what the cut put on it.
+    /// Another window or program may have copied since.
+    /// </summary>
+    bool IsOnClipboard(string? clipboardText);
+
+    /// <param name="clipboardText">What the cut put on the system clipboard.</param>
+    void Set(CopySelectionPayload payload, AnimationChainListSave sourceDocument, string clipboardText);
     void Clear();
     bool Contains(object data);
 
@@ -73,6 +80,7 @@ public interface IPendingCutState
 public sealed class PendingCutState : IPendingCutState
 {
     private CopySelectionPayload? _payload;
+    private string? _clipboardText;
 
     public event Action? Changed;
 
@@ -94,9 +102,12 @@ public sealed class PendingCutState : IPendingCutState
     public IReadOnlyList<object> WireframeShapes =>
         _payload?.Kind == CopySelectionKind.Shape ? _payload.Shapes : [];
 
-    public void Set(CopySelectionPayload payload, AnimationChainListSave sourceDocument)
+    public bool IsOnClipboard(string? clipboardText) => _payload is not null && clipboardText == _clipboardText;
+
+    public void Set(CopySelectionPayload payload, AnimationChainListSave sourceDocument, string clipboardText)
     {
         _payload = payload;
+        _clipboardText = clipboardText;
         SourceDocument = sourceDocument;
         Changed?.Invoke();
     }
@@ -105,6 +116,7 @@ public sealed class PendingCutState : IPendingCutState
     {
         if (_payload is null) return;
         _payload = null;
+        _clipboardText = null;
         SourceDocument = null;
         Changed?.Invoke();
     }

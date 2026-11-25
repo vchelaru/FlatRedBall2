@@ -29,7 +29,7 @@ public class CutPasteTests
             Chains = new[] { chain },
         };
 
-        cut.Set(payload, acls);
+        cut.Set(payload, acls, "");
         Assert.True(cut.IsActive);
         Assert.Equal(CopySelectionKind.Chain, cut.Kind);
         Assert.Same(acls, cut.SourceDocument);
@@ -49,8 +49,8 @@ public class CutPasteTests
         var acls = new AnimationChainListSave();
         var c1 = new AnimationChainSave { Name = "A" };
         var c2 = new AnimationChainSave { Name = "B" };
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c1 } }, acls);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c2 } }, acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c1 } }, acls, "");
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c2 } }, acls, "");
 
         Assert.False(cut.Contains(c1));
         Assert.True(cut.Contains(c2));
@@ -62,7 +62,7 @@ public class CutPasteTests
         var cut = new PendingCutState();
         var acls = new AnimationChainListSave();
         var chain = TestHelpers.MakeChain(acls, "Walk", 2);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, acls, "");
 
         Assert.Equal(2, cut.WireframeFrames.Count);
         Assert.Contains(chain.Frames[0], cut.WireframeFrames);
@@ -170,7 +170,7 @@ public class CutPasteTests
         var ctxA = TestHelpers.SetupFreshAcls();
         var ctxB = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls, "");
 
         Assert.Equal(CutCompletion.CrossDocument, cut.ResolveCompletion(ctxB.Acls));
     }
@@ -181,7 +181,7 @@ public class CutPasteTests
         var cut = new PendingCutState();
         var ctxA = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls, "");
 
         Assert.Equal(CutCompletion.SameDocument, cut.ResolveCompletion(ctxA.Acls));
     }
@@ -194,7 +194,7 @@ public class CutPasteTests
         var ctxA = TestHelpers.SetupFreshAcls();
         var ctxB = TestHelpers.SetupFreshAcls();
         var chain = new AnimationChainSave { Name = "Walk" }; // never added to any acls
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls, "");
 
         Assert.Equal(CutCompletion.Stale, cut.ResolveCompletion(ctxB.Acls));
     }
@@ -219,7 +219,7 @@ public class CutPasteTests
         var cut = new PendingCutState();
         var ctxA = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls, "");
 
         bool removed = CutFromBackgroundTab(ctxA, cut);
 
@@ -234,7 +234,7 @@ public class CutPasteTests
         var ctxA = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 2);
         var frame = chain.Frames[0];
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } }, ctxA.Acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } }, ctxA.Acls, "");
 
         bool removed = CutFromBackgroundTab(ctxA, cut);
 
@@ -257,7 +257,7 @@ public class CutPasteTests
         frame.ShapesSave = new ShapesSave();
         frame.ShapesSave.Add(shape);
         chain.IsLocked = true;
-        cut.Set(new CopySelectionPayload { Kind = kind, Chains = [chain], Frames = [frame], Shapes = [shape] }, ctx.Acls);
+        cut.Set(new CopySelectionPayload { Kind = kind, Chains = [chain], Frames = [frame], Shapes = [shape] }, ctx.Acls, "");
 
         CutFromBackgroundTab(ctx, cut).ShouldBe(expectedRemoved);
 
@@ -272,7 +272,7 @@ public class CutPasteTests
         var ctxA = TestHelpers.SetupFreshAcls();
         var ctxB = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls, "");
 
         Assert.True(cut.SourcesBelongToProject(ctxA.Acls));
         Assert.False(cut.SourcesBelongToProject(ctxB.Acls));
