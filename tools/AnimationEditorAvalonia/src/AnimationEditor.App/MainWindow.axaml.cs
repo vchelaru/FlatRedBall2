@@ -2481,7 +2481,7 @@ public partial class MainWindow : Window
 
     private void OnTitleFileOpenFolderClick(object? sender, RoutedEventArgs e)
     {
-        var folder = Path.GetDirectoryName(_projectManager.FileName);
+        var folder = Path.GetDirectoryName(TitlePath);
         if (!string.IsNullOrEmpty(folder))
             Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
     }
@@ -2778,8 +2778,8 @@ public partial class MainWindow : Window
 
     private void OnTitleFileCopyPathClick(object? sender, RoutedEventArgs e)
     {
-        if (!string.IsNullOrEmpty(_projectManager.FileName))
-            CopyTextToClipboard(_projectManager.FileName);
+        if (!string.IsNullOrEmpty(TitlePath))
+            CopyTextToClipboard(TitlePath);
     }
 
     private void OnMinimizeBtnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -7524,9 +7524,12 @@ public partial class MainWindow : Window
     /// <summary>Makes the window Detach to New Window opens. Tests replace it so the window uses temp settings.</summary>
     internal Func<MainWindow> DetachedWindowFactory { get; set; } = () => App.CreateDetachedWindow();
 
+    /// <summary>The file the title bar names and its menu acts on, or null for none.</summary>
+    private string? TitlePath => ActivePane.TitlePath(_tabManager.ActiveTab);
+
     private void UpdateTitle()
     {
-        var filePath = ActivePane.TitlePath(_tabManager.ActiveTab);
+        var filePath = TitlePath;
         Title = TitleBarHelper.BuildWindowTitle(filePath);
 
         var hasFile = !string.IsNullOrEmpty(filePath);
