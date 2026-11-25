@@ -1296,6 +1296,8 @@ public partial class MainWindow : Window
                     _tabManager.Rename(savedFrom.Path, newPath);
                     RebuildTabStrip();
                 }
+                // The texture names are relative to the new folder.
+                RefreshPropertyPanel();
             });
         };
         _events.AvailableTexturesChanged += () => Dispatcher.UIThread.InvokeAsync(RefreshTextureCombo);

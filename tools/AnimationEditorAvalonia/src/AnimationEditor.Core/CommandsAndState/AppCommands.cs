@@ -901,6 +901,13 @@ namespace AnimationEditor.Core.CommandsAndState
 
             bool toAnotherFile = string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path);
             if (!WriteDocument(path, toAnotherFile)) return false;
+            if (!string.IsNullOrEmpty(_pm.FileName)
+                && new FilePath(_pm.FileName).GetDirectoryContainingThis() != new FilePath(path).GetDirectoryContainingThis())
+            {
+                // The textures in the undo history are named relative to the old folder.
+                _undoManager.Clear();
+                _undoManager.MarkSaved();
+            }
             _pm.FileName = path;
             SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();

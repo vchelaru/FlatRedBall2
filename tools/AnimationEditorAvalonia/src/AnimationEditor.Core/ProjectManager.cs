@@ -189,19 +189,28 @@ namespace AnimationEditor.Core
 
             var acls = AnimationChainListSave;
             if (acls == null) return;
-            SaveAnimationChainList(acls, targetPath, OnDiskCoordinateType);
+            SaveAnimationChainList(acls, string.IsNullOrEmpty(FileName) ? targetPath : FileName, targetPath, OnDiskCoordinateType);
         }
 
         /// <inheritdoc cref="IProjectManager.SaveAnimationChainList(AnimationChainListSave, string, TextureCoordinateType)"/>
-        public void SaveAnimationChainList(AnimationChainListSave acls, string targetPath, TextureCoordinateType diskFormat)
+        public void SaveAnimationChainList(AnimationChainListSave acls, string targetPath, TextureCoordinateType diskFormat) =>
+            SaveAnimationChainList(acls, targetPath, targetPath, diskFormat);
+
+        // ownPath: the file whose folder the document's relative paths are relative to so far.
+        private static void SaveAnimationChainList(
+            AnimationChainListSave acls, string ownPath, string targetPath, TextureCoordinateType diskFormat)
         {
+            var (from, to) = (new FilePath(ownPath).GetDirectoryContainingThis(), new FilePath(targetPath).GetDirectoryContainingThis());
             var achxDirectory = System.IO.Path.GetDirectoryName(targetPath) ?? string.Empty;
             var textureNames = acls.AnimationChains.SelectMany(chain => chain.Frames)
                 .Select(frame => (Frame: frame, frame.TextureName)).ToList();
+            var projectFile = acls.ProjectFile;
             void Write() { if (IsJsonPath(targetPath)) acls.SaveJson(targetPath); else acls.Save(targetPath); }
 
             try
             {
+                foreach (var (frame, name) in textureNames) frame.TextureName = TexturePathHelper.Rebase(name, from, to);
+                if (projectFile != null) acls.ProjectFile = TexturePathHelper.Rebase(projectFile, from, to);
                 NormalizeFrameTextureNames(acls, achxDirectory);
                 TextureCoordinateConverter.WriteAs(acls, diskFormat, TextureCoordinateConverter.SizesIn(achxDirectory), Write);
             }
@@ -209,6 +218,7 @@ namespace AnimationEditor.Core
             {
                 // The document is still where it was, and a name relative to the target's folder is another file there.
                 foreach (var (frame, name) in textureNames) frame.TextureName = name;
+                acls.ProjectFile = projectFile;
                 throw;
             }
         }
