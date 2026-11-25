@@ -75,7 +75,7 @@ public static class AnimationDescriber
             if (summary)
             {
                 w.WriteNumber("frames", chain.Frames.Count);
-                w.WriteNumber("length", Seconds(doc, chain));
+                w.WriteReal("length", Seconds(doc, chain));
                 w.WriteBoolean("locked", chain.IsLocked);
                 w.WriteEndObject();
                 continue;
@@ -84,7 +84,7 @@ public static class AnimationDescriber
             w.WriteBoolean("pingPong", chain.PingPong);
             w.WriteBoolean("reverse", chain.Reverse);
             w.WriteBoolean("locked", chain.IsLocked);
-            w.WriteNumber("length", Seconds(doc, chain));
+            w.WriteReal("length", Seconds(doc, chain));
             if (ownerTiles is not null && ownerTiles.TryGetValue(chain, out var ownerTile)) w.WriteNumber("ownerTile", ownerTile);
             w.WriteStartArray("frames");
             for (int i = 0; i < chain.Frames.Count; i++)
@@ -93,16 +93,16 @@ public static class AnimationDescriber
                 w.WriteStartObject();
                 w.WriteNumber("index", i);
                 w.WriteString("texture", f.TextureName);
-                w.WriteNumber("length", f.FrameLength);
+                w.WriteReal("length", f.FrameLength);
                 w.WriteStartObject("region");
-                w.WriteNumber("x", f.LeftCoordinate);
-                w.WriteNumber("y", f.TopCoordinate);
-                w.WriteNumber("width", f.RightCoordinate - f.LeftCoordinate);
-                w.WriteNumber("height", f.BottomCoordinate - f.TopCoordinate);
+                w.WriteReal("x", f.LeftCoordinate);
+                w.WriteReal("y", f.TopCoordinate);
+                w.WriteReal("width", f.RightCoordinate - f.LeftCoordinate);
+                w.WriteReal("height", f.BottomCoordinate - f.TopCoordinate);
                 w.WriteEndObject();
                 w.WriteStartObject("offset");
-                w.WriteNumber("x", PlainZero(f.RelativeX));
-                w.WriteNumber("y", PlainZero(f.RelativeY));
+                w.WriteReal("x", PlainZero(f.RelativeX));
+                w.WriteReal("y", PlainZero(f.RelativeY));
                 w.WriteEndObject();
                 WriteFlips(w, f.FlipHorizontal, f.FlipVertical, f.FlipDiagonal);
                 WriteColor(w, StoredColor(f));
@@ -126,19 +126,19 @@ public static class AnimationDescriber
                     w.WriteString("address", $"{chain.Name}/{i}/{EditAddress.TypeName(shape)}/{shape.Name}");
                     w.WriteString("type", EditAddress.TypeName(shape));
                     w.WriteString("name", shape.Name);
-                    w.WriteNumber("x", PlainZero(shape.X));
-                    w.WriteNumber("y", PlainZero(shape.Y));
+                    w.WriteReal("x", PlainZero(shape.X));
+                    w.WriteReal("y", PlainZero(shape.Y));
                     switch (shape)
                     {
-                        case AARectSave r: w.WriteNumber("scaleX", r.ScaleX); w.WriteNumber("scaleY", r.ScaleY); break;
-                        case CircleSave c: w.WriteNumber("radius", c.Radius); break;
+                        case AARectSave r: w.WriteReal("scaleX", r.ScaleX); w.WriteReal("scaleY", r.ScaleY); break;
+                        case CircleSave c: w.WriteReal("radius", c.Radius); break;
                         case PolygonSave p:
                             w.WriteStartArray("points");
                             foreach (var point in p.Points)
                             {
                                 w.WriteStartArray();
-                                w.WriteNumberValue(PlainZero(point.X));
-                                w.WriteNumberValue(PlainZero(point.Y));
+                                w.WriteRealValue(PlainZero(point.X));
+                                w.WriteRealValue(PlainZero(point.Y));
                                 w.WriteEndArray();
                             }
                             w.WriteEndArray();

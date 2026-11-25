@@ -71,6 +71,9 @@ public class AnimationChainListSave
     /// </summary>
     public string? ProjectFile { get; set; }
 
+    // The path an early FRB1 wrote into the file itself. Only carried, so saving a file keeps it.
+    internal string? Frb1FileName;
+
     internal EmptyTextForms EmptyText;
 
     /// <summary>
@@ -243,6 +246,7 @@ public class AnimationChainListSave
                 Reverse = BoolEl(chainEl, "Reverse"),
             };
             chain.Name = chain.EmptyText.Read(chainEl, "Name");
+            chain.ColorKey = chain.EmptyText.ReadOptional(chainEl, "ColorKey");
             chain.ParentFile = chain.EmptyText.ReadOptional(chainEl, "ParentFile");
 
             foreach (var frameEl in chainEl.Elements("Frame"))
@@ -251,6 +255,7 @@ public class AnimationChainListSave
             result.AnimationChains.Add(chain);
         }
 
+        result.Frb1FileName = result.EmptyText.ReadOptional(root, "FileName");
         result.ProjectFile = result.EmptyText.ReadOptional(root, "ProjectFile");
 
         return result;
@@ -277,7 +282,7 @@ public class AnimationChainListSave
     /// Frame <see cref="AnimationFrameSave.Events"/> (an FRB2 extension) are written last in the frame as
     /// <c>&lt;Events&gt;&lt;Event&gt;&lt;Name/&gt;&lt;Data/&gt;&lt;/Event&gt;&lt;/Events&gt;</c>, only when the frame has any;
     /// <c>Data</c> is omitted when <c>null</c>.
-    /// FRB1 fields FRB2 does not model (a chain's ParentFile, a shape's Parent, a polygon's RotationZ, cubes and spheres)
+    /// FRB1 fields FRB2 does not model (a file's FileName, a chain's ColorKey and ParentFile, a shape's Parent, a polygon's RotationZ, cubes and spheres)
     /// are carried as read, and text that reads as empty keeps its form: left out, self-closed or an empty pair of tags.
     /// </remarks>
     public void Save(string path)
@@ -516,6 +521,7 @@ public class AnimationChainListSave
         {
             var chainEl = new XElement("AnimationChain",
                 chain.EmptyText.Write("Name", chain.Name),
+                chain.EmptyText.Write("ColorKey", chain.ColorKey),
                 chain.EmptyText.Write("ParentFile", chain.ParentFile));
             // Tooling-only, written only when true so an unlocked/legacy chain round-trips
             // byte-identical (same convention as the frame writer's optional fields below).
@@ -535,6 +541,7 @@ public class AnimationChainListSave
             root.Add(chainEl);
         }
 
+        root.Add(EmptyText.Write("FileName", Frb1FileName));
         root.Add(EmptyText.Write("ProjectFile", ProjectFile));
 
         ThrowIfUnstorable(root);

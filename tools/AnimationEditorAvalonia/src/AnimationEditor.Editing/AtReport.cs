@@ -152,8 +152,8 @@ public static class AtReport
                 }
                 w.WriteString("chain", s.Chain);
                 w.WriteNumber("frame", s.Frame);
-                w.WriteNumber("offsetX", s.OffsetX);
-                w.WriteNumber("offsetY", s.OffsetY);
+                w.WriteReal("offsetX", s.OffsetX);
+                w.WriteReal("offsetY", s.OffsetY);
                 AnimationDescriber.WriteFlips(w, s.FlipHorizontal, s.FlipVertical, s.FlipDiagonal);
                 AnimationDescriber.WriteColor(w, s.Color);
                 w.WriteStartArray("events");
@@ -165,14 +165,14 @@ public static class AtReport
                     w.WriteStartObject();
                     w.WriteString("type", shape.Type);
                     w.WriteString("name", shape.Name);
-                    w.WriteNumber("x", shape.X);
-                    w.WriteNumber("y", shape.Y);
-                    if (shape.Type == "rect") { w.WriteNumber("scaleX", shape.SizeX); w.WriteNumber("scaleY", shape.SizeY); }
-                    else if (shape.Type == "circle") w.WriteNumber("radius", shape.SizeX);
+                    w.WriteReal("x", shape.X);
+                    w.WriteReal("y", shape.Y);
+                    if (shape.Type == "rect") { w.WriteReal("scaleX", shape.SizeX); w.WriteReal("scaleY", shape.SizeY); }
+                    else if (shape.Type == "circle") w.WriteReal("radius", shape.SizeX);
                     else
                     {
                         w.WriteStartArray("points");
-                        foreach (var (px, py) in shape.Points) { w.WriteStartObject(); w.WriteNumber("x", px); w.WriteNumber("y", py); w.WriteEndObject(); }
+                        foreach (var (px, py) in shape.Points) { w.WriteStartObject(); w.WriteReal("x", px); w.WriteReal("y", py); w.WriteEndObject(); }
                         w.WriteEndArray();
                     }
                     w.WriteEndObject();
