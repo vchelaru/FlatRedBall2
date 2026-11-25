@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../Shared/UnlistableFolder.cs" Link="Shared/UnlistableFolder.cs" />
     <ProjectReference Include="..\..\src\AnimationEditor.Editing\AnimationEditor.Editing.csproj" />
   </ItemGroup>
 

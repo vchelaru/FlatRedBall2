@@ -21,17 +21,21 @@ public sealed record OpenDocuments(
         new Dictionary<FilePath, (bool, string?)>(), new Dictionary<FilePath, SequenceListSave?>());
 }
 
+/// <param name="Why">The reason in a few words.</param>
+/// <param name="Detail">The whole reason; empty when <paramref name="Why"/> says it all.</param>
+public sealed record ConversionProblem(string Why, string Detail = "");
+
 /// <summary>
 /// One <c>.achx</c> of a plan. One that converts was converted in memory and read back, and every animation, frame, shape
 /// and event compared equal; one that did not is skipped.
 /// </summary>
-/// <param name="SkipReason">Why the file is left alone, or null when it is converted.</param>
+/// <param name="Problem">Why the file is left alone, or null when it is converted.</param>
 /// <param name="IsOpen">Its tab closes.</param>
 /// <param name="SavesEdits">Its tab holds edits its file lacks, which are saved first.</param>
 public sealed record PlannedFile(
-    string Source, string Target, string? SkipReason = null, int Animations = 0, int Frames = 0, bool IsOpen = false, bool SavesEdits = false)
+    string Source, string Target, ConversionProblem? Problem = null, int Animations = 0, int Frames = 0, bool IsOpen = false, bool SavesEdits = false)
 {
-    public bool Converts => SkipReason is null;
+    public bool Converts => Problem is null;
 }
 
 /// <summary>One <c>.seqj</c> that uses a file of a plan, or that could not be read to tell.</summary>
@@ -39,7 +43,7 @@ public sealed record PlannedFile(
 /// <param name="Blocks">How many of its blocks play one of them.</param>
 /// <param name="Problem">Why it cannot be updated, or null when it is.</param>
 public sealed record PlannedSequence(
-    string Path, IReadOnlyCollection<string> Plays, int Blocks, bool IsOpen = false, string? Problem = null)
+    string Path, IReadOnlyCollection<string> Plays, int Blocks, bool IsOpen = false, ConversionProblem? Problem = null)
 {
     public bool Updates => Problem is null;
 }
@@ -72,20 +76,20 @@ public sealed record AchxConversionPlan(
         bool isOpen = open.Animations.TryGetValue(new FilePath(source), out var tab);
         var skipped = new PlannedFile(source, target, IsOpen: isOpen);
 
-        if (File.Exists(target)) return skipped with { SkipReason = "an .achj with that name already exists" };
+        if (File.Exists(target)) return skipped with { Problem = new($"{Path.GetFileName(target)} exists") };
         if (tab.UnsavedEdits && (tab.CannotSave ?? WriteProtection(source)) is { } reason)
-            return skipped with { SkipReason = $"its unsaved edits cannot be saved: {reason}" };
+            return skipped with { Problem = new("Unsaved edits can't be saved", reason) };
         try
         {
             var list = AnimationFileLoader.Read(new FilePath(source));
             if (AnimationListComparison.FirstDifference(list, AnimationChainListSave.FromJsonString(list.ToJsonString())) is { } difference)
-                return skipped with { SkipReason = $"it would not be kept exactly: {difference}" };
+                return skipped with { Problem = new($"Not exact: {difference}", "The .achj would not hold the same data there.") };
             return new PlannedFile(source, target, null, list.AnimationChains.Count,
                 list.AnimationChains.Sum(chain => chain.Frames.Count), isOpen, tab.UnsavedEdits);
         }
         catch (Exception ex)
         {
-            return skipped with { SkipReason = $"it could not be read: {ex.Message}" };
+            return skipped with { Problem = new("Can't be read", ex.Message) };
         }
     }
 
@@ -112,14 +116,15 @@ public sealed record AchxConversionPlan(
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
-                found.Add(new PlannedSequence(path, [], 0, isOpen, $"it could not be read, so what it plays is not known: {ex.Message}"));
+                found.Add(new PlannedSequence(path, [], 0, isOpen, new("Can't be read", $"What it plays is not known. {ex.Message}")));
                 continue;
             }
 
             var (plays, blocks) = SequenceSourcePaths.Using(sequences, new FilePath(path).GetDirectoryContainingThis(), wanted);
             if (plays.Count == 0) continue;
             found.Add(new PlannedSequence(path, plays, blocks, isOpen,
-                unsaved is not null ? "it has edits that could not be saved" : WriteProtection(path)));
+                unsaved is not null ? new("Edits can't be saved", "Its tab holds edits that its file does not.")
+                : WriteProtection(path) is { } reason ? new("Read-only", reason) : null));
         }
         return found;
     }
@@ -127,9 +132,9 @@ public sealed record AchxConversionPlan(
     /// <summary>Why a file cannot be replaced, as far as that shows without trying, or null.</summary>
     private static string? WriteProtection(string path)
     {
-        if ((File.GetAttributes(path) & FileAttributes.ReadOnly) != 0) return "it is read-only";
+        if ((File.GetAttributes(path) & FileAttributes.ReadOnly) != 0) return "The file is read-only.";
         return !OperatingSystem.IsWindows() && (File.GetUnixFileMode(Path.GetDirectoryName(path)!) & UnixFileMode.UserWrite) == 0
-            ? "its folder is read-only"
+            ? "Its folder is read-only."
             : null;
     }
 }

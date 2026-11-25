@@ -7,7 +7,6 @@ using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Documents;
 using Avalonia.Layout;
 using Avalonia.Media;
 using FlatRedBall2.AnimationEditorCommon;
@@ -121,61 +120,17 @@ public static class EditorDialogs
 
     /// <summary>
     /// Shows everything <paramref name="plan"/> will do. True for Convert. A plan that converts nothing only says why, with
-    /// Close in place of Convert and Cancel.
+    /// Close in place of Convert and Cancel. Enter presses the focused button and never converts from elsewhere.
     /// </summary>
     public static Task<bool> ShowConversionPlanAsync(IEditorDialogHost host, AchxConversionPlan plan)
     {
-        var text = ConversionPlanText.Of(plan);
-        var list = new StackPanel { Margin = new Thickness(10, 8), Spacing = 12 };
-        foreach (var section in text.Sections)
-        {
-            var rows = new StackPanel { Spacing = 4 };
-            var title = new TextBlock { Text = section.Title, FontWeight = FontWeight.SemiBold };
-            MarkProblem(title, section.IsProblem);
-            rows.Children.Add(title);
-            foreach (var row in section.Rows)
-            {
-                rows.Children.Add(new TextBlock
-                {
-                    Margin = new Thickness(8, 0, 0, 0),
-                    TextWrapping = TextWrapping.Wrap,
-                    Inlines = [new Run(row.Text + "   "), new Run(row.Detail) { FontSize = 11, Foreground = Brushes.Gray }],
-                });
-            }
-            list.Children.Add(rows);
-        }
-
-        // Focusable, so Page Up and Page Down scroll it.
-        var frame = new Border { BorderThickness = new Thickness(1), Child = new ScrollViewer { Content = list, MaxHeight = 320, Focusable = true } };
-        frame.Bind(Border.BorderBrushProperty, frame.GetResourceObservable("LineBrush"));
-        frame.Bind(Border.BackgroundProperty, frame.GetResourceObservable("BgCanvas"));
-
-        var panel = new StackPanel { Margin = new Thickness(16), Spacing = 12 };
-        var summary = new StackPanel { Spacing = 2 };
-        foreach (var line in text.Summary)
-        {
-            var block = new TextBlock { Text = line.Text, TextWrapping = TextWrapping.Wrap };
-            MarkProblem(block, line.IsProblem);
-            summary.Children.Add(block);
-        }
-        panel.Children.Add(summary);
-        panel.Children.Add(frame);
-        foreach (var note in text.Notes)
-            panel.Children.Add(new TextBlock { Text = note, FontSize = 11, Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap });
-
-        var dialog = new EditorDialog<bool>(
-            new EditorDialogOptions("Convert to .achj", 560, SizeToContentHeight: true), panel, cancelResult: false);
+        var view = ConversionPlanView.Of(plan);
+        EditorDialog<bool>? dialog = null;
+        dialog = new EditorDialog<bool>(ConversionPlanDialog.Options,
+            ConversionPlanDialog.Build(view, () => dialog!.Confirm(), () => dialog!.Cancel()), cancelResult: false);
+        dialog.Confirm = () => dialog.Complete(view.CanConvert);
         dialog.Cancel = () => dialog.Complete(false);
-        dialog.Confirm = () => dialog.Complete(text.CanConvert);
-        panel.Children.Add(text.CanConvert
-            ? BuildButtonRow(("Convert", dialog.Confirm), ("Cancel", dialog.Cancel))
-            : BuildButtonRow(("Close", dialog.Cancel)));
         return host.ShowAsync(dialog);
-
-        static void MarkProblem(TextBlock block, bool isProblem)
-        {
-            if (isProblem) block.Bind(TextBlock.ForegroundProperty, block.GetResourceObservable("AccentSoft"));
-        }
     }
 
     public static Task<string?> PromptStringAsync(

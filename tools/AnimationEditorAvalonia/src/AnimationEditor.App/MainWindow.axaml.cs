@@ -909,6 +909,7 @@ public partial class MainWindow : Window
         // See the comment in ActivateTabAsync (#1026) -- a pending cut survives this switch too.
         if (tab.CachedEditorModel is not null)
             _projectManager.AnimationChainListSave = tab.CachedEditorModel;
+        RestoreGuides(tab);
         _appCommands.RestoreTabSelection(tab);
         _undoManager.Clear();
         if (tab.UndoSnapshot != null)
@@ -1046,6 +1047,7 @@ public partial class MainWindow : Window
         _selectedState.Reset();
         _undoManager.Clear();
         ClearWireframeTexture();
+        RestoreGuides(null);
         ProjectPanel.SyncSelectionToActiveFile(null);
         RefreshTreeView();
         RefreshFilesPanel();
@@ -1323,6 +1325,8 @@ public partial class MainWindow : Window
         // Tree events — fully wired (WireTreeView connects these after tree is constructed)
         _appCommands.RefreshTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RefreshTreeView);
         _appCommands.RebuildTreeViewRequested           += expandedChainNames => Dispatcher.UIThread.InvokeAsync(() => RebuildTreeView(expandedChainNames));
+        // Raised when another document comes to the front, before its companion file, whose guides win, is applied.
+        _appCommands.RebuildTreeViewRequested           += _ => RestoreGuides(_tabManager.ActiveTab);
         _appCommands.RefreshChainNodeRequested          += c  => Dispatcher.UIThread.InvokeAsync(() => RefreshChainNode(c));
         _appCommands.RefreshFrameNodeRequested          += f  => Dispatcher.UIThread.InvokeAsync(() => RefreshFrameNode(f));
         _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
@@ -1426,9 +1430,10 @@ public partial class MainWindow : Window
                 s.WireframePanX,
                 s.WireframePanY,
                 Math.Clamp(s.WireframeZoomPercent / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom)));
-            // The preview has no texture swap to fight, so it takes its camera in the same turn as the document.
+            // The preview has no texture swap to fight, so it takes its camera and guides in the same turn as the
+            // document: the wireframe's texture load saves the companion.
             if (Dispatcher.UIThread.CheckAccess())
-                ApplyCompanionPreviewCamera(s);
+                ApplyCompanionPreview(s);
             Dispatcher.UIThread.InvokeAsync(() => ApplyCompanionSettings(s));
         };
     }
@@ -2174,12 +2179,13 @@ public partial class MainWindow : Window
         _ioManager.SaveCompanionFileFor(new FilePath(_projectManager.FileName), BuildCompanionSettings());
     }
 
-    private void ApplyCompanionPreviewCamera(AESettingsSave settings)
+    private void ApplyCompanionPreview(AESettingsSave settings)
     {
         bool wasSuppressed = _suppressCompanionSave;
         _suppressCompanionSave = true;
         try
         {
+            PreviewCtrl.SetGuides(settings.HorizontalGuides, settings.VerticalGuides);
             PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);
             PreviewCtrl.SetPan(settings.PreviewPanX, settings.PreviewPanY);
         }
@@ -2188,6 +2194,10 @@ public partial class MainWindow : Window
             _suppressCompanionSave = wasSuppressed;
         }
     }
+
+    /// <summary>Shows the guides <paramref name="tab"/> was left with, none when it has not been shown or there is no tab.</summary>
+    private void RestoreGuides(TabEntry? tab) =>
+        PreviewCtrl.SetGuides(tab?.CachedGuides?.Horizontal ?? [], tab?.CachedGuides?.Vertical ?? []);
 
     private void ApplyCompanionSettings(AESettingsSave settings)
     {
@@ -2205,8 +2215,6 @@ public partial class MainWindow : Window
                     node.IsExpanded = expandedSet.Contains(chain.Name);
             }
             TreeBuilder.ApplyExpandedFrames(_treeRoots, settings.ExpandedFrames);
-
-            PreviewCtrl.SetGuides(settings.HorizontalGuides, settings.VerticalGuides);
         }
         finally
         {
@@ -2589,7 +2597,8 @@ public partial class MainWindow : Window
     /// same folder under <see cref="NewAnimationFileNaming.SuggestDuplicateFileName"/>'s name, so
     /// texture paths (relative to the file) still resolve, then opens the copy the way "New
     /// Animation File" does. Companion files (<c>.aeproperties</c>, <c>.tiledsync</c>) are not
-    /// copied: a second file pushing into the same tilesets would fight the original. The folder
+    /// copied: a second file pushing into the same tilesets would fight the original. An open file whose last
+    /// save failed is saved first, and when that fails again nothing is copied. The folder
     /// watcher refreshes the tree, same as <see cref="DeleteProjectFileAsync"/>.
     /// </summary>
     internal async Task DuplicateProjectFileAsync(string relativePath)
@@ -2597,22 +2606,46 @@ public partial class MainWindow : Window
         var sourcePath = ResolveProjectFolderAbsolutePath(relativePath);
         if (sourcePath is null) return;
 
+        var fileName = new FilePath(sourcePath).NoPath;
+        var (savedEdits, reason) = SaveFailedEditsOf(sourcePath);
+        if (reason is not null)
+        {
+            // Posted because the failed save's own banner is, and would replace this one.
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                ShowProblem($"⚠ Could not duplicate {fileName}: its unsaved edits could not be saved ({reason})"));
+            return;
+        }
+        if (savedEdits) Notifications.HideProblem(AutoSaveFailedPrefix);
+
         var folder = Path.GetDirectoryName(sourcePath)!;
-        var copyName = NewAnimationFileNaming.SuggestDuplicateFileName(
-            new FilePath(sourcePath).NoPath,
-            Directory.EnumerateFiles(folder).Select(f => new FilePath(f).NoPath));
-        var copyPath = Path.Combine(folder, copyName);
+        string copyPath;
         try
         {
+            var copyName = NewAnimationFileNaming.SuggestDuplicateFileName(
+                fileName,
+                Directory.EnumerateFiles(folder).Select(f => new FilePath(f).NoPath));
+            copyPath = Path.Combine(folder, copyName);
             File.Copy(sourcePath, copyPath, overwrite: false);
         }
         catch (Exception ex)
         {
-            ShowProblem($"⚠ Could not duplicate {new FilePath(sourcePath).NoPath}: {ex.Message}");
+            ShowProblem($"⚠ Could not duplicate {fileName}: {ex.Message}");
             return;
         }
 
         await LoadAnimationFileAsync(copyPath);
+    }
+
+    /// <summary>
+    /// Writes the edits a failed save left in the open tab of <paramref name="path"/>, for a command that reads the file.
+    /// Returns whether it wrote some, and why that failed again.
+    /// </summary>
+    private (bool Saved, string? Error) SaveFailedEditsOf(string path)
+    {
+        if (_tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(path)) is not { } tab || !PaneFor(tab).HasFailedSave(tab))
+            return (false, null);
+        var error = PaneFor(tab).SaveFailedEdits(tab);
+        return (error is null, error);
     }
 
     /// <summary>
@@ -2662,7 +2695,7 @@ public partial class MainWindow : Window
         if (!await EditorDialogs.ShowConversionPlanAsync(_dialogHost, plan)) return;
 
         var outcome = AchxConversion.Run(plan, new ConversionSteps(
-            source => OpenTab(source) is { } tab ? _achxPane.SaveFailedEdits(tab) : null,
+            source => SaveFailedEditsOf(source).Error,
             DeleteToRecycleBin,
             (path, files) => _sequencePane.ChangeSourceExtension(path, files, AchxConversionPlan.TargetExtension,
                 (save, target) => AchxConversion.ReplaceRecyclingOriginal(save, target, DeleteToRecycleBin))));
@@ -2970,6 +3003,7 @@ public partial class MainWindow : Window
         // the previously-active tab left behind before content replaces the fresh blank ACLS.
         _projectManager.ResetToBlankDocument();
         _projectManager.AnimationChainListSave = content;
+        RestoreGuides(null);
         _selectedState.Reset();
         if (selectedChain is not null)
             _selectedState.SelectedChain = selectedChain;
@@ -3037,6 +3071,7 @@ public partial class MainWindow : Window
             _appCommands.CloseProject();
             ShowPane(_achxPane);
             ClearWireframeTexture();
+            RestoreGuides(null);
         }
         else
         {
@@ -3112,6 +3147,11 @@ public partial class MainWindow : Window
     {
         _projectManager.ProjectFolderPath = path;
         _projectFolderWatcher.Watch(path);
+        return await ScanProjectFolderAsync(path);
+    }
+
+    private async Task<int> ScanProjectFolderAsync(string path)
+    {
         var rootFolder = new DiskEditorFolder(path);
         var scan = await AchxFolderScanner.ScanProjectAsync(rootFolder);
         var entries = scan.Files;
@@ -3164,7 +3204,7 @@ public partial class MainWindow : Window
         if (_projectManager.ProjectFolderPath is null) return;
 
         // A create or delete changes tree *structure*, not just a thumbnail -- and a full rescan
-        // is exactly what LoadProjectFolderAsync already does on every Open Project Folder, so
+        // is exactly what ScanProjectFolderAsync already does on every Open Project Folder, so
         // reuse it rather than hand-rolling incremental tree add/remove. Detected from ground
         // truth (does the path exist on disk / is it already a tree node) rather than the
         // coalesced WatcherChangeType: a brand-new file's Create is immediately followed by a
@@ -3176,7 +3216,8 @@ public partial class MainWindow : Window
             !File.Exists(c.Path) || FindProjectPanelEntry(ProjectPanel.TreeRoots, c.Path) is null);
         if (structureChanged)
         {
-            await LoadProjectFolderAsync(_projectManager.ProjectFolderPath);
+            _projectFolderWatcher.RestartIfStopped();
+            await ScanProjectFolderAsync(_projectManager.ProjectFolderPath);
             return;
         }
 

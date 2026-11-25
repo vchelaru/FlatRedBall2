@@ -424,8 +424,16 @@ public partial class MainWindow
         /// </summary>
         public async Task<TabEntry?> PrepareCloseAsync(TabEntry tab)
         {
-            if (!_documents.TryGetValue(tab.Path, out var document) || !document.HasUnsavedEdits) return tab;
-            return await ConfirmCloseAsync(document) ? tab : null;
+            if (!HasFailedSave(tab)) return tab;
+            return await ConfirmCloseAsync(_documents[tab.Path]) ? tab : null;
+        }
+
+        public bool HasFailedSave(TabEntry tab) => _documents.TryGetValue(tab.Path, out var document) && document.HasUnsavedEdits;
+
+        public string? SaveFailedEdits(TabEntry tab)
+        {
+            _documents[tab.Path].SaveToDisk();
+            return _documents[tab.Path].SaveError;
         }
 
         /// <summary>Whether any open .seqj holds edits its file lacks (a failed save), for the window-close check.</summary>

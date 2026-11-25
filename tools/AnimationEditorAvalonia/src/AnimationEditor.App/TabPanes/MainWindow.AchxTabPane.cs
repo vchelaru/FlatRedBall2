@@ -43,6 +43,7 @@ public partial class MainWindow
             // Before the snapshot, so the rename is in this tab's history, and a held drag cannot add to the next tab's.
             _window.SettlePendingAchxInput();
             _window._tabController.CaptureLeavingTab(tab);
+            tab.CachedGuides = new PreviewGuides(_window.PreviewCtrl.HGuides.ToList(), _window.PreviewCtrl.VGuides.ToList());
             _window.SaveCompanionFile();
         }
 
@@ -147,10 +148,6 @@ public partial class MainWindow
             ? (true, _window._appCommands.SaveRefusal(tab.Path.FullPath, tab == _window._tabManager.ActiveTab ? null : tab))
             : (false, null);
 
-        /// <summary>
-        /// Writes the edits a failed save left in <paramref name="tab"/> (<see cref="HasFailedSave"/>), without switching to it. Returns why that failed
-        /// again, or null when the file has them.
-        /// </summary>
         public string? SaveFailedEdits(TabEntry tab)
         {
             string? reason = null;

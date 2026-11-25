@@ -26,6 +26,10 @@ namespace AnimationEditor.Core.Models
             Seeded = true;
         }
 
+        /// <summary>Whether <paramref name="camera"/> is the one recorded for <paramref name="texture"/>.</summary>
+        public bool Remembers(string texture, TextureCamera camera) =>
+            _byTexture.TryGetValue(texture, out var remembered) && remembered == camera;
+
         /// <summary>
         /// Gives a tab that has never been shown the camera its companion file saved. Applied to the first texture
         /// the tab shows. Ignored once the tab has been seeded or has remembered any camera.

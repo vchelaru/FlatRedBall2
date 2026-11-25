@@ -53,6 +53,7 @@ public class DocumentWriteMatrixScenarioTests
             DocAction.CloseWindowWithUnsavedEdits => front <= background,
             DocAction.LeaveDuringRename => background is DocType.Achx or DocType.Seqj,
             DocAction.ConvertOpenTabToAchj or DocAction.ConvertOpenPushSource => eitherPaneInFront && background == DocType.Achx,
+            DocAction.DuplicateWithUnsavedEdits => eitherPaneInFront && background != DocType.Untitled,
             // What was recovered is an Untitled document.
             DocAction.RecoverAtStartup => front == DocType.Untitled,
             _ => true,
@@ -98,7 +99,7 @@ public class DocumentWriteMatrixScenarioTests
         using var editor = new AnimationEditorHarness();
         // A folder each: an unwritable file on Linux is an unwritable folder. A cut needs both on the one texture.
         bool apart = action is DocAction.CloseTabWithUnsavedEdits or DocAction.CloseBehindOutsideChange or DocAction.CloseWindowWithUnsavedEdits
-            or DocAction.ConvertOpenTabToAchj or DocAction.ConvertOpenPushSource;
+            or DocAction.ConvertOpenTabToAchj or DocAction.ConvertOpenPushSource or DocAction.DuplicateWithUnsavedEdits;
         AnimationChainSave chain = Documents.ChainFor(background, Documents.BackgroundName);
         if (action == DocAction.CutChainATilesetCannotStore) chain = Documents.RichChain(Documents.BackgroundName, "other.png");
         else if (front == DocType.Tsx && action is DocAction.CutChain or DocAction.CutFrame) chain = Documents.PlainChain(Documents.BackgroundName);
@@ -216,6 +217,18 @@ public class DocumentWriteMatrixScenarioTests
                 editor.Layout();
                 written.Add(back.Path);
                 back.Path = Path.ChangeExtension(back.Path, ".achj");
+                break;
+            case DocAction.DuplicateWithUnsavedEdits:
+                EditWithoutSaving(editor, back);
+                editor.ClickTab(current.Label);
+                editor.Services.ProjectManager.ProjectFolderPath = editor.ProjectFolder;
+                await editor.Window.DuplicateProjectFileAsync(Path.GetRelativePath(editor.ProjectFolder, back.Path!).Replace('\\', '/'));
+                editor.Layout();
+                string copy = Path.Combine(back.Folder, Documents.BackgroundName + "2" + background.Extension());
+                editor.ProblemText.ShouldBeNull();
+                editor.Tabs.ActiveTab!.Path.FullPath.ShouldBe(new FilePath(copy).FullPath);
+                Documents.ShouldHold(copy, back.Expected);
+                written.Add(copy);
                 break;
             default:
                 throw new InvalidOperationException($"{action} has no case here.");

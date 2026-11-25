@@ -1,4 +1,5 @@
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.IO;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -43,10 +44,11 @@ public static class TiledSyncAssociationScanner
             return Array.Empty<string>();
 
         var owners = new List<string>();
-        // A folder that cannot be read is skipped, as a file that cannot be is.
-        var everyReadableFolder = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0 };
-        foreach (var syncFile in Directory.EnumerateFiles(tsxDir.FullPath, "*.tiledsync", everyReadableFolder))
+        foreach (var syncFile in FolderWalk.Files(tsxDir.FullPath))
         {
+            if (!Path.GetExtension(syncFile).Equals(".tiledsync", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             try
             {
                 var json = File.ReadAllText(syncFile);

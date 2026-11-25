@@ -7,8 +7,8 @@ using FilePath = AnimationEditor.Core.Paths.FilePath;
 namespace AnimationEditor.App.Services;
 
 /// <summary>
-/// <c>System.IO</c>-backed <see cref="IEditorFolder"/> for desktop's Open Project Folder (#770) --
-/// a real filesystem, so there's no permission or enumeration failure to guard against.
+/// <c>System.IO</c>-backed <see cref="IEditorFolder"/> for desktop's Open Project Folder (#770).
+/// Listing it throws when the folder cannot be listed; <see cref="AchxFolderScanner"/> skips such a subfolder.
 /// </summary>
 public sealed class DiskEditorFolder : IEditorFolder
 {
