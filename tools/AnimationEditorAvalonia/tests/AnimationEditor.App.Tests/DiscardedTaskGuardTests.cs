@@ -13,8 +13,8 @@ public class DiscardedTaskGuardTests
 {
     private static readonly Regex Discard = new(@"(?<![\w])_ = (?<call>[^;]*?Async)\(");
 
-    /// <summary>A lambda handler, up to its first await.</summary>
-    private static readonly Regex AsyncHandler = new(@"\+= async\b.*?\bawait (?<call>[\w.]+)\(", RegexOptions.Singleline);
+    /// <summary>A lambda handler or dispatched lambda, up to its first await.</summary>
+    private static readonly Regex AsyncHandler = new(@"(\+= |InvokeAsync\(|Post\()async\b.*?\bawait (?<call>[\w.]+)\(", RegexOptions.Singleline);
 
     private static readonly Regex AsyncVoid = new(@"\basync void (?<call>\w+)\(");
 
@@ -62,8 +62,8 @@ public class DiscardedTaskGuardTests
         var unguarded = AppFiles()
             .SelectMany(path => new[] { (Regex: AsyncHandler, Except: NeedNoGuard), (Regex: AsyncVoid, Except: AsyncVoidNeedsNoGuard) }
                 .SelectMany(rule => rule.Regex.Matches(File.ReadAllText(path))
-                    .Select(match => match.Groups["call"].Value)
-                    .Where(call => !rule.Except.ContainsKey(call))
+                    .Select(match => match.Groups["call"].Value.Split('.').Last())
+                    .Where(call => call != "RunGuardedAsync" && !rule.Except.ContainsKey(call))
                     .Select(call => $"{Path.GetFileName(path)}: {call}")))
             .ToList();
 

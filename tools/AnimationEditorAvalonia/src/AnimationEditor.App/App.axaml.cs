@@ -162,7 +162,7 @@ public partial class App : Application
             SingleInstance.FileOpenRequested += path =>
                 Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    await window.OpenFileAsTab(path);
+                    await window.RunGuardedAsync(() => window.OpenFileAsTab(path), "Open");
                     window.BringToForeground();
                 });
             SingleInstance.ActivationRequested += () =>
@@ -179,7 +179,10 @@ public partial class App : Application
                 string[] paths = opened.Files.Select(file => file.TryGetLocalPath()).OfType<string>().ToArray();
                 Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    foreach (string path in paths) await window.OpenFileAsTab(path);
+                    await window.RunGuardedAsync(async () =>
+                    {
+                        foreach (string path in paths) await window.OpenFileAsTab(path);
+                    }, "Open");
                     if (window.IsVisible) window.BringToForeground();
                 });
             };

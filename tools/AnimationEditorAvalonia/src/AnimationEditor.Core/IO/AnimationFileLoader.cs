@@ -17,14 +17,15 @@ public static class AnimationFileLoader
 {
     /// <summary>Reads <paramref name="path"/> and converts it to pixels.</summary>
     /// <remarks>A UV frame whose texture size can't be read gets an unset region (<see cref="Utilities.FrameRegion.Unset"/>).</remarks>
+    /// <param name="readingTexture">Called with the path of each texture whose size is about to be read.</param>
     /// <exception cref="FileNotFoundException">The file does not exist.</exception>
     /// <exception cref="InvalidDataException">The file contains merge conflict markers.</exception>
-    public static EditorAnimationFile Load(string path)
+    public static EditorAnimationFile Load(string path, Action<string>? readingTexture = null)
     {
         var filePath = new FilePath(path);
         var list = Read(filePath);
         var onDisk = list.CoordinateType;
-        TextureCoordinateConverter.ToPixels(list, SizesBeside(filePath));
+        TextureCoordinateConverter.ToPixels(list, SizesBeside(filePath, readingTexture));
         return new EditorAnimationFile(list, onDisk);
     }
 
@@ -58,6 +59,6 @@ public static class AnimationFileLoader
         return onDisk;
     }
 
-    private static Func<string, (int Width, int Height)?> SizesBeside(FilePath path) =>
-        TextureCoordinateConverter.SizesIn(path.GetDirectoryContainingThis().FullPath);
+    private static Func<string, (int Width, int Height)?> SizesBeside(FilePath path, Action<string>? readingTexture = null) =>
+        TextureCoordinateConverter.SizesIn(path.GetDirectoryContainingThis().FullPath, readingTexture);
 }

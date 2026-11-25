@@ -113,11 +113,11 @@ public class SequenceSourceReloadTests
     }
 
     // A UV frame covering its whole texture: its pixels come from the texture's size (#2112).
-    private static SequenceDocument OpenUvDocument(string folder)
+    private static SequenceDocument OpenUvDocument(string folder, string texture = "sheet.png")
     {
         var list = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
         var chain = new AnimationChainSave { Name = "Walk" };
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FrameLength = 0.1f, RightCoordinate = 1, BottomCoordinate = 1 });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = texture, FrameLength = 0.1f, RightCoordinate = 1, BottomCoordinate = 1 });
         list.AnimationChains.Add(chain);
         list.SaveJson(Path.Combine(folder, "hero.achj"));
         return OpenDocument(folder);
@@ -154,6 +154,15 @@ public class SequenceSourceReloadTests
 
         document.ReloadChangedSources().ShouldBeTrue();
         document.SourceChains("hero.achj")!.AnimationChains[0].Frames.Single().RightCoordinate.ShouldBe(128);
+    }
+
+    [Fact]
+    public void Load_UvSourceWithATextureNameNoPathCanHold_ShowsTheSource()
+    {
+        using var dir = new TestHelpers.TempDir();
+        var document = OpenUvDocument(dir.Path, "nul" + (char)0 + ".png");
+
+        document.SourceChains("hero.achj")!.AnimationChains.Single().Name.ShouldBe("Walk");
     }
 
     [Fact]

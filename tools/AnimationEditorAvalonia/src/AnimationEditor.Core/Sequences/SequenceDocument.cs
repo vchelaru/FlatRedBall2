@@ -42,6 +42,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     {
         public static FileStamp Of(string path)
         {
+            if (!File.Exists(path)) return default; // also for a path that can't be one
             var info = new FileInfo(path);
             return info.Exists ? new FileStamp(true, info.LastWriteTimeUtc, info.Length) : default;
         }
@@ -1578,11 +1579,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
             string full = SourcePath(source).FullPath;
             if (_stamps.TryGetValue(source, out var known) && known.All(file => FileStamp.Of(file.Key) == file.Value)) continue;
             var stamps = new Dictionary<string, FileStamp> { [full] = FileStamp.Of(full) };
-            var loaded = TryLoad(full);
-            _sources[source] = loaded?.List;
-            if (loaded is { OnDiskCoordinateType: TextureCoordinateType.UV })
-                foreach (var frame in loaded.List.AnimationChains.SelectMany(chain => chain.Frames))
-                    if (ResolveTexturePath(source, frame) is { } texture) stamps[texture] = FileStamp.Of(texture);
+            _sources[source] = TryLoad(full, texture => stamps[texture] = FileStamp.Of(texture));
             _stamps[source] = stamps;
             any = true;
         }
@@ -1590,11 +1587,11 @@ public sealed class SequenceDocument : ISequenceChainLookup
         return any;
     }
 
-    private static EditorAnimationFile? TryLoad(string absolutePath)
+    private static AnimationChainListSave? TryLoad(string absolutePath, Action<string> readingTexture)
     {
         try
         {
-            return AnimationFileLoader.Load(absolutePath);
+            return AnimationFileLoader.Load(absolutePath, readingTexture).List;
         }
         catch (Exception ex)
         {

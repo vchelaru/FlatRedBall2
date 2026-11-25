@@ -1106,7 +1106,6 @@ namespace AnimationEditor.Core.CommandsAndState
 
             ItemsDeleted?.Invoke($"{total} items");
             RefreshWireframeRequested?.Invoke();
-            _events.RaiseAnimationChainsChanged();
         }
 
         public void DeleteFrames(List<AnimationFrameSave> frames)
@@ -1137,7 +1136,6 @@ namespace AnimationEditor.Core.CommandsAndState
 
             ItemsDeleted?.Invoke(label);
             RefreshWireframeRequested?.Invoke();
-            _events.RaiseAnimationChainsChanged();
         }
 
         private List<string> GetSelectedFrameShapeNames()
