@@ -626,11 +626,12 @@ public partial class MainWindow
             if (_document is not { } document) return;
             var surface = Surface;
             if (RefusedForNothingSelected("copy", surface, clearClipboard: true)) return;
-            string? text = surface == EditSurface.List
-                ? document.CopySequences(document.SelectedIndices)
-                : _window.SequenceTimeline.CopySelectionText();
-            if (text is not null) _window.CopyTextToClipboard(text);
+            if (SelectionText(document, surface) is { } text) _window.CopyTextToClipboard(text);
         }
+
+        private string? SelectionText(SequenceDocument document, EditSurface surface) => surface == EditSurface.List
+            ? document.CopySequences(document.SelectedIndices)
+            : _window.SequenceTimeline.CopySelectionText();
 
         /// <summary>
         /// Ctrl+V and Edit &gt; Paste read the clipboard and paste what it holds, whichever pane owns the edit hotkeys
@@ -643,12 +644,23 @@ public partial class MainWindow
             _ = _window.RunGuardedAsync(() => PasteAsync(document), "Paste");
         }
 
-        /// <summary>Ctrl+X and Edit &gt; Cut: copies, then removes, as one undo entry for the removal.</summary>
+        /// <summary>
+        /// Ctrl+X and Edit &gt; Cut: copies, then removes, as one undo entry for the removal. Nothing is removed when the copy
+        /// did not reach the clipboard, which another program may hold.
+        /// </summary>
         public void CutSelection()
         {
+            if (_document is not { } document) return;
             var surface = Surface;
             if (RefusedForNothingSelected("cut", surface, clearClipboard: true)) return;
-            CopySelection();
+            _ = _window.RunGuardedAsync(() => CutAsync(document, surface), "Cut");
+        }
+
+        private async Task CutAsync(SequenceDocument document, EditSurface surface)
+        {
+            if (TopLevel.GetTopLevel(_window)?.Clipboard is not { } clipboard || SelectionText(document, surface) is not { } text) return;
+            await clipboard.SetTextAsync(text);
+            if (document != _document || SelectionText(document, surface) != text) return; // only what was copied is removed
             if (surface == EditSurface.List)
             {
                 DeleteSelected();
