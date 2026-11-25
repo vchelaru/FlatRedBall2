@@ -64,7 +64,7 @@ public class UndoFidelityTests : IDisposable
         var target = TestHelpers.MakeChain(_ctx.Acls, "Run", 1);
         var before = chain.Frames.ToList();
 
-        _ctx.AppCommands.PasteFramesCut(target, [before[2], before[0]], null, [before[2], before[0]]);
+        _ctx.AppCommands.PasteFramesCut(target, [before[2], before[0]], null);
         _ctx.UndoManager.Undo();
 
         chain.Frames.Select(f => f.TextureName).ShouldBe(before.Select(f => f.TextureName));
@@ -124,7 +124,7 @@ public class UndoFidelityTests : IDisposable
         var frame = TestHelpers.MakeChain(_ctx.Acls, "Walk", 1).Frames[0];
         frame.ShapesSave = null;
 
-        _ctx.AppCommands.PasteShapesCut(frame, [new CircleSave { Name = "C" }], sourcesToRemove: [], frame);
+        _ctx.AppCommands.PasteShapesCut(frame, [], frame);
 
         frame.ShapesSave.ShouldBeNull();
     }

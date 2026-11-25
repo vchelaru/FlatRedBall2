@@ -70,69 +70,87 @@ public class CutPasteTests
     }
 
     [Fact]
-    public void PasteChainsCut_OneUndoRestoresSourcesAndRemovesPasted()
+    public void PasteChainsCut_MovesTheChainsBelowTheSelectedOne_OneUndo()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var c1 = TestHelpers.MakeChain(ctx.Acls, "Chain1");
         var c2 = TestHelpers.MakeChain(ctx.Acls, "Chain2");
-        TestHelpers.MakeChain(ctx.Acls, "Chain3");
-        ctx.SelectedState.SelectedNodes = new List<object> { c1, c2 };
+        var c3 = TestHelpers.MakeChain(ctx.Acls, "Chain3");
+        ctx.SelectedState.SelectedNodes = new List<object> { c3 };
 
-        var pasted = new List<AnimationChainSave>
-        {
-            AnimationCloneHelper.CloneChain(c1),
-            AnimationCloneHelper.CloneChain(c2),
-        };
+        ctx.AppCommands.PasteChainsCut(new[] { c1, c2 });
 
-        ctx.AppCommands.PasteChainsCut(pasted, new[] { c1, c2 });
-
-        Assert.Equal(3, ctx.Acls.AnimationChains.Count);
-        Assert.DoesNotContain(c1, ctx.Acls.AnimationChains);
-        Assert.DoesNotContain(c2, ctx.Acls.AnimationChains);
+        ctx.Acls.AnimationChains.ShouldBe([c3, c1, c2]);
+        ctx.Acls.AnimationChains.Select(c => c.Name).ShouldBe(["Chain3", "Chain1", "Chain2"]);
 
         ctx.UndoManager.Undo();
-        Assert.Equal(3, ctx.Acls.AnimationChains.Count);
-        Assert.Contains(c1, ctx.Acls.AnimationChains);
-        Assert.Contains(c2, ctx.Acls.AnimationChains);
+        ctx.Acls.AnimationChains.ShouldBe([c1, c2, c3]);
     }
 
     [Fact]
-    public void PasteFramesCut_OneUndoRestoresSourcesAndRemovesPasted()
+    public void PasteFramesCut_SameChain_MovesTheFrame_OneUndo()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
-        var f1 = chain.Frames[1];
-        var pasted = new[] { AnimationCloneHelper.CloneFrame(f1) };
+        var before = chain.Frames.ToList();
 
-        ctx.AppCommands.PasteFramesCut(chain, pasted, insertIndex: 2, sourcesToRemove: new[] { f1 });
+        ctx.AppCommands.PasteFramesCut(chain, [before[1]], insertIndex: 3);
 
-        Assert.Equal(3, chain.Frames.Count);
-        Assert.DoesNotContain(f1, chain.Frames);
-        Assert.Equal("frame1.png", chain.Frames[1].TextureName);
+        chain.Frames.ShouldBe([before[0], before[2], before[1]]);
 
         ctx.UndoManager.Undo();
-        Assert.Equal(3, chain.Frames.Count);
-        Assert.Same(f1, chain.Frames[1]);
+        chain.Frames.ShouldBe(before);
     }
 
     [Fact]
-    public void PasteShapesCut_OneUndoRestoresSourcesAndRemovesPasted()
+    public void PasteFramesCut_LockedSource_KeepsItsFrameAndPastesACopy()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
-        var frame = chain.Frames[0];
-        var rect = new AARectSave { Name = "Hit" };
-        frame.ShapesSave!.Add(rect);
+        var locked = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var run = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+        var runFrame = run.Frames[0];
+        var target = TestHelpers.MakeChain(ctx.Acls, "Idle");
+        locked.IsLocked = true;
 
-        var pastedRect = (AARectSave)AnimationCloneHelper.CloneShape(rect)!;
-        ctx.AppCommands.PasteShapesCut(frame, new object[] { pastedRect }, new[] { rect }, frame);
+        ctx.AppCommands.PasteFramesCut(target, [locked.Frames[0], runFrame], insertIndex: null);
 
-        Assert.Single(frame.ShapesSave.Shapes);
-        Assert.DoesNotContain(rect, frame.ShapesSave.Shapes);
+        locked.Frames.Count.ShouldBe(1);
+        run.Frames.ShouldBeEmpty();
+        target.Frames.Count.ShouldBe(2);
+        target.Frames[0].ShouldNotBeSameAs(locked.Frames[0]);
+        target.Frames[1].ShouldBeSameAs(runFrame);
 
         ctx.UndoManager.Undo();
-        Assert.Single(frame.ShapesSave.Shapes);
-        Assert.Same(rect, frame.ShapesSave.Shapes[0]);
+        run.Frames.ShouldBe([runFrame]);
+        target.Frames.ShouldBeEmpty();
+    }
+
+    // Within its own frame a shape keeps its name; in another frame a taken name gets a free one, which undo takes back.
+    [Fact]
+    public void PasteShapesCut_MovesTheShape_OneUndoEach()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var (frame, other) = (chain.Frames[0], chain.Frames[1]);
+        var (hit, hurt) = (new AARectSave { Name = "Hit" }, new AARectSave { Name = "Hurt" });
+        frame.ShapesSave!.Add(hit);
+        frame.ShapesSave.Add(hurt);
+        other.ShapesSave!.Add(new CircleSave { Name = "Hit" });
+
+        ctx.AppCommands.PasteShapesCut(frame, [hit], frame);
+        frame.ShapesSave.Shapes.ShouldBe([hurt, hit]);
+        hit.Name.ShouldBe("Hit");
+
+        ctx.AppCommands.PasteShapesCut(other, [hit], frame);
+        frame.ShapesSave.Shapes.ShouldBe([hurt]);
+        other.ShapesSave.Shapes[0].ShouldBeSameAs(hit);
+        hit.Name.ShouldBe("Hit2");
+
+        ctx.UndoManager.Undo();
+        hit.Name.ShouldBe("Hit");
+        ctx.UndoManager.Undo();
+        frame.ShapesSave.Shapes.ShouldBe([hit, hurt]);
+        other.ShapesSave.Shapes.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -143,14 +161,8 @@ public class CutPasteTests
         var run  = TestHelpers.MakeChain(ctx.Acls, "Run", 2);
         var walkF0 = walk.Frames[0];
         var runF1  = run.Frames[1];
-        var pasted = new[]
-        {
-            AnimationCloneHelper.CloneFrame(walkF0),
-            AnimationCloneHelper.CloneFrame(runF1),
-        };
 
-        ctx.AppCommands.PasteFramesCut(walk, pasted, insertIndex: null,
-            sourcesToRemove: new[] { walkF0, runF1 });
+        ctx.AppCommands.PasteFramesCut(walk, new[] { walkF0, runF1 }, insertIndex: null);
 
         Assert.Equal(3, walk.Frames.Count);
         Assert.Single(run.Frames);

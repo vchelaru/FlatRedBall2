@@ -8270,16 +8270,15 @@ public partial class MainWindow : Window
 
         if (chains is { Count: > 0 })
         {
-            QueuePastedChainExpandFromSources(chains, chains);
-            if (completingCutAcrossDocuments)
-            {
-                _appCommands.PasteChains(chains);
-                RemoveCutSourcesAndSaveTheirDocument(chains);
-            }
-            else if (completingCut)
-                _appCommands.PasteChainsCut(chains, _pendingCutState.Chains);
+            if (cutCompletion == CutCompletion.SameDocument)
+                _appCommands.PasteChainsCut(_pendingCutState.Chains);
             else
+            {
+                QueuePastedChainExpandFromSources(chains, chains);
                 _appCommands.PasteChains(chains);
+                if (completingCutAcrossDocuments)
+                    RemoveCutSourcesAndSaveTheirDocument(chains);
+            }
         }
         else if (frames is { Count: > 0 })
         {
@@ -8293,7 +8292,7 @@ public partial class MainWindow : Window
                 RemoveCutSourcesAndSaveTheirDocument([targetChain]);
             }
             else if (completingCut)
-                _appCommands.PasteFramesCut(targetChain, frames, insertIndex, _pendingCutState.Frames);
+                _appCommands.PasteFramesCut(targetChain, _pendingCutState.Frames, insertIndex);
             else
                 _appCommands.PasteFrames(targetChain, frames, insertIndex);
             RefreshChainNode(targetChain);
@@ -8327,7 +8326,7 @@ public partial class MainWindow : Window
                     ? _objectFinder.GetAnimationFrameContaining(source)
                     : null;
                 if (sourceFrame is null) return;
-                _appCommands.PasteShapesCut(frame, shapes, _pendingCutState.Shapes, sourceFrame);
+                _appCommands.PasteShapesCut(frame, _pendingCutState.Shapes, sourceFrame);
             }
             else
             {

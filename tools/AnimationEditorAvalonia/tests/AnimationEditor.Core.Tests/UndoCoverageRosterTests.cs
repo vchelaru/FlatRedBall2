@@ -460,9 +460,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() =>
             {
                 var source = Zebra(ctx);
+                int index = ctx.Acls.AnimationChains.IndexOf(source);
                 ctx.AppCommands.PasteChainsCut(
-                    new List<AnimationChainSave> { new() { Name = "PastedCut" } },
-                    new List<AnimationChainSave> { source });
+                    new List<AnimationChainSave> { source },
+                    insertIndex: index > 0 ? 0 : 2);
             }));
         yield return Row(nameof(IAppCommands.PasteFramesCut),
             ctx => Sync(() =>
@@ -471,18 +472,17 @@ public class UndoCoverageRosterTests
                 var source = chain.Frames[1];
                 ctx.AppCommands.PasteFramesCut(
                     chain,
-                    new List<AnimationFrameSave> { new() { ShapesSave = new ShapesSave() } },
-                    insertIndex: 2,
-                    sourcesToRemove: new List<AnimationFrameSave> { source });
+                    new List<AnimationFrameSave> { source },
+                    insertIndex: 0);
             }));
         yield return Row(nameof(IAppCommands.PasteShapesCut),
             ctx => Sync(() =>
             {
-                var frame = Zebra(ctx).Frames[1];
+                var chain = Zebra(ctx);
                 var source = Rect(ctx);
+                var frame = chain.Frames.Single(f => f.ShapesSave?.Shapes.Contains(source) == true);
                 ctx.AppCommands.PasteShapesCut(
-                    frame,
-                    new List<object> { new AARectSave { Name = "PastedCut" } },
+                    chain.Frames.First(f => f != frame),
                     new List<object> { source },
                     frame);
             }));

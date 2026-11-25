@@ -103,7 +103,7 @@ public class BrokenSequenceNoticeTests
     }
 
     [Fact]
-    public void ChainNamesRemoved_CutAndMixedDelete_ReportTheLostNames()
+    public void ChainNamesRemoved_MixedDelete_ReportsTheLostNames()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chains = ctx.ProjectManager.AnimationChainListSave!.AnimationChains;
@@ -112,9 +112,9 @@ public class BrokenSequenceNoticeTests
         var reported = new List<string>();
         ctx.AppCommands.ChainNamesRemoved += removed => reported.Add($"{removed.Verb} {string.Join(",", removed.Names)}");
 
-        ctx.AppCommands.PasteChainsCut([new AnimationChainSave { Name = "Jump2" }], [chains[2]]);
-        ctx.AppCommands.DeleteSelection([chains[0]], [chains[1].Frames[0]], []);
+        ctx.AppCommands.PasteChainsCut([chains[2]], insertIndex: 0); // a move, so its name stays
+        ctx.AppCommands.DeleteSelection([chains[1]], [chains[2].Frames[0]], []);
 
-        reported.ShouldBe(["Cutting Jump", "Deleting Walk"]);
+        reported.ShouldBe(["Deleting Walk"]);
     }
 }

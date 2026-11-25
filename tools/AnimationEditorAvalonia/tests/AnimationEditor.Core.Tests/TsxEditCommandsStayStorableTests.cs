@@ -147,7 +147,7 @@ public class TsxEditCommandsStayStorableTests : IDisposable
         Row(nameof(IAppCommands.DuplicateShape), c => c.AppCommands.DuplicateShape(Circle())),
         Row(nameof(IAppCommands.PasteShapes), c => c.AppCommands.PasteShapes(Frame(c), [Circle()])),
         Row(nameof(IAppCommands.PasteShapes), c => c.AppCommands.PasteShapes(Frames(c), [Circle()])),
-        Row(nameof(IAppCommands.PasteShapesCut), c => c.AppCommands.PasteShapesCut(Frames(c)[1], [Circle()], [Circle()], Frame(c))),
+        Row(nameof(IAppCommands.PasteShapesCut), c => c.AppCommands.PasteShapesCut(Frames(c)[1], [Circle()], Frame(c))),
         Row(nameof(IAppCommands.MatchRectangleToFrame), c => c.AppCommands.MatchRectangleToFrame(Rect(), Frame(c))),
         Row(nameof(IAppCommands.MatchCircleToFrame), c => c.AppCommands.MatchCircleToFrame(Circle(), Frame(c))),
         Row(nameof(IAppCommands.MatchRectanglesToFrames), c => c.AppCommands.MatchRectanglesToFrames([Rect()])),

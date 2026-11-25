@@ -6,17 +6,16 @@ using System.Linq;
 namespace AnimationEditor.Core.CommandsAndState.Commands;
 
 /// <summary>
-/// Moves the <em>same</em> frame instances (not clones) from a source chain to a target
+/// Moves the <em>same</em> frame instances (not clones) from one or more source chains to a target
 /// chain at a resolved insert index, as one undo step. Covers both within-chain reorder
-/// (source == target) and cross-animation moves. The moved frames are sorted by their
-/// source-chain index and become a contiguous, gap-squashed block at the destination, so
-/// a multi-select drag preserves relative order. Preserving instance identity is what lets
+/// (source == target) and cross-animation moves. The frames become a contiguous, gap-squashed
+/// block at the destination, in the order given. Preserving instance identity is what lets
 /// the tree's frame VMs survive the move (see <c>TreeBuilder.SyncFramesInto</c>).
 /// </summary>
 internal sealed class MoveFramesCommand : IUndoableCommand
 {
     private readonly IReadOnlyList<AnimationFrameSave> _frames;
-    private readonly AnimationChainSave _sourceChain;
+    private readonly AnimationChainSave[] _chains;
     private readonly AnimationChainSave _targetChain;
     private readonly int _insertIndex;
     private readonly IAppCommands _commands;
@@ -24,15 +23,11 @@ internal sealed class MoveFramesCommand : IUndoableCommand
     private readonly ISelectedState _selectedState;
     private readonly List<object> _preSelection;
 
-    private AnimationFrameSave[] _moved = [];
-    private AnimationFrameSave[] _sourceBefore = [];
-    private AnimationFrameSave[] _targetBefore = [];
+    private AnimationFrameSave[][] _before = [];
 
     public string Description { get; }
 
-    /// <param name="insertIndex">Where the block lands in the target chain, interpreted
-    /// against the target's current frame list (before any source removal). For a same-chain
-    /// move the index is adjusted internally for the frames removed ahead of it.</param>
+    /// <summary>Moves frames of one chain, keeping their order there.</summary>
     public MoveFramesCommand(
         IReadOnlyList<AnimationFrameSave> frames,
         AnimationChainSave sourceChain,
@@ -41,56 +36,59 @@ internal sealed class MoveFramesCommand : IUndoableCommand
         IAppCommands commands,
         IApplicationEvents events,
         ISelectedState selectedState)
+        : this(frames.Where(sourceChain.Frames.Contains).OrderBy(f => sourceChain.Frames.IndexOf(f)).ToArray(),
+            [sourceChain], targetChain, insertIndex,
+            (frames.Count, ReferenceEquals(sourceChain, targetChain)) switch
+            {
+                (1, true) => $"Move Frame in '{sourceChain.Name}'",
+                (_, true) => $"Move {frames.Count} Frames",
+                (1, false) => $"Move Frame to '{targetChain.Name}'",
+                _ => $"Move {frames.Count} Frames to '{targetChain.Name}'",
+            },
+            commands, events, selectedState)
+    {
+    }
+
+    /// <param name="frames">The block. A frame that is in none of the chains is added.</param>
+    /// <param name="insertIndex">Where the block lands in the target chain, interpreted
+    /// against the target's current frame list (before any source removal). For a same-chain
+    /// move the index is adjusted internally for the frames removed ahead of it.</param>
+    public MoveFramesCommand(
+        IReadOnlyList<AnimationFrameSave> frames,
+        IReadOnlyList<AnimationChainSave> sourceChains,
+        AnimationChainSave targetChain,
+        int insertIndex,
+        string description,
+        IAppCommands commands,
+        IApplicationEvents events,
+        ISelectedState selectedState)
     {
         _frames = frames;
-        _sourceChain = sourceChain;
+        _chains = sourceChains.Append(targetChain).Distinct().ToArray();
         _targetChain = targetChain;
         _insertIndex = insertIndex;
         _commands = commands;
         _events = events;
         _selectedState = selectedState;
         _preSelection = new List<object>(selectedState.SelectedNodes);
-        bool sameChain = ReferenceEquals(sourceChain, targetChain);
-        Description = (frames.Count, sameChain) switch
-        {
-            (1, true) => $"Move Frame in '{sourceChain.Name}'",
-            (_, true) => $"Move {frames.Count} Frames",
-            (1, false) => $"Move Frame to '{targetChain.Name}'",
-            _ => $"Move {frames.Count} Frames to '{targetChain.Name}'",
-        };
+        Description = description;
     }
 
     public bool Do()
     {
-        _sourceBefore = _sourceChain.Frames.ToArray();
-        _targetBefore = _targetChain.Frames.ToArray();
+        if (_frames.Count == 0) return false;
+        _before = _chains.Select(c => c.Frames.ToArray()).ToArray();
 
-        var movedIndices = _frames
-            .Select(f => _sourceChain.Frames.IndexOf(f))
-            .Where(i => i >= 0)
-            .OrderBy(i => i)
-            .ToArray();
-        if (movedIndices.Length == 0) return false;
-
-        _moved = movedIndices.Select(i => _sourceChain.Frames[i]).ToArray();
-
-        bool sameChain = ReferenceEquals(_sourceChain, _targetChain);
-
-        // Removing the selected frames from the target shifts the insert position left by
-        // however many of them sat ahead of it. Cross-chain moves don't touch the target.
-        int insertAt = _insertIndex;
-        if (sameChain)
-            insertAt -= movedIndices.Count(i => i < _insertIndex);
-
-        foreach (var frame in _moved)
-            _sourceChain.Frames.Remove(frame);
+        // Removing the block from the target shifts the insert position left by however many of its frames sat ahead of it.
+        int insertAt = _insertIndex - _targetChain.Frames.Take(_insertIndex).Count(_frames.Contains);
+        foreach (var chain in _chains)
+            chain.Frames.RemoveAll(_frames.Contains);
 
         insertAt = Math.Clamp(insertAt, 0, _targetChain.Frames.Count);
-        for (int i = 0; i < _moved.Length; i++)
-            _targetChain.Frames.Insert(insertAt + i, _moved[i]);
+        _targetChain.Frames.InsertRange(insertAt, _frames);
 
-        if (sameChain && _targetChain.Frames.SequenceEqual(_targetBefore))
-            return false; // reorder produced an identical list — no undo entry
+        if (_chains.Zip(_before).All(x => x.First.Frames.SequenceEqual(x.Second)))
+            return false; // the frames already were there — no undo entry
 
         RaiseSideEffects();
         SelectMoved();
@@ -99,9 +97,8 @@ internal sealed class MoveFramesCommand : IUndoableCommand
 
     public void Undo()
     {
-        RestoreOrder(_sourceChain, _sourceBefore);
-        if (!ReferenceEquals(_sourceChain, _targetChain))
-            RestoreOrder(_targetChain, _targetBefore);
+        foreach (var (chain, before) in _chains.Zip(_before))
+            RestoreOrder(chain, before);
         RaiseSideEffects();
         _selectedState.SelectedNodes = _preSelection;
         _selectedState.SelectedFrame = _preSelection.OfType<AnimationFrameSave>().LastOrDefault();
@@ -118,15 +115,14 @@ internal sealed class MoveFramesCommand : IUndoableCommand
 
     private void SelectMoved()
     {
-        _selectedState.SelectedNodes = _moved.Cast<object>().ToList();
-        _selectedState.SelectedFrame = _moved[^1];
+        _selectedState.SelectedNodes = _frames.Cast<object>().ToList();
+        _selectedState.SelectedFrame = _frames[^1];
     }
 
     private void RaiseSideEffects()
     {
-        _commands.RefreshTreeNode(_sourceChain);
-        if (!ReferenceEquals(_sourceChain, _targetChain))
-            _commands.RefreshTreeNode(_targetChain);
+        foreach (var chain in _chains)
+            _commands.RefreshTreeNode(chain);
         _commands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
     }

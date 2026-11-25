@@ -737,17 +737,21 @@ namespace AnimationEditor.Core.CommandsAndState
         /// skipped (bulk skip-locked-entries), same as other multi-target paste/delete operations.</summary>
         void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<object> shapes);
 
-        /// <summary>Paste chains then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
-        void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains,
-            IReadOnlyList<AnimationChainSave> sourcesToRemove);
+        /// <summary>Moves cut chains below the selected ones, or to <paramref name="insertIndex"/>, in one undo step.</summary>
+        void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains, int? insertIndex = null);
 
-        /// <summary>Paste frames then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
-        void PasteFramesCut(AnimationChainSave targetChain, IReadOnlyList<AnimationFrameSave> frames,
-            int? insertIndex, IReadOnlyList<AnimationFrameSave> sourcesToRemove);
+        /// <summary>
+        /// Moves cut frames to <paramref name="insertIndex"/> (the end when null) in one undo step. Frames of a locked
+        /// chain stay there and are copied.
+        /// </summary>
+        void PasteFramesCut(AnimationChainSave targetChain, IReadOnlyList<AnimationFrameSave> frames, int? insertIndex);
 
-        /// <summary>Paste shapes then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
-        void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes,
-            IReadOnlyList<object> sourcesToRemove, AnimationFrameSave sourceFrame);
+        /// <summary>
+        /// Moves cut shapes from <paramref name="sourceFrame"/> to the end of their type in <paramref name="targetFrame"/>
+        /// in one undo step. A shape whose name is taken there gets a free one. Shapes of a locked chain stay there and
+        /// are copied.
+        /// </summary>
+        void PasteShapesCut(AnimationFrameSave targetFrame, IReadOnlyList<object> shapes, AnimationFrameSave sourceFrame);
 
         /// <summary>Duplicates the homogeneous multi-selection as one undo step.</summary>
         void DuplicateSelection(CopySelectionPayload payload);

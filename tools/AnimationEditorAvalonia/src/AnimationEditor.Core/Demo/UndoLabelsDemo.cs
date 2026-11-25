@@ -104,16 +104,11 @@ internal static class UndoLabelsDemo
         cmds.PasteShapes(shapeFrame, new object[] { pasteCircle });
 
         var cutSource = shapeFrame.ShapesSave!.AARectSaves.First(r => r.Name == "Other");
-        var cutClone = (AARectSave)AnimationCloneHelper.CloneShape(cutSource)!;
-        cmds.PasteShapesCut(shapeFrame, new object[] { cutClone }, new[] { (object)cutSource }, shapeFrame);
+        cmds.PasteShapesCut(walk.Frames[1], new object[] { cutSource }, shapeFrame);
 
-        var cutFrameSrc = scrap.Frames[0];
-        cmds.PasteFramesCut(walk, new[] { AnimationCloneHelper.CloneFrame(cutFrameSrc) },
-            insertIndex: null, sourcesToRemove: new[] { cutFrameSrc });
+        cmds.PasteFramesCut(walk, new[] { scrap.Frames[0] }, insertIndex: null);
 
-        var cutAnimClone = AnimationCloneHelper.CloneChain(scrap);
-        cutAnimClone.Name = "Scrap";
-        cmds.PasteChainsCut(new[] { cutAnimClone }, new[] { scrap });
+        cmds.PasteChainsCut(new[] { scrap }, insertIndex: 0);
 
         var doomed = cmds.AddAnimationChainWithName("Doomed")!;
         cmds.AddFrame(doomed, textureName);
