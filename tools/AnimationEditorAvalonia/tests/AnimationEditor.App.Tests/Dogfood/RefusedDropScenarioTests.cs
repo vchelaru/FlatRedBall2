@@ -149,4 +149,46 @@ public class RefusedDropScenarioTests : IDisposable
         File.Exists(Path.Combine(editor.ProjectFolder, "bad.png")).ShouldBeFalse();
         editor.ProblemText.ShouldNotBeNull().ShouldContain("Could not load image");
     }
+
+    [AvaloniaFact]
+    public async Task APngFromOutside_OnALockedAnimation_CopiesNothing()
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        string png = Path.Combine(_outside, "new.png");
+        File.Move(editor.WritePng("new.png", 64, 64), png);
+        editor.Services.AppCommands.SetChainLocked(editor.ChainNamed("Walk"), true);
+        editor.Dialogs.AnswerNextEditorDialog(content =>
+        {
+            content.GetVisualDescendants().OfType<Button>().First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            return true;
+        });
+
+        await DropOnRow(editor, editor.ChainNamed("Walk").Frames[0], png);
+
+        editor.ChainNamed("Walk").Frames[0].TextureName.ShouldBe("sheet.png");
+        File.Exists(Path.Combine(editor.ProjectFolder, "new.png")).ShouldBeFalse();
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("locked");
+    }
+
+    [AvaloniaTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task APngFromOutside_OnALockedAnimationRowOrTheCanvas_IsRefusedWithoutAsking(bool onCanvas)
+    {
+        var (editor, path) = await OpenAsync();
+        using var _ = editor;
+        string png = Path.Combine(_outside, "new.png");
+        File.Move(editor.WritePng("new.png", 64, 64), png);
+        var walk = editor.ChainNamed("Walk");
+        editor.ClickRow(walk.Frames[0]);
+        editor.Services.AppCommands.SetChainLocked(walk, true);
+
+        if (onCanvas) await Drop(editor, editor.Wireframe, new Point(100, 100), png);
+        else await DropOnRow(editor, walk, png);
+
+        walk.Frames.ShouldAllBe(f => f.TextureName == "sheet.png");
+        File.Exists(Path.Combine(editor.ProjectFolder, "new.png")).ShouldBeFalse();
+        editor.ProblemText.ShouldNotBeNull().ShouldContain("locked");
+    }
 }

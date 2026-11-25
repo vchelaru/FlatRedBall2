@@ -4211,6 +4211,14 @@ public partial class MainWindow : Window
         if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
             return false;
 
+        // Before the copy question, whose copy would be left behind.
+        var editedChain = targetFrame is null ? targetChain : _objectFinder.GetAnimationChainContaining(targetFrame);
+        if (editedChain is { IsLocked: true })
+        {
+            ShowProblem($"⚠ '{editedChain.Name}' is locked. Unlock the animation to edit.");
+            return false;
+        }
+
         string? resolvedFilePath = await ResolveTextureForProjectAsync(droppedFilePath,
             retried => ApplyResolvedPngDrop(targetChain, targetFrame, retried, createFrameOnCtrl));
         return resolvedFilePath is not null
