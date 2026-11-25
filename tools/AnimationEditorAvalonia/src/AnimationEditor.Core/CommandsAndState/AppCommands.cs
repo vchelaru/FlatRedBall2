@@ -890,6 +890,11 @@ namespace AnimationEditor.Core.CommandsAndState
                 SaveAsRefused?.Invoke(SaveTarget.OpenInAnotherTabMessage(path));
                 return false;
             }
+            if (_pm.IsNativeTsxProject && TiledSyncAssociationScanner.FindAssociationsTargeting(path) is [var owner, ..])
+            {
+                SaveAsRefused?.Invoke(SaveTarget.AssociatedTilesetMessage(path, owner));
+                return false;
+            }
 
             bool toAnotherFile = string.IsNullOrEmpty(_pm.FileName) || new FilePath(_pm.FileName) != new FilePath(path);
             if (!SaveOpenDocument(path, toAnotherFile)) return false;

@@ -106,6 +106,28 @@ public class TiledTilesetSyncRunnerTests
         tiles[0].GetProperty<StringProperty>("achjAnimationName").Value.ShouldBe(isOwn ? "Renamed" : "Walk");
     }
 
+    [Theory]
+    [InlineData("Hero.achx", "Hero.achj", " Delete Hero.achx if Hero.achj replaced it.")]
+    [InlineData("anims/Hero.achj", "anims/Hero.achx", " Delete Hero.achj if Hero.achx replaced it.")]
+    [InlineData("Hero.achx", "anims/Hero.achj", "")]
+    [InlineData("Hero.achx", "Hero2.achj", "")]
+    public void SyncAll_TileOwnedByTheOtherFormatOfTheSameFile_TheWarningSaysWhichFileToDelete(
+        string first, string second, string advice)
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        Directory.CreateDirectory(Path.Combine(root, "anims"));
+        var tsxPath = WriteFixtureTileset(root);
+        File.WriteAllText(Path.Combine(root, first), "");
+        var achj = AchjWithWalkChain();
+        foreach (var frame in achj.AnimationChains[0].Frames)
+            frame.TextureName = Path.Combine(root, "Heroes.png");
+        TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(root, first), [tsxPath]);
+
+        var outcome = TiledTilesetSyncRunner.SyncAll(achj, Path.Combine(root, second), [tsxPath]).Single();
+
+        outcome.Warnings.Single().ShouldEndWith($"already owned by \"{first}\" - skipped.{advice}");
+    }
+
     // No image file exists in any case: the comparison is by path only.
     [Theory]
     [InlineData("Hero.achx", "Heroes.png", "Heroes.png", true)]

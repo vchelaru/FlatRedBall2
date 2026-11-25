@@ -1,4 +1,7 @@
+using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Paths;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.Data
 {
@@ -15,5 +18,10 @@ namespace AnimationEditor.Core.Data
     public class AETiledSyncSave
     {
         public List<string> TiledTilesetPaths { get; set; } = new List<string>();
+
+        /// <summary>The associated tilesets, whose paths are stored relative to <paramref name="folder"/> (the one this file is
+        /// in), or absolute from another drive or network share.</summary>
+        public IEnumerable<FilePath> ResolveTilesets(FilePath folder) =>
+            TiledTilesetPaths.Select(path => new FilePath(TexturePathHelper.ResolveDisplayPath(path, folder.FullPath)));
     }
 }

@@ -124,9 +124,7 @@ namespace AnimationEditor.Core.IO
                 return Array.Empty<string>();
 
             var achxFolder = new FilePath(achxFile).GetDirectoryContainingThis();
-            return settings.TiledTilesetPaths
-                .Select(relative => new FilePath(achxFolder.FullPath + relative).FullPath)
-                .ToList();
+            return settings.ResolveTilesets(achxFolder).Select(tileset => tileset.FullPath).ToList();
         }
 
         public void AddAssociatedTiledTilesetPath(string achxFile, string tsxFile)
@@ -136,8 +134,7 @@ namespace AnimationEditor.Core.IO
             var relativeTsxPath = new FilePath(tsxFile).RelativeTo(achxFolder);
 
             var settings = LoadTiledSyncSettings(achxFile);
-            var alreadyAssociated = settings.TiledTilesetPaths
-                .Any(p => new FilePath(achxFolder.FullPath + p) == new FilePath(tsxFile));
+            var alreadyAssociated = settings.ResolveTilesets(achxFolder).Contains(new FilePath(tsxFile));
             if (!alreadyAssociated)
             {
                 settings.TiledTilesetPaths.Add(relativeTsxPath);
