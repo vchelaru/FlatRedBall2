@@ -14,7 +14,7 @@ public class SequenceTimelineContinuousTests
         new() { Source = "a.achj", Chain = chain, Start = start, Length = length };
 
     // Chain "A" has a 0.5 s cycle, "B" a 1 s cycle.
-    private static double Cycle(SequenceChainReferenceSave reference) => reference.Chain == "A" ? 0.5 : 1;
+    private static double? Cycle(SequenceChainReferenceSave reference) => reference.Chain == "A" ? 0.5 : 1;
 
     private static SequenceTrackSave Track(bool continuous, params SequenceChainReferenceSave[] chains)
     {

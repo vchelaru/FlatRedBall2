@@ -15,7 +15,7 @@ public class SequenceTimelineTests
         var charge = Ref("Charge", start: 0); // 3 s cycle
         var hurt = Ref("Hurt", start: 1);     // 0.5 s cycle
         var track = new SequenceTrackSave { Chains = { charge, hurt } };
-        double Cycle(SequenceChainReferenceSave r) => r == charge ? 3 : 0.5;
+        double? Cycle(SequenceChainReferenceSave r) => r == charge ? 3 : 0.5;
 
         SequenceTimeline.ActiveAt(track, 0.5, Cycle, out double localTime).ShouldBe(charge);
         localTime.ShouldBe(0.5, 1e-9);
@@ -55,8 +55,8 @@ public class SequenceTimelineTests
         var walk = Ref("Walk", start: 0);
         var missing = Ref("Deleted", start: 1);
         var track = new SequenceTrackSave { Chains = { walk, missing } };
-        // A chain that can't be resolved has a cycle length of 0.
-        double Cycle(SequenceChainReferenceSave r) => r == walk ? 3 : 0;
+        // A chain that can't be resolved has no cycle length.
+        double? Cycle(SequenceChainReferenceSave r) => r == walk ? 3 : null;
 
         SequenceTimeline.ActiveAt(track, 1.5, Cycle, out _).ShouldBeNull();
         SequenceTimeline.PlayedLength(track, walk, cycleLength: 3).ShouldBe(1, 1e-9);
@@ -142,7 +142,7 @@ public class SequenceTimelineTests
         var long_ = Ref("Long", start: 0, length: 10);
         var missing = Ref("Deleted", start: 1);
         var sequence = new SequenceSave { Tracks = { new SequenceTrackSave { Chains = { long_, missing } } } };
-        double Cycle(SequenceChainReferenceSave r) => r == long_ ? 1 : 0;
+        double? Cycle(SequenceChainReferenceSave r) => r == long_ ? 1 : null;
 
         // Long asks for 10 s but is cut at 1 s by the missing chain, which itself plays 0 s.
         SequenceTimeline.Length([sequence], sequence, Cycle).ShouldBe(1, 1e-9);
@@ -181,5 +181,27 @@ public class SequenceTimelineTests
         SequenceTimeline.PoseTime(1.5, length: 2, loop: false).ShouldBe(1.5);
         SequenceTimeline.PoseTime(2, length: 2, loop: true).ShouldBe(2);
         SequenceTimeline.PoseTime(5, length: 0, loop: false).ShouldBe(5);
+    }
+
+    // A chain with frames and no length (cycle length 0) is not a missing one (null): its block's own Length holds its frame.
+    [Theory]
+    [InlineData(null, 2.0, false)]
+    [InlineData(null, null, false)]
+    [InlineData(0.0, 2.0, true)]
+    [InlineData(0.0, null, false)]
+    [InlineData(0.0, 0.0, false)]
+    public void ActiveAt_MissingChainOrOneOfNoLength_PlaysOnlyTheSecondAndOnlyForItsOwnLength(double? cycle, double? length, bool plays)
+    {
+        var walk = Ref("Walk", start: 0, length: 4);
+        var block = Ref("Block", start: 1, length: length);
+        var track = new SequenceTrackSave { Chains = { walk, block } };
+        var sequence = new SequenceSave { Tracks = { track } };
+        double? Cycle(SequenceChainReferenceSave r) => r == walk ? 4 : cycle;
+
+        SequenceTimeline.ActiveAt(track, 0.9, Cycle, out _).ShouldBe(walk);
+        SequenceTimeline.ActiveAt(track, 1, Cycle, out _).ShouldBe(plays ? block : null);
+        SequenceTimeline.ActiveAt(track, 2.9, Cycle, out _).ShouldBe(plays ? block : null);
+        SequenceTimeline.ActiveAt(track, 3, Cycle, out _).ShouldBeNull();
+        SequenceTimeline.Length([sequence], sequence, Cycle).ShouldBe(plays ? 3 : 1, 1e-9);
     }
 }

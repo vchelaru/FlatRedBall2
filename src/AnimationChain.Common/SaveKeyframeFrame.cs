@@ -8,19 +8,18 @@ namespace FlatRedBall2.AnimationEditorCommon;
 /// <summary>
 /// Adapts an <see cref="AnimationFrameSave"/> to <see cref="IKeyframeFrame"/> for editor-side
 /// evaluation: color channels resolved through <see cref="EffectiveFrameColor"/>, curve names parsed
-/// into <see cref="KeyframeCurve"/>, frame lengths converted from the file's <see cref="TimeMeasurementUnit"/> to seconds, and an unset length read as the editor's 0.1 s default.
+/// into <see cref="KeyframeCurve"/>, frame lengths converted from the file's <see cref="TimeMeasurementUnit"/> to seconds (0 for a length that is not positive).
 /// </summary>
 public readonly struct SaveKeyframeFrame : IKeyframeFrame
 {
     private readonly AnimationFrameSave _frame;
     private readonly ResolvedFrameColor _color;
-    private readonly double _secondsPerUnit;
 
-    private SaveKeyframeFrame(AnimationFrameSave frame, ResolvedFrameColor color, double secondsPerUnit)
+    private SaveKeyframeFrame(AnimationFrameSave frame, ResolvedFrameColor color, TimeMeasurementUnit unit)
     {
         _frame = frame;
         _color = color;
-        _secondsPerUnit = secondsPerUnit;
+        DurationSeconds = AnimationFrameSave.PlayedSeconds(frame.FrameLength, unit);
         OffsetCurve = KeyframeCurve.Parse(frame.OffsetInterpolation, frame.OffsetEasing);
         ColorCurve = KeyframeCurve.Parse(frame.ColorInterpolation, frame.ColorEasing);
         KeyframeShapes = frame.ShapesSave is { Shapes.Count: > 0 } shapes
@@ -32,15 +31,14 @@ public readonly struct SaveKeyframeFrame : IKeyframeFrame
     public static SaveKeyframeFrame[] Create(AnimationChainSave chain, TimeMeasurementUnit unit = TimeMeasurementUnit.Second)
     {
         var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
-        double secondsPerUnit = unit == TimeMeasurementUnit.Millisecond ? 0.001 : 1.0;
         var result = new SaveKeyframeFrame[chain.Frames.Count];
         for (int i = 0; i < result.Length; i++)
-            result[i] = new SaveKeyframeFrame(chain.Frames[i], colors[i], secondsPerUnit);
+            result[i] = new SaveKeyframeFrame(chain.Frames[i], colors[i], unit);
         return result;
     }
 
     /// <inheritdoc/>
-    public double DurationSeconds => _frame.FrameLength > 0 ? _frame.FrameLength * _secondsPerUnit : 0.1;
+    public double DurationSeconds { get; }
 
     /// <inheritdoc/>
     public float RelativeX => _frame.RelativeX;

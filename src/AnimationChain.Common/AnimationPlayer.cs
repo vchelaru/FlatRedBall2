@@ -135,8 +135,20 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// </summary>
     public bool IsReversed { get; set; }
 
-    /// <summary>Multiplier applied to frame time. 2.0 plays twice as fast; 0.5 plays half-speed.</summary>
-    public float AnimationSpeed { get; set; } = 1f;
+    /// <summary>Multiplier applied to frame time. 2.0 plays twice as fast; 0.5 plays half-speed; 0 pauses.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative or NaN. Play backward with <see cref="IsReversed"/>.
+    /// This may change: FRB1 plays backward on a negative speed, so FRB2 may support it later.</exception>
+    public float AnimationSpeed
+    {
+        get => _animationSpeed;
+        set
+        {
+            if (!(value >= 0))
+                throw new ArgumentOutOfRangeException(nameof(value), value, "AnimationSpeed cannot be negative or NaN. Set IsReversed to play backward.");
+            _animationSpeed = value;
+        }
+    }
+    private float _animationSpeed = 1f;
 
     /// <summary>Raised once when a non-looping animation reaches the end of its cycle. One with no length reaches it on its first update.</summary>
     public event Action? AnimationFinished;

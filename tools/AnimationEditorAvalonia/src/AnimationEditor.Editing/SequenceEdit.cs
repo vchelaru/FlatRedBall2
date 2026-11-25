@@ -361,7 +361,7 @@ public static class SequenceEdit
         var last = ordered[^1];
         double targetLength = SequenceReferences.Plays(doc.Save.Sequences, doc.Save.Sequences[sequence].Name, last.Sequence)
             && SequenceReferences.Find(doc.Save.Sequences, last.Sequence) is { } found
-            ? SequenceTimeline.Length(doc.Save.Sequences, found, r => doc.CycleLength(r) ?? 0) : 0;
+            ? SequenceTimeline.Length(doc.Save.Sequences, found, doc.CycleLength) : 0;
         return Math.Round(last.Start + SequenceTimeline.FullLength(last.Length, targetLength), 6);
     }
 
@@ -371,7 +371,7 @@ public static class SequenceEdit
         var ordered = SequenceTimeline.Ordered(track);
         if (ordered.Count == 0) return 0;
         var last = ordered[^1];
-        return Math.Round(last.Start + SequenceTimeline.FullLength(last.Length, doc.CycleLength(last) ?? 0), 6);
+        return Math.Round(last.Start + SequenceTimeline.ChainLength(last.Length, doc.CycleLength(last)), 6);
     }
 
     /// <summary>Moves a block to <paramref name="start"/> seconds (0 or more). On a reference track the block is a clip (index in list order).</summary>

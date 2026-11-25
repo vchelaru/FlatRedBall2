@@ -32,10 +32,10 @@ public static class TimelineCulling
     {
         if (cycleLength <= 0) yield break;
         double cyclePixels = cycleLength * viewport.PixelsPerSecond;
-        int step = Math.Max(1, (int)(1 / cyclePixels));
+        long step = Math.Max(1, (long)(1 / cyclePixels));
         // On a multiple of the step, so the same cycles are picked wherever the view is scrolled.
-        int first = (int)Math.Max(0, (viewport.ColumnWidth - viewport.XAt(start)) / cyclePixels) / step * step;
-        for (int cycle = first; cycle * cycleLength < played - 1e-9 && viewport.XAt(start + cycle * cycleLength) <= viewWidth; cycle += step)
-            yield return cycle;
+        long first = (long)Math.Max(0, (viewport.ColumnWidth - viewport.XAt(start)) / cyclePixels) / step * step;
+        for (long cycle = first; cycle <= int.MaxValue && cycle * cycleLength < played - 1e-9 && viewport.XAt(start + cycle * cycleLength) <= viewWidth; cycle += step)
+            yield return (int)cycle;
     }
 }

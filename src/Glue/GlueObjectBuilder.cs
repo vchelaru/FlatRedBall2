@@ -301,7 +301,9 @@ public sealed class GlueObjectBuilder
                 continue;
             }
 
-            property.SetValue(instance, converted);
+            if (!GlueMemberWriter.TrySetValue(property, instance, converted, out string? refusal))
+                Warn($"'{save.InstanceName}.{memberName}' could not take the authored value " +
+                     $"'{instruction.Value}'; the default was kept. {refusal}", elementName);
         }
     }
 

@@ -269,7 +269,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     /// <summary>Seconds until the shown sequence ends (<see cref="SequenceTimeline.Length"/>); 0 when nothing is shown.</summary>
     public double SequenceLength =>
         Sequence is { } sequence && _document is { } document
-            ? SequenceTimeline.Length(document.Save.Sequences, sequence, reference => document.CycleLength(reference) ?? 0)
+            ? SequenceTimeline.Length(document.Save.Sequences, sequence, document.CycleLength)
             : 0;
 
     // IZoomTarget: 100% is the default pixels per second.
@@ -617,7 +617,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
     private void Rebuild()
     {
         _blocks = Sequence is { } sequence && _document is { } document
-            ? TimelineLayout.Blocks(sequence, document.CycleLength)
+            ? TimelineLayout.Blocks(sequence, document.CycleLength, reference => document.FindChain(reference) is null)
             : Array.Empty<TimelineBlock>();
         _trackStarts = TimelineLayout.TrackStarts(_blocks, TrackCount);
         RebuildReferences();
@@ -1722,7 +1722,7 @@ public sealed partial class SequenceTimelineControl : Control, IZoomTarget
         double labelWidth = Math.Max(1, body.Width - 12);
         string label = block.IsMissing
             ? $"⚠ {block.Reference.Chain} (missing)"
-            : BlockLabel.Fit(block.Reference.Chain, block.Cycles, block.Played, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
+            : BlockLabel.Fit(block.Reference.Chain, block.Cycles, block.PlayedSeconds, labelWidth, s => Text(s, 11, Brush("Ink")).Width);
         using (context.PushClip(body.Deflate(new Thickness(5, 0))))
         {
             var text = TrimmedText(label, 11, Brush("Ink"), FontWeight.Normal, labelWidth);

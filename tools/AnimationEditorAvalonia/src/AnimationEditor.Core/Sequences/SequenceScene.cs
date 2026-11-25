@@ -78,14 +78,14 @@ public static class SequenceScene
     }
 
     private static double LengthOf(SequenceSave sequence, ISequenceChainLookup lookup, IReadOnlyList<SequenceSave> file) =>
-        SequenceTimeline.Length(file, sequence, reference => lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(reference)) : 0);
+        SequenceTimeline.Length(file, sequence, reference => ChainClock.CycleLength(lookup.FindChain(reference), lookup.UnitOf(reference)));
 
     private static void Collect(SequenceSave sequence, int sequenceIndex, double time, ISequenceChainLookup lookup,
         IReadOnlyList<SequenceSave>? file, List<SequenceSprite> sprites, int? outerTrack, List<SequenceSave> stack, int pass = 0)
     {
         var tracks = sequence.Tracks;
-        double CycleLength(SequenceChainReferenceSave reference) =>
-            lookup.FindChain(reference) is { } found ? ChainClock.TotalLength(found, lookup.UnitOf(reference)) : 0;
+        double? CycleLength(SequenceChainReferenceSave reference) =>
+            ChainClock.CycleLength(lookup.FindChain(reference), lookup.UnitOf(reference));
         double length = SequenceTimeline.Length(file ?? Array.Empty<SequenceSave>(), sequence, CycleLength);
         time = SequenceTimeline.PoseTime(time, length, sequence.Loop);
         // Only a looping sequence wraps, so a pass means nothing to one that stops at its end.

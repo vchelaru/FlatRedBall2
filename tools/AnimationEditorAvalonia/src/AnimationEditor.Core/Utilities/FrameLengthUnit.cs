@@ -47,8 +47,8 @@ public readonly record struct FrameLengthUnit(TimeMeasurementUnit Unit)
     /// <summary>Length of a newly created frame: 0.1 s (0.1 or 100 depending on the unit).</summary>
     public float DefaultFrameLength => FromSeconds(DefaultSeconds);
 
-    /// <summary>How long a frame plays, in seconds. A length that is not positive plays as the default.</summary>
-    public double PlaybackSeconds(float length) => length > 0 ? ToSeconds(AnimationFrameSave.AsWritten(length)) : DefaultSeconds;
+    /// <summary>How long a frame plays, in seconds. 0 for a length that is not positive: the frame is skipped, as in the game.</summary>
+    public double PlaybackSeconds(float length) => AnimationFrameSave.PlayedSeconds(length, Unit);
 
     /// <summary>Label suffix: <c>s</c> or <c>ms</c>.</summary>
     public string Suffix => IsMilliseconds ? "ms" : "s";

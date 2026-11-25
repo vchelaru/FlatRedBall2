@@ -9,7 +9,7 @@ namespace AnimationEditor.Core.ViewModels;
 public static class TimelineBuilder
 {
     /// <summary>
-    /// Minimum cell width in pixels, applied only to zero-length and negative-length frames.
+    /// Minimum cell width in pixels, applied only to frames of no length.
     /// </summary>
     public const double MinCellWidth = 24.0;
 
@@ -33,8 +33,8 @@ public static class TimelineBuilder
         double minDuration = double.MaxValue;
         foreach (var frame in chain.Frames)
         {
-            if (frame.FrameLength > 0)
-                minDuration = Math.Min(minDuration, unit.ToSeconds(frame.FrameLength));
+            if (unit.PlaybackSeconds(frame.FrameLength) is > 0 and var seconds)
+                minDuration = Math.Min(minDuration, seconds);
         }
 
         if (minDuration == double.MaxValue)
@@ -61,8 +61,8 @@ public static class TimelineBuilder
 
             foreach (var frame in chain.Frames)
             {
-                if (frame.FrameLength > 0)
-                    minDuration = Math.Min(minDuration, unit.ToSeconds(frame.FrameLength));
+                if (unit.PlaybackSeconds(frame.FrameLength) is > 0 and var seconds)
+                    minDuration = Math.Min(minDuration, seconds);
             }
         }
 
@@ -73,46 +73,21 @@ public static class TimelineBuilder
     }
 
     /// <summary>
-    /// Total play duration of <paramref name="chain"/> in seconds — the sum of every frame's
-    /// <see cref="AnimationFrameSave.FrameLength"/>, which is in the file's unit (matching
-    /// the editor's per-frame display), converted to seconds.
-    /// Returns 0 for a null or empty chain.
+    /// Total play duration of <paramref name="chain"/> in seconds: the sum of what every frame plays
+    /// (<see cref="FrameLengthUnit.PlaybackSeconds"/>). Returns 0 for a null or empty chain.
     /// </summary>
     public static float TotalSeconds(AnimationChainSave? chain, FrameLengthUnit unit) =>
-        (float)unit.ToSeconds(TotalLength(chain));
+        (float)(chain?.Frames.Sum(frame => unit.PlaybackSeconds(frame.FrameLength)) ?? 0);
 
-    /// <summary>Sum of every frame length in the chain, in the file's own unit.</summary>
-    private static float TotalLength(AnimationChainSave? chain)
-    {
-        if (chain is null)
-            return 0f;
-
-        float total = 0f;
-        foreach (var frame in chain.Frames)
-            total += frame.FrameLength;
-        return total;
-    }
-
-    /// <summary>Sum of <see cref="TotalLength(AnimationChainSave?)"/> across every chain in the list.</summary>
+    /// <summary>Sum of <see cref="TotalSeconds(AnimationChainSave?, FrameLengthUnit)"/> across every chain in the list.</summary>
     public static float TotalSeconds(AnimationChainListSave? acls) =>
-        (float)FrameLengthUnit.Of(acls).ToSeconds(TotalLength(acls));
-
-    private static float TotalLength(AnimationChainListSave? acls)
-    {
-        if (acls is null)
-            return 0f;
-
-        float total = 0f;
-        foreach (var chain in acls.AnimationChains)
-            total += TotalLength(chain);
-        return total;
-    }
+        acls?.AnimationChains.Sum(chain => TotalSeconds(chain, FrameLengthUnit.Of(acls))) ?? 0f;
 
     /// <summary>Total play time of a chain in the file's own unit, formatted for display: <c>"1.50s"</c> or <c>"1500ms"</c>.</summary>
-    public static string FormatTotal(AnimationChainSave? chain, FrameLengthUnit unit) => unit.Format(TotalLength(chain));
+    public static string FormatTotal(AnimationChainSave? chain, FrameLengthUnit unit) => unit.Format(unit.FromSeconds(TotalSeconds(chain, unit)));
 
     /// <summary>Total play time of every chain in the file, in its own unit, formatted for display.</summary>
-    public static string FormatTotal(AnimationChainListSave? acls) => FrameLengthUnit.Of(acls).Format(TotalLength(acls));
+    public static string FormatTotal(AnimationChainListSave? acls) => FrameLengthUnit.Of(acls).Format(FrameLengthUnit.Of(acls).FromSeconds(TotalSeconds(acls)));
 
     /// <summary>Formats a duration in seconds for display, e.g. <c>1.5</c> → <c>"1.50s"</c>.</summary>
     public static string FormatSeconds(float seconds) => $"{seconds:0.00}s";
@@ -134,7 +109,7 @@ public static class TimelineBuilder
         var result = new List<TimelineFrameVm>(chain.Frames.Count);
         for (int i = 0; i < chain.Frames.Count; i++)
         {
-            var length = Math.Max(0.0, unit.ToSeconds(chain.Frames[i].FrameLength));
+            var length = unit.PlaybackSeconds(chain.Frames[i].FrameLength);
             var width = length > 0 ? length * pixelsPerSecond : MinCellWidth;
             result.Add(new TimelineFrameVm(i, width) { EventNames = chain.Frames[i].Events.Select(e => e.Name).ToArray() });
         }

@@ -74,12 +74,12 @@ public static class TimelineReferences
     /// <summary>
     /// Every reference track of <paramref name="sequence"/> as a clip. <paramref name="file"/> is the file's sequences, which the
     /// references resolve against; <paramref name="cycleLength"/> returns a chain reference's cycle in seconds, or null when
-    /// its chain is missing.
+    /// its chain is missing or has no frames.
     /// </summary>
     public static IReadOnlyList<TimelineReference> For(SequenceSave sequence, IReadOnlyList<SequenceSave> file,
         Func<SequenceChainReferenceSave, double?> cycleLength)
     {
-        double LengthOf(SequenceSave s) => SequenceTimeline.Length(file, s, reference => cycleLength(reference) ?? 0);
+        double LengthOf(SequenceSave s) => SequenceTimeline.Length(file, s, cycleLength);
         var result = new List<TimelineReference>();
         for (int t = 0; t < sequence.Tracks.Count; t++)
         {

@@ -278,8 +278,8 @@ public class FilmstripLayoutTests
 
         frames[0].Duration.ShouldBe(0.2, 1e-6);
         (frames[0].SpriteWidth, frames[0].SpriteHeight).ShouldBe((32.0, 16.0));
-        // An unset length plays for 0.1 s; a diagonal flip swaps the footprint.
-        frames[1].Duration.ShouldBe(0.1, 1e-6);
+        // A frame of no length is skipped; a diagonal flip swaps the footprint.
+        frames[1].Duration.ShouldBe(0);
         (frames[1].SpriteWidth, frames[1].SpriteHeight).ShouldBe((32.0, 16.0));
     }
 

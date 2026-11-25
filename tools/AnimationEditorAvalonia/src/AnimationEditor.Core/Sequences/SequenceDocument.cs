@@ -79,7 +79,7 @@ public sealed class SequenceDocument : ISequenceChainLookup
     /// <summary>Seconds until sequence <paramref name="index"/> ends (<see cref="SequenceTimeline.Length"/>); 0 for an index outside the file.</summary>
     public double SequenceLength(int index) =>
         index >= 0 && index < Save.Sequences.Count
-            ? SequenceTimeline.Length(Save.Sequences, Save.Sequences[index], reference => CycleLength(reference) ?? 0)
+            ? SequenceTimeline.Length(Save.Sequences, Save.Sequences[index], CycleLength)
             : 0;
 
     /// <summary>The grey text after sequence <paramref name="index"/>'s name in the list: its track count and length (<see cref="SequenceListSummary"/>).</summary>
@@ -877,10 +877,9 @@ public sealed class SequenceDocument : ISequenceChainLookup
 
     /// <summary>
     /// Seconds of one playback cycle of <paramref name="reference"/>'s chain (twice its length for ping-pong), or null
-    /// when the chain is missing.
+    /// when the chain is missing or has no frames.
     /// </summary>
-    public double? CycleLength(SequenceChainReferenceSave reference) =>
-        FindChain(reference) is { } chain ? ChainClock.TotalLength(chain, UnitOf(reference)) : null;
+    public double? CycleLength(SequenceChainReferenceSave reference) => ChainClock.CycleLength(FindChain(reference), UnitOf(reference));
 
     /// <summary>
     /// The block's length in seconds as shown and edited: <see cref="SequenceChainReferenceSave.Length"/> when set, else
