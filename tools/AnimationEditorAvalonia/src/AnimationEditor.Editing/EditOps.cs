@@ -848,10 +848,9 @@ public static class EditOps
         try
         {
             // Copied now, since this op and later ones read the copy's size; a failed batch undoes it.
-            var plan = TextureCopyDecider.PlanCopyForProject(session.ProjectManager, absolute);
-            if (plan is null) return new TextureResolveResult(absolute, new EditResult([], [], []));
-            if (choice is not TextureCopyChoice.KeepInPlace) session.Rollback.Remember(plan.DestinationPath);
-            return FrameTextureEdit.ApplyChoice(plan, choice);
+            if (FrameTextureEdit.Resolved(session.ProjectManager, absolute, out var plan) is { } done) return done;
+            if (choice is not TextureCopyChoice.KeepInPlace) session.Rollback.Remember(plan!.DestinationPath);
+            return FrameTextureEdit.ApplyChoice(plan!, choice);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

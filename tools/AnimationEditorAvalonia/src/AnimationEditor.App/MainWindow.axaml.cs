@@ -1599,10 +1599,11 @@ public partial class MainWindow : Window
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
         // "Add Frame" (menu/button, no explicit texture) falls back to whatever the canvas is
-        // currently showing when the document has nothing else to offer.
+        // currently showing when the document has nothing else to offer. A missing texture shows
+        // nothing and has no size, so a frame given it would be one pixel once its file appears.
         _appCommands.CanvasDefaultTexturePath = () =>
         {
-            var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;
+            var texPath = WireframeCtrl.BitmapSize == (0, 0) ? null : WireframeCtrl.LoadedTexturePathCasePreserved;
             return string.IsNullOrEmpty(texPath) ? null : RelativizeTexturePath(texPath);
         };
         _appCommands.DecodedTextureSize = SkiaFileDecoder.ReadSize;
@@ -5185,9 +5186,9 @@ public partial class MainWindow : Window
         // the old ones, so they are rebuilt when their tab is next shown.
         MarkHiddenTreesStale();
 
-        // Force-reload the wireframe texture if it matches the changed PNG
-        if (string.Equals(WireframeCtrl.LoadedTexturePath,
-            new FilePath(absolutePath).Standardized,
+        // Force-reload the wireframe texture if it matches the changed PNG, also when the last load of it failed
+        if (string.Equals(WireframeCtrl.RequestedTexturePath,
+            new FilePath(absolutePath).StandardizedCaseSensitive,
             StringComparison.OrdinalIgnoreCase))
         {
             WireframeCtrl.ForceReloadTexture();
@@ -6142,20 +6143,34 @@ public partial class MainWindow : Window
     /// <summary>
     /// The one "bring a user's texture into the project" step shared by Browse… and every PNG drop.
     /// Asks the copy prompt through <see cref="FrameTextureEdit.ResolveForProjectAsync"/> and returns the
-    /// absolute path to reference, or null when cancelled or the copy failed; a failed copy shows a toast whose
-    /// Retry re-runs the same choice and hands the result to <paramref name="applyAfterRetry"/>.
+    /// absolute path to reference, or null when cancelled or the copy failed; a failed copy shows a banner whose
+    /// Retry re-runs the same choice (or asks, when it failed before asking) and hands the result to
+    /// <paramref name="applyAfterRetry"/>.
     /// </summary>
     private async Task<string?> ResolveTextureForProjectAsync(string texturePath, Action<string> applyAfterRetry)
     {
-        var choice = TextureCopyChoice.Cancel;
+        TextureCopyChoice? choice = null;
         var resolved = await FrameTextureEdit.ResolveForProjectAsync(_projectManager, texturePath,
-            async plan => choice = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan));
+            async plan =>
+            {
+                var answer = await EditorDialogs.ChooseTextureCopyAsync(_dialogHost, plan);
+                choice = answer;
+                return answer;
+            });
         if (resolved.AbsolutePath is not null) return resolved.AbsolutePath;
         if (resolved.Result.HasError(EditErrorCode.Cancelled)) return null;
 
         ShowProblem(resolved.Result.Errors[0], retry: () =>
         {
-            var retried = FrameTextureEdit.ResolveForProject(_projectManager, texturePath, choice);
+            if (choice is not { } chosen)
+            {
+                _ = RunGuardedAsync(async () =>
+                {
+                    if (await ResolveTextureForProjectAsync(texturePath, applyAfterRetry) is { } asked) applyAfterRetry(asked);
+                }, "Add texture");
+                return;
+            }
+            var retried = FrameTextureEdit.ResolveForProject(_projectManager, texturePath, chosen);
             if (retried.AbsolutePath is { } path) applyAfterRetry(path);
             else ShowProblem($"Retry failed: {retried.Result.Errors[0]}");
         });

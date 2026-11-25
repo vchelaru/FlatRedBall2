@@ -258,6 +258,8 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     // (e.g. MainWindow.OnFrameCreatedFromRegion) never write a lowercased texture name (#941).
     private string? _loadedTexturePathCasePreserved;
 
+    private string? _requestedTexturePath;
+
     // Bumped by every load/swap so an in-flight LoadTextureAsync decode that finishes after a newer
     // load can detect it was superseded and discard its result instead of painting stale pixels.
     private int _textureLoadId;
@@ -305,6 +307,9 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     private TextureCameraMemory _cameraMemory = new();
     private bool _memoryRebound;
 
+    // The texture (lowercased) the live camera was set for: the last one that was actually shown.
+    private string? _cameraTexturePath;
+
     /// <summary>
     /// Where this viewport remembers its camera per texture. The host binds it to the active tab's memory, so the
     /// camera for a document is decided in one place. Binding a different memory makes the next texture load
@@ -332,6 +337,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     private void ApplyRememberedCamera(string norm)
     {
         _memoryRebound = false;
+        _cameraTexturePath = norm;
         if (_cameraMemory.Take(norm, out bool fromSeed) is not { } cam)
         {
             CenterTexture();
@@ -362,6 +368,13 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
 
     /// <summary>Absolute path of the currently displayed texture in its real on-disk case, or null.</summary>
     public string? LoadedTexturePathCasePreserved => _loadedTexturePathCasePreserved;
+
+    /// <summary>
+    /// Absolute path (real case) of the texture the view was last asked to show, or null. Unlike
+    /// <see cref="LoadedTexturePath"/> it stays when that file could not be decoded, so a later change to it is
+    /// recognised as a change to this view's texture.
+    /// </summary>
+    public string? RequestedTexturePath => _requestedTexturePath;
 
     /// <summary>Pixel dimensions of the loaded bitmap (0×0 when nothing is loaded).</summary>
     public (int Width, int Height) BitmapSize =>
@@ -601,6 +614,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         // form is what actually goes to the filesystem (Linux is case-sensitive).
         string? norm = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).Standardized;
         string? casePreserved = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).StandardizedCaseSensitive;
+        _requestedTexturePath = casePreserved;
 
         // Any load supersedes an in-flight async decode (LoadTextureAsync) so it can't paint late.
         _textureLoadId++;
@@ -641,6 +655,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     {
         string? norm = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).Standardized;
         string? casePreserved = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).StandardizedCaseSensitive;
+        _requestedTexturePath = casePreserved;
 
         int loadId = ++_textureLoadId;
 
@@ -753,15 +768,15 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
     protected virtual void OnTextureLoaded(SKBitmap? bitmap) { }
 
     /// <summary>
-    /// Force-reload the currently displayed texture from disk, bypassing the identity check.
-    /// Use for PNG hot-reload when the file content changed but the path did not.
+    /// Force-reload <see cref="RequestedTexturePath"/> from disk, bypassing the identity check, whether or not the
+    /// last load of it worked. Use for PNG hot-reload when the file content changed but the path did not.
     /// Must be called on the UI thread.
     /// </summary>
     public void ForceReloadTexture()
     {
         // Reload by the case-preserved path: the lowercased identity only resolves on a
         // case-insensitive filesystem, and on Linux a hot reload found no file and went blank.
-        var path = _loadedTexturePathCasePreserved ?? _loadedTexturePath;
+        var path = _requestedTexturePath;
         if (path == null) return;
         // LoadTexture only restores a saved camera when the camera memory has an entry for this
         // path, which is populated on cross-texture switches, not on the very first load of a
@@ -769,7 +784,10 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget, IWheelInp
         // would find no entry and fall through to CenterTexture(), resetting pan/zoom (#584).
         var savedCamera = (_panX, _panY, _zoom);
         _loadedTexturePath = null;   // clear identity so LoadTexture doesn't short-circuit
-        LoadTexture(new FilePath(path).StandardizedCaseSensitive);
+        bool hasCamera = _cameraTexturePath == new FilePath(path).Standardized;
+        LoadTexture(path);
+        // A texture that was missing or unreadable until now has no camera to keep; the load just gave it its first.
+        if (!hasCamera) return;
         (_panX, _panY, _zoom) = savedCamera;
         ClampCamera();
         RaiseViewChanged();

@@ -70,11 +70,15 @@ internal static class TextureCoordinateConverter
         }
     }
 
-    /// <summary>Throws when a frame's region is set but its texture's size can't be read.</summary>
+    /// <summary>
+    /// Throws when a frame's region is set but its texture's size can't be read. 0,0,1,1 is "not set" only in pixels
+    /// (<see cref="FrameRegion.Unset"/>); in UV it is the whole texture, a region like any other.
+    /// </summary>
     internal static void ThrowIfUnsized(AnimationChainListSave list, Func<string, (int Width, int Height)?> textureSize, string action)
     {
         var unsized = Frames(list)
-            .Where(frame => !string.IsNullOrEmpty(frame.TextureName) && FrameRegion.Of(frame) != FrameRegion.Unset
+            .Where(frame => !string.IsNullOrEmpty(frame.TextureName)
+                && (list.CoordinateType == TextureCoordinateType.UV || FrameRegion.Of(frame) != FrameRegion.Unset)
                 && textureSize(frame.TextureName) is null)
             .Select(frame => frame.TextureName).Distinct().ToList();
         if (unsized.Count > 0)

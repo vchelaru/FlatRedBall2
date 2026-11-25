@@ -148,7 +148,7 @@ public class ProjectManagerSaveTests : IDisposable
         var frame = new AnimationFrameSave { TextureName = "hero.png", ShapesSave = null };
         var chain = new AnimationChainSave { Name = "Idle" };
         chain.Frames.Add(frame);
-        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
         preParsed.AnimationChains.Add(chain);
         string path = AchxPath("noshapes.achx");
 

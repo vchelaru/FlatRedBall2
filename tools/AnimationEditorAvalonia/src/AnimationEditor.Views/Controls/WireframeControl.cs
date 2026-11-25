@@ -921,7 +921,15 @@ public class WireframeControl : TextureViewport
         // still blank so the canvas doesn't imply a texture the frame doesn't have (#616) -- so
         // this substitution only applies when no frame is selected at all.
         if (path is null && _selectedState?.SelectedFrame is null)
+        {
+            // It could not be decoded; it is read again when its file changes, not on every refresh.
+            if (LoadedTexturePath is null)
+            {
+                RefreshFrames();
+                return;
+            }
             path = LoadedTexturePathCasePreserved;
+        }
 
         LoadTexture(path);
     }

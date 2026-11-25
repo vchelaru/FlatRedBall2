@@ -18,7 +18,7 @@ public class ProjectManagerAchjFormatTests
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/test.achj";
         System.IO.File.WriteAllText(path,
-            "{\"animationChains\":[{\"name\":\"Walk\",\"frames\":[{\"textureName\":\"walk.png\",\"frameLength\":0.1}]}]}");
+            "{\"coordinateType\":\"Pixel\",\"animationChains\":[{\"name\":\"Walk\",\"frames\":[{\"textureName\":\"walk.png\",\"frameLength\":0.1}]}]}");
 
         pm.LoadAnimationChain(new FilePath(path));
 
