@@ -177,6 +177,21 @@ public partial class MainWindow : Window
     private ScrollViewer? GetAnimTreeScrollViewer() =>
         AnimTree.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
 
+    /// <summary>
+    /// Scrolls the selected row's header into the tree's viewport (#2198). The header, not the whole
+    /// row: an expanded row's bounds span its children, which can be taller than the viewport.
+    /// </summary>
+    private void RevealSelectedTreeRow()
+    {
+        object? selected = _selectedState.SelectedShape
+                        ?? _selectedState.SelectedFrame
+                        ?? (object?)_selectedState.SelectedChain;
+        if (selected is null || TreeBuilder.FindNodeForData(_treeRoots, selected) is not { } node) return;
+        AnimTree.GetVisualDescendants().OfType<TextBlock>()
+            .FirstOrDefault(label => label.Name == "RowHeaderLabel" && ReferenceEquals(label.DataContext, node))
+            ?.BringIntoView();
+    }
+
     private void WithPreservedAnimTreeScroll(Action action)
     {
         var scroll = GetAnimTreeScrollViewer();
@@ -1317,6 +1332,8 @@ public partial class MainWindow : Window
         _appCommands.RebuildTreeViewRequested           += _ => RestoreGuides(_tabManager.ActiveTab);
         _appCommands.RefreshChainNodeRequested          += c  => Dispatcher.UIThread.InvokeAsync(() => RefreshChainNode(c));
         _appCommands.RefreshFrameNodeRequested          += f  => Dispatcher.UIThread.InvokeAsync(() => RefreshFrameNode(f));
+        // Background runs after the dispatched tree refresh and its layout pass, so the moved row is at its new place.
+        _events.TreeReordered += () => Dispatcher.UIThread.Post(RevealSelectedTreeRow, DispatcherPriority.Background);
         _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
         // RefreshWireframeRequested is handled by WireframeControl directly
 
