@@ -2417,11 +2417,14 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// Rebuilds the ContextMenu with a single "Reveal &lt;filename&gt; in File Manager" item for the
-    /// currently loaded texture, or cancels the menu entirely when there's nothing to reveal.
+    /// Rebuilds the ContextMenu for the loaded texture (<see cref="TextureContextMenu"/>), or cancels
+    /// the menu entirely when there is no texture.
     /// </summary>
     private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e) =>
-        RevealInExplorerMenu.Populate(ContextMenu, DetermineTexturePath(), _showError, e);
+        TextureContextMenu.Populate(ContextMenu, DetermineTexturePath(), _showError, OpenTextureInNewTabRequested, e);
+
+    /// <summary>Raised with the texture's absolute path when the user picks "Open &lt;file&gt; in New Tab" on the canvas menu.</summary>
+    public event Action<string>? OpenTextureInNewTabRequested;
 
     internal string? DetermineTexturePath()
     {

@@ -2223,8 +2223,8 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     }
 
     /// <summary>
-    /// Rebuilds the ContextMenu with a single "Reveal &lt;filename&gt; in File Manager" item for the
-    /// currently previewed texture, or cancels the menu entirely when there's nothing to reveal.
+    /// Rebuilds the ContextMenu: a vertex menu over a polygon vertex, else the texture menu
+    /// (<see cref="TextureContextMenu"/>), or cancels it when there is no texture.
     /// </summary>
     private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e) =>
         PopulateContextMenu(_contextMenuPos, e);
@@ -2236,8 +2236,11 @@ public partial class PreviewControl : Control, IZoomTarget, IPanScrollTarget, IW
     private void PopulateContextMenu(Point pos, System.ComponentModel.CancelEventArgs e)
     {
         if (TryPopulateVertexMenu(pos)) return;
-        RevealInExplorerMenu.Populate(ContextMenu, ResolveSelectedTexturePath(), _showError, e);
+        TextureContextMenu.Populate(ContextMenu, ResolveSelectedTexturePath(), _showError, OpenTextureInNewTabRequested, e);
     }
+
+    /// <summary>Raised with the texture's absolute path when the user picks "Open &lt;file&gt; in New Tab" on the canvas menu.</summary>
+    public event Action<string>? OpenTextureInNewTabRequested;
 
     /// <summary>Right-click on a vertex of the selected polygon: a single "Delete Vertex" item (disabled at three vertices).</summary>
     private bool TryPopulateVertexMenu(Point pos)

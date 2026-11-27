@@ -342,6 +342,8 @@ public partial class MainWindow : Window
         WireframeCtrl.CommandModifier = _commandModifier;
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowProblem(msg));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowProblem(msg));
+        WireframeCtrl.OpenTextureInNewTabRequested += OpenPngAsTab;
+        PreviewCtrl.OpenTextureInNewTabRequested += OpenPngAsTab;
         // The sequence preview gets a selection of its own that nothing ever selects in, so its shape and sprite
         // gestures have nothing of the achx document to edit. Its own playback timer has nothing to play.
         SequencePreview.InitializeServices(new SelectedState(_projectManager), _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowProblem(msg));

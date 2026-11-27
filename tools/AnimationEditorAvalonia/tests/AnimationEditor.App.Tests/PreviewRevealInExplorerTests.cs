@@ -230,7 +230,7 @@ public class PreviewRevealInExplorerTests
             window.MouseUp(point, MouseButton.Right);
             Dispatcher.UIThread.RunJobs();
 
-            var item = preview.ContextMenu!.Items.OfType<MenuItem>().Single();
+            var item = preview.ContextMenu!.Items.OfType<MenuItem>().First();
             Assert.Equal("Reveal hero.png in File Manager", item.Header);
         }
         finally { window.Close(); }
