@@ -20,6 +20,10 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action? FitFrameToViewRequested;
         public event Action<System.Collections.Generic.IReadOnlyList<FrameFlipChange>>? FramesFlipped;
 
+        public event Action? TreeReordered;
+
+        public void RaiseTreeReordered() => TreeReordered?.Invoke();
+
         public void RaiseFramesFlipped(System.Collections.Generic.IReadOnlyList<FrameFlipChange> changes) =>
             FramesFlipped?.Invoke(changes);
 

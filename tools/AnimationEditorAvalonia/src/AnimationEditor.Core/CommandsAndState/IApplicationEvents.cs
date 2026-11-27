@@ -41,6 +41,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         event Action<System.Collections.Generic.IReadOnlyList<FrameFlipChange>> FramesFlipped;
 
+        /// <summary>
+        /// Fired after the order of chains, frames or shapes changes (a reorder, its undo, or its redo),
+        /// before <see cref="AnimationChainsChanged"/>. The ANIMATIONS tree scrolls the selected row into
+        /// view on it, so a row moved past either edge of the viewport stays visible.
+        /// </summary>
+        event Action TreeReordered;
+
+        void RaiseTreeReordered();
         void RaiseFramesFlipped(System.Collections.Generic.IReadOnlyList<FrameFlipChange> changes);
         void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle);
         void RaiseAfterCircleChanged(CircleSave circle);

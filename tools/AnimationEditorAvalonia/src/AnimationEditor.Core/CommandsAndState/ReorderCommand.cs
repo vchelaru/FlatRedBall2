@@ -84,6 +84,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private void RaiseSideEffects()
         {
             _refresh();
+            _events.RaiseTreeReordered();
             _events.RaiseAnimationChainsChanged();
         }
     }
