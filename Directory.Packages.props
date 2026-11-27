@@ -40,7 +40,7 @@
 
   <ItemGroup>
     <PackageVersion Include="AsepriteDotNet" Version="1.9.1" />
-    <PackageVersion Include="FlatRedBall.InterpolationCore" Version="2025.4.22.1" />
+    <PackageVersion Include="FlatRedBall.InterpolationCore" Version="2026.11.27.1138" />
     <PackageVersion Include="NVorbis" Version="0.10.5" />
     <PackageVersion Include="Apos.Shapes" Version="$(AposShapesVersion)" />
     <PackageVersion Include="Apos.Shapes.KNI" Version="$(AposShapesVersion)" />
