@@ -15,7 +15,7 @@ All six clusters in section A have been extracted on this branch. What each one 
 | A3 | `Views/Controls/DiagnosticsOverlayHost.cs`, `DrawTimeOverlay.TimeAndDraw` | Settled the GPU/CPU-label inconsistency between the two panels. |
 | A4 | `Views/Controls/IPanScrollTarget.cs`, `PanScrollBinder.cs` | Collapsed three `MainWindow` copies and all three suppression flags. `PreviewControl.SetPanX/Y` now take a raw scrollbar value like `TextureViewport`'s, so the two conventions became one. |
 | A5 | `Views/Controls/EditorNotificationOverlay` (already existed) | `MainWindow` hosts it as `Notifications`; the desktop toast/banner code-behind and its XAML are gone. |
-| A6 | `Views/Services/RevealInExplorerMenu.cs` | |
+| A6 | `Views/Services/TextureContextMenu.cs` | |
 
 Section C (non-wins) was left alone as recommended.
 
