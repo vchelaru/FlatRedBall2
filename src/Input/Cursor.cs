@@ -10,7 +10,8 @@ namespace FlatRedBall2.Input;
 
 /// <summary>
 /// Default <see cref="ICursor"/> implementation. Reports either the system mouse or the first
-/// active touch, with touch taking precedence when present. Created and updated by
+/// touch. A touch's position takes precedence while it is held and after it lifts, until the
+/// mouse moves. Created and updated by
 /// <see cref="InputManager"/> — game code should access the cursor via <c>Engine.Input.Cursor</c>
 /// rather than constructing this directly.
 /// </summary>
@@ -36,6 +37,7 @@ public class Cursor : ICursor
     private bool _touchActive;
     private bool _touchActivePrev;
     private Vector2 _touchScreenPos;
+    private bool _touchOwnsPosition;
     private bool _touchAvailable = true;
 
     // Synthetic state from automation injection. Once _injectedOnly is set (at automation startup,
@@ -107,7 +109,11 @@ public class Cursor : ICursor
         Update(_injectedOnly ? default : Mouse.GetState(), realTimeSinceStart);
 
     // Test seam: hardwareState stands in for Mouse.GetState(), and is ignored once input is injected-only.
-    internal void Update(MouseState hardwareState, TimeSpan realTimeSinceStart)
+    internal void Update(MouseState hardwareState, TimeSpan realTimeSinceStart) =>
+        Update(hardwareState, ReadTouchPanel(), realTimeSinceStart);
+
+    // Test seam: touches stands in for TouchPanel.GetState(). Both are ignored once input is injected-only.
+    internal void Update(MouseState hardwareState, TouchCollection touches, TimeSpan realTimeSinceStart)
     {
         _previousMouse = _currentMouse;
         _currentMouse = _injectedOnly
@@ -126,10 +132,25 @@ public class Cursor : ICursor
         _touchActivePrev = _touchActive;
         _touchActive = false;
 
-        // Skip touch polling while injected-only — automation drives the cursor exclusively
-        // through the synthetic mouse state, and TouchPanel.GetState() requires a real window.
-        if (_touchAvailable && !_injectedOnly)
-            UpdateTouch();
+        // Automation drives the cursor exclusively through the synthetic mouse state.
+        if (!_injectedOnly && touches.Count > 0)
+        {
+            var first = touches[0];
+            if (first.State != TouchLocationState.Released)
+            {
+                _touchActive = true;
+                _touchScreenPos = new Vector2(first.Position.X, first.Position.Y);
+            }
+        }
+
+        // The last touch keeps the position until the mouse moves on a frame with no touch, so the
+        // release frame (and every frame after it) still reports where the finger lifted. Mouse
+        // movement while a finger is down (browsers may synthesize mouse events from touches)
+        // does not count.
+        if (_touchActive)
+            _touchOwnsPosition = true;
+        else if (_currentMouse.X != _previousMouse.X || _currentMouse.Y != _previousMouse.Y)
+            _touchOwnsPosition = false;
 
         UpdateActiveCamera();
         UpdateClickSuppression();
@@ -238,31 +259,29 @@ public class Cursor : ICursor
         }
     }
 
-    private void UpdateTouch()
+    // TouchPanel.GetState() requires a real window, so it is not polled while injected-only.
+    private TouchCollection ReadTouchPanel()
     {
+        if (!_touchAvailable || _injectedOnly) return default;
         try
         {
-            var touches = TouchPanel.GetState();
-            if (touches.Count > 0)
-            {
-                var first = touches[0];
-                if (first.State != TouchLocationState.Released)
-                {
-                    _touchActive = true;
-                    _touchScreenPos = new Vector2(first.Position.X, first.Position.Y);
-                }
-            }
+            return TouchPanel.GetState();
         }
         catch (NullReferenceException)
         {
             // TouchPanel requires an initialized GameWindow; permanently disable in this environment.
             _touchAvailable = false;
+            return default;
         }
     }
 
     /// <inheritdoc/>
-    /// <remarks>Returns the active touch position when a touch is in progress; otherwise the mouse position.</remarks>
-    public Vector2 ScreenPosition => _touchActive
+    /// <remarks>
+    /// Returns the touch position while a touch is in progress, and keeps returning where the
+    /// last touch lifted (including on the release frame) until the mouse moves; otherwise the
+    /// mouse position.
+    /// </remarks>
+    public Vector2 ScreenPosition => _touchOwnsPosition
         ? _touchScreenPos
         : new Vector2(_currentMouse.X, _currentMouse.Y);
 
